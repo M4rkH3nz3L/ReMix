@@ -21,6 +21,8 @@ let loopStartedAt = 0;
 let loopLen = 0;
 /** 🧪 mérés: az utolsó indítás késése (ms, hívás → start) */
 export let lastStartMs = 0;
+/** 🧪 mérés: az utoljára loopolt minta PCM-je (az élő előhallgatás = a beégetett klip) */
+export let lastLoopPcm: Float32Array[] | null = null;
 
 async function context(): Promise<Ctx | null> {
   if (!api) {
@@ -68,6 +70,7 @@ export async function playPcm(stereo: Float32Array[], loop = false, resume = fal
       const at = resume ? previewPosition() : null;
       offset = at !== null ? at % len : 0;
       stopPreview();
+      lastLoopPcm = stereo;
       loopSrc = src;
       loopLen = len;
       loopStartedAt = c.currentTime - offset;
@@ -103,24 +106,25 @@ export function previewPosition(): number | null {
 
 const noteCache = new Map<string, Float32Array[]>();
 /** egy hang megszólaltatása (fél beat) — a cellára koppintáskor */
-export function auditionNote(midi: number, wave: SynthWave, bpm: number): Promise<boolean> {
-  const key = `${midi}|${wave}|${bpm}`;
+export function auditionNote(midi: number, wave: SynthWave, bpm: number, velocity = 100): Promise<boolean> {
+  const key = `${midi}|${wave}|${bpm}|${velocity}`;
   let pcm = noteCache.get(key);
   if (!pcm) {
-    pcm = renderSynthPcm([{ id: 'a', midi, startBeat: 0, lengthBeats: 0.5 }], wave, bpm);
+    pcm = renderSynthPcm([{ id: 'a', midi, startBeat: 0, lengthBeats: 0.5, velocity }], wave, bpm);
     noteCache.set(key, pcm);
   }
   return playPcm(pcm);
 }
 
-const drumCache = new Map<DrumVoice, Float32Array[]>();
-/** egy dob-hang megszólaltatása */
-export function auditionDrum(voice: DrumVoice): Promise<boolean> {
-  let pcm = drumCache.get(voice);
-  if (!pcm) {
-    const x = drumVoicePcm(voice);
-    pcm = [x, x];
-    drumCache.set(voice, pcm);
+const drumCache = new Map<DrumVoice, Float32Array>();
+/** egy dob-hang megszólaltatása (a velocity a sütött minta szintjén: hiányzó = 0,9) */
+export function auditionDrum(voice: DrumVoice, velocity?: number): Promise<boolean> {
+  let x = drumCache.get(voice);
+  if (!x) {
+    x = drumVoicePcm(voice);
+    drumCache.set(voice, x);
   }
-  return playPcm(pcm);
+  const g = velocity ? Math.min(1, velocity / 127) : 0.9;
+  const y = x.map((v) => v * g);
+  return playPcm([y, y]);
 }

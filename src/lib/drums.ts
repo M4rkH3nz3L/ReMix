@@ -14,8 +14,20 @@ export const STEPS_PER_BAR = 16; // 16-od felbontás
 export type DrumPattern = Record<DrumVoice, boolean[]>;
 export interface DrumHit {
   voice: DrumVoice;
+  /** lépés (16-od); swinggel tört is lehet */
   step: number;
+  /** 1–127 (hiányzó = a normál ütés, 0,9-es szint — a worker és a telefon is) */
+  velocity?: number;
 }
+
+/** ütésenkénti velocity a rács mellett (hiányzó cella = normál ütés) */
+export type DrumVelocity = Partial<Record<DrumVoice, (number | undefined)[]>>;
+
+/** a három szint: normál (alap) → hangsúlyos → halk → normál */
+export const DRUM_ACCENT = 127;
+export const DRUM_SOFT = 64;
+/** a swing felső határa (a lépés 60 %-a) */
+export const SWING_MAX = 0.6;
 
 const round = (n: number): number => Math.round(n * 1000) / 1000;
 
@@ -50,17 +62,42 @@ export function toggleStep(pattern: DrumPattern, voice: DrumVoice, step: number)
   return { ...pattern, [voice]: next };
 }
 
-/** A minta aktív ütései (voice + step) — a worker bemenete. */
-export function patternHits(pattern: DrumPattern): DrumHit[] {
+/**
+ * A minta aktív ütései (voice + step [+ velocity]) — a worker és a telefonos render bemenete.
+ * `swing` (0–0,6): a páros 16-odok (a 2., 4., … lépés, 0-alapon a páratlan indexek) késése a
+ * lépés-hossz arányában — a tört lépést a telefon mintára, a worker ms-ra pontosan helyezi.
+ */
+export function patternHits(pattern: DrumPattern, velocity: DrumVelocity = {}, swing = 0): DrumHit[] {
+  const sw = Math.max(0, Math.min(SWING_MAX, Number.isFinite(swing) ? swing : 0));
   const hits: DrumHit[] = [];
   for (const v of DRUM_VOICES) {
     (pattern[v] ?? []).forEach((on, step) => {
       if (on) {
-        hits.push({ voice: v, step });
+        const vel = velocity[v]?.[step];
+        const at = step % 2 === 1 && sw > 0 ? step + sw : step;
+        hits.push(vel ? { voice: v, step: at, velocity: vel } : { voice: v, step: at });
       }
     });
   }
   return hits;
+}
+
+/** egy ütés velocity-jének léptetése: normál → hangsúlyos → halk → normál (immutábilis) */
+export function cycleVelocity(velocity: DrumVelocity, voice: DrumVoice, step: number): DrumVelocity {
+  const row = (velocity[voice] ?? []).slice();
+  const cur = row[step];
+  row[step] = cur === undefined ? DRUM_ACCENT : cur === DRUM_ACCENT ? DRUM_SOFT : undefined;
+  return { ...velocity, [voice]: row };
+}
+
+/** a rács-hossz változásakor a velocity-sorok vágása */
+export function resizeVelocity(velocity: DrumVelocity, bars: number): DrumVelocity {
+  const n = stepCount(bars);
+  const out: DrumVelocity = {};
+  for (const v of DRUM_VOICES) {
+    if (velocity[v]) out[v] = velocity[v]!.slice(0, n);
+  }
+  return out;
 }
 
 /** Egy ütés időpontja mp-ben. */

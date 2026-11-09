@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -9,13 +9,16 @@ import { auditionNote } from '@/lib/instrumentPreview';
 import { padTo, renderSynthPcm } from '@/lib/instrumentRender';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { palette } from '@/constants/editor';
+import { registerDevAction } from '@/lib/devActions';
 import { makeId } from '@/lib/id';
 import {
+  cycleNoteVelocity,
   DEFAULT_HIGH_MIDI,
   DEFAULT_LOW_MIDI,
   isBlackKey,
   noteAt,
   noteLabel,
+  NOTE_VELOCITIES,
   pitchRows,
   synthDurationSec,
   toggleNote,
@@ -35,9 +38,12 @@ const WAVE_ICON: Record<SynthWave, keyof typeof Ionicons.glyphMap> = {
   sawtooth: 'trending-up-outline',
 };
 
+const VEL_KEY: Record<number, string> = { 50: 'soft', 100: 'mid', 127: 'hard' };
+
 /**
  * 🎹 PIANO-ROLL (AUDIOT §5): hangjegy-szerkesztő rács (hangmagasság-sorok × ütem-oszlopok).
- * Koppintás = hang hozzáad/törlés; a hullámforma választható. A „Sávra" a worker `/synth`-jén
+ * Koppintás = hang hozzáad/törlés (a választott erősséggel); hosszan nyomva a hang erőssége
+ * (közepes → erős → halk); a hullámforma választható. A „Sávra" a worker `/synth`-jén
  * hanggá rendereli (MIDI→frekvencia), és a Hang Stúdió sima klipként teszi a music-sávra.
  */
 export function PianoRollSheet({
@@ -55,6 +61,27 @@ export function PianoRollSheet({
   const [notes, setNotes] = useState<SynthNote[]>([]);
   const [wave, setWave] = useState<SynthWave>('sine');
   const [bars, setBars] = useState(4);
+  /** az új hangok velocity-je */
+  const [noteVel, setNoteVel] = useState<number>(100);
+  // 🧪 füstteszt (R7): a hangjegyek beállítása + a jelenlegiek
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+  const bakeRef = useRef(() => onBake(notes, wave));
+  bakeRef.current = () => onBake(notes, wave);
+  useEffect(() => {
+    const offs = [
+      registerDevAction('synth.set', (arg) => {
+        const a = arg as { notes: Omit<SynthNote, 'id'>[]; wave?: SynthWave; bars?: number };
+        setNotes(a.notes.map((n) => ({ ...n, id: makeId('note') })));
+        if (a.wave) setWave(a.wave);
+        if (a.bars) setBars(a.bars);
+        return true;
+      }),
+      registerDevAction('synth.bake', () => bakeRef.current()),
+      registerDevAction('synth.notes', () => notesRef.current.map((n) => `${n.midi}@${n.startBeat}v${n.velocity ?? 100}`).join(',')),
+    ];
+    return () => offs.forEach((off) => off());
+  }, []);
 
   const rows = pitchRows(DEFAULT_LOW_MIDI, DEFAULT_HIGH_MIDI);
   const beats = bars * 4;
@@ -63,8 +90,15 @@ export function PianoRollSheet({
 
   const tap = (midi: number, beat: number) => {
     // 🎧 az új hang azonnal megszólal (offline, a telefonon)
-    if (!noteAt(notes, midi, beat)) void auditionNote(midi, wave, bpm);
-    setNotes((prev) => toggleNote(prev, midi, beat, () => makeId('note')));
+    if (!noteAt(notes, midi, beat)) void auditionNote(midi, wave, bpm, noteVel);
+    setNotes((prev) => toggleNote(prev, midi, beat, () => makeId('note'), 1, noteVel));
+  };
+  const longPress = (midi: number, beat: number) => {
+    const n = noteAt(notes, midi, beat);
+    if (!n) return;
+    const next = cycleNoteVelocity(notes, n.id);
+    setNotes(next);
+    void auditionNote(midi, wave, bpm, next.find((x) => x.id === n.id)?.velocity ?? 100);
   };
 
   return (
@@ -96,6 +130,16 @@ export function PianoRollSheet({
         </Pressable>
       </View>
 
+      {/* az új hangok erőssége (a meglévőé: hosszan nyomva) */}
+      <View style={styles.controls}>
+        <Text style={styles.velLabel}>{t('studio.pianoRoll.velocity', { defaultValue: 'Erősség' })}</Text>
+        {NOTE_VELOCITIES.map((v) => (
+          <Pressable key={v} testID={`pianoroll-vel-${v}`} onPress={() => setNoteVel(v)} style={[styles.waveBtn, noteVel === v && styles.waveBtnActive]} accessibilityState={{ selected: noteVel === v }}>
+            <Text style={[styles.waveText, noteVel === v && { color: '#fff' }]}>{t(`studio.pianoRoll.vel.${VEL_KEY[v]}`, { defaultValue: VEL_KEY[v] })}</Text>
+          </Pressable>
+        ))}
+      </View>
+
       {/* ⭐ saját dallamok (hangjegyek + hullámforma + ütemszám) */}
       <UserPresetRow
         kind="synth"
@@ -119,17 +163,24 @@ export function PianoRollSheet({
                     <Text style={styles.gutterText}>{noteLabel(midi)}</Text>
                   </View>
                   {cols.map((beat) => {
-                    const on = !!noteAt(notes, midi, beat);
+                    const note = noteAt(notes, midi, beat);
+                    const on = !!note;
+                    const vel = note?.velocity ?? 100;
                     const barStart = beat % 4 === 0;
                     return (
                       <Pressable
                         key={beat}
                         onPress={() => tap(midi, beat)}
+                        onLongPress={() => longPress(midi, beat)}
+                        accessibilityLabel={`${noteLabel(midi)} ${beat + 1}`}
+                        accessibilityState={{ selected: on }}
                         style={[
                           styles.cell,
                           black && styles.cellBlack,
                           barStart && styles.cellBar,
                           on && styles.cellOn,
+                          on && vel >= 127 && styles.cellHard,
+                          on && vel < 100 && styles.cellSoft,
                         ]}
                       />
                     );
@@ -148,7 +199,7 @@ export function PianoRollSheet({
         <PreviewPlayButton
           testID="pianoroll-play"
           disabled={notes.length === 0}
-          version={`${wave}|${bpm}|${bars}|${notes.map((n) => `${n.midi}@${n.startBeat}`).join(',')}`}
+          version={`${wave}|${bpm}|${bars}|${notes.map((n) => `${n.midi}@${n.startBeat}v${n.velocity ?? 100}`).join(',')}`}
           build={() => (notes.length > 0 ? padTo(renderSynthPcm(notes, wave, bpm), Math.max(bars * 4, Math.ceil(synthDurationSec(notes, bpm) * (bpm / 60))) * (60 / bpm)) : null)}
         />
         <Pressable onPress={() => setNotes([])} style={styles.clearBtn} disabled={notes.length === 0}>
@@ -193,6 +244,9 @@ const styles = StyleSheet.create({
   cellBlack: { backgroundColor: '#080a11' },
   cellBar: { borderLeftWidth: 1, borderLeftColor: palette.border },
   cellOn: { backgroundColor: palette.accent },
+  cellHard: { borderWidth: 2, borderColor: '#fff' },
+  cellSoft: { opacity: 0.45 },
+  velLabel: { color: palette.textDim, fontSize: 11, fontWeight: '700' },
   footer: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
   footerInfo: { flex: 1, color: palette.textDim, fontSize: 12, fontWeight: '600' },
   clearBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: palette.border },

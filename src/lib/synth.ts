@@ -88,6 +88,18 @@ export function toggleNote(
   return [...notes, { id: makeId(), midi, startBeat, lengthBeats, velocity }];
 }
 
+/** a piano roll három velocity-szintje: halk · közepes (alap) · erős */
+export const NOTE_VELOCITIES = [50, 100, 127] as const;
+
+/** egy hang velocity-jének léptetése: közepes → erős → halk → közepes (immutábilis) */
+export function cycleNoteVelocity(notes: SynthNote[], id: string): SynthNote[] {
+  return notes.map((n) => {
+    if (n.id !== id) return n;
+    const cur = n.velocity ?? 100;
+    return { ...n, velocity: cur >= 127 ? 50 : cur >= 100 ? 127 : 100 };
+  });
+}
+
 /** Hang törlése id alapján. */
 export function removeNote(notes: SynthNote[], id: string): SynthNote[] {
   return notes.filter((n) => n.id !== id);

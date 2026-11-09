@@ -3231,7 +3231,11 @@
       "title": "Drumcomputer",
       "entry": "Drumcomputer (Step-Sequencer)",
       "clipLabel": "Drums",
-      "stepHint": "tel-Schritte · fette Linien sind die Beats"
+      "stepHint": "tel-Schritte · fette Linien sind die Beats · lange drücken: Akzent / leise",
+      "swing": "Swing",
+      "swingLess": "Weniger Swing",
+      "swingMore": "Mehr Swing",
+      "velHint": "Lange drücken: normaler, betonter oder leiser Schlag"
     },
     "pianoRoll": {
       "title": "Komponieren",
@@ -3240,6 +3244,8 @@
       "bake": "Auf Spur",
       "bars": "Takte",
       "notes": "Noten",
+      "velocity": "Anschlag",
+      "vel": { "soft": "Leise", "mid": "Mittel", "hard": "Stark" },
       "wave": {
         "sine": "Sinus",
         "square": "Rechteck",

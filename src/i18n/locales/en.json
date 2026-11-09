@@ -3231,7 +3231,11 @@
       "title": "Drum machine",
       "entry": "Drum machine (step sequencer)",
       "clipLabel": "Drums",
-      "stepHint": " steps · bold lines are the beats"
+      "stepHint": " steps · bold lines are the beats · long press: accent / soft",
+      "swing": "Swing",
+      "swingLess": "Less swing",
+      "swingMore": "More swing",
+      "velHint": "Long press: normal, accented or soft hit"
     },
     "pianoRoll": {
       "title": "Compose",
@@ -3240,6 +3244,8 @@
       "bake": "To track",
       "bars": "bars",
       "notes": "notes",
+      "velocity": "Velocity",
+      "vel": { "soft": "Soft", "mid": "Medium", "hard": "Hard" },
       "wave": {
         "sine": "Sine",
         "square": "Square",

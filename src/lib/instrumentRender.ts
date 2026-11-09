@@ -146,7 +146,8 @@ export function renderDrumsPcm(hits: DrumHit[], bars: number, bpm: number, sr = 
   const cache = new Map<DrumVoice, Float32Array>();
   const voice = (v: DrumVoice) => cache.get(v) ?? cache.set(v, drumVoicePcm(v, sr)).get(v)!;
   return placeOnGrid(
-    hits.slice(0, 512).map((h) => ({ step: h.step, pcm: [voice(h.voice)], gain: 0.9 })),
+    // a velocity a worker képletével (hiányzó = 0,9)
+    hits.slice(0, 512).map((h) => ({ step: h.step, pcm: [voice(h.voice)], gain: Number(h.velocity) > 0 ? Math.min(1, Number(h.velocity) / 127) : 0.9 })),
     bars,
     bpm,
     sr

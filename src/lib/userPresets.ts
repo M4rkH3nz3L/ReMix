@@ -1,4 +1,4 @@
-import { DRUM_VOICES, type DrumPattern } from '@/lib/drums';
+import { DRUM_VOICES, SWING_MAX, type DrumPattern, type DrumVelocity } from '@/lib/drums';
 import type { SynthNote, SynthWave } from '@/lib/synth';
 import type { AudioFx, AudioMaster } from '@/types/project';
 
@@ -11,6 +11,10 @@ import type { AudioFx, AudioMaster } from '@/types/project';
 export interface DrumPresetValue {
   bars: number;
   pattern: DrumPattern;
+  /** ütésenkénti szint (hiányzó = normál) */
+  velocity?: DrumVelocity;
+  /** 0–0,6 */
+  swing?: number;
 }
 export interface SynthPresetValue {
   bars: number;
@@ -86,7 +90,7 @@ function cleanMaster(v: unknown): AudioMaster | null {
 
 function cleanDrums(v: unknown): DrumPresetValue | null {
   if (!v || typeof v !== 'object') return null;
-  const x = v as { bars?: unknown; pattern?: Record<string, unknown> };
+  const x = v as { bars?: unknown; pattern?: Record<string, unknown>; velocity?: Record<string, unknown>; swing?: unknown };
   const bars = Math.round(num(x.bars, 1, 4) ?? 0);
   if (!bars || !x.pattern) return null;
   const pattern = {} as DrumPattern;
@@ -94,7 +98,13 @@ function cleanDrums(v: unknown): DrumPresetValue | null {
     const row = Array.isArray(x.pattern[voice]) ? (x.pattern[voice] as unknown[]) : [];
     pattern[voice] = Array.from({ length: bars * 16 }, (_, i) => row[i] === true);
   }
-  return { bars, pattern };
+  const velocity: DrumVelocity = {};
+  for (const voice of DRUM_VOICES) {
+    const row = x.velocity && Array.isArray(x.velocity[voice]) ? (x.velocity[voice] as unknown[]) : null;
+    if (row) velocity[voice] = Array.from({ length: bars * 16 }, (_, i) => (num(row[i], 1, 127) === undefined ? undefined : Math.round(num(row[i], 1, 127)!)));
+  }
+  const swing = num(x.swing, 0, SWING_MAX);
+  return clean({ bars, pattern, velocity: Object.keys(velocity).length ? velocity : undefined, swing: swing || undefined });
 }
 
 function cleanSynth(v: unknown): SynthPresetValue | null {

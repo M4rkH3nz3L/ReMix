@@ -92,7 +92,8 @@ import { wordCutRanges } from '@/lib/speechEdit';
 import { gccPhatLag, SYNC_MIN_CONFIDENCE } from '@/lib/audioSync';
 import { syncClipTo } from '@/lib/audioSyncClient';
 import { exportParts } from '@/components/studio/audio/exportParts';
-import { auditionDrum, auditionNote, lastStartMs, playPcm, previewLooping, previewPosition, stopPreview, warmPreview } from '@/lib/instrumentPreview';
+import { auditionDrum, auditionNote, lastLoopPcm, lastStartMs, playPcm, previewLooping, previewPosition, stopPreview, warmPreview } from '@/lib/instrumentPreview';
+import { DRUM_ACCENT, DRUM_SOFT, emptyPattern } from '@/lib/drums';
 import { renderDrumsPcm, renderSamplerPcm, renderSynthPcm } from '@/lib/instrumentRender';
 import { decodeSample } from '@/lib/instrumentClient';
 import { USER_PRESETS_KEY, useUserPresets } from '@/store/userPresetStore';
@@ -5549,6 +5550,159 @@ async function smokeInstruments(log: Log) {
   router.back();
 }
 
+/**
+ * 🥁🎹 R7: velocity + swing — a dobgép és a piano roll a felületen át (dev-akciók) beállítva,
+ * „Sávra” sütve, a fájlon mérve: a velocity a csúcsszintben, a swing a páros 16-odok késésében
+ * (± 1 ms); az élő előhallgatás („▶”) PCM-je = a beégetett klip.
+ */
+async function smokeVelSwing(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const api = (await loadAudioApi())!;
+  const left = async (uri: string) => (await api.decodeAudioData(uri, SR)).getChannelData(0);
+  const peakOf = (x: Float32Array, a: number, b: number) => {
+    let m = 0;
+    for (let i = Math.max(0, a); i < Math.min(x.length, b); i++) m = Math.max(m, Math.abs(x[i]));
+    return m;
+  };
+  const maxDiff = (a: Float32Array, b: Float32Array) => {
+    let d = 0;
+    for (let i = 0; i < Math.min(a.length, b.length); i++) d = Math.max(d, Math.abs(a[i] - b[i]));
+    return d;
+  };
+  const id = 'prj_smoke_velswing';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:velswing', caught));
+  const base = createEmptyProject('smoke velocity swing', '9:16', undefined, 'audio');
+  await saveProject({ ...base, id });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) {
+    await sleep(200);
+  }
+  await sleep(1200);
+  const musicClips = () => st().project!.tracks.find((t) => t.type === 'music')!.clips as AudioClip[];
+  const waitClip = async (n: number) => {
+    for (let i = 0; i < 100 && musicClips().length < n; i++) await sleep(100);
+    return musicClips()[n - 1];
+  };
+  const created: string[] = [];
+  try {
+    // 1) dobgép: hihat az 1–4. 16-odon; a 2. hangsúlyos, a 3. halk; swing 40 %
+    runDevAction('audio.openDrums');
+    await sleep(800);
+    const pattern = { ...emptyPattern(1), hihat: Array.from({ length: 16 }, (_, i) => i < 4) };
+    runDevAction('drums.set', { pattern, velocity: { hihat: [undefined, DRUM_ACCENT, DRUM_SOFT] }, swing: 0.4 });
+    await sleep(300);
+    const hits = runDevAction('drums.hits') as string;
+    log(hits === 'hihat0,hihat1.4v127,hihat2v64,hihat3.4', 'a dobgép ütései: a páros 16-odok 40 %-kal később, a szint ütésenként', hits);
+    // élő előhallgatás (a „Sávra” bezárja a lapot → előtte)
+    const playing = (await runDevAction('preview.drums-play')) as boolean;
+    await sleep(500);
+    const dLive = playing && previewLooping() ? (lastLoopPcm?.[0] ?? null) : null;
+    log(true, 'FOTÓZHATÓ', 'a dobgép: a hangsúlyos (fehér keret) és a halk (halvány) ütés, swing 40 %');
+    await sleep(2500);
+    await runDevAction('preview.drums-play');
+    runDevAction('drums.bake');
+    const dc = await waitClip(1);
+    if (!dc?.uri) {
+      log(false, 'a dobminta a sávra kerül', 'nincs klip');
+      return;
+    }
+    created.push(dc.uri);
+    const d = await left(dc.uri);
+    const step = 0.125; // 120 BPM, 16-od
+    const onsetMs = (fromSec: number) => {
+      const i0 = Math.round(fromSec * SR);
+      for (let i = i0; i < d.length; i++) if (Math.abs(d[i]) > 1e-4) return (i / SR) * 1000;
+      return -1;
+    };
+    const on = [0, 1, 2, 3].map((k) => onsetMs(k * step - (k ? 0.002 : 0)));
+    const late = [on[1] - 125, on[3] - 375];
+    const pk = on.map((ms) => peakOf(d, Math.round((ms / 1000) * SR), Math.round((ms / 1000 + 0.06) * SR)));
+    log(Math.abs(on[0]) <= 1 && Math.abs(on[2] - 250) <= 1 && late.every((l) => Math.abs(l - 50) <= 1), 'swing 40 %: a páros 16-odok 50 ms-mal később (± 1 ms), a páratlanok a rácson', `kezdetek ${on.map((x) => x.toFixed(2)).join(' · ')} ms → késés ${late.map((x) => x.toFixed(2)).join(' / ')} ms`);
+    const r1 = pk[1] / pk[0];
+    const r2 = pk[2] / pk[0];
+    log(Math.abs(r1 - 1 / 0.9) < 0.02 && Math.abs(r2 - DRUM_SOFT / 127 / 0.9) < 0.02 && Math.abs(pk[3] / pk[0] - 1) < 0.02, 'velocity: a csúcsszint a hangsúlyosnál ×1,11, a halknál ×0,56 (a normálhoz)', `csúcsok ${pk.map((x) => x.toFixed(3)).join(' · ')} → ×${r1.toFixed(3)} / ×${r2.toFixed(3)} (várt ×1,111 / ×0,560)`);
+    const dd = dLive ? maxDiff(dLive, d) : 1;
+    log(!!dLive && dd < 1e-4 && Math.abs(dLive.length - d.length) <= 1, 'az élő előhallgatás („▶”) = a beégetett klip', `eltérés ${dd.toExponential(1)} (16 bit), ${(d.length / SR).toFixed(3)} s`);
+    await sleep(400);
+    // 2) piano roll: A4 három erősséggel (halk · közepes · erős)
+    runDevAction('audio.openPianoRoll');
+    await sleep(800);
+    runDevAction('synth.set', { wave: 'sine', bars: 1, notes: [{ midi: 69, startBeat: 0, lengthBeats: 1, velocity: 50 }, { midi: 69, startBeat: 1, lengthBeats: 1, velocity: 100 }, { midi: 69, startBeat: 2, lengthBeats: 1, velocity: 127 }] });
+    await sleep(300);
+    const notes = runDevAction('synth.notes') as string;
+    const sPlaying = (await runDevAction('preview.pianoroll-play')) as boolean;
+    await sleep(500);
+    const live = lastLoopPcm?.[0] ?? null;
+    await runDevAction('preview.pianoroll-play');
+    runDevAction('synth.bake');
+    const sc = await waitClip(2);
+    if (!sc?.uri) {
+      log(false, 'a dallam a sávra kerül', 'nincs klip');
+      return;
+    }
+    created.push(sc.uri);
+    const sx = await left(sc.uri);
+    const spk = [0, 1, 2].map((b) => peakOf(sx, Math.round((b * 0.5 + 0.1) * SR), Math.round((b * 0.5 + 0.4) * SR)));
+    log(Math.abs(spk[0] / spk[2] - 50 / 127) < 0.01 && Math.abs(spk[1] / spk[2] - 100 / 127) < 0.01, 'piano roll velocity: a csúcsszint a velocity-vel arányos (50 · 100 · 127)', `${notes} → csúcsok ${spk.map((x) => x.toFixed(3)).join(' · ')} (×${(spk[0] / spk[2]).toFixed(3)} / ×${(spk[1] / spk[2]).toFixed(3)}, várt ×0,394 / ×0,787)`);
+    const sd = live ? maxDiff(live, sx) : 1;
+    log(sPlaying && sd < 1e-4, 'az élő előhallgatás = a beégetett dallam (a közös hossz)', `eltérés ${sd.toExponential(1)}`);
+    runDevAction('audio.closePianoRoll');
+    // 3) egy visszavonás: a dallam-klip eltűnik
+    st().undo();
+    log(musicClips().length === 1, 'a beégetés egy visszavonással visszavonható', `${musicClips().length} klip`);
+  } finally {
+    stopPreview();
+    for (const u of created) {
+      try {
+        const f = new File(u);
+        if (f.exists) f.delete();
+      } catch (caught) {
+        logCaught('lib/imageSmoke.tsx:velswing-clean', caught);
+      }
+    }
+    router.back();
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:velswing-del', caught));
+  }
+}
+
+/** 👆 R7 valódi érintéssel (adb / ember): hosszú nyomás = ütés-szint, a swing-gomb lépked. */
+async function smokeVelTouch(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_veltouch';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:veltouch', caught));
+  await saveProject({ ...createEmptyProject('smoke veltouch', '9:16', undefined, 'audio'), id });
+  router.push(`/studio/audio/${id}` as Href);
+  for (let i = 0; i < 60 && useEditorStore.getState().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  runDevAction('audio.openDrums');
+  await sleep(800);
+  const hits = () => runDevAction('drums.hits') as string;
+  const waitFor = async (cond: () => boolean, ms: number) => {
+    for (let i = 0; i < ms / 100 && !cond(); i++) await sleep(100);
+    return cond();
+  };
+  try {
+    log(null, 'READY', 'long1');
+    const a = await waitFor(() => hits() === 'hihat5v127', 25000);
+    log(a, 'hosszú nyomás az üres cellán: hangsúlyos ütés', hits());
+    log(null, 'READY', 'long2');
+    const b = await waitFor(() => hits() === 'hihat5v64', 25000);
+    log(b, 'újra hosszan: halk', hits());
+    log(null, 'READY', 'swing');
+    const c = await waitFor(() => hits() === 'hihat5.2v64', 25000);
+    log(c, 'swing + ×2 (20 %): a páros 16-od 0,2 lépéssel később', hits());
+    log(null, 'READY', 'tap');
+    const d = await waitFor(() => hits() === '', 25000);
+    log(d, 'rövid koppintás: az ütés ki', hits() || '(üres)');
+  } finally {
+    runDevAction('audio.closeDrums');
+    router.back();
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:veltouch-del', caught));
+  }
+}
+
 /** ✂️🎚️ Tartomány- és stem-export: a tartomány = a teljes export szelete (masterrel), Σ stem = keverés master nélkül, a némított sáv kimarad. */
 async function smokeStemExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7366,6 +7520,14 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'veltouch') {
+    await step(phase, () => smokeVelTouch(log));
+    return;
+  }
+  if (phase === 'velswing') {
+    await step(phase, () => smokeVelSwing(log));
     return;
   }
   if (phase === 'audioremix') {

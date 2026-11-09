@@ -1,4 +1,5 @@
 import {
+  cycleNoteVelocity,
   DEFAULT_HIGH_MIDI,
   DEFAULT_LOW_MIDI,
   isBlackKey,
@@ -14,6 +15,7 @@ import {
   toggleNote,
   type SynthNote,
 } from '@/lib/synth';
+import { renderSynthPcm } from '@/lib/instrumentRender';
 
 let idc = 0;
 const mkId = () => `n${idc++}`;
@@ -68,5 +70,25 @@ describe('synth — piano-roll mag', () => {
     expect(removeNote(notes, n0)).toHaveLength(1);
     expect(isEmpty([])).toBe(true);
     expect(isEmpty(notes)).toBe(false);
+  });
+});
+
+describe('🎹 velocity (R7)', () => {
+  it('a hang erőssége hosszan nyomva: közepes → erős → halk → közepes; csak az a hang', () => {
+    const notes = [
+      { id: 'a', midi: 60, startBeat: 0, lengthBeats: 1 },
+      { id: 'b', midi: 62, startBeat: 1, lengthBeats: 1, velocity: 100 },
+    ];
+    const v1 = cycleNoteVelocity(notes, 'a');
+    expect(v1[0].velocity).toBe(127);
+    expect(v1[1]).toBe(notes[1]);
+    expect(cycleNoteVelocity(v1, 'a')[0].velocity).toBe(50);
+    expect(cycleNoteVelocity(cycleNoteVelocity(v1, 'a'), 'a')[0].velocity).toBe(100);
+    expect(toggleNote([], 60, 0, () => 'x', 1, 50)[0].velocity).toBe(50);
+  });
+  it('mérve: a csúcsszint a velocity-vel arányos (a hang közepén)', () => {
+    const pk = (velocity: number) => renderSynthPcm([{ id: 'a', midi: 69, startBeat: 0, lengthBeats: 1, velocity }], 'sine', 120)[0].subarray(2000, 18000).reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+    expect(pk(50) / pk(127)).toBeCloseTo(50 / 127, 2);
+    expect(pk(100) / pk(127)).toBeCloseTo(100 / 127, 2);
   });
 });

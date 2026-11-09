@@ -38,6 +38,15 @@ describe('⭐ saját presetek', () => {
     pat = toggleStep(pat, 'snare', 20);
     const d = upsertPreset([], 'drums', 'Alap', { bars: 2, pattern: pat }, 'd', now)![0];
     expect(d.value).toEqual({ bars: 2, pattern: pat });
+    // R7: az ütésenkénti szint és a swing is a presetbe kerül (tartományra vágva)
+    const vel = new Array(32).fill(undefined);
+    vel[0] = 127;
+    vel[3] = 999;
+    const dv = upsertPreset([], 'drums', 'Swing', { bars: 2, pattern: pat, velocity: { kick: vel }, swing: 0.9 }, 'dv', now)![0].value as { velocity: { kick: (number | undefined)[] }; swing: number };
+    expect(dv.velocity.kick[0]).toBe(127);
+    expect(dv.velocity.kick[3]).toBe(127);
+    expect(dv.velocity.kick[1]).toBeUndefined();
+    expect(dv.swing).toBe(0.6);
     const s = upsertPreset([], 'synth', 'Dal', { bars: 2, wave: 'square', notes: [{ midi: 60, startBeat: 0, lengthBeats: 1 }, { midi: 999, startBeat: 1, lengthBeats: 1 }] }, 's', now)![0];
     // a tartományon kívüli MIDI-hang (999) a 127-re korlátozódik
     expect(s.value).toEqual({ bars: 2, wave: 'square', notes: [{ midi: 60, startBeat: 0, lengthBeats: 1 }, { midi: 127, startBeat: 1, lengthBeats: 1 }] });

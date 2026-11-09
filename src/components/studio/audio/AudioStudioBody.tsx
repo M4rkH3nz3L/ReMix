@@ -263,7 +263,7 @@ export function AudioStudioBody({
   }, [playhead, isPlaying]);
 
   // 🧪 a füstteszt a gombok mögötti függvényeket hívja (csak __DEV__)
-  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void; meter: () => void; beatSplit: (every: 'bar' | 'beat') => number; silenceFind: () => Promise<number | null>; speechStart: () => Promise<number | null>; speechUpgrade: () => Promise<number | null>; syncSelected: () => Promise<unknown>; openDrums: () => void; editClip: () => void; closeDrums: () => void; assistant: () => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {}, meter: () => {}, beatSplit: () => 0, silenceFind: async () => null, speechStart: async () => null, speechUpgrade: async () => null, syncSelected: async () => null, openDrums: () => {}, editClip: () => {}, closeDrums: () => {}, assistant: () => {} });
+  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void; meter: () => void; beatSplit: (every: 'bar' | 'beat') => number; silenceFind: () => Promise<number | null>; speechStart: () => Promise<number | null>; speechUpgrade: () => Promise<number | null>; syncSelected: () => Promise<unknown>; openDrums: () => void; editClip: () => void; closeDrums: () => void; assistant: () => void; pianoRoll: (open: boolean) => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {}, meter: () => {}, beatSplit: () => 0, silenceFind: async () => null, speechStart: async () => null, speechUpgrade: async () => null, syncSelected: async () => null, openDrums: () => {}, editClip: () => {}, closeDrums: () => {}, assistant: () => {}, pianoRoll: () => {} });
   useEffect(() => {
     const offs = [
       registerDevAction('audio.fit', () => devRef.current.fit()),
@@ -288,6 +288,8 @@ export function AudioStudioBody({
       registerDevAction('audio.openDrums', () => devRef.current.openDrums()),
       registerDevAction('audio.editClip', () => devRef.current.editClip()),
       registerDevAction('audio.closeDrums', () => devRef.current.closeDrums()),
+      registerDevAction('audio.openPianoRoll', () => devRef.current.pianoRoll(true)),
+      registerDevAction('audio.closePianoRoll', () => devRef.current.pianoRoll(false)),
       registerDevAction('audio.assistant', () => devRef.current.assistant()),
       registerDevAction('audio.mixAssist', () => useMixAssist.getState().show('mix')),
       registerDevAction('audio.mixAssistClose', () => useMixAssist.getState().close()),
@@ -540,7 +542,7 @@ export function AudioStudioBody({
     const c = selectedAudioClip(st.project, st.selectedClipId);
     const ref = c ? syncCandidates(c)[0] : undefined;
     return c && ref ? runAudioSync(c, ref, fps, t, true) : null;
-  }, openDrums: () => setDrumMachine(true), editClip: () => setEditing(true), closeDrums: () => setDrumMachine(false), assistant: () => setAssistantOpen(true) };
+  }, openDrums: () => setDrumMachine(true), editClip: () => setEditing(true), closeDrums: () => setDrumMachine(false), assistant: () => setAssistantOpen(true), pianoRoll: (open) => setPianoRoll(open) };
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   // 🎙️ A10: a felvétel akkor is klip lesz, ha az app háttérbe megy vagy a képernyő bezárul

@@ -3231,7 +3231,11 @@
       "title": "Dob-gép",
       "entry": "Dob-gép (step-sequencer)",
       "clipLabel": "Dob",
-      "stepHint": "-od lépések · a félkövér vonalak a beatek"
+      "stepHint": "-od lépések · a félkövér vonalak a beatek · hosszan nyomva: hangsúlyos / halk",
+      "swing": "Swing",
+      "swingLess": "Kevesebb swing",
+      "swingMore": "Több swing",
+      "velHint": "Hosszan nyomva: normál, hangsúlyos vagy halk ütés"
     },
     "pianoRoll": {
       "title": "Zeneszerzés",
@@ -3240,6 +3244,8 @@
       "bake": "Sávra",
       "bars": "ütem",
       "notes": "hang",
+      "velocity": "Erősség",
+      "vel": { "soft": "Halk", "mid": "Közepes", "hard": "Erős" },
       "wave": {
         "sine": "Szinusz",
         "square": "Négyszög",

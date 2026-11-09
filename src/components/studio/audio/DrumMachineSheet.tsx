@@ -11,17 +11,23 @@ import { renderDrumsPcm } from '@/lib/instrumentRender';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { palette } from '@/constants/editor';
 import {
+  cycleVelocity,
+  DRUM_ACCENT,
   DRUM_LABEL,
+  DRUM_SOFT,
   DRUM_VOICES,
   emptyPattern,
   hasHits,
   patternDurationSec,
   patternHits,
+  resizeVelocity,
   STEPS_PER_BAR,
+  SWING_MAX,
   stepCount,
   toggleStep,
   type DrumHit,
   type DrumPattern,
+  type DrumVelocity,
 } from '@/lib/drums';
 
 /** lépés-cella: 44 pt magas (Apple HIG érintési minimum) — a workspace-ben van rá hely */
@@ -29,7 +35,8 @@ const CELL_W = 30;
 const CELL_H = 44;
 
 /**
- * 🥁 DOB-GÉP (AUDIOT §5): step-sequencer rács (hangok × 16-od lépések). Koppintás = ütés be/ki.
+ * 🥁 DOB-GÉP (AUDIOT §5): step-sequencer rács (hangok × 16-od lépések). Koppintás = ütés be/ki,
+ * hosszan nyomva az ütés szintje (normál → hangsúlyos → halk); a swing a páros 16-odokat késlelteti.
  * A „Sávra" a worker `/drums`-án szintetizált dob-mintává rendereli (nincs minta-fájl-függés),
  * és a Hang Stúdió sima klipként teszi a sávra. A lépés-logika a pure `drums.ts`-ben.
  */
@@ -47,6 +54,10 @@ export function DrumMachineSheet({
   const { t } = useTranslation();
   const [bars, setBars] = useState(1);
   const [pattern, setPattern] = useState<DrumPattern>(() => emptyPattern(1));
+  const [velocity, setVelocity] = useState<DrumVelocity>({});
+  /** 0–0,6 (a lépés-hossz aránya) */
+  const [swing, setSwing] = useState(0);
+  const hitsOf = () => patternHits(pattern, velocity, swing);
   // 🧪 füstteszt: egy alap ütem (kick 1/3, snare 2/4, hihat nyolcadok)
   useEffect(
     () =>
@@ -60,9 +71,25 @@ export function DrumMachineSheet({
       }),
     []
   );
-  const patternRef = useRef(pattern);
-  patternRef.current = pattern;
-  useEffect(() => registerDevAction('drums.hits', () => patternHits(patternRef.current).map((h) => `${h.voice}${h.step}`).join(',')), []);
+  // 🧪 füstteszt (R7): minta + ütésenkénti szint + swing beállítása
+  useEffect(
+    () =>
+      registerDevAction('drums.set', (arg) => {
+        const a = arg as { pattern: DrumPattern; velocity?: DrumVelocity; swing?: number; bars?: number };
+        setBars(a.bars ?? 1);
+        setPattern(a.pattern);
+        setVelocity(a.velocity ?? {});
+        setSwing(a.swing ?? 0);
+        return true;
+      }),
+    []
+  );
+  const hitsRef = useRef(hitsOf);
+  hitsRef.current = hitsOf;
+  const bakeRef = useRef(() => onBake(hitsOf(), bars));
+  bakeRef.current = () => onBake(hitsOf(), bars);
+  useEffect(() => registerDevAction('drums.bake', () => bakeRef.current()), []);
+  useEffect(() => registerDevAction('drums.hits', () => hitsRef.current().map((h) => `${h.voice}${h.step}${h.velocity ? `v${h.velocity}` : ''}`).join(',')), []);
 
   const steps = stepCount(bars);
   const cols = Array.from({ length: steps }, (_, i) => i);
@@ -84,7 +111,9 @@ export function DrumMachineSheet({
       }
       return fresh;
     });
+    setVelocity((prev) => resizeVelocity(prev, b));
   };
+  const setSwingStep = (delta: number) => setSwing((s) => Math.round(Math.max(0, Math.min(SWING_MAX, s + delta)) * 10) / 10);
 
   return (
     <AudioSheetFrame id="drumMachine" onClose={onClose} sheetStyle={styles.sheet}>
@@ -106,16 +135,27 @@ export function DrumMachineSheet({
           <Ionicons name="add" size={16} color={palette.text} />
         </Pressable>
         <View style={{ flex: 1 }} />
+        {/* swing: 0–60 %, 10-esével */}
+        <Text style={styles.info}>{t('studio.drums.swing', { defaultValue: 'Swing' })}</Text>
+        <Pressable testID="drums-swing-minus" onPress={() => setSwingStep(-0.1)} disabled={swing <= 0} hitSlop={6} style={[styles.stepBtn, swing <= 0 && styles.disabled]} accessibilityLabel={t('studio.drums.swingLess', { defaultValue: 'Kevesebb swing' })}>
+          <Ionicons name="remove" size={16} color={palette.text} />
+        </Pressable>
+        <Text style={styles.barsText} testID="drums-swing-value">{Math.round(swing * 100)} %</Text>
+        <Pressable testID="drums-swing-plus" onPress={() => setSwingStep(0.1)} disabled={swing >= SWING_MAX} hitSlop={6} style={[styles.stepBtn, swing >= SWING_MAX && styles.disabled]} accessibilityLabel={t('studio.drums.swingMore', { defaultValue: 'Több swing' })}>
+          <Ionicons name="add" size={16} color={palette.text} />
+        </Pressable>
         <Text style={styles.info}>{bpm} BPM · {durSec.toFixed(1)}s</Text>
       </View>
 
       {/* ⭐ saját dobminták */}
       <UserPresetRow
         kind="drums"
-        getValue={() => (hasHits(pattern) ? { bars, pattern } : null)}
+        getValue={() => (hasHits(pattern) ? { bars, pattern, velocity, swing } : null)}
         onApply={(v) => {
           setBars(v.bars);
           setPattern(v.pattern);
+          setVelocity(v.velocity ?? {});
+          setSwing(v.swing ?? 0);
         }}
       />
 
@@ -128,21 +168,35 @@ export function DrumMachineSheet({
               </View>
               {cols.map((step) => {
                 const on = pattern[voice]?.[step];
+                const vel = velocity[voice]?.[step];
                 const beatStart = step % 4 === 0;
                 return (
                   <Pressable
                     key={step}
+                    testID={`drums-cell-${voice}-${step}`}
                     onPress={() => {
                       // 🎧 az új ütés azonnal megszólal
-                      if (!on) void auditionDrum(voice);
+                      if (!on) void auditionDrum(voice, vel);
                       setPattern((p) => toggleStep(p, voice, step));
                     }}
+                    onLongPress={() => {
+                      // hosszan: az ütés szintje (normál → hangsúlyos → halk); üres cellán be is kapcsol
+                      const next = cycleVelocity(velocity, voice, step);
+                      setVelocity(next);
+                      if (!on) setPattern((p) => toggleStep(p, voice, step));
+                      void auditionDrum(voice, next[voice]?.[step]);
+                    }}
+                    accessibilityLabel={`${DRUM_LABEL[voice]} ${step + 1}`}
+                    accessibilityState={{ selected: !!on }}
+                    accessibilityHint={t('studio.drums.velHint', { defaultValue: 'Hosszan nyomva: normál, hangsúlyos vagy halk ütés' })}
                     style={[
                       styles.cell,
                       beatStart && styles.cellBeat,
                       // ütemcsoport-térköz (4-esével) — a rács ránézésre olvasható, mint egy hardveres dobgépen
                       beatStart && step > 0 && styles.cellGroupGap,
                       on && styles.cellOn,
+                      on && vel === DRUM_ACCENT && styles.cellAccent,
+                      on && vel === DRUM_SOFT && styles.cellSoft,
                     ]}
                   />
                 );
@@ -156,15 +210,19 @@ export function DrumMachineSheet({
         <PreviewPlayButton
           testID="drums-play"
           disabled={!hasHits(pattern)}
-          version={`${bpm}|${bars}|${patternHits(pattern).map((h) => `${h.voice}${h.step}`).join(',')}`}
-          build={() => (hasHits(pattern) ? renderDrumsPcm(patternHits(pattern), bars, bpm) : null)}
+          version={`${bpm}|${bars}|${hitsOf().map((h) => `${h.voice}${h.step}v${h.velocity ?? ''}`).join(',')}`}
+          build={() => (hasHits(pattern) ? renderDrumsPcm(hitsOf(), bars, bpm) : null)}
         />
-        <Pressable onPress={() => setPattern(emptyPattern(bars))} style={styles.clearBtn} disabled={!hasHits(pattern)}>
+        <Pressable
+          onPress={() => {
+            setPattern(emptyPattern(bars));
+            setVelocity({});
+          }} style={styles.clearBtn} disabled={!hasHits(pattern)}>
           <Ionicons name="trash-outline" size={15} color={hasHits(pattern) ? palette.textDim : palette.border} />
           <Text style={styles.clearText}>{t('common.clear', { defaultValue: 'Törlés' })}</Text>
         </Pressable>
         <Pressable
-          onPress={() => onBake(patternHits(pattern), bars)}
+          onPress={() => onBake(hitsOf(), bars)}
           disabled={busy || !hasHits(pattern)}
           style={[styles.bakeBtn, (busy || !hasHits(pattern)) && styles.disabled]}
         >
@@ -172,7 +230,7 @@ export function DrumMachineSheet({
           <Text style={styles.bakeText}>{t('studio.pianoRoll.bake', { defaultValue: 'Sávra' })}</Text>
         </Pressable>
       </View>
-      <Text style={styles.hint}>{STEPS_PER_BAR}{t('studio.drums.stepHint', { defaultValue: '-od lépések · a félkövér vonalak a beatek' })}</Text>
+      <Text style={styles.hint}>{STEPS_PER_BAR}{t('studio.drums.stepHint', { defaultValue: '-od lépések · a félkövér vonalak a beatek · hosszan nyomva: hangsúlyos / halk' })}</Text>
     </AudioSheetFrame>
   );
 }
@@ -181,7 +239,7 @@ const styles = StyleSheet.create({
   sheet: { backgroundColor: palette.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 12, maxHeight: '86%' },
   handleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
   title: { color: palette.text, fontSize: 17, fontWeight: '800' },
-  controls: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  controls: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' },
   stepBtn: { padding: 5, borderWidth: 1, borderColor: palette.border, borderRadius: 8 },
   barsText: { color: palette.text, fontSize: 13, fontWeight: '700', minWidth: 52, textAlign: 'center' },
   info: { color: palette.textDim, fontSize: 12, fontWeight: '600' },
@@ -192,6 +250,8 @@ const styles = StyleSheet.create({
   cellBeat: { borderColor: palette.border, backgroundColor: '#11131c' },
   cellOn: { backgroundColor: palette.accent, borderColor: palette.accent },
   cellGroupGap: { marginLeft: 6 },
+  cellAccent: { borderColor: '#fff', borderWidth: 2 },
+  cellSoft: { opacity: 0.45 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
   clearBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: palette.border },
   clearText: { color: palette.textDim, fontSize: 13, fontWeight: '700' },

@@ -101,9 +101,27 @@ export function openLiveChannel(
     };
   }
 
+  // ✅ ack: a szerver visszaigazolja a broadcastot — a visszaigazolatlan szerkesztés újra megy (mérve:
+  // a visszaigazolás nélküli küldésnél két eszköz között egy szerkesztés elveszett, és a projekt eltért)
   const channel = sb.channel(topic, {
-    config: { presence: { key: self.id }, broadcast: { self: false } },
+    config: { presence: { key: self.id }, broadcast: { self: false, ack: true } },
   });
+  let markReady: () => void = () => {};
+  const ready = new Promise<void>((resolve) => {
+    markReady = resolve;
+  });
+  // a szerkesztések és a zárak SORBAN mennek (a sorrend a társnál is ugyanaz), csatlakozás után
+  let queue: Promise<void> = Promise.resolve();
+  const reliable = (event: string, payload: Record<string, unknown>) => {
+    queue = queue.then(() =>
+      sendWithRetry(async () => {
+        await Promise.race([ready, new Promise((r) => setTimeout(r, 10_000))]);
+        return channel.send({ type: 'broadcast', event, payload });
+      }).then((ok) => {
+        if (!ok) logCaught('lib/collabLive.ts:send', new Error(`a közös szerkesztés üzenete nem ment ki (${event})`));
+      })
+    );
+  };
 
   const readPresence = () => {
     const state = channel.presenceState() as Record<string, PresenceMeta[]>;
@@ -147,22 +165,35 @@ export function openLiveChannel(
     .on('presence', { event: 'leave' }, readPresence)
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
+        markReady();
         void channel.track({ id: self.id, name: self.name, avatar: self.avatar } satisfies PresenceMeta);
       }
     });
 
   return {
-    broadcast: (commands) => {
-      void channel.send({ type: 'broadcast', event: 'cmd', payload: { commands } });
-    },
+    broadcast: (commands) => reliable('cmd', { commands }),
     sendCursor: (playhead) => {
       void channel.send({ type: 'broadcast', event: 'cursor', payload: { id: self.id, playhead } });
     },
-    sendLock: (msg) => {
-      void channel.send({ type: 'broadcast', event: 'lock', payload: { lock: msg } });
-    },
+    sendLock: (msg) => reliable('lock', { lock: msg }),
     stop: () => {
       void sb.removeChannel(channel);
     },
   };
+}
+
+/**
+ * ✅ küldés visszaigazolásra várva: `'ok'`-ig, legfeljebb `attempts`-szer, növekvő várakozással
+ * (300, 600, 900… ms); igaz, ha kiment. Tiszta (a csatorna-hívás paraméter) — tesztelhető.
+ */
+export async function sendWithRetry(send: () => Promise<string>, attempts = 5, wait: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms))): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      if ((await send()) === 'ok') return true;
+    } catch (caught) {
+      logCaught('lib/collabLive.ts:sendWithRetry', caught);
+    }
+    if (i < attempts - 1) await wait(300 * (i + 1));
+  }
+  return false;
 }

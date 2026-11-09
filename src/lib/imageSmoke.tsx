@@ -4572,8 +4572,14 @@ async function smokeWhoAmI(log: Log) {
 }
 
 const COLLAB_PID = 'prj_smoke_collab_audio';
+const trackDump = (p: Project | null) =>
+  JSON.stringify((p?.tracks ?? []).filter((t) => t.clips.length > 0).map((t) => [t.type, t.clips.map((c) => { const { uri, ...rest } = c as AudioClip; return { ...rest, uri: uri.split('/').pop() }; })]));
+// a tartalom ujjlenyomata: rendezett kulcsok, eszközfüggő uri nélkül (a felhőből letöltött projekt
+// JSON-jában más a kulcsok sorrendje, és a társnál a média helyi fájlra mutat)
+const canon = (v: unknown): unknown =>
+  Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v as Record<string, unknown>).filter(([k]) => k !== 'uri').sort(([a], [b]) => a.localeCompare(b)).map(([k, x]) => [k, canon(x)])) : v;
 const fingerprint = (p: Project | null) => {
-  const str = JSON.stringify(p?.tracks ?? []);
+  const str = JSON.stringify(canon(p?.tracks ?? []));
   let h = 5381;
   for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
   return h.toString(36);
@@ -4758,6 +4764,8 @@ async function smokeLockOwner(log: Log) {
   log(m().volume === 0.25, '[tulaj] feloldás után a tag zene-szerkesztése átjött', `zene ${m().volume}`);
   await sleep(2500);
   log(null, '[tulaj] ujjlenyomat a végén', fingerprint(st().project));
+  log(null, '[tulaj] sávok', trackDump(st().project));
+  log(null, '[tulaj] a kapott távoli parancsok', st().events.filter((e) => e.actor === 'remote').map((e) => `${e.command.type}${'clipId' in e.command ? `:${(e.command as { clipId: string }).clipId}` : ''}`).join(', ') || '—');
   await sleep(4000);
   router.back();
 }
@@ -4787,13 +4795,15 @@ async function smokeLockMember(log: Log) {
   for (let i = 0; i < 1200 && !st().lockedTracks.includes('music'); i++) await sleep(100);
   log(st().lockedTracks.includes('music'), '[tag] a tulaj zárolása nálam is zár (zene)', st().lockedTracks.join(',') || '—');
   const okMusic = st().dispatch({ type: 'UPDATE_CLIP', clipId: 'm', patch: { volume: 0.25 } });
-  st().dispatch({ type: 'UPDATE_CLIP', clipId: 'v', patch: { pan: -0.3 } });
+  const okPan = st().dispatch({ type: 'UPDATE_CLIP', clipId: 'v', patch: { pan: -0.3 } });
+  log(null, '[tag] a beszéd pan helyben', `dispatch → ${okPan}, pan most ${(st().project?.tracks.find((t) => t.type === 'voiceover')?.clips[0] as AudioClip | undefined)?.pan}`);
   log(!okMusic, '[tag] a zárolt zenére írás nálam is no-op', `dispatch → ${okMusic}`);
   for (let i = 0; i < 600 && st().lockedTracks.includes('music'); i++) await sleep(100);
   log(!st().lockedTracks.includes('music'), '[tag] a feloldás nálam is felold', '');
   st().dispatch({ type: 'UPDATE_CLIP', clipId: 'm', patch: { volume: 0.25 } });
   await sleep(3000);
   log(null, '[tag] ujjlenyomat a végén', fingerprint(st().project));
+  log(null, '[tag] sávok', trackDump(st().project));
   await sleep(4000);
   router.back();
 }

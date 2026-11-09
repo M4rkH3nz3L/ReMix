@@ -254,6 +254,13 @@ class PreviewEngine {
     return task;
   }
 
+  /** 🎧 egy forrás előre dekódolása (pl. a referencia A/B: a váltás ne a dekódolásra várjon — mérve: a lassú
+   * eszközön az első B-váltás után több mp-ig csend volt) */
+  async preload(uri: string): Promise<void> {
+    if (!(await this.available())) return;
+    await this.decode(this.api!, uri);
+  }
+
   /** a felszabadítható dekódolt források (a tervben már nem szereplők) */
   forget(keepUris: Set<string>): void {
     for (const uri of this.decoded.keys()) {

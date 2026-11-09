@@ -5,6 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useMixAssist } from '@/store/mixAssistStore';
+import { useReference } from '@/store/referenceStore';
+import { applyReference, measureReference, pickReferenceFile } from '@/lib/referenceClient';
+import { measureMastered } from '@/lib/mixAssistClient';
 import { UserPresetRow } from '@/components/studio/audio/UserPresetRow';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { Chip, PrimaryButton, Stepper } from '@/components/ui/controls';
@@ -75,6 +78,35 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
     )
       .catch((e: Error) => { logCaught('components/studio/audio/MasterSheet.tsx:onAnalyze', e); })
       .finally(() => setAnalyzing(false));
+  };
+
+  // 🎧🅰️🅱️ referencia A/B
+  const refTrack = useReference((s) => s.ref);
+  const refListening = useReference((s) => s.listening);
+  const mixLufs = useReference((s) => s.mixLufs);
+  const measureMixLufs = async () => {
+    const st = useEditorStore.getState();
+    if (!st.project) return;
+    const stats = await withCancellableProgress(t('studio.master.refMeasuring'), (report, signal) => measureMastered(st.project!, { isTrackAudible: st.isTrackAudible, masterVolume: st.masterVolume }, report, signal)).catch((caught) => {
+      logCaught('components/studio/audio/MasterSheet.tsx:mixLufs', caught);
+      return null;
+    });
+    useReference.getState().setMixLufs(stats && Number.isFinite(stats.lufs) ? stats.lufs : null);
+  };
+  const chooseReference = async () => {
+    const f = await pickReferenceFile();
+    if (!f) return;
+    const m = await measureReference(f.uri);
+    if (!m) {
+      Alert.alert(t('studio.master.reference'), t('studio.master.refFailed'));
+      return;
+    }
+    await applyReference({ ...f, ...m });
+    await measureMixLufs();
+  };
+  const toggleReference = async () => {
+    if (!refListening && useReference.getState().mixLufs === null) await measureMixLufs();
+    useReference.getState().setListening(!refListening);
   };
 
   const setField = (patch: Partial<AudioMaster>) =>
@@ -295,6 +327,14 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
             />
           ))}
         </View>
+
+        {/* 🎧🅰️🅱️ referencia: egy kész dal a keverés hangosságára illesztve, ugyanott — a projektbe nem kerül */}
+        <Text style={[styles.section, { marginTop: 12 }]}>{t('studio.master.reference')}</Text>
+        <View style={styles.chipRow} testID="master-reference">
+          <Chip label={refTrack ? `${refTrack.name} · ${refTrack.lufs.toFixed(1)} LUFS` : t('studio.master.refPick')} active={false} onPress={() => void chooseReference()} />
+          {refTrack ? <Chip label={t('studio.master.refListen')} active={refListening} onPress={() => void toggleReference()} /> : null}
+        </View>
+        {refTrack ? <Text style={styles.hint}>{t('studio.master.refHint', { mix: mixLufs !== null ? mixLufs.toFixed(1) : '…' })}</Text> : null}
 
         <View style={{ gap: 8, marginTop: 12 }}>
           <PrimaryButton icon="pulse" label={t('studio.master.apply')} onPress={apply} />

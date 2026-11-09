@@ -79,6 +79,9 @@ import { dbToVolume } from '@/lib/clipGain';
 import { tempoMatchPatch } from '@/lib/tempoMatch';
 import { moveStage } from '@/lib/fxOrder';
 import { masterPreset } from '@/lib/audioMaster';
+import { useReference } from '@/store/referenceStore';
+import { applyReference, measureReference } from '@/lib/referenceClient';
+import { measureMastered } from '@/lib/mixAssistClient';
 import { previewLocalUri } from '@/lib/previewRemoteCache';
 import { canExtractAudio, extractVideoAudio } from '@/lib/videoAudioImport';
 import { useSilenceReview } from '@/store/silenceReviewStore';
@@ -4973,6 +4976,58 @@ async function smokeMasterDyn(log: Log) {
   router.back();
 }
 
+/** 🎧🅰️🅱️ R5 referencia A/B: a referencia (−8 LUFS) a keverés (−20 LUFS) hangosságára illesztve szól, ugyanott, lejátszás közben váltva; a projekt nem változik. */
+async function smokeRefAB(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const write = (name: string, amp: number, hz: number) => {
+    const x = Float32Array.from({ length: 14 * SR }, (_, i) => amp * Math.sin((2 * Math.PI * hz * i) / SR));
+    const f = new File(Paths.cache, name);
+    if (f.exists) f.delete();
+    f.create();
+    f.write(encodeWav16([x, x], SR, () => 0.5));
+    return f.uri;
+  };
+  const mixUri = write('smoke_ref_mix.wav', 0.1, 1000);
+  const refUri = write('smoke_ref_song.wav', 0.4, 440);
+  const id = 'prj_smoke_refab';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:refab', caught));
+  const base = createEmptyProject('smoke referencia', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'k', uri: mixUri, label: 'keverés', start: 0, duration: 14, trimIn: 0, sourceDuration: 14, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  const before = JSON.stringify(st().project);
+  // a felület útja: a referencia mérése + a keverés hangossága (ugyanazok a függvények)
+  const m = await measureReference(refUri);
+  const mixStats = await measureMastered(st().project!, { isTrackAudible: st().isTrackAudible, masterVolume: st().masterVolume });
+  log(!!m && Math.abs(m.lufs - -8) <= 1 && !!mixStats && Math.abs(mixStats.lufs - -20) <= 0.3, 'a referencia és a keverés hangossága mérve', `referencia ${m?.lufs.toFixed(2)} LUFS, keverés ${mixStats?.lufs.toFixed(2)} LUFS`);
+  if (!m || !mixStats) return;
+  await applyReference({ uri: refUri, name: 'referencia', ...m });
+  useReference.getState().setMixLufs(mixStats.lufs);
+  st().setPlayhead(0);
+  st().setPlaying(true);
+  for (let i = 0; i < 40 && !previewEngine.isPlaying(); i++) await sleep(50);
+  await sleep(3600);
+  const a = previewEngine.loudness();
+  const headA = st().playhead;
+  useReference.getState().setListening(true);
+  await sleep(3600);
+  const b = previewEngine.loudness();
+  const headB = st().playhead;
+  log(true, 'FOTÓZHATÓ', 'B: a referencia szól (a master-lapon)');
+  useReference.getState().setListening(false);
+  await sleep(300);
+  st().setPlaying(false);
+  log(!!a && !!b && Math.abs(a.shortTerm - mixStats.lufs) <= 0.5 && Math.abs(b.shortTerm - mixStats.lufs) <= 0.5, 'A: a keverés, B: a referencia — mindkettő a keverés hangosságán (± 0,5 LU); illesztés nélkül a B 12 dB-lel hangosabb volna', a && b ? `A ${a.shortTerm.toFixed(2)} · B ${b.shortTerm.toFixed(2)} LUFS (a referencia saját: ${m.lufs.toFixed(1)})` : 'null');
+  log(headB > headA + 3, 'a váltás nem ugrik vissza: a lejátszás ugyanott folytatódik', `${headA.toFixed(2)} → ${headB.toFixed(2)} s`);
+  log(JSON.stringify(st().project) === before, 'a projekt nem változott', '');
+  useReference.getState().setRef(null);
+  router.back();
+}
+
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
 async function smokeConsole(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7289,6 +7344,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'refab') {
+    await step(phase, () => smokeRefAB(log));
     return;
   }
   if (phase === 'masterdyn') {

@@ -21,6 +21,8 @@ import { useEditorStore } from '@/store/editorStore';
 import type { AudioClip, Clip, Project, TrackType, VideoClip } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
 import { fetchPreviewSource, remoteUris, withLocalSources } from '@/lib/previewRemoteCache';
+import { referenceMatchGain, referenceProject } from '@/lib/referenceAB';
+import { useReference } from '@/store/referenceStore';
 import { AUDIO_TRACKS } from '@/lib/audioTracks';
 
 /** ⏱️ a tanult indítási késés (mp) — közös a lejátszóknak (`learnStartLatency`) */
@@ -60,14 +62,20 @@ export function AudioLayer() {
   const fxBypass = useEditorStore((s) => s.fxBypass);
   // 🎧 az exporttal AZONOS keverési terv (mute/solo/fader/master is) — ezt játssza a motor;
   // 🅰️🅱️ A/B-nél a feldolgozás nélküli eredeti (az exportot nem érinti)
+  // 🎧🅰️🅱️ referencia hallgatása: a motor a referenciát játssza a keverés helyett (hangosság-illesztve)
+  const refTrack = useReference((s) => (s.listening ? s.ref : null));
+  const mixLufs = useReference((s) => s.mixLufs);
   const plan = useMemo(() => {
     if (!project) {
       return null;
     }
+    if (refTrack) {
+      return offlineMixPlan(referenceProject(project, refTrack, referenceMatchGain(refTrack.lufs, mixLufs ?? refTrack.lufs)));
+    }
     const audible = (t: TrackType) => (solo.length > 0 ? solo.includes(t) : !muted.includes(t));
     const mix = mixForExport(fxBypass ? withoutProcessing(project) : project, audible, masterVolume);
     return mix ? offlineMixPlan(mix) : null;
-  }, [project, masterVolume, muted, solo, fxBypass]);
+  }, [project, masterVolume, muted, solo, fxBypass, refTrack, mixLufs]);
   // 🌐 a távoli forrású klipek: letöltés a cache-be, utána a motor játssza (a +dB, effekt, master is)
   const remote = useMemo(() => remoteUris(plan), [plan]);
   const [localOf, setLocalOf] = useState<Record<string, string>>({});

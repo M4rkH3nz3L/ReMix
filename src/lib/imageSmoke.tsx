@@ -5028,6 +5028,28 @@ async function smokeRefAB(log: Log) {
   router.back();
 }
 
+/** 🎵 R6 hang-poszt remixe: a poszt videójának hangja kinyerve → hang-projekt (a Hang Stúdióban nyílik), a forrás megjelölve. Prod nélkül: szintetikus poszt a teszt-szerver videójával. */
+async function smokeAudioRemix(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const post = { id: 'post_smoke_audio', title: 'Hang-poszt', description: '', hashtags: [], videoUri: `${smokeFileHost()}/vid_audio.mp4`, posterUri: null, aspectRatio: '9:16', durationSec: 6, projectId: 'orig_audio', rendered: true, remixable: true, sourceKind: 'audio', visibility: 'public', moderationStatus: 'approved', createdAt: new Date().toISOString(), counts: { likes: 0, comments: 0, shares: 0, saves: 0, views: 0, remixes: 0 }, creator: { id: 'c', username: 'kata', displayName: 'Kata' } } as unknown as FeedPost;
+  const t0 = Date.now();
+  const pid = await remixFromPost(post);
+  const p = pid ? await loadProject(pid) : null;
+  const clip = p?.tracks.find((t) => t.type === 'music')?.clips[0] as AudioClip | undefined;
+  log(!!p && p.kind === 'audio' && !!clip && clip.uri.endsWith('.m4a') && new File(clip.uri).exists && Math.abs(clip.duration - 6) <= 1 / 30 && p.remixOf?.postId === post.id, 'a hang-poszt remixe hang-projekt: a videó hangja M4A-ként, a forrás megjelölve', `${p?.kind}, ${clip?.duration.toFixed(3)} s, ${clip?.uri.split('/').pop()}, ${Date.now() - t0} ms`);
+  if (!pid || !p) return;
+  const route = remixRoute(post, pid);
+  router.push(route as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== pid; i++) await sleep(200);
+  await sleep(800);
+  log(route === `/studio/audio/${pid}` && st().project?.id === pid, 'a Hang Stúdióban nyílik meg', route);
+  log(true, 'FOTÓZHATÓ', 'a hang-remix a Hang Stúdióban');
+  await sleep(2500);
+  router.back();
+  await deleteProject(pid).catch((caught) => logCaught('lib/imageSmoke.tsx:audioremix', caught));
+}
+
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
 async function smokeConsole(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7344,6 +7366,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'audioremix') {
+    await step(phase, () => smokeAudioRemix(log));
     return;
   }
   if (phase === 'refab') {

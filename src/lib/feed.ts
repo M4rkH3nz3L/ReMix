@@ -3,7 +3,10 @@ import { Platform } from 'react-native';
 
 import { applyDiversity, rankBy, rankTrending, type PostSignals } from '@/lib/feedRanking';
 import { makeId } from '@/lib/id';
-import { imageRemixProject } from '@/lib/imageRemix';
+import { audioRemixProject, imageRemixProject } from '@/lib/imageRemix';
+import { downloadToCache } from '@/lib/media';
+import { extractVideoAudio } from '@/lib/videoAudioImport';
+import { File } from 'expo-file-system';
 import { finiteNum, mapValid, str } from '@/lib/parseGuards';
 import type { ViewEvent } from '@/lib/viewSignals';
 import { isLoopbackUrl, reachableMediaUrl } from '@/lib/mediaUrl';
@@ -83,7 +86,7 @@ function toPost(r: PostRow, liked: Set<string>, saved: Set<string>): FeedPost {
   // a project_snapshot jsonb KÉTFÉLE hasznot hordozhat: interaktív (hotspot) sáv
   // `{ tracks }`, és/vagy a carousel kép-lista `{ carousel }` (kép-projekt lapozható
   // megosztása). Visszafelé kompatibilis: a régi posztok csak `{ tracks }`-ot tároltak.
-  const snap = (r.project_snapshot ?? null) as { tracks?: Track[]; carousel?: string[] } | null;
+  const snap = (r.project_snapshot ?? null) as { tracks?: Track[]; carousel?: string[]; sourceKind?: string } | null;
   const carousel = Array.isArray(snap?.carousel)
     ? snap!.carousel.map((u) => reachableMediaUrl(u)).filter((u): u is string => !!u)
     : undefined;
@@ -101,6 +104,7 @@ function toPost(r: PostRow, liked: Set<string>, saved: Set<string>): FeedPost {
     projectId: r.project_id ?? undefined,
     interactive: snap?.tracks ? { tracks: snap.tracks } : undefined,
     rendered: !!r.video_url,
+    ...(snap?.sourceKind === 'audio' ? { sourceKind: 'audio' as const } : {}),
     remixable: r.remixable,
     remixOfPostId: r.remix_of_post_id ?? undefined,
     remixOfCreator: r.remix_of_creator ?? undefined,
@@ -532,7 +536,9 @@ export async function publishPost(
   // teljes, szerkeszthető projektet SZÁNDÉKOSAN nem (a remix a videót importálja).
   // A carousel kép-lista (ha van) ugyanebbe a jsonb-be megy (`carousel`).
   const interactiveTrack = project.tracks.find((tr) => tr.type === 'interactive');
-  const snapshot: { tracks?: Track[]; carousel?: string[] } = {};
+  // 🎵 hang-projektből készült poszt: a remixe hang-projekt lesz (ugyanebben a jsonb-ben — migráció nélkül)
+  const snapshot: { tracks?: Track[]; carousel?: string[]; sourceKind?: 'audio' } = {};
+  if (project.kind === 'audio') snapshot.sourceKind = 'audio';
   if (interactiveTrack && interactiveTrack.clips.length > 0) {
     snapshot.tracks = [interactiveTrack];
   }
@@ -861,6 +867,23 @@ export async function remixFromPost(post: FeedPost): Promise<string | null> {
     const remix = imageRemixProject(post);
     await saveProject(remix);
     return remix.id;
+  }
+  // 🎵 hang-poszt: a videó hangja kinyerve → hang-projekt (ha a kinyerés nem megy, a régi videós remix)
+  if (post.remixable && post.sourceKind === 'audio' && post.videoUri) {
+    const local = await downloadToCache(post.videoUri, `remix_${post.id}.mp4`);
+    if (local) {
+      const r = await extractVideoAudio(local, post.title);
+      try {
+        new File(local).delete();
+      } catch (caught) {
+        logCaught('lib/feed.ts:remixAudioCleanup', caught);
+      }
+      if (r.ok) {
+        const remix = audioRemixProject(post, { uri: r.uri, duration: r.duration });
+        await saveProject(remix);
+        return remix.id;
+      }
+    }
   }
   // renderelt videó nélkül nincs mit importálni
   if (!post.remixable || !post.videoUri) {

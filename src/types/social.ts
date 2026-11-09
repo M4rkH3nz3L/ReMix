@@ -75,6 +75,8 @@ export interface FeedPost {
   interactive?: { tracks: Track[] };
   /** true, ha a `videoUri` a teljes idővonal renderje (nem csak az első klip) */
   rendered: boolean;
+  /** 🎵 a poszt hang-projektből készült — a remixe hang-projekt (a videó hangjából) */
+  sourceKind?: 'audio';
   /** remixelhető-e (M4): ha false, csak megtekintés */
   remixable: boolean;
   /** ha ez egy remix, a forrás-poszt azonosítója (M4 attribúció) */

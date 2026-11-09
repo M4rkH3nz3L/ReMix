@@ -1,4 +1,4 @@
-import { canRemix, imageRemixProject, remixRoute } from '@/lib/imageRemix';
+import { audioRemixProject, canRemix, imageRemixProject, remixRoute } from '@/lib/imageRemix';
 import type { FeedPost } from '@/types/social';
 
 const post = (over: Partial<FeedPost>): FeedPost =>
@@ -37,5 +37,23 @@ describe('kép-remix', () => {
   it('a kép-remix a képstúdióba, a videós a szerkesztőbe visz', () => {
     expect(remixRoute(post({ images: ['u'] }), 'x')).toBe('/studio/image/x');
     expect(remixRoute(post({ videoUri: 'v' }), 'x')).toBe('/editor/x');
+  });
+});
+
+describe('🎵 hang-remix (R6)', () => {
+  it('a hang-posztból hang-projekt: a kinyert hang egy klipként a zene-sávon, a forrás megjelölve', () => {
+    let n = 0;
+    const p = audioRemixProject(post({ id: 'p9', projectId: 'orig', videoUri: 'https://x/v.mp4', sourceKind: 'audio' }), { uri: 'file:///m/x_hang.m4a', duration: 42.5 }, (k) => `${k}_${++n}`);
+    expect(p.kind).toBe('audio');
+    const clips = p.tracks.flatMap((t) => t.clips);
+    expect(clips).toHaveLength(1);
+    expect(p.tracks.find((t) => t.type === 'music')!.clips[0]).toEqual(expect.objectContaining({ kind: 'audio', uri: 'file:///m/x_hang.m4a', duration: 42.5, sourceDuration: 42.5, trimIn: 0 }));
+    expect(p.assets[0]).toEqual(expect.objectContaining({ kind: 'audio', uri: 'file:///m/x_hang.m4a', provider: 'local' }));
+    expect(p.remixOf).toEqual({ projectId: 'orig', name: 'Kata', postId: 'p9' });
+  });
+  it('a hang-poszt remixe a Hang Stúdióba nyílik; a videó- és kép-posztoké változatlan', () => {
+    expect(remixRoute(post({ sourceKind: 'audio', videoUri: 'https://x/v.mp4' }), 'r1')).toBe('/studio/audio/r1');
+    expect(remixRoute(post({ videoUri: 'https://x/v.mp4' }), 'r1')).toBe('/editor/r1');
+    expect(remixRoute(post({ images: ['https://x/1.png'] }), 'r1')).toBe('/studio/image/r1');
   });
 });

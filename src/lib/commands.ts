@@ -65,6 +65,7 @@ export type EditorCommand =
   | { type: 'SET_AUDIO_BUSES'; buses: AudioBus[] }
   | { type: 'SET_TRACK_SEND'; trackType: TrackType; busId: string; amount: number }
   | { type: 'SET_REGIONS'; regions: TimelineRegion[] }
+  | { type: 'SET_LOCKED_TRACKS'; lockedTracks: TrackType[] }
   | { type: 'SET_LINKS'; links: string[][] }
   /**
    * 🎨 Kép-dokumentum beírása (létrehozás ÉS módosítás). A réteg-műveletek
@@ -427,6 +428,15 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
       return { ...project, chapters: next.length > 0 ? next : undefined };
     }
 
+    case 'SET_LOCKED_TRACKS': {
+      const next = [...new Set(cmd.lockedTracks)].sort();
+      const prev = [...(project.lockedTracks ?? [])].sort();
+      if (JSON.stringify(prev) === JSON.stringify(next)) {
+        return null;
+      }
+      return { ...project, lockedTracks: next.length > 0 ? next : undefined };
+    }
+
     case 'SET_REGIONS': {
       const next = [...cmd.regions].sort((a, b) => a.start - b.start);
       const prev = project.regions ?? [];
@@ -648,6 +658,8 @@ export function describeCommand(cmd: EditorCommand): string {
       return tr('lib.commands.setTrackSend', { defaultValue: 'Küldés' });
     case 'SET_REGIONS':
       return tr('lib.commands.setRegions', { count: cmd.regions.length });
+    case 'SET_LOCKED_TRACKS':
+      return tr('lib.commands.setLockedTracks', { count: cmd.lockedTracks.length, defaultValue: `Zárolt sávok: ${cmd.lockedTracks.length}` });
     case 'SET_LINKS':
       return tr('lib.commands.setLinks', { count: cmd.links.filter((g) => g.length > 1).length });
     case 'UPSERT_IMAGE_DOC':

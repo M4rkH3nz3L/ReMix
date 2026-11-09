@@ -1756,6 +1756,8 @@ export interface Project {
   particles?: ParticlesConfig;
   /** 🔖 szerkezeti jelölők az idővonalon */
   markers?: Marker[];
+  /** 🔒 zárolt sávok (közös szerkesztésben a társnál is): rájuk nem lehet írni — a parancs-buszon szinkronizálódik */
+  lockedTracks?: TrackType[];
   /** 🏷️ névvel jelölt idő-tartományok (szervezés/navigáció; nem renderelődik) */
   regions?: TimelineRegion[];
   /** 🎬 story-struktúra fejezetek (Hook/Context/Value/CTA) — a videó „térképe" */

@@ -159,6 +159,10 @@ export const createViewSlice: EditorSlice<ViewSlice> = (set, get) => ({
     const patch: Partial<Pick<EditorState, TrackFlagKey>> = {};
     patch[key] = next;
     set(patch);
+    // 🔒 a zár a projekt része (parancs-buszon): a közös szerkesztésben a társnál is érvényes, mentődik
+    if (flag === 'lock' && get().project) {
+      get().dispatch({ type: 'SET_LOCKED_TRACKS', lockedTracks: next }, 'user');
+    }
   },
 
   cycleTrackHeight: (type) => {

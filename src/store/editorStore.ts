@@ -53,6 +53,20 @@ export const useEditorStore = create<EditorState>()((...a) => ({
   ...createViewSlice(...a),
 }));
 
+/**
+ * 🔒 A sáv-zár forrása a projekt (`lockedTracks`, parancs-buszon — a társ zárolása is ide érkezik,
+ * a visszavonás és a betöltés is): a munkamenet `lockedTracks`-e (amit a mag-kapu és a felület olvas)
+ * minden projekt-változáskor ebből frissül. Régi projekt (mező nélkül) → a munkamenet marad.
+ */
+useEditorStore.subscribe((s, prev) => {
+  if (s.project === prev.project || !s.project) return;
+  const fromProject = s.project.lockedTracks;
+  if (fromProject === undefined && prev.project?.id === s.project.id && prev.project?.lockedTracks === undefined) return;
+  const want = [...(fromProject ?? [])].sort();
+  const have = [...s.lockedTracks].sort();
+  if (want.join() !== have.join()) useEditorStore.setState({ lockedTracks: want });
+});
+
 /** A kijelölt klip kényelmi selectora. */
 export function selectSelectedClip(state: EditorState): Clip | null {
   if (!state.project || !state.selectedClipId) {

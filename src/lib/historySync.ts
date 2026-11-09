@@ -81,6 +81,7 @@ export function undoSyncCommands(from: Project, to: Project, label?: string): Ed
   if (!same(from.markers, to.markers)) out.push({ type: 'SET_MARKERS', markers: to.markers ?? [] });
   if (!same(from.chapters, to.chapters)) out.push({ type: 'SET_CHAPTERS', chapters: to.chapters ?? [] });
   if (!same(from.regions, to.regions)) out.push({ type: 'SET_REGIONS', regions: to.regions ?? [] });
+  if (!same(from.lockedTracks, to.lockedTracks)) out.push({ type: 'SET_LOCKED_TRACKS', lockedTracks: to.lockedTracks ?? [] });
   if (!same(from.links, to.links)) out.push({ type: 'SET_LINKS', links: to.links ?? [] });
   if (from.aspectRatio !== to.aspectRatio) out.push({ type: 'SET_ASPECT', aspectRatio: to.aspectRatio });
   if ((from.fps ?? 30) !== (to.fps ?? 30)) out.push({ type: 'SET_FPS', fps: to.fps ?? 30 });

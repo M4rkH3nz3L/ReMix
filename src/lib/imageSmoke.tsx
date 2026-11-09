@@ -77,6 +77,7 @@ import { lastTakeAlign, setTakeAlignForTest } from '@/lib/recordTakeClient';
 import { selectTakeCommand } from '@/lib/punchRecord';
 import { dbToVolume } from '@/lib/clipGain';
 import { tempoMatchPatch } from '@/lib/tempoMatch';
+import { moveStage } from '@/lib/fxOrder';
 import { previewLocalUri } from '@/lib/previewRemoteCache';
 import { canExtractAudio, extractVideoAudio } from '@/lib/videoAudioImport';
 import { useSilenceReview } from '@/store/silenceReviewStore';
@@ -109,6 +110,7 @@ import { bestUsableWhisperModelId, lastRawTokens, runWhisperSmokeTest, transcrib
 import { catalogAvailability, catalogEntry } from '@/lib/modelCatalog';
 import { decodeToMono16k } from '@/lib/audioDecode';
 import { findClipSilences } from '@/lib/audioSilenceClient';
+import { LiveLoudness } from '@/lib/liveLoudness';
 import { integratedLoudness } from '@/lib/loudness';
 import { getStretchProxySync, stretchProxyKey } from '@/lib/stretchProxy';
 import { trimAudioRight } from '@/lib/audioTrim';
@@ -4836,6 +4838,69 @@ async function smokeLockPersist(log: Log) {
   router.back();
 }
 
+/** 🔀 R3 effekt-sorrend: kompresszor→zengés vs. zengés→kompresszor mérhetően más, az élő előnézet = az export (az adott sorrendben), egy undo. */
+async function smokeFxOrder(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  // 0,25 s-os hangos ütések 1 s-onként (a zengés farka a csendben látszik)
+  const x = Float32Array.from({ length: 10 * SR }, (_, i) => ((i / SR) % 1 < 0.25 ? 0.6 * Math.sin((2 * Math.PI * 440 * i) / SR) : 0));
+  const f = new File(Paths.document, 'smoke_fxorder.wav');
+  if (f.exists) f.delete();
+  f.create();
+  f.write(encodeWav16([x, x], SR, () => 0.5));
+  const id = 'prj_smoke_fxorder';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:fxorder', caught));
+  const base = createEmptyProject('smoke effekt-sorrend', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'k', uri: f.uri, label: 'ütések', start: 0, duration: 10, trimIn: 0, sourceDuration: 10, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported', audioFx: { compressor: true, reverb: 0.8 } };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  const render = async (name: string) => {
+    const { uri: out } = await exportOfflineWav(st().project!, new File(projectExportDir(), name), undefined, undefined, 'float32');
+    const y = (await (await loadAudioApi())!.decodeAudioData(out, SR)).getChannelData(0).slice();
+    new File(out).delete();
+    return y;
+  };
+  // a zengés farkának energiája (az ütések utáni csendben, 0,3–0,9 s)
+  const tail = (y: Float32Array) => {
+    let e = 0;
+    for (let k = 1; k < 9; k++) for (let i = Math.round((k + 0.3) * SR); i < Math.round((k + 0.9) * SR); i++) e += y[i] * y[i];
+    return 10 * Math.log10(e / (8 * 0.6 * SR) + 1e-20);
+  };
+  const a = await render('smoke_fxo_a.wav');
+  const before = JSON.stringify(st().project);
+  st().dispatch({ type: 'UPDATE_CLIP', clipId: 'k', patch: { audioFx: { compressor: true, reverb: 0.8, order: moveStage(undefined, 'reverb', -1) } } });
+  st().selectClip('k');
+  runDevAction('audio.editClip');
+  await sleep(800);
+  log(true, 'FOTÓZHATÓ', 'a klipszerkesztőben az effekt-sorrend (zengés a kompresszor előtt)');
+  await sleep(2500);
+  runDevAction('clipEdit.done');
+  const b = await render('smoke_fxo_b.wav');
+  let d = 0;
+  for (let i = 0; i < Math.min(a.length, b.length); i++) d = Math.max(d, Math.abs(a[i] - b[i]));
+  log(d > 0.01 && Math.abs(tail(a) - tail(b)) > 1, 'a sorrend számít: kompresszor→zengés vs. zengés→kompresszor mérhetően más (a zengés farka)', `max eltérés ${d.toFixed(3)}, farok ${tail(a).toFixed(1)} vs ${tail(b).toFixed(1)} dB`);
+  // az élő előnézet a választott sorrendben = az export (short-term LUFS)
+  st().setPlayhead(0);
+  st().setPlaying(true);
+  for (let i = 0; i < 40 && !previewEngine.isPlaying(); i++) await sleep(50);
+  await sleep(4000);
+  const live = previewEngine.loudness();
+  const pos = st().playhead;
+  st().setPlaying(false);
+  // ugyanaz a mérő (short-term, kapu nélküli 3 s) az export ugyanazon pontjáig
+  const end = Math.round(pos * SR);
+  const meter = new LiveLoudness(SR);
+  meter.push(0, b.subarray(0, end), b.subarray(0, end));
+  const ref = meter.readAt(end).shortTerm;
+  log(!!live && Math.abs(live.shortTerm - ref) <= 0.5, 'az élő előnézet a választott sorrendben szól: a short-term = az export ugyanazon 3 s-a (± 0,5 LU)', live ? `élő ${live.shortTerm.toFixed(2)} vs export ${ref.toFixed(2)} LUFS` : 'null');
+  st().undo();
+  log(JSON.stringify(st().project) === before, 'egy visszavonás: az alap sorrend', '');
+  router.back();
+}
+
 /** 🎚️ Keverőpult tableten: függőleges faderek egymás mellett (képernyőkép), a fader akadálymentes állítása. */
 async function smokeConsole(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7152,6 +7217,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'fxorder') {
+    await step(phase, () => smokeFxOrder(log));
     return;
   }
   if (phase === 'remotegain') {

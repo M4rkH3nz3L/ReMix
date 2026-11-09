@@ -48,6 +48,17 @@ function voiceChain({ voiceEnhance, deReverb }) {
  * Vesszőre végződik (a hívó további szűrőket fűz mögé); üres string = nincs FX.
  * Sorrend: szűrők → zaj/sziszegés → dinamika → tér → normalizálás → limiter.
  */
+/** 🔀 a mozgatható fokozatok sorrendje — a kliens `fxStageOrder` (src/lib/fxOrder.ts) tükre */
+const FX_STAGES = ['filters', 'eq', 'gate', 'deEsser', 'compressor', 'reverb', 'delay', 'stereoWide'];
+function fxStageOrder(order) {
+  const out = [];
+  for (const s of Array.isArray(order) ? order : []) {
+    if (FX_STAGES.includes(s) && !out.includes(s)) out.push(s);
+  }
+  for (const s of FX_STAGES) if (!out.includes(s)) out.push(s);
+  return out;
+}
+
 function audioFxChain(fx) {
   if (!fx) {
     return '';
@@ -70,51 +81,53 @@ function audioFxChain(fx) {
       );
     }
   }
-  if (fx.highpass > 0) {
-    parts.push(`highpass=f=${Math.round(clampN(fx.highpass, 20, 2000))}`);
-  }
-  if (fx.lowpass > 0) {
-    parts.push(`lowpass=f=${Math.round(clampN(fx.lowpass, 1000, 20000))}`);
-  }
-  if (fx.eq) {
-    const g = (v) => clampN(v || 0, -12, 12);
-    if (g(fx.eq.low)) {
-      parts.push(`equalizer=f=100:t=q:w=1:g=${g(fx.eq.low)}`);
-    }
-    if (g(fx.eq.mid)) {
-      parts.push(`equalizer=f=1000:t=q:w=1:g=${g(fx.eq.mid)}`);
-    }
-    if (g(fx.eq.high)) {
-      parts.push(`equalizer=f=8000:t=q:w=1:g=${g(fx.eq.high)}`);
-    }
-  }
-  if (fx.denoise) {
-    parts.push('afftdn=nf=-25');
-  }
-  if (fx.gate) {
+  // 🔀 a mozgatható fokozatok a klip sorrendjében (a kliens `src/lib/fxOrder.ts` tükre — szerződés-teszt);
+  // a zajszűrés a szűrők/EQ után marad (a kliensen előmenet), a normalizálás és a limiter mindig a végén
+  const stages = {
+    filters: () => {
+      if (fx.highpass > 0) parts.push(`highpass=f=${Math.round(clampN(fx.highpass, 20, 2000))}`);
+      if (fx.lowpass > 0) parts.push(`lowpass=f=${Math.round(clampN(fx.lowpass, 1000, 20000))}`);
+    },
+    eq: () => {
+      if (!fx.eq) return;
+      const g = (v) => clampN(v || 0, -12, 12);
+      if (g(fx.eq.low)) parts.push(`equalizer=f=100:t=q:w=1:g=${g(fx.eq.low)}`);
+      if (g(fx.eq.mid)) parts.push(`equalizer=f=1000:t=q:w=1:g=${g(fx.eq.mid)}`);
+      if (g(fx.eq.high)) parts.push(`equalizer=f=8000:t=q:w=1:g=${g(fx.eq.high)}`);
+    },
     // 🚪 zajkapu: a küszöb alatti halk részek (háttérzaj/szünetek) lehalkítása
-    parts.push('agate=threshold=0.05:ratio=9:attack=5:release=80:range=0.06');
+    gate: () => fx.gate && parts.push('agate=threshold=0.05:ratio=9:attack=5:release=80:range=0.06'),
+    deEsser: () => fx.deEsser && parts.push('deesser'),
+    compressor: () => fx.compressor && parts.push('acompressor=threshold=-18dB:ratio=3:attack=5:release=150'),
+    reverb: () => {
+      if (fx.reverb > 0) {
+        const a = clampN(fx.reverb, 0, 1);
+        const dec = (0.3 + a * 0.5).toFixed(2);
+        // két korai visszaverődés — enyhe terem-hatás
+        parts.push(`aecho=0.8:0.9:40|75:${dec}|${(dec * 0.7).toFixed(2)}`);
+      }
+    },
+    delay: () => {
+      if (fx.delay > 0) {
+        const a = clampN(fx.delay, 0, 1);
+        parts.push(`aecho=0.8:0.6:${Math.round(120 + a * 380)}:${(0.2 + a * 0.5).toFixed(2)}`);
+      }
+    },
+    // 🎧 Haas-szélesítés: mono/szűk → szélesebb sztereó-kép
+    stereoWide: () => fx.stereoWide && parts.push('haas'),
+  };
+  const order = fxStageOrder(fx.order);
+  // a zajszűrés az EQ/szűrők után (ha azok elöl vannak), különben a mozgatható rész elején
+  let denoised = false;
+  const denoise = () => {
+    if (!denoised && fx.denoise) parts.push('afftdn=nf=-25');
+    denoised = true;
+  };
+  for (const stage of order) {
+    if (stage !== 'filters' && stage !== 'eq') denoise();
+    stages[stage]();
   }
-  if (fx.deEsser) {
-    parts.push('deesser');
-  }
-  if (fx.compressor) {
-    parts.push('acompressor=threshold=-18dB:ratio=3:attack=5:release=150');
-  }
-  if (fx.reverb > 0) {
-    const a = clampN(fx.reverb, 0, 1);
-    const dec = (0.3 + a * 0.5).toFixed(2);
-    // két korai visszaverődés — enyhe terem-hatás
-    parts.push(`aecho=0.8:0.9:40|75:${dec}|${(dec * 0.7).toFixed(2)}`);
-  }
-  if (fx.delay > 0) {
-    const a = clampN(fx.delay, 0, 1);
-    parts.push(`aecho=0.8:0.6:${Math.round(120 + a * 380)}:${(0.2 + a * 0.5).toFixed(2)}`);
-  }
-  if (fx.stereoWide) {
-    // 🎧 Haas-szélesítés: mono/szűk → szélesebb sztereó-kép (a spatial effektek után)
-    parts.push('haas');
-  }
+  denoise();
   if (fx.normalize) {
     parts.push('loudnorm=I=-16:TP=-1.5:LRA=11');
   }
@@ -199,6 +212,7 @@ function masterGraph(master, out = 'mst') {
 }
 
 module.exports = {
+  fxStageOrder,
   VOICE_ENHANCE,
   dereverbChain,
   voiceChain,

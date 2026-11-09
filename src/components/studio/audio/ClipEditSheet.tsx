@@ -22,6 +22,7 @@ import { stemClipsFrom } from '@/lib/stemClips';
 import { separateStems, STEM_SEPARATION_ENABLED } from '@/lib/stems';
 import { selectTakeCommand } from '@/lib/punchRecord';
 import { tempoMatchPatch, tempoResetPatch } from '@/lib/tempoMatch';
+import { fxStageOrder, moveStage, type FxStage } from '@/lib/fxOrder';
 import { CLIP_DB_MAX, CLIP_DB_MIN, CLIP_VOLUME_MAX, dbToVolume, formatDb, volumeToDb } from '@/lib/clipGain';
 import { TakePicker } from '@/components/studio/audio/TakePicker';
 import { clamp } from '@/lib/time';
@@ -493,6 +494,31 @@ export function ClipEditSheet({
         />
         <Text style={styles.hint}>{t('panels.audio.mixHint')}</Text>
 
+        {/* 🔀 effekt-sorrend: az aktív fokozatok a lánc sorrendjében, léptetéssel (előnézet = export) */}
+        {(() => {
+          const activeStage = (st: FxStage) =>
+            st === 'filters' ? !!(fx.highpass || fx.lowpass) : st === 'eq' ? !!(fx.eq?.low || fx.eq?.mid || fx.eq?.high) : st === 'reverb' ? (fx.reverb ?? 0) > 0 : st === 'delay' ? (fx.delay ?? 0) > 0 : !!fx[st];
+          const order = fxStageOrder(fx.order).filter(activeStage);
+          if (order.length < 2) return null;
+          return (
+            <View style={styles.orderBox} testID="fx-order">
+              <Text style={styles.autoLabel}>{t('studio.audio.fxOrder.title')}</Text>
+              {order.map((st, i) => (
+                <View key={st} style={styles.orderRow}>
+                  <Text style={styles.orderName}>{`${i + 1}. ${t(`studio.audio.fxOrder.stage.${st}`)}`}</Text>
+                  <Pressable onPress={() => patchFx({ order: moveStage(fx.order, st, -1) })} disabled={i === 0} hitSlop={6} style={[styles.orderBtn, i === 0 && { opacity: 0.3 }]} accessibilityLabel={t('studio.audio.fxOrder.up')}>
+                    <Ionicons name="chevron-up" size={16} color={palette.text} />
+                  </Pressable>
+                  <Pressable onPress={() => patchFx({ order: moveStage(fx.order, st, 1) })} disabled={i === order.length - 1} hitSlop={6} style={[styles.orderBtn, i === order.length - 1 && { opacity: 0.3 }]} accessibilityLabel={t('studio.audio.fxOrder.down')}>
+                    <Ionicons name="chevron-down" size={16} color={palette.text} />
+                  </Pressable>
+                </View>
+              ))}
+              <Text style={styles.hint}>{t('studio.audio.fxOrder.hint')}</Text>
+            </View>
+          );
+        })()}
+
         {/* 🔇 csendek keresése → jóváhagyás az idővonalon */}
         <View style={styles.divider} />
         <Pressable
@@ -606,6 +632,10 @@ const styles = StyleSheet.create({
   proTag: { backgroundColor: palette.accentSoft, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   proTagText: { color: palette.accent, fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   presetRow: { gap: 6, paddingVertical: 2, paddingRight: 8, marginBottom: 6 },
+  orderBox: { marginTop: 8, gap: 6 },
+  orderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, borderWidth: 1, borderColor: palette.border, borderRadius: 10, paddingHorizontal: 10 },
+  orderName: { flex: 1, color: palette.text, fontSize: 14, fontWeight: '600' },
+  orderBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.border },
   tempoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
   tempoLabel: { color: palette.textDim, fontSize: 12, fontWeight: '700' },
   tempoBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.border },

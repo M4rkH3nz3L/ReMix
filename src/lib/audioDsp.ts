@@ -1,4 +1,5 @@
 import { sampleChannel } from '@/lib/keyframes';
+import { fxStageOrder, type FxStage } from '@/lib/fxOrder';
 import type { AudioFx, Keyframe } from '@/types/project';
 
 /**
@@ -581,7 +582,7 @@ export const NORMALIZE_PEAK_DB = -1.5;
 const clampN = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /** a közös DSP-ben már megvalósított effektek */
-const SUPPORTED = new Set<keyof AudioFx>(['highpass', 'lowpass', 'eq', 'gate', 'deEsser', 'compressor', 'limiter', 'reverb', 'delay', 'stereoWide', 'pitchSemitones', 'harmony', 'normalize', 'denoise']);
+const SUPPORTED = new Set<keyof AudioFx>(['order', 'highpass', 'lowpass', 'eq', 'gate', 'deEsser', 'compressor', 'limiter', 'reverb', 'delay', 'stereoWide', 'pitchSemitones', 'harmony', 'normalize', 'denoise']);
 
 /** van-e a klipen olyan effekt, amit a közös DSP még nem tud (akkor a régi úton szól) */
 export function fxUnsupported(fx: AudioFx | undefined): boolean {
@@ -650,53 +651,75 @@ export function buildFxChain(fx: AudioFx | undefined, sr: number, normGain = 1, 
     chain.push(new Gate(0.02, 2.5, 8, 90, 0.06, sr), peaking(300, -3, sr, 1.2));
   }
   // 🎛️ automatizált paraméternél a görbe szól (a statikus érték az alap); a szorítás a statikussal azonos
+  const f = fx;
   const hpF = (v: number) => clampN(v, 20, 2000);
   const lpF = (v: number) => clampN(v, 1000, 20000);
   const g = (v: number | undefined) => clampN(v || 0, -12, 12);
-  if (has('fxHighpass')) {
-    chain.push(new AutoBiquad((v) => highpassCoeffs(hpF(v), sr), auto!.fxHighpass!, fx.highpass || 20, sr));
-  } else if (fx.highpass && fx.highpass > 0) {
-    chain.push(highpass(Math.round(hpF(fx.highpass)), sr));
-  }
-  if (has('fxLowpass')) {
-    chain.push(new AutoBiquad((v) => lowpassCoeffs(lpF(v), sr), auto!.fxLowpass!, fx.lowpass || 20000, sr));
-  } else if (fx.lowpass && fx.lowpass > 0) {
-    chain.push(lowpass(Math.round(lpF(fx.lowpass)), sr));
-  }
-  const band = (key: 'fxEqLow' | 'fxEqMid' | 'fxEqHigh', f: number, base: number | undefined) => {
+  const band = (key: 'fxEqLow' | 'fxEqMid' | 'fxEqHigh', freq: number, base: number | undefined) => {
     if (has(key)) {
-      chain.push(new AutoBiquad((v) => peakingCoeffs(f, g(v), sr), auto![key]!, g(base), sr));
+      chain.push(new AutoBiquad((v) => peakingCoeffs(freq, g(v), sr), auto![key]!, g(base), sr));
     } else if (g(base)) {
-      chain.push(peaking(f, g(base), sr));
+      chain.push(peaking(freq, g(base), sr));
     }
   };
-  band('fxEqLow', 100, fx.eq?.low);
-  band('fxEqMid', 1000, fx.eq?.mid);
-  band('fxEqHigh', 8000, fx.eq?.high);
-  // a szerver sorrendje: szűrők → zajszűrés (előmenet: `denoiseStereo`) → kapu → de-esser → kompresszor → … → limiter
-  if (fx.gate) chain.push(new Gate(0.05, 9, 5, 80, 0.06, sr));
-  if (fx.deEsser) chain.push(new DeEsser(sr));
-  if (fx.compressor) chain.push(new Compressor(-18, 3, 5, 150, sr));
   const reverbDecays = (amount: number) => {
     // a mérték 0-nál a zengés elhal (a 0,3-as alap is lehalkul) — a görbe 0-ja tényleg száraz
     const a = clampN(amount, 0, 1);
     const dec = a > 0 ? Number((0.3 + a * 0.5).toFixed(2)) : 0;
     return [dec, Number((dec * 0.7).toFixed(2))];
   };
-  if ((fx.reverb && fx.reverb > 0) || has('fxReverb')) {
-    const e = new Echo(0.8, 0.9, [40, 75], reverbDecays(fx.reverb ?? 0), sr);
-    if (has('fxReverb')) e.auto = { kfs: auto!.fxReverb!, fallback: fx.reverb ?? 0, decaysOf: reverbDecays, sr };
-    chain.push(e);
-  }
-  if ((fx.delay && fx.delay > 0) || has('fxDelay')) {
-    // a delay ideje a statikus mértékből (a késleltetési vonal hossza nem automatizálható kattogás nélkül)
-    const a = clampN(fx.delay ?? 0.5, 0, 1);
-    const delayDecay = (amount: number) => [clampN(amount, 0, 1) > 0 ? Number((0.2 + clampN(amount, 0, 1) * 0.5).toFixed(2)) : 0];
-    const e = new Echo(0.8, 0.6, [Math.round(120 + a * 380)], delayDecay(fx.delay ?? 0), sr);
-    if (has('fxDelay')) e.auto = { kfs: auto!.fxDelay!, fallback: fx.delay ?? 0, decaysOf: delayDecay, sr };
-    chain.push(e);
-  }
-  if (fx.stereoWide) chain.push(new Haas(sr));
+  // 🔀 a mozgatható fokozatok a klip sorrendjében (`fxOrder.ts`; a szerver ugyanezt követi). Az alap
+  // sorrend a szerveré: szűrők → EQ → (zajszűrés: előmenet) → kapu → de-esser → kompresszor → zengés →
+  // visszhang → szélesítés; utána mindig a normalizálás és a limiter
+  const stages: Record<FxStage, () => void> = {
+    filters: () => {
+      if (has('fxHighpass')) {
+        chain.push(new AutoBiquad((v) => highpassCoeffs(hpF(v), sr), auto!.fxHighpass!, f.highpass || 20, sr));
+      } else if (f.highpass && f.highpass > 0) {
+        chain.push(highpass(Math.round(hpF(f.highpass)), sr));
+      }
+      if (has('fxLowpass')) {
+        chain.push(new AutoBiquad((v) => lowpassCoeffs(lpF(v), sr), auto!.fxLowpass!, f.lowpass || 20000, sr));
+      } else if (f.lowpass && f.lowpass > 0) {
+        chain.push(lowpass(Math.round(lpF(f.lowpass)), sr));
+      }
+    },
+    eq: () => {
+      band('fxEqLow', 100, f.eq?.low);
+      band('fxEqMid', 1000, f.eq?.mid);
+      band('fxEqHigh', 8000, f.eq?.high);
+    },
+    gate: () => {
+      if (f.gate) chain.push(new Gate(0.05, 9, 5, 80, 0.06, sr));
+    },
+    deEsser: () => {
+      if (f.deEsser) chain.push(new DeEsser(sr));
+    },
+    compressor: () => {
+      if (f.compressor) chain.push(new Compressor(-18, 3, 5, 150, sr));
+    },
+    reverb: () => {
+      if ((f.reverb && f.reverb > 0) || has('fxReverb')) {
+        const e = new Echo(0.8, 0.9, [40, 75], reverbDecays(f.reverb ?? 0), sr);
+        if (has('fxReverb')) e.auto = { kfs: auto!.fxReverb!, fallback: f.reverb ?? 0, decaysOf: reverbDecays, sr };
+        chain.push(e);
+      }
+    },
+    delay: () => {
+      if ((f.delay && f.delay > 0) || has('fxDelay')) {
+        // a delay ideje a statikus mértékből (a késleltetési vonal hossza nem automatizálható kattogás nélkül)
+        const a = clampN(f.delay ?? 0.5, 0, 1);
+        const delayDecay = (amount: number) => [clampN(amount, 0, 1) > 0 ? Number((0.2 + clampN(amount, 0, 1) * 0.5).toFixed(2)) : 0];
+        const e = new Echo(0.8, 0.6, [Math.round(120 + a * 380)], delayDecay(f.delay ?? 0), sr);
+        if (has('fxDelay')) e.auto = { kfs: auto!.fxDelay!, fallback: f.delay ?? 0, decaysOf: delayDecay, sr };
+        chain.push(e);
+      }
+    },
+    stereoWide: () => {
+      if (f.stereoWide) chain.push(new Haas(sr));
+    },
+  };
+  for (const stage of fxStageOrder(f.order)) stages[stage]();
   // 📏 normalizálás: az előmenetben mért fix erősítés −16 LUFS-re + csúcsplafon −1,5 dB
   if (fx.normalize) {
     chain.push(new Gain(normGain), new Limiter(dbToLin(NORMALIZE_PEAK_DB), 50, sr));

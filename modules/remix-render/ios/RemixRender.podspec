@@ -13,7 +13,10 @@ Pod::Spec.new do |s|
 
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    'SWIFT_COMPILATION_MODE' => 'wholemodule'
+    'SWIFT_COMPILATION_MODE' => 'wholemodule',
+    # ⚡ a DSP-magok (DspKernels) dev-buildben is optimalizálva: -Onone mellett a mintánkénti ciklus a
+    # JS-sel azonos sebességű volt (mérve iPaden: 0,94 vs 1,10 ms / 125 ms-os sztereó biquad)
+    'SWIFT_OPTIMIZATION_LEVEL' => '-O'
   }
 
   s.source_files = "**/*.{h,m,mm,swift,hpp,cpp}"

@@ -75,6 +75,31 @@ class RemixRenderModule : Module() {
       }
     }
 
+    // ⚡ a közös hang-DSP forró ciklusai natívan (a `src/lib/dspKernels.ts` tükre, azonos aritmetikával és
+    // sorrenddel); helyben dolgozik, az állapot a JS `Float64Array`-jében marad
+    Function("dspRun") { kind: Int, l: expo.modules.kotlin.typedarray.Float32Array, r: expo.modules.kotlin.typedarray.Float32Array, p: expo.modules.kotlin.typedarray.Float64Array, st: expo.modules.kotlin.typedarray.Float64Array, aux: expo.modules.kotlin.typedarray.Float32Array? ->
+      val n = l.length
+      if (n == 0) return@Function
+      // tömeges másolás primitív tömbökbe (az elemenkénti Buffer.get/put a debug ART-ban lassú), számolás, vissza
+      val o = java.nio.ByteOrder.nativeOrder()
+      val lb = l.toDirectBuffer().order(o).asFloatBuffer()
+      val rb = r.toDirectBuffer().order(o).asFloatBuffer()
+      val pb = p.toDirectBuffer().order(o).asDoubleBuffer()
+      val sb = st.toDirectBuffer().order(o).asDoubleBuffer()
+      val ab = aux?.toDirectBuffer()?.order(o)?.asFloatBuffer()
+      val la = FloatArray(n).also { lb.get(it) }
+      val ra = FloatArray(r.length).also { rb.get(it) }
+      val pa = DoubleArray(p.length).also { pb.get(it) }
+      val sa = DoubleArray(st.length).also { sb.get(it) }
+      val auxLen = aux?.length ?: 0
+      val aa = ab?.let { FloatArray(auxLen).also { a -> ab.get(a) } }
+      DspKernels.run(kind, la, ra, n, pa, sa, aa, auxLen)
+      lb.rewind(); lb.put(la)
+      rb.rewind(); rb.put(ra)
+      sb.rewind(); sb.put(sa)
+      if (ab != null && aa != null) { ab.rewind(); ab.put(aa) }
+    }
+
     // 🗣️ a telefonon lévő beszédhangok (csak a net nélkül is szólók)
     AsyncFunction("ttsVoices") { promise: Promise ->
       withTts(promise) { engine ->

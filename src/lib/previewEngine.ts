@@ -8,6 +8,7 @@ import { LiveLoudness, type LoudnessReading } from '@/lib/liveLoudness';
 import { addMetronome, type MetronomeConfig } from '@/lib/metronome';
 import { measureMasterGain, mixRange, OFFLINE_SAMPLE_RATE, sourceRanges, stretchJobs, withNormalizeGains, type DecodedSource, type OfflineMixPlan } from '@/lib/offlineMix';
 import { stretchSegment } from '@/lib/offlineMixClient';
+import '@/lib/dspNativeClient';
 
 /**
  * 🎧 „AZT KAPOD, AMIT HALLASZ” — az előre renderelt előnézet. A telefon a lejátszófej ELŐTT

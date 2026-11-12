@@ -169,6 +169,20 @@ public class RemixRenderModule: Module {
       return ["output": s.outputLatency, "input": s.inputLatency, "buffer": s.ioBufferDuration, "category": s.category.rawValue, "route": route, "options": s.categoryOptions.rawValue]
     }
 
+    /// ⚡ a közös hang-DSP forró ciklusai natívan (`src/lib/dspKernels.ts` tükre, azonos aritmetikával és
+    /// sorrenddel — a JIT nélküli Hermesben a teljes lánc nem fért bele a valós időbe). Helyben dolgozik;
+    /// az állapot a JS `Float64Array`-jében marad.
+    Function("dspRun") { (kind: Int, l: Float32Array, r: Float32Array, p: Float64Array, st: Float64Array, aux: Float32Array?) in
+      let n = l.length
+      if n == 0 { return }
+      let L = l.rawPointer.bindMemory(to: Float32.self, capacity: n)
+      let R = r.rawPointer.bindMemory(to: Float32.self, capacity: r.length)
+      let P = p.rawPointer.bindMemory(to: Double.self, capacity: max(1, p.length))
+      let S = st.rawPointer.bindMemory(to: Double.self, capacity: max(1, st.length))
+      let A = aux.map { $0.rawPointer.bindMemory(to: Float32.self, capacity: $0.length) }
+      DspKernels.run(kind, L, R, n, P, S, A, aux?.length ?? 0)
+    }
+
     /// 🗣️ a rendszer beszédhangjai (a telefonon lévők — net nélkül is szólnak)
     AsyncFunction("ttsVoices") { () -> [[String: Any]] in
       AVSpeechSynthesisVoice.speechVoices().map {
@@ -790,6 +804,170 @@ final class SpeechFileJob: NSObject, AVSpeechSynthesizerDelegate {
     DispatchQueue.main.async {
       p.reject(error)
       self.onFinish?()
+    }
+  }
+}
+
+
+/// ⚡ A DSP-magok (a `dspKernels.ts` JS-változatának pontos tükre: float32 olvasás → double számolás → float32 írás).
+enum DspKernels {
+  @inline(__always) static func dbToLin(_ db: Double) -> Double { pow(10.0, db / 20.0) }
+
+  static func compGainDb(_ levelDb: Double, _ thr: Double, _ ratio: Double, _ knee: Double) -> Double {
+    let over = levelDb - thr
+    let half = knee / 2
+    if over <= -half { return 0 }
+    if over >= half { return (1 / ratio - 1) * over }
+    return ((1 / ratio - 1) * pow(over + half, 2)) / (2 * knee)
+  }
+
+  static func highShelfNorm(_ f: Double, _ gainDb: Double, _ sr: Double) -> (Double, Double, Double, Double, Double) {
+    let A = pow(10.0, gainDb / 40.0)
+    let w = (2 * Double.pi * f) / sr
+    let c = cos(w)
+    let alpha = (sin(w) / 2) * 2.0.squareRoot()
+    let sq = 2 * A.squareRoot() * alpha
+    let b0 = A * (A + 1 + (A - 1) * c + sq)
+    let b1 = -2 * A * (A - 1 + (A + 1) * c)
+    let b2 = A * (A + 1 + (A - 1) * c - sq)
+    let a0 = A + 1 - (A - 1) * c + sq
+    let a1 = 2 * (A - 1 - (A + 1) * c)
+    let a2 = A + 1 - (A - 1) * c - sq
+    return (b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0)
+  }
+
+  static func biquadCh(_ buf: UnsafeMutablePointer<Float32>, _ n: Int, _ k: UnsafeMutablePointer<Double>, _ s: UnsafeMutablePointer<Double>, _ o: Int) {
+    var x1 = s[o], x2 = s[o + 1], y1 = s[o + 2], y2 = s[o + 3]
+    let b0 = k[0], b1 = k[1], b2 = k[2], a1 = k[3], a2 = k[4]
+    for i in 0..<n {
+      let x = Double(buf[i])
+      let y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+      x2 = x1; x1 = x; y2 = y1; y1 = y
+      buf[i] = Float32(y)
+    }
+    s[o] = x1; s[o + 1] = x2; s[o + 2] = y1; s[o + 3] = y2
+  }
+
+  static func run(_ kind: Int, _ l: UnsafeMutablePointer<Float32>, _ r: UnsafeMutablePointer<Float32>, _ n: Int,
+                  _ p: UnsafeMutablePointer<Double>, _ st: UnsafeMutablePointer<Double>, _ aux: UnsafeMutablePointer<Float32>?, _ auxLen: Int) {
+    switch kind {
+    case 0: // BIQUAD
+      biquadCh(l, n, p, st, 0)
+      biquadCh(r, n, p, st, 4)
+    case 1: // COMP
+      var env = st[0]
+      let att = p[2], rel = p[3]
+      for i in 0..<n {
+        let li = Double(l[i]), ri = Double(r[i])
+        let pw = (li * li + ri * ri) / 2
+        env += (pw - env) * (pw > env ? att : rel)
+        let g = env > 1e-12 ? dbToLin(compGainDb(10 * log10(env), p[0], p[1], p[4])) : 1
+        l[i] = Float32(Double(l[i]) * g)
+        r[i] = Float32(Double(r[i]) * g)
+      }
+      st[0] = env
+    case 2: // GATE
+      var env = st[0], gain = st[1]
+      let thrDb = p[0], floorDb = p[1], ratio = p[2], att = p[3], rel = p[4]
+      for i in 0..<n {
+        let pk = max(abs(Double(l[i])), abs(Double(r[i])))
+        env += (pk - env) * (pk > env ? att : rel)
+        let lev = 20 * log10(env + 1e-12)
+        let targetDb = lev >= thrDb ? 0 : max(floorDb, (lev - thrDb) * (ratio - 1))
+        let target = dbToLin(targetDb)
+        gain += (target - gain) * (target > gain ? att : rel)
+        l[i] = Float32(Double(l[i]) * gain)
+        r[i] = Float32(Double(r[i]) * gain)
+      }
+      st[0] = env; st[1] = gain
+    case 3: // LIMIT
+      var gain = st[0]
+      let limit = p[0], rel = p[1]
+      for i in 0..<n {
+        let pk = max(abs(Double(l[i])), abs(Double(r[i])))
+        let need = pk * gain > limit ? limit / pk : 1
+        gain = need < gain ? need : gain + (1 - gain) * rel
+        if pk * gain > limit { gain = limit / pk }
+        l[i] = Float32(Double(l[i]) * gain)
+        r[i] = Float32(Double(r[i]) * gain)
+      }
+      st[0] = gain
+    case 4: // SAT
+      let k = p[0], norm = p[1]
+      for i in 0..<n {
+        l[i] = Float32(tanh(k * Double(l[i])) * norm)
+        r[i] = Float32(tanh(k * Double(r[i])) * norm)
+      }
+    case 5: // HAAS
+      guard let line = aux else { return }
+      let len = auxLen
+      var w = Int(st[0])
+      let dl = Int(p[0]), dr = Int(p[1])
+      for i in 0..<n {
+        line[w] = Float32((Double(l[i]) + Double(r[i])) / 2)
+        w = (w + 1) % len
+        l[i] = line[(w - 1 - dl + 2 * len) % len]
+        r[i] = line[(w - 1 - dr + 2 * len) % len]
+      }
+      st[0] = Double(w)
+    case 6: // ECHO
+      guard let all = aux else { return }
+      let len = auxLen / 2
+      let taps = Int(p[2])
+      for ch in 0..<2 {
+        let buf = ch == 0 ? l : r
+        let base = ch * len
+        var w = Int(st[ch])
+        for i in 0..<n {
+          let x = Double(buf[i])
+          all[base + w] = buf[i]
+          w = (w + 1) % len
+          var y = x * p[0]
+          for k in 0..<taps {
+            let d = Int(p[3 + k])
+            y += Double(all[base + ((w - 1 - d + 2 * len) % len)]) * p[3 + taps + k]
+          }
+          buf[i] = Float32(y * p[1])
+        }
+        st[ch] = Double(w)
+      }
+    case 7: // DEESS
+      let hl = UnsafeMutablePointer<Float32>.allocate(capacity: n)
+      let hr = UnsafeMutablePointer<Float32>.allocate(capacity: n)
+      defer { hl.deallocate(); hr.deallocate() }
+      hl.update(from: l, count: n)
+      hr.update(from: r, count: n)
+      biquadCh(hl, n, p + 5, st, 16)
+      biquadCh(hr, n, p + 5, st, 20)
+      let floor = p[0], att = p[1], rel = p[2], sr = p[3]
+      let pos = Int(p[4])
+      var envHi = st[0], envAll = st[1], gain = st[2]
+      var b0 = st[3], b1 = st[4], b2 = st[5], a1 = st[6], a2 = st[7]
+      for i in 0..<n {
+        let hli = Double(hl[i]), hri = Double(hr[i]), li = Double(l[i]), ri = Double(r[i])
+        let ph = (hli * hli + hri * hri) / 2
+        let pa = (li * li + ri * ri) / 2
+        envHi += (ph - envHi) * (ph > envHi ? att : rel)
+        envAll += (pa - envAll) * (pa > envAll ? att : rel)
+        let ratio = envAll > 1e-12 ? envHi / envAll : 0
+        let target = ratio > 0.3 ? max(floor, pow(0.3 / ratio, 2)) : 1
+        gain += (target - gain) * (target < gain ? att : rel)
+        if (pos + i) % 32 == 0 {
+          (b0, b1, b2, a1, a2) = highShelfNorm(6000, 20 * log10(gain), sr)
+        }
+        for ch in 0..<2 {
+          let buf = ch == 0 ? l : r
+          let o = ch == 0 ? 8 : 12
+          let x = Double(buf[i])
+          let y = b0 * x + b1 * st[o] + b2 * st[o + 1] - a1 * st[o + 2] - a2 * st[o + 3]
+          st[o + 1] = st[o]; st[o] = x; st[o + 3] = st[o + 2]; st[o + 2] = y
+          buf[i] = Float32(y)
+        }
+      }
+      st[0] = envHi; st[1] = envAll; st[2] = gain
+      st[3] = b0; st[4] = b1; st[5] = b2; st[6] = a1; st[7] = a2
+    default:
+      break
     }
   }
 }

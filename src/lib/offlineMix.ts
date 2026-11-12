@@ -341,10 +341,19 @@ export function mixRange(
       const read = (from: number, to: number): [Float32Array, Float32Array] => {
         const l = new Float32Array(to - from);
         const r = new Float32Array(to - from);
-        const loopRead = loopN > 0;
         const offR = srcOffset - base;
+        if (loopN === 0) {
+          // folytonos forrás: egy blokkmásolás (natív memcpy) — a tartományon kívüli rész nulla marad
+          const s0 = Math.max(from + offR, 0);
+          const s1 = Math.min(to + offR, left.length);
+          if (s1 > s0) {
+            l.set(left.subarray(s0, s1), s0 - offR - from);
+            r.set(right.subarray(s0, s1), s0 - offR - from);
+          }
+          return [l, r];
+        }
         for (let i = from; i < to; i++) {
-          const s = loopRead ? srcIndex(i) - base : i + offR;
+          const s = srcIndex(i) - base;
           if (s >= 0 && s < left.length) {
             l[i - from] = left[s];
             r[i - from] = right[s];

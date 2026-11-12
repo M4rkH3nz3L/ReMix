@@ -69,6 +69,8 @@ import { barsBeatsLabel, beatSplitTimes } from '@/lib/audioTransport';
 import { useProgressStore } from '@/store/progressStore';
 import { useRecordPrefs } from '@/store/recordPrefsStore';
 import { clickSample } from '@/lib/metronome';
+import { highShelfNorm, KERNEL, nativeDspActive, runKernel, runKernelJs, type KernelKind } from '@/lib/dspKernels';
+import '@/lib/dspNativeClient';
 import { canSpeakOnDevice } from '@/lib/ttsOnDevice';
 import { useAuth } from '@/store/authStore';
 import { useCollabLive } from '@/store/collabLiveStore';
@@ -6156,6 +6158,70 @@ async function smokeDspProf(log: Log) {
   for (const [k, v] of Object.entries(all)) rows.push(`${k} ${run({ [k]: v }, false)}`);
   rows.push(`mind ${run(all, false)}`, `mind+master ${run(all, true)}`);
   log(null, 'ms / 125 ms-os szelet (3 klip)', rows.join(' | '));
+  // egy mag-hívás ára (5512 mintás sztereó szelet): a natív számítás vs a híváskeret
+  const bl = new Float32Array(5512);
+  const br = new Float32Array(5512);
+  const bp = Float64Array.of(0.2, 0.4, 0.2, -0.5, 0.3);
+  const bs = new Float64Array(8);
+  let t1 = Date.now();
+  for (let k = 0; k < 200; k++) runKernel(KERNEL.BIQUAD, bl, br, bp, bs);
+  const nat = (Date.now() - t1) / 200;
+  t1 = Date.now();
+  for (let k = 0; k < 20; k++) runKernelJs(KERNEL.BIQUAD, bl, br, bp, bs);
+  const jsMs = (Date.now() - t1) / 20;
+  const sm = new Float32Array(64);
+  t1 = Date.now();
+  for (let k = 0; k < 2000; k++) runKernel(KERNEL.BIQUAD, sm, sm, bp, bs);
+  log(null, 'egy biquad-hívás', `natív ${nat.toFixed(3)} ms · JS ${jsMs.toFixed(2)} ms · üres hívás ${((Date.now() - t1) / 2000).toFixed(3)} ms`);
+}
+
+/** ⚡ A natív DSP-mag = a JS-mag, bitre (minden fajta, darabolva, eltolt `subarray`-jel is); és a sebesség. */
+async function smokeDspNative(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  log(nativeDspActive(), 'a natív DSP-mag be van kötve (a build tudja)', `${nativeDspActive()}`);
+  if (!nativeDspActive()) return;
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;
+  const sig = (n: number, amp: number) => Float32Array.from({ length: n }, (_, i) => amp * (Math.sin(i / 7) * 0.6 + rnd() * 0.4) * (i % 3000 < 1500 ? 1 : 0.02));
+  const hs = highShelfNorm(5500, 0, 44100);
+  const cases: { name: string; kind: KernelKind; p: () => Float64Array; st: () => Float64Array; aux?: () => Float32Array }[] = [
+    { name: 'biquad', kind: KERNEL.BIQUAD, p: () => Float64Array.of(0.2, 0.4, 0.2, -0.5, 0.3), st: () => new Float64Array(8) },
+    { name: 'kompresszor', kind: KERNEL.COMP, p: () => Float64Array.of(-18, 3, 0.004, 0.0002, 9), st: () => new Float64Array(1) },
+    { name: 'kapu', kind: KERNEL.GATE, p: () => Float64Array.of(-26, -24.4, 9, 0.004, 0.0003), st: () => Float64Array.of(0, 1) },
+    { name: 'limiter', kind: KERNEL.LIMIT, p: () => Float64Array.of(0.5, 0.0005), st: () => Float64Array.of(1) },
+    { name: 'szaturáció', kind: KERNEL.SAT, p: () => Float64Array.of(3.8, 1 / Math.tanh(3.8)), st: () => new Float64Array(0) },
+    { name: 'haas', kind: KERNEL.HAAS, p: () => Float64Array.of(90, 93), st: () => new Float64Array(1), aux: () => new Float32Array(94) },
+    { name: 'visszhang', kind: KERNEL.ECHO, p: () => Float64Array.of(0.8, 0.9, 2, 1764, 3308, 0.55, 0.39), st: () => new Float64Array(2), aux: () => new Float32Array(2 * 3309) },
+    { name: 'de-esser', kind: KERNEL.DEESS, p: () => Float64Array.of(0.25, 0.01, 0.0004, 44100, 7, ...hs), st: () => { const x = new Float64Array(24); x[2] = 1; x[3] = 1; return x; } },
+  ];
+  const eqBits = (a: Float32Array | Float64Array, b: Float32Array | Float64Array) => {
+    const x = new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
+    const y = new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
+    return x.length === y.length && x.every((v, i) => v === y[i]);
+  };
+  for (const c of cases) {
+    const N = 6000;
+    const L0 = sig(N + 64, 0.9);
+    const R0 = sig(N + 64, 0.7);
+    const run = (fn: typeof runKernel) => {
+      const l = Float32Array.from(L0);
+      const r = Float32Array.from(R0);
+      const p = c.p();
+      const st = c.st();
+      const aux = c.aux ? c.aux() : null;
+      // három darab, a középső eltolt nézet (subarray) — a darabolás és az eltolás is számít
+      fn(c.kind, l.subarray(0, 2000), r.subarray(0, 2000), p, st, aux);
+      fn(c.kind, l.subarray(2000, 4100), r.subarray(2000, 4100), p, st, aux);
+      fn(c.kind, l.subarray(4100, N), r.subarray(4100, N), p, st, aux);
+      return { l, r, st, aux };
+    };
+    const js = run(runKernelJs);
+    const nat = run(runKernel);
+    const same = eqBits(js.l, nat.l) && eqBits(js.r, nat.r) && eqBits(js.st, nat.st) && (!js.aux || eqBits(js.aux, nat.aux!));
+    let maxd = 0;
+    for (let i = 0; i < N; i++) maxd = Math.max(maxd, Math.abs(js.l[i] - nat.l[i]), Math.abs(js.r[i] - nat.r[i]));
+    log(same || (Platform.OS === 'android' && maxd < 1e-6), `${c.name}: natív = JS ${same ? '(bitre)' : '(a libm utolsó bitjén belül)'}`, `max eltérés ${maxd.toExponential(1)}`);
+  }
 }
 
 /** ✂️🎚️ Tartomány- és stem-export: a tartomány = a teljes export szelete (masterrel), Σ stem = keverés master nélkül, a némított sáv kimarad. */
@@ -7978,6 +8044,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'dspnative') {
+    await step(phase, () => smokeDspNative(log));
     return;
   }
   if (phase === 'dspprof') {

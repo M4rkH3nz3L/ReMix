@@ -1,6 +1,7 @@
 import { sampleChannel } from '@/lib/keyframes';
 import { fxStageOrder, type FxStage } from '@/lib/fxOrder';
 import type { AudioFx, Keyframe } from '@/types/project';
+import { compGainDb, KERNEL, runKernel } from '@/lib/dspKernels';
 
 /**
  * 🎛️ A KÖZÖS hang-DSP (PRO-AUDIO „azt kapod, amit hallasz”): az előnézet és a telefonos export
@@ -24,65 +25,35 @@ export interface Processor {
 
 /** másodrendű IIR szűrő (direkt I. alak, csatornánkénti állapot) */
 export class Biquad implements Processor {
-  private b0: number;
-  private b1: number;
-  private b2: number;
-  private a1: number;
-  private a2: number;
-  private x1 = [0, 0];
-  private x2 = [0, 0];
-  private y1 = [0, 0];
-  private y2 = [0, 0];
+  /** normált együtthatók: b0 b1 b2 a1 a2 */
+  private readonly k = new Float64Array(5);
+  /** állapot: x1 x2 y1 y2 (bal), x1 x2 y1 y2 (jobb) — 64 bites */
+  private st = new Float64Array(8);
 
   constructor(c: { b0: number; b1: number; b2: number; a0: number; a1: number; a2: number }) {
-    this.b0 = c.b0 / c.a0;
-    this.b1 = c.b1 / c.a0;
-    this.b2 = c.b2 / c.a0;
-    this.a1 = c.a1 / c.a0;
-    this.a2 = c.a2 / c.a0;
+    this.setCoeffs(c);
   }
 
   /** új együtthatók (az állapot marad — automációhoz) */
   setCoeffs(c: { b0: number; b1: number; b2: number; a0: number; a1: number; a2: number }): void {
-    this.b0 = c.b0 / c.a0;
-    this.b1 = c.b1 / c.a0;
-    this.b2 = c.b2 / c.a0;
-    this.a1 = c.a1 / c.a0;
-    this.a2 = c.a2 / c.a0;
+    this.k[0] = c.b0 / c.a0;
+    this.k[1] = c.b1 / c.a0;
+    this.k[2] = c.b2 / c.a0;
+    this.k[3] = c.a1 / c.a0;
+    this.k[4] = c.a2 / c.a0;
+  }
+
+  /** a normált együtthatók (a de-esser detektora a natív magnak adja tovább) */
+  coeffs(): Float64Array {
+    return this.k;
   }
 
   reset(): void {
-    this.x1 = [0, 0];
-    this.x2 = [0, 0];
-    this.y1 = [0, 0];
-    this.y2 = [0, 0];
+    this.st = new Float64Array(8);
   }
 
   processStereo(l: Float32Array, r: Float32Array): void {
-    this.process(l, 0);
-    this.process(r, 1);
-  }
-
-  /** helyben szűr egy csatornát */
-  process(buf: Float32Array, ch: number): void {
-    let x1 = this.x1[ch];
-    let x2 = this.x2[ch];
-    let y1 = this.y1[ch];
-    let y2 = this.y2[ch];
-    const { b0, b1, b2, a1, a2 } = this;
-    for (let i = 0; i < buf.length; i++) {
-      const x = buf[i];
-      const y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
-      x2 = x1;
-      x1 = x;
-      y2 = y1;
-      y1 = y;
-      buf[i] = y;
-    }
-    this.x1[ch] = x1;
-    this.x2[ch] = x2;
-    this.y1[ch] = y1;
-    this.y2[ch] = y2;
+    runKernel(KERNEL.BIQUAD, l, r, this.k, this.st);
   }
 }
 
@@ -175,9 +146,12 @@ const coeff = (ms: number, sr: number) => 1 - Math.exp(-1 / ((ms / 1000) * sr));
  * A szerver alapbeállítása: −18 dB, 3:1, 5 / 150 ms.
  */
 export class Compressor implements Processor {
-  private env = 0;
   private readonly att: number;
   private readonly rel: number;
+  /** küszöb arány felfutás lecsengés térd */
+  private readonly p: Float64Array;
+  /** env */
+  private readonly st = new Float64Array(1);
 
   constructor(
     private readonly thresholdDb: number,
@@ -189,28 +163,16 @@ export class Compressor implements Processor {
   ) {
     this.att = coeff(attackMs, sr);
     this.rel = coeff(releaseMs, sr);
+    this.p = Float64Array.of(thresholdDb, ratio, this.att, this.rel, kneeDb);
   }
 
-  /** a statikus görbe: bemeneti szint (dB) → erősítés (dB) */
+  /** a statikus görbe: bemeneti szint (dB) → erősítés (dB) — lágy térd: négyzetes átmenet */
   gainDb(levelDb: number): number {
-    const over = levelDb - this.thresholdDb;
-    const half = this.kneeDb / 2;
-    if (over <= -half) return 0;
-    if (over >= half) return (1 / this.ratio - 1) * over;
-    // lágy térd: négyzetes átmenet
-    return ((1 / this.ratio - 1) * (over + half) ** 2) / (2 * this.kneeDb);
+    return compGainDb(levelDb, this.thresholdDb, this.ratio, this.kneeDb);
   }
 
   processStereo(l: Float32Array, r: Float32Array): void {
-    let env = this.env;
-    for (let i = 0; i < l.length; i++) {
-      const p = (l[i] * l[i] + r[i] * r[i]) / 2;
-      env += (p - env) * (p > env ? this.att : this.rel);
-      const g = env > 1e-12 ? dbToLin(this.gainDb(10 * Math.log10(env))) : 1;
-      l[i] *= g;
-      r[i] *= g;
-    }
-    this.env = env;
+    runKernel(KERNEL.COMP, l, r, this.p, this.st);
   }
 }
 
@@ -219,41 +181,28 @@ export class Compressor implements Processor {
  * `rangeLin` szintig. A szerver alapbeállítása: küszöb 0,05 (≈ −26 dB), 9:1, 5 / 80 ms, 0,06.
  */
 export class Gate implements Processor {
-  private env = 0;
-  private gain = 1;
   private readonly att: number;
   private readonly rel: number;
+  /** küszöb (dB) padló (dB) arány felfutás lecsengés */
+  private readonly p: Float64Array;
+  /** env gain */
+  private readonly st = Float64Array.of(0, 1);
 
   constructor(
-    private readonly thresholdLin: number,
-    private readonly ratio: number,
+    thresholdLin: number,
+    ratio: number,
     attackMs: number,
     releaseMs: number,
-    private readonly rangeLin: number,
+    rangeLin: number,
     sr: number
   ) {
     this.att = coeff(attackMs, sr);
     this.rel = coeff(releaseMs, sr);
+    this.p = Float64Array.of(20 * Math.log10(thresholdLin), 20 * Math.log10(rangeLin), ratio, this.att, this.rel);
   }
 
   processStereo(l: Float32Array, r: Float32Array): void {
-    let env = this.env;
-    let gain = this.gain;
-    const thrDb = 20 * Math.log10(this.thresholdLin);
-    const floorDb = 20 * Math.log10(this.rangeLin);
-    for (let i = 0; i < l.length; i++) {
-      const p = Math.max(Math.abs(l[i]), Math.abs(r[i]));
-      env += (p - env) * (p > env ? this.att : this.rel);
-      const lev = 20 * Math.log10(env + 1e-12);
-      const targetDb = lev >= thrDb ? 0 : Math.max(floorDb, (lev - thrDb) * (this.ratio - 1));
-      const target = dbToLin(targetDb);
-      // nyitás gyorsan, zárás lassan (nincs kattogás)
-      gain += (target - gain) * (target > gain ? this.att : this.rel);
-      l[i] *= gain;
-      r[i] *= gain;
-    }
-    this.env = env;
-    this.gain = gain;
+    runKernel(KERNEL.GATE, l, r, this.p, this.st);
   }
 }
 
@@ -286,57 +235,22 @@ function highShelf(f: number, gainDb: number, sr: number): Biquad {
  * 32 mintás rácsán frissül (a darabolástól független), az állapota folytonos (nincs kattogás).
  */
 export class DeEsser implements Processor {
-  private readonly detect: Biquad;
-  private envHi = 0;
-  private envAll = 0;
-  private gain = 1;
-  private readonly att: number;
-  private readonly rel: number;
-  private x1 = [0, 0];
-  private x2 = [0, 0];
-  private y1 = [0, 0];
-  private y2 = [0, 0];
-  /** a polc aktuális (normált) együtthatói: b0, b1, b2, a1, a2 — kezdetben átengedő */
-  private k: [number, number, number, number, number] = [1, 0, 0, 0, 0];
+  /** padló felfutás lecsengés sr pos · a detektor (5500 Hz-es felüláteresztő) együtthatói */
+  private readonly p: Float64Array;
+  /** envHi envAll gain · a polc együtthatói (kezdetben átengedő) · a polc és a detektor állapota */
+  private readonly st = new Float64Array(24);
 
-  constructor(private readonly sr: number, private readonly maxCutDb = 12) {
-    this.detect = highpass(5500, sr);
-    this.att = coeff(2, sr);
-    this.rel = coeff(60, sr);
+  constructor(sr: number, maxCutDb = 12) {
+    const detect = highpass(5500, sr).coeffs();
+    this.p = Float64Array.of(dbToLin(-maxCutDb), coeff(2, sr), coeff(60, sr), sr, 0, detect[0], detect[1], detect[2], detect[3], detect[4]);
+    this.st[2] = 1;
+    this.st[3] = 1;
   }
 
   processStereo(l: Float32Array, r: Float32Array, pos: number): void {
-    const hl = Float32Array.from(l);
-    const hr = Float32Array.from(r);
-    this.detect.processStereo(hl, hr);
-    const floor = dbToLin(-this.maxCutDb);
-    // az együtthatók CSAK a rácspontokon változnak (a darab eleje nem rácspont)
-    let [b0, b1, b2, a1, a2] = this.k;
-    const coeffs = () => {
-      const c = highShelfCoeffs(6000, 20 * Math.log10(this.gain), this.sr);
-      [b0, b1, b2, a1, a2] = this.k = [c.b0 / c.a0, c.b1 / c.a0, c.b2 / c.a0, c.a1 / c.a0, c.a2 / c.a0];
-    };
-    for (let i = 0; i < l.length; i++) {
-      const ph = (hl[i] * hl[i] + hr[i] * hr[i]) / 2;
-      const pa = (l[i] * l[i] + r[i] * r[i]) / 2;
-      this.envHi += (ph - this.envHi) * (ph > this.envHi ? this.att : this.rel);
-      this.envAll += (pa - this.envAll) * (pa > this.envAll ? this.att : this.rel);
-      const ratio = this.envAll > 1e-12 ? this.envHi / this.envAll : 0;
-      const target = ratio > 0.3 ? Math.max(floor, (0.3 / ratio) ** 2) : 1;
-      this.gain += (target - this.gain) * (target < this.gain ? this.att : this.rel);
-      // a polc a klip saját 32 mintás rácsán frissül
-      if ((pos + i) % 32 === 0) coeffs();
-      for (let ch = 0; ch < 2; ch++) {
-        const buf = ch === 0 ? l : r;
-        const x = buf[i];
-        const y = b0 * x + b1 * this.x1[ch] + b2 * this.x2[ch] - a1 * this.y1[ch] - a2 * this.y2[ch];
-        this.x2[ch] = this.x1[ch];
-        this.x1[ch] = x;
-        this.y2[ch] = this.y1[ch];
-        this.y1[ch] = y;
-        buf[i] = y;
-      }
-    }
+    // a polc a klip saját 32 mintás rácsán frissül (a darab eleje nem rácspont)
+    this.p[4] = pos;
+    runKernel(KERNEL.DEESS, l, r, this.p, this.st);
   }
 }
 
@@ -345,50 +259,17 @@ export class DeEsser implements Processor {
  * át), utána simán enged vissza (`releaseMs`). A szerver alapbeállítása: 0,95.
  */
 export class Limiter implements Processor {
-  private gain = 1;
-  private readonly rel: number;
+  /** plafon lecsengés */
+  private readonly p: Float64Array;
+  /** gain */
+  private readonly st = Float64Array.of(1);
 
-  constructor(private readonly limit: number, releaseMs: number, sr: number) {
-    this.rel = coeff(releaseMs, sr);
+  constructor(limit: number, releaseMs: number, sr: number) {
+    this.p = Float64Array.of(limit, coeff(releaseMs, sr));
   }
 
   processStereo(l: Float32Array, r: Float32Array): void {
-    let gain = this.gain;
-    for (let i = 0; i < l.length; i++) {
-      const p = Math.max(Math.abs(l[i]), Math.abs(r[i]));
-      const need = p * gain > this.limit ? this.limit / p : 1;
-      gain = need < gain ? need : gain + (1 - gain) * this.rel;
-      if (p * gain > this.limit) gain = this.limit / p;
-      l[i] *= gain;
-      r[i] *= gain;
-    }
-    this.gain = gain;
-  }
-}
-
-/** késleltetési vonal (gyűrűpuffer) — a darabok között folytonos */
-class DelayLine {
-  private buf: Float32Array;
-  private w = 0;
-  constructor(maxSamples: number) {
-    this.buf = new Float32Array(Math.max(1, maxSamples + 1));
-  }
-  /** beírja `x`-et, és visszaadja a `d` mintával korábbit */
-  push(x: number, d: number): number {
-    this.buf[this.w] = x;
-    const len = this.buf.length;
-    const out = this.buf[(this.w - d + len) % len];
-    this.w = (this.w + 1) % len;
-    return out;
-  }
-  /** a `d` mintával korábbi érték (beírás nélkül, a most beírt utánra számolva) */
-  tap(d: number): number {
-    const len = this.buf.length;
-    return this.buf[(this.w - 1 - d + 2 * len) % len];
-  }
-  write(x: number): void {
-    this.buf[this.w] = x;
-    this.w = (this.w + 1) % this.buf.length;
+    runKernel(KERNEL.LIMIT, l, r, this.p, this.st);
   }
 }
 
@@ -398,41 +279,39 @@ class DelayLine {
  * visszaverődés (40 / 75 ms), a delay egy hosszú (120–500 ms).
  */
 export class Echo implements Processor {
-  private lines: [DelayLine, DelayLine];
-  private readonly taps: number[];
+  /** a két csatorna vonala egymás után (csatornánként `len` minta) */
+  private readonly lines: Float32Array;
+  /** írófej (bal), írófej (jobb) */
+  private readonly st = new Float64Array(2);
+  /** be-erősítés ki-erősítés n · késések · csillapítások */
+  private readonly p: Float64Array;
+  private readonly n: number;
 
-  constructor(
-    private readonly inGain: number,
-    private readonly outGain: number,
-    delaysMs: number[],
-    private decays: number[],
-    sr: number
-  ) {
-    this.taps = delaysMs.map((ms) => Math.round((ms / 1000) * sr));
-    const max = Math.max(...this.taps);
-    this.lines = [new DelayLine(max), new DelayLine(max)];
+  constructor(inGain: number, outGain: number, delaysMs: number[], decays: number[], sr: number) {
+    const taps = delaysMs.map((ms) => Math.round((ms / 1000) * sr));
+    this.n = taps.length;
+    this.lines = new Float32Array(2 * Math.max(1, Math.max(...taps) + 1));
+    this.p = Float64Array.of(inGain, outGain, taps.length, ...taps, ...decays);
   }
 
   /** 🎛️ a csillapítások automációja: a mérték (0–1) görbéje → csillapítások (64 mintánként) */
   auto?: { kfs: Keyframe[]; fallback: number; decaysOf: (amount: number) => number[]; sr: number };
 
   processStereo(l: Float32Array, r: Float32Array, pos = 0): void {
-    const io = [l, r];
-    for (let ch = 0; ch < 2; ch++) {
-      const buf = io[ch];
-      const line = this.lines[ch];
-      let decays = this.decays;
-      for (let i = 0; i < buf.length; i++) {
-        if (this.auto && (i === 0 || (pos + i) % AUTO_BLOCK === 0)) {
-          const at = pos + i;
-          decays = this.auto.decaysOf(sampleChannel(this.auto.kfs, (at - (at % AUTO_BLOCK)) / this.auto.sr, this.auto.fallback));
-        }
-        const x = buf[i];
-        line.write(x);
-        let y = x * this.inGain;
-        for (let k = 0; k < this.taps.length; k++) y += line.tap(this.taps[k]) * decays[k];
-        buf[i] = y * this.outGain;
-      }
+    if (!this.auto) {
+      runKernel(KERNEL.ECHO, l, r, this.p, this.st, this.lines);
+      return;
+    }
+    // automáció: a darab az automáció 64 mintás rácsán szakaszokra bomlik, szakaszonként a görbe értékével
+    const a = this.auto;
+    let i = 0;
+    while (i < l.length) {
+      const at = pos + i;
+      const next = Math.min(l.length, i + (AUTO_BLOCK - (at % AUTO_BLOCK)));
+      const decays = a.decaysOf(sampleChannel(a.kfs, (at - (at % AUTO_BLOCK)) / a.sr, a.fallback));
+      for (let k = 0; k < this.n; k++) this.p[3 + this.n + k] = decays[k];
+      runKernel(KERNEL.ECHO, l.subarray(i, next), r.subarray(i, next), this.p, this.st, this.lines);
+      i = next;
     }
   }
 }
@@ -442,22 +321,19 @@ export class Echo implements Processor {
  * a szerver `haas` alapbeállítása (mono vagy szűk jelből széles sztereó-kép).
  */
 export class Haas implements Processor {
-  private readonly line: DelayLine;
-  private readonly dl: number;
-  private readonly dr: number;
+  private readonly line: Float32Array;
+  private readonly st = new Float64Array(1);
+  private readonly p: Float64Array;
 
   constructor(sr: number, leftMs = 2.05, rightMs = 2.12) {
-    this.dl = Math.round((leftMs / 1000) * sr);
-    this.dr = Math.round((rightMs / 1000) * sr);
-    this.line = new DelayLine(Math.max(this.dl, this.dr));
+    const dl = Math.round((leftMs / 1000) * sr);
+    const dr = Math.round((rightMs / 1000) * sr);
+    this.line = new Float32Array(Math.max(1, Math.max(dl, dr) + 1));
+    this.p = Float64Array.of(dl, dr);
   }
 
   processStereo(l: Float32Array, r: Float32Array): void {
-    for (let i = 0; i < l.length; i++) {
-      this.line.write((l[i] + r[i]) / 2);
-      l[i] = this.line.tap(this.dl);
-      r[i] = this.line.tap(this.dr);
-    }
+    runKernel(KERNEL.HAAS, l, r, this.p, this.st, this.line);
   }
 }
 
@@ -585,15 +461,12 @@ export function saturationDrive(amount: number | undefined): number | null {
 
 /** 🔥 lágy telítés: y = tanh(k·x)/tanh(k) — a 0 dBFS marad 0 dBFS, a halkabb rész erősödik, felharmonikusok */
 export class Saturator implements Processor {
-  private readonly norm: number;
-  constructor(private readonly k: number) {
-    this.norm = 1 / Math.tanh(k);
+  private readonly p: Float64Array;
+  constructor(k: number) {
+    this.p = Float64Array.of(k, 1 / Math.tanh(k));
   }
   processStereo(l: Float32Array, r: Float32Array): void {
-    for (let i = 0; i < l.length; i++) {
-      l[i] = Math.tanh(this.k * l[i]) * this.norm;
-      r[i] = Math.tanh(this.k * r[i]) * this.norm;
-    }
+    runKernel(KERNEL.SAT, l, r, this.p, new Float64Array(0));
   }
 }
 

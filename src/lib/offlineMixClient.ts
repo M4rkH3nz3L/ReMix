@@ -13,6 +13,7 @@ import { ZipStoreWriter } from '@/lib/zipStore';
 import type { ProgressUpdate } from '@/lib/progress';
 import { RenderCancelledError } from '@/lib/render';
 import type { Project } from '@/types/project';
+import '@/lib/dspNativeClient';
 
 /**
  * a telefonos export felső határa: a hosszú forrás szakaszosan olvasódik (`longSource`), a

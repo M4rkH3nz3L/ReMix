@@ -121,6 +121,7 @@ import { getStretchProxySync, stretchProxyKey } from '@/lib/stretchProxy';
 import { trimAudioRight } from '@/lib/audioTrim';
 import type { RenderSettings } from '@/lib/render';
 import { encodeWav16, wavHeader16 } from '@/lib/offlineMix';
+import { detectBeats, lastBeatPath } from '@/lib/beats';
 import { canDetachAudio, detachAudioCommands } from '@/lib/audioExtract';
 import { freeDiskBytes, setFreeDiskOverride } from '@/lib/diskSpaceClient';
 import { EXPORT_SPACE_MARGIN, RECORD_STOP_FREE, wavBytes } from '@/lib/diskSpace';
@@ -5817,6 +5818,64 @@ async function smokeInstrumentEdit(log: Log) {
   }
 }
 
+/** 🥁 AP3: a tempó-felismerés a telefonon fut (worker nélkül); 120 és 93 BPM klikk-sávon ±1 BPM, a beatek a rácson. */
+async function smokeBpmOffline(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const click = (name: string, bpm: number, sec: number) => {
+    const x = new Float32Array(Math.round(sec * SR));
+    let seed = bpm;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;
+    const period = (60 / bpm) * SR;
+    for (let k = 0; k * period < x.length; k++) {
+      const at = Math.round(k * period);
+      const amp = k % 4 === 0 ? 0.9 : 0.5;
+      for (let i = 0; i < 1600 && at + i < x.length; i++) x[at + i] += amp * Math.exp(-i / 240) * rnd();
+    }
+    const file = new File(Paths.document, name);
+    if (file.exists) file.delete();
+    file.create();
+    file.write(encodeWav16([x, x], SR, () => 0.5));
+    return file.uri;
+  };
+  const id = 'prj_smoke_bpm';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:bpm', caught));
+  const base = createEmptyProject('smoke bpm', '9:16', undefined, 'audio');
+  const files = [click('smoke_click_120.wav', 120, 20), click('smoke_click_93.wav', 93, 20)];
+  const mk = (uri: string, cid: string): AudioClip => ({ kind: 'audio', id: cid, label: cid, start: 0, duration: 20, trimIn: 0, sourceDuration: 20, uri, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' });
+  await saveProject({ ...base, id, bpm: 100, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [mk(files[0], 'c120')] } : t.type === 'sfx' ? { ...t, clips: [mk(files[1], 'c93')] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  try {
+    for (const [cid, bpm] of [['c120', 120], ['c93', 93]] as const) {
+      st().selectClip(cid);
+      await sleep(200);
+      const t0 = Date.now();
+      await runDevAction('audio.autoBpm');
+      const ms = Date.now() - t0;
+      const got = st().project!.bpm ?? 0;
+      const grid = await detectBeats(files[cid === 'c120' ? 0 : 1]);
+      const period = 60 / bpm;
+      const offs = (grid?.beats ?? []).slice(1, -1).map((b) => {
+        const o = ((b % period) + period) % period;
+        return o > period / 2 ? o - period : o;
+      });
+      const worst = Math.max(...offs.map((o) => Math.abs(o) * 1000));
+      const mean = (offs.reduce((a, o) => a + o, 0) / Math.max(1, offs.length)) * 1000;
+      log(Math.abs(got - bpm) <= 1 && lastBeatPath() === 'device' && worst <= 52 && Math.abs(mean) <= 25, `${bpm} BPM klikk-sáv: a stúdió „Tempó felismerése” a telefonon (worker nélkül) ±1 BPM, a beatek a rácson`, `${got} BPM, ${lastBeatPath()}, ${ms} ms, beat-eltérés átlag ${mean.toFixed(1)} / max ${worst.toFixed(1)} ms`);
+    }
+    log(true, 'FOTÓZHATÓ', 'a felismert tempó és a beat-vonalak az idővonalon');
+    await sleep(2500);
+  } finally {
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:bpm-del', caught));
+    for (const f of files) new File(f).delete();
+  }
+}
+
 /** ✂️🎚️ Tartomány- és stem-export: a tartomány = a teljes export szelete (masterrel), Σ stem = keverés master nélkül, a némított sáv kimarad. */
 async function smokeStemExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7634,6 +7693,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'bpmoffline') {
+    await step(phase, () => smokeBpmOffline(log));
     return;
   }
   if (phase === 'instredit') {

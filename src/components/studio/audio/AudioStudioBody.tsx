@@ -173,6 +173,7 @@ export function AudioStudioBody({
   const [adding, setAdding] = useState(false);
   const [tts, setTts] = useState(false);
   const [pianoRoll, setPianoRoll] = useState(false);
+  const autoBpmRef = useRef<() => Promise<void>>(async () => {});
   /** 🎹🥁 az újraszerkesztett hangszer-minta (null = új minta) */
   const [editDocId, setEditDocId] = useState<string | null>(null);
   const [pianoBusy, setPianoBusy] = useState(false);
@@ -268,7 +269,7 @@ export function AudioStudioBody({
   }, [playhead, isPlaying]);
 
   // 🧪 a füstteszt a gombok mögötti függvényeket hívja (csak __DEV__)
-  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void; meter: () => void; beatSplit: (every: 'bar' | 'beat') => number; silenceFind: () => Promise<number | null>; speechStart: () => Promise<number | null>; speechUpgrade: () => Promise<number | null>; syncSelected: () => Promise<unknown>; openDrums: () => void; editClip: () => void; closeDrums: () => void; assistant: () => void; pianoRoll: (open: boolean) => void }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {}, meter: () => {}, beatSplit: () => 0, silenceFind: async () => null, speechStart: async () => null, speechUpgrade: async () => null, syncSelected: async () => null, openDrums: () => {}, editClip: () => {}, closeDrums: () => {}, assistant: () => {}, pianoRoll: () => {} });
+  const devRef = useRef<{ fit: () => void; zoomIn: () => void; marker: () => void; addLane: () => void; mixer: () => void; copy: () => void; paste: () => void; duplicate: () => void; meter: () => void; beatSplit: (every: 'bar' | 'beat') => number; silenceFind: () => Promise<number | null>; speechStart: () => Promise<number | null>; speechUpgrade: () => Promise<number | null>; syncSelected: () => Promise<unknown>; openDrums: () => void; editClip: () => void; closeDrums: () => void; assistant: () => void; pianoRoll: (open: boolean) => void; autoBpm: () => Promise<void> }>({ fit: () => {}, zoomIn: () => {}, marker: () => {}, addLane: () => {}, mixer: () => {}, copy: () => {}, paste: () => {}, duplicate: () => {}, meter: () => {}, beatSplit: () => 0, silenceFind: async () => null, speechStart: async () => null, speechUpgrade: async () => null, syncSelected: async () => null, openDrums: () => {}, editClip: () => {}, closeDrums: () => {}, assistant: () => {}, pianoRoll: () => {}, autoBpm: async () => {} });
   useEffect(() => {
     const offs = [
       registerDevAction('audio.fit', () => devRef.current.fit()),
@@ -293,6 +294,7 @@ export function AudioStudioBody({
       registerDevAction('audio.openDrums', () => devRef.current.openDrums()),
       registerDevAction('audio.editClip', () => devRef.current.editClip()),
       registerDevAction('audio.closeDrums', () => devRef.current.closeDrums()),
+      registerDevAction('audio.autoBpm', () => devRef.current.autoBpm()),
       registerDevAction('audio.openPianoRoll', () => devRef.current.pianoRoll(true)),
       registerDevAction('audio.closePianoRoll', () => devRef.current.pianoRoll(false)),
       registerDevAction('audio.assistant', () => devRef.current.assistant()),
@@ -547,7 +549,7 @@ export function AudioStudioBody({
     const c = selectedAudioClip(st.project, st.selectedClipId);
     const ref = c ? syncCandidates(c)[0] : undefined;
     return c && ref ? runAudioSync(c, ref, fps, t, true) : null;
-  }, openDrums: () => setDrumMachine(true), editClip: () => setEditing(true), closeDrums: () => setDrumMachine(false), assistant: () => setAssistantOpen(true), pianoRoll: (open) => setPianoRoll(open) };
+  }, openDrums: () => setDrumMachine(true), editClip: () => setEditing(true), closeDrums: () => setDrumMachine(false), assistant: () => setAssistantOpen(true), pianoRoll: (open) => setPianoRoll(open), autoBpm: () => autoBpmRef.current() };
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
   // 🎙️ A10: a felvétel akkor is klip lesz, ha az app háttérbe megy vagy a képernyő bezárul
@@ -679,7 +681,7 @@ export function AudioStudioBody({
   const toggleFlag = (type: TrackType, flag: 'mute' | 'solo') =>
     useEditorStore.getState().toggleTrackFlag(type, flag);
 
-  // 🥁🔎 tempó auto-felismerés: a kiválasztott (vagy az első hang-) klip beat-rácsából (/beats) → BPM
+  // 🥁🔎 tempó auto-felismerés: a kiválasztott (vagy az első hang-) klip beat-rácsából → BPM (a telefonon, offline; a worker tartalék)
   const autoDetectBpm = async () => {
     if (bpmBusy) {
       return;
@@ -701,12 +703,15 @@ export function AudioStudioBody({
         // 🥁📍 a felismert beatek a forrás idejében maradnak, a vonalak a klipekből számolódnak
         setDetectedBeats({ uri, beats: grid.beats ?? [] });
       } else {
-        Alert.alert(t('studio.audio.autoBpm', { defaultValue: 'Tempó felismerése' }), t('studio.audio.autoBpmFail', { defaultValue: 'Nem sikerült tempót felismerni (fut a render-worker?).' }));
+        Alert.alert(t('studio.audio.autoBpm', { defaultValue: 'Tempó felismerése' }), t('studio.audio.autoBpmFail', { defaultValue: 'Nem sikerült felismerni a tempót.' }));
       }
     } finally {
       setBpmBusy(false);
     }
   };
+
+  // 🧪 füstteszt: a tempó-felismerés (a devRef a deklaráció előtt épül)
+  autoBpmRef.current = autoDetectBpm;
 
   /**
    * 🎹🥁 a sütött minta a sávra: új minta → a minta (`InstrumentDoc`) + egy új klip a playheadnél;

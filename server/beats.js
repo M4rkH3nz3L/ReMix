@@ -94,7 +94,8 @@ function estimateTempo(flux) {
       bestLag = lag;
     }
   }
-  if (bestLag === 0) {
+  // csend / ütemtelen zaj: nincs pozitív korreláció → nincs tempó (eddig a legkisebb lagot, ~260 BPM-et adta)
+  if (bestLag === 0 || bestScore <= 0) {
     return null;
   }
   // tört periódus finomítása fésű-pásztázással: a legjobb fázisú rács-összeg
@@ -194,7 +195,14 @@ function analyzeBeatsFromPcm(pcm, sampleRate = SR) {
     return { bpm: 0, beats: [], downbeats: [], energy: [], duration };
   }
   const beatIdx = beatPositions(flux, periodHops);
-  const beats = beatIdx.map((i) => Math.round(i * HOP_SEC * 1000) / 1000);
+  // a beat ideje az elemző ablak KÖZEPE (eddig az eleje: a beatek ~fél ablakkal, ~46 ms-mal korábbra estek)
+  // + a fluxus-csúcs parabolikus finomítása (a hop-rácsnál pontosabb, ±fél hop)
+  const subHop = (i) => {
+    if (i <= 0 || i >= flux.length - 1) return 0;
+    const den = flux[i - 1] - 2 * flux[i] + flux[i + 1];
+    return den < 0 ? Math.max(-0.5, Math.min(0.5, (0.5 * (flux[i - 1] - flux[i + 1])) / den)) : 0;
+  };
+  const beats = beatIdx.map((i) => Math.round(((i + subHop(i)) * HOP_SEC + WIN / 2 / SR) * 1000) / 1000);
   const dbOff = downbeatOffset(flux, beatIdx);
   const downbeats = beats.filter((_, k) => k % 4 === dbOff);
   // 0,5 mp-es normalizált energia-blokkok (drop/energia-szint a tervezőknek)

@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NewerSchemaBanner } from '@/components/NewerSchemaBanner';
 import { CollabPresence } from '@/components/editor/CollabPresence';
 import { UndoGestureArea } from '@/components/UndoGestureArea';
 import { SourceBin } from '@/components/SourceBin';
@@ -1023,6 +1024,7 @@ export default function EditorScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        <NewerSchemaBanner />
         {body}
         <BottomSheet
           visible={projectMenuOpen}

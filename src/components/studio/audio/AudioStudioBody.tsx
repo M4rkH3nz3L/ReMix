@@ -10,6 +10,7 @@ import { ActivityIndicator, Alert, type GestureResponderEvent, Pressable, Scroll
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { LANE_HEIGHTS, useAudioEditMode } from '@/store/audioEditModeStore';
+import { NewerSchemaBanner } from '@/components/NewerSchemaBanner';
 import { MixAssistSheet } from '@/components/studio/audio/MixAssistSheet';
 import { useMixAssist } from '@/store/mixAssistStore';
 import { UndoGestureArea } from '@/components/UndoGestureArea';
@@ -990,6 +991,7 @@ export function AudioStudioBody({
   return (
     <UndoGestureArea>
     <View style={styles.root} onLayout={(e) => setRootH(e.nativeEvent.layout.height)}>
+      <NewerSchemaBanner />
       <View style={styles.topBar} onLayout={(e) => setTopBarH(e.nativeEvent.layout.height)}>
         <Pressable onPress={exitStudio} hitSlop={10} style={styles.topBtn}>
           <Ionicons name={mode === 'scoped' ? 'close' : 'chevron-back'} size={26} color={palette.text} />

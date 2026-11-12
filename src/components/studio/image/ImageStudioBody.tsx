@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Image, PixelRatio, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
+import { NewerSchemaBanner } from '@/components/NewerSchemaBanner';
 import { Chip } from '@/components/ui/controls';
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { ImageAdjustStrip } from '@/components/studio/image/ImageAdjustStrip';
@@ -1884,6 +1885,7 @@ export function ImageStudioBody({
 
   return (
     <View style={styles.root}>
+      <NewerSchemaBanner />
       {/* felső sáv */}
       <View style={[styles.topBar, precisionMode ? styles.hidden : null]}>
         <Pressable onPress={exitStudio} hitSlop={10} style={styles.topBtn}>

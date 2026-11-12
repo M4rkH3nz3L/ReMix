@@ -1,6 +1,6 @@
 import { ensureCloud } from '@/lib/backend';
 import { backupProjectMedia, mediaRemoteMap } from '@/lib/mediaSync';
-import { migrateProject, projectDuration } from '@/lib/projectUtils';
+import { isNewerSchema, migrateProject, projectDuration } from '@/lib/projectUtils';
 import { canBackupMedia } from '@/lib/storagePolicy';
 import { pendingCloudDeletes, restorableIds } from '@/lib/projectTombstones';
 import {
@@ -38,6 +38,8 @@ function requireUserId(): string {
 /** A projekt (JSON) felhő-mentése (upsert a saját soraiba). */
 export async function pushProject(project: Project): Promise<void> {
   ensureCloud('cloudSync'); // Pro-kapu
+  // 📐 újabb app-verzió projektje: csak olvasható — a felhőben sem írjuk felül
+  if (isNewerSchema(project)) return;
   const supabase = requireSupabase();
   const { error } = await supabase.from('cloud_projects').upsert(
     {
@@ -86,7 +88,7 @@ export async function pullProject(projectId: string): Promise<Project | null> {
 export async function backupProjectToCloud(project: Project): Promise<void> {
   try {
     const uid = useAuth.getState().user?.id;
-    if (!supabase || !uid) {
+    if (!supabase || !uid || isNewerSchema(project)) {
       return;
     }
     // 🪦 törölt projekt mentése el se induljon (a média-feltöltés se)

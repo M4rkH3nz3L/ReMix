@@ -118,7 +118,7 @@ export function createEmptyProject(
     ...(kind === 'model3d' ? { model3d: createModel3DDoc(undefined, config?.model3dStorageFormat) } : {}),
     createdAt: now,
     updatedAt: now,
-    schemaVersion: 6,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
   };
 }
 
@@ -187,6 +187,20 @@ export function projectMediaBytes(project: Project): number {
 }
 
 /** Séma-migráció betöltéskor — idempotens, lépcsőzetes. */
+/**
+ * 📐 Az app által ismert legújabb projekt-séma. v7 (2026-11-12): a v6 után bevezetett, mind
+ * opcionális hang-mezők (take-ek, effekt-sorrend, master-dinamika, sáv-zár, hangszer-minták) —
+ * a lépés csak a verziót lépteti. Ennél ÚJABB projekt (egy későbbi app-verzió mentette) csak
+ * olvasható: a parancs-busz, a helyi mentés és a felhő-feltöltés sem írja (különben a régi app
+ * csendben elhagyná, amit nem ismer).
+ */
+export const CURRENT_SCHEMA_VERSION = 7;
+
+/** egy újabb app-verzió projektje-e (csak olvasható) */
+export function isNewerSchema(project: Pick<Project, 'schemaVersion'> | null | undefined): boolean {
+  return !!project && Number(project.schemaVersion) > CURRENT_SCHEMA_VERSION;
+}
+
 export function migrateProject(project: Project): Project {
   let next = project;
   if (next.schemaVersion < 2 || !Array.isArray(next.assets)) {
@@ -206,6 +220,10 @@ export function migrateProject(project: Project): Project {
   if (next.schemaVersion < 6) {
     // v5 → v6: projekt-fajta (kind) — a régi, kind nélküli projektek videók
     next = { ...next, kind: next.kind ?? 'video', schemaVersion: 6 };
+  }
+  if (next.schemaVersion < 7) {
+    // v6 → v7: az új hang-mezők opcionálisak, csak a verzió lép
+    next = { ...next, schemaVersion: 7 };
   }
   // 🔗 verzió-független backfill (ADR-012): a séma-migráció utáni úton (preset/AI/
   // hang-leválasztás) assetId NÉLKÜL hozzáadott media-klipek is kapjanak asset-linket.

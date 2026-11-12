@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ProjectEvent } from '@/lib/commands';
 import { rebaseDocumentUris } from '@/lib/docUri';
 import { makeId } from '@/lib/id';
-import { migrateProject, projectDuration, projectKind } from '@/lib/projectUtils';
+import { isNewerSchema, migrateProject, projectDuration, projectKind } from '@/lib/projectUtils';
 import { addTombstones, removeTombstones } from '@/lib/projectTombstones';
 import type { Project, ProjectMeta } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
@@ -224,6 +224,8 @@ export async function loadProject(id: string): Promise<Project | null> {
 }
 
 export async function saveProject(project: Project): Promise<void> {
+  // 📐 újabb app-verzió projektje: csak olvasható — a régi app nem írja felül
+  if (isNewerSchema(project)) return;
   await clearTombstone(project.id);
   const stamped: Project = { ...project, updatedAt: new Date().toISOString() };
   // a `listProjects` sérült indexnél ÚJRAÉPÍT (nem üres listát ad), így a
@@ -312,6 +314,7 @@ export async function saveProjectAndEvents(
   project: Project,
   events: ProjectEvent[]
 ): Promise<void> {
+  if (isNewerSchema(project)) return;
   await clearTombstone(project.id);
   const stamped: Project = { ...project, updatedAt: new Date().toISOString() };
   const metas = await listProjects();

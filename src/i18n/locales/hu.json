@@ -3254,6 +3254,7 @@
       },
       "failed": "Most nem sikerült hanggá alakítani. Ellenőrizd az internetkapcsolatot, és próbáld újra."
     },
+    "newerSchema": "Ezt a projektet az app újabb verziója mentette. Frissítsd az appot a szerkesztéshez — addig csak megtekinthető, a módosítások nem mentődnek.",
     "chooseKind": "Mit készítesz?",
     "kind": {
       "model3d": "3D",

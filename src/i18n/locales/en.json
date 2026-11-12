@@ -3254,6 +3254,7 @@
       },
       "failed": "Couldn't turn this into audio right now. Check your connection and try again."
     },
+    "newerSchema": "This project was saved by a newer version of the app. Update the app to edit it — until then it is view-only and changes are not saved.",
     "chooseKind": "What are you creating?",
     "kind": {
       "model3d": "3D",

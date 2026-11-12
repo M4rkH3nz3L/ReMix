@@ -12,7 +12,7 @@ import { isHeavyCommand, slimForLog } from '@/lib/eventLog';
 import { coalesceKey, shouldCoalesce, type LastCommit } from '@/lib/historyCoalesce';
 import { makeId } from '@/lib/id';
 import { undoSyncCommands } from '@/lib/historySync';
-import { findClip } from '@/lib/projectUtils';
+import { findClip, isNewerSchema } from '@/lib/projectUtils';
 import type { Project } from '@/types/project';
 
 import { getLiveBroadcaster } from '../broadcasters';
@@ -148,6 +148,10 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
     if (!project) {
       return false;
     }
+    // 📐 újabb app-verzió projektje: csak olvasható (a régi app nem írhatja felül, amit nem ismer)
+    if (isNewerSchema(project)) {
+      return false;
+    }
     // 🔒 core-guard: a zárolt sávra írás a MAGBAN is no-op — így az AI (actor:'ai')
     // és a programozott hívók sem kerülhetik meg a sáv-védelmet (eddig csak a UI tiltotta).
     // A 'remote' collab-visszajátszás kivétel: a társ-szerkesztő edítje authoritatív,
@@ -216,7 +220,7 @@ export const createHistorySlice: EditorSlice<HistorySlice> = (set, get) => ({
   applyBatch: (commands, actor = 'ai') => {
     lastCommit = null;
     const { project, past, pastLabels, events, lockedTracks } = get();
-    if (!project) {
+    if (!project || isNewerSchema(project)) {
       return 0;
     }
     let cur = project;

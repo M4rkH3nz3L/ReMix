@@ -3254,6 +3254,7 @@
       },
       "failed": "Das Umwandeln in Audio hat gerade nicht geklappt. Prüfe deine Verbindung und versuche es erneut."
     },
+    "newerSchema": "Dieses Projekt wurde mit einer neueren App-Version gespeichert. Aktualisiere die App zum Bearbeiten — bis dahin nur ansehen, Änderungen werden nicht gespeichert.",
     "chooseKind": "Was möchtest du erstellen?",
     "kind": {
       "model3d": "3D",

@@ -5703,6 +5703,37 @@ async function smokeVelTouch(log: Log) {
   }
 }
 
+/** 📐 AP1: az újabb app-verzió projektje csak olvasható — a szerkesztés nem megy át, a tárolt bájtok változatlanok. */
+async function smokeNewerSchema(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_newer';
+  const key = `vided.project.v1.${id}`;
+  const base = createEmptyProject('smoke újabb séma', '9:16', undefined, 'audio');
+  const stored = { ...base, id, schemaVersion: 99, futureField: { x: 1 } };
+  const raw = JSON.stringify(stored);
+  await AsyncStorage.setItem(key, raw);
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1500);
+  const opened = st().project?.id === id && st().project?.schemaVersion === 99;
+  const ok = st().dispatch({ type: 'RENAME_PROJECT', name: 'felülírva' });
+  log(opened && !ok && st().project?.name === base.name, 'a v99-es projekt megnyílik, a szerkesztés nem megy át', `séma ${st().project?.schemaVersion}, dispatch ${ok}`);
+  log(true, 'FOTÓZHATÓ', 'a „csak olvasható” sáv a Hang Stúdió tetején');
+  await sleep(2500);
+  router.back();
+  await sleep(1500); // a kilépéskori mentés is lefut
+  const after = await AsyncStorage.getItem(key);
+  log(after === raw, 'kilépés után a tárolt projekt bájtra változatlan (az ismeretlen mező is megmaradt)', `${raw.length} bájt`);
+  await AsyncStorage.removeItem(key);
+  // a mai projekt v7-tel mentődik
+  const cur = { ...createEmptyProject('smoke v7', '9:16', undefined, 'audio'), id: 'prj_smoke_v7' };
+  await saveProject(cur);
+  const back = JSON.parse((await AsyncStorage.getItem('vided.project.v1.prj_smoke_v7')) ?? '{}') as { schemaVersion?: number };
+  log(back.schemaVersion === 7, 'az új projekt a jelenlegi sémán (v7) mentődik', `v${back.schemaVersion}`);
+  await deleteProject('prj_smoke_v7').catch((caught) => logCaught('lib/imageSmoke.tsx:newerschema', caught));
+}
+
 /** ✂️🎚️ Tartomány- és stem-export: a tartomány = a teljes export szelete (masterrel), Σ stem = keverés master nélkül, a némított sáv kimarad. */
 async function smokeStemExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7520,6 +7551,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'newerschema') {
+    await step(phase, () => smokeNewerSchema(log));
     return;
   }
   if (phase === 'veltouch') {

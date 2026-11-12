@@ -4023,6 +4023,7 @@
       "importDevice": "Import from device",
       "library": "Library",
       "libraryEmpty": "No library audio available.",
+      "template": {"label": "Start from", "blank": "Blank", "podcast": "Podcast", "music": "Music", "voiceover": "Voice-over", "blankHint": "An empty project with your settings.", "podcastHint": "Voice and music tracks, podcast loudness; music can duck under the voice.", "musicHint": "120 BPM, 4/4, section markers (Intro, Verse, Chorus, Outro), music loudness.", "voiceoverHint": "A voice track for video, video loudness.", "trackVoice": "Voice", "trackMusic": "Music", "trackSfx": "Sounds", "intro": "Intro", "verse": "Verse", "chorus": "Chorus", "outro": "Outro"},
       "ttsTitle": "AI voice (TTS)",
       "ttsFailed": "Couldn’t create the speech. Try another voice.",
       "ttsOnDevice": "Uses your phone’s voice — works offline.",

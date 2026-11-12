@@ -224,6 +224,8 @@ export default function ProjectsScreen() {
         setBg={s.setBg}
         audioTarget={s.audioTarget}
         setAudioTarget={s.setAudioTarget}
+        audioTemplate={s.audioTemplate}
+        setAudioTemplate={s.setAudioTemplate}
         model3dFormat={s.model3dFormat}
         setModel3dFormat={s.setModel3dFormat}
         sources={s.sources}

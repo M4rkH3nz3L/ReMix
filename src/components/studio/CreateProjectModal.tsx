@@ -26,6 +26,7 @@ import { supportedSourceKinds, type SourceKind } from '@/lib/projectSource';
 import type { Layout } from '@/hooks/useLayout';
 import type { AspectRatio, Asset, AudioMasterTarget, ProjectKind } from '@/types/project';
 import type { MeshFormat } from '@/types/model3d';
+import { AUDIO_TEMPLATES, type AudioTemplate } from '@/lib/audioTemplates';
 
 /** 🎚️ a hang-projekt választható master-céljai (a 'custom' nem induló-beállítás). */
 const AUDIO_TARGETS = AUDIO_MASTER_TARGETS.filter((tg) => tg !== 'custom');
@@ -77,6 +78,8 @@ export function CreateProjectModal(props: {
   // hang
   audioTarget: AudioMasterTarget;
   setAudioTarget: (tg: AudioMasterTarget) => void;
+  audioTemplate: AudioTemplate;
+  setAudioTemplate: (tpl: AudioTemplate) => void;
   // 3D
   model3dFormat: MeshFormat;
   setModel3dFormat: (f: MeshFormat) => void;
@@ -117,6 +120,8 @@ export function CreateProjectModal(props: {
     setBg,
     audioTarget,
     setAudioTarget,
+    audioTemplate,
+    setAudioTemplate,
     model3dFormat,
     setModel3dFormat,
     sources,
@@ -365,6 +370,14 @@ export function CreateProjectModal(props: {
             {/* 🎚️ HANG-projekt: master-cél (az alap hangosság/plafon preset) */}
             {kind === 'audio' ? (
               <>
+                {/* 🧩 indító-sablon: sávok, tempó, jelölők, hangosság */}
+                <Text style={styles.fieldLabel}>{t('studio.audio.template.label')}</Text>
+                <View style={styles.aspectRow}>
+                  {AUDIO_TEMPLATES.map((tpl) => (
+                    <Chip key={tpl} label={t(`studio.audio.template.${tpl}`)} active={audioTemplate === tpl} onPress={() => setAudioTemplate(tpl)} />
+                  ))}
+                </View>
+                <Text style={styles.seoHint}>{t(`studio.audio.template.${audioTemplate}Hint`)}</Text>
                 <Text style={styles.fieldLabel}>{t('home.audioMasterLabel')}</Text>
                 <Text style={styles.seoHint}>{t('home.audioMasterHint')}</Text>
                 <View style={styles.aspectRow}>

@@ -34,6 +34,8 @@ import { withProgress } from '@/store/progressStore';
 import type { MeshFormat } from '@/types/model3d';
 import type { AspectRatio, Asset, AudioMasterTarget, Project, ProjectKind, ProjectMeta } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
+import { applyAudioTemplate, templateTarget, type AudioTemplate } from '@/lib/audioTemplates';
+import { registerDevAction } from '@/lib/devActions';
 
 /**
  * 🎬 A Stúdió / projekt-lista képernyő NEM-prezentációs magja: a lista
@@ -62,6 +64,13 @@ export function useStudio() {
   const [bg, setBg] = useState<string>(BG_SWATCHES[0]);
   // 🎚️ hang-projekt: a master-cél (az alap hangosság/plafon preset)
   const [audioTarget, setAudioTarget] = useState<AudioMasterTarget>('music');
+  // 🧩 hang-projekt indító-sablon (a választás a hangosság-célt is beállítja)
+  const [audioTemplate, setAudioTemplateRaw] = useState<AudioTemplate>('blank');
+  const setAudioTemplate = (tpl: AudioTemplate) => {
+    setAudioTemplateRaw(tpl);
+    const tg = templateTarget(tpl);
+    if (tg) setAudioTarget(tg);
+  };
   // 🧊 3D-projekt: a modell tárolási formátuma
   const [model3dFormat, setModel3dFormat] = useState<MeshFormat>(DEFAULT_STORAGE_FORMAT);
   // 🗂️ a projekt FORRÁS-mappája — a létrehozáskor hozzáadott támogatott fájlok
@@ -130,6 +139,7 @@ export function useStudio() {
     setImgFormat('raster');
     setBg(BG_SWATCHES[0]);
     setAudioTarget('music');
+    setAudioTemplateRaw('blank');
     setModel3dFormat(DEFAULT_STORAGE_FORMAT);
     setSources([]);
   };
@@ -227,13 +237,22 @@ export function useStudio() {
       config.model3dStorageFormat = model3dFormat;
     }
     // a cím szolgál a projekt neveként ÉS a SEO-címként is (később külön szerkeszthető)
-    const base = createEmptyProject(
+    const created = createEmptyProject(
       title,
       projectAspect,
       { title, description, hashtags, keywords },
       kind,
       config
     );
+    const base =
+      kind === 'audio'
+        ? applyAudioTemplate(created, audioTemplate, {
+            voice: t('studio.audio.template.trackVoice'),
+            music: t('studio.audio.template.trackMusic'),
+            sfx: t('studio.audio.template.trackSfx'),
+            sections: [t('studio.audio.template.intro'), t('studio.audio.template.verse'), t('studio.audio.template.chorus'), t('studio.audio.template.outro')],
+          })
+        : created;
     // 🗂️ a létrehozáskor hozzáadott források a projekt forrás-mappájába (assets)
     const project = sources.length > 0 ? { ...base, assets: sources } : base;
     await saveProject(project);
@@ -423,6 +442,26 @@ export function useStudio() {
     resetCreateForm();
   };
 
+  // 🧪 füstteszt: az „Új projekt” űrlap kitöltése és a létrehozás (a valódi `create` útja; csak __DEV__)
+  const createRef = useRef(create);
+  createRef.current = create;
+  useEffect(() => {
+    const offs = [
+      registerDevAction('studio.fillCreate', (arg) => {
+        const a = arg as { name: string; kind: ProjectKind; audioTemplate?: AudioTemplate };
+        setName(a.name);
+        setSeoDescription('smoke');
+        setSeoHashtags('#smoke');
+        setSeoKeywords('smoke');
+        setKind(a.kind);
+        if (a.audioTemplate) setAudioTemplate(a.audioTemplate);
+        return true;
+      }),
+      registerDevAction('studio.create', () => createRef.current()),
+    ];
+    return () => offs.forEach((off) => off());
+  }, []);
+
   return {
     // i18n / elrendezés
     t,
@@ -458,6 +497,8 @@ export function useStudio() {
     setBg,
     audioTarget,
     setAudioTarget,
+    audioTemplate,
+    setAudioTemplate,
     model3dFormat,
     setModel3dFormat,
     sources,

@@ -6038,6 +6038,48 @@ async function smokeQuickVolume(log: Log) {
   }
 }
 
+/** 🧩 AP7: az „Új projekt” űrlap hang-sablonnal (a valódi létrehozási út): zene és podcast. */
+async function smokeAudioTemplate(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const st = useEditorStore.getState;
+  const created: string[] = [];
+  try {
+    for (const tpl of ['music', 'podcast'] as const) {
+      router.replace('/studio' as Href);
+      await sleep(1500);
+      const name = `smoke sablon ${tpl}`;
+      runDevAction('studio.fillCreate', { name, kind: 'audio', audioTemplate: tpl });
+      await sleep(400);
+      await runDevAction('studio.create');
+      for (let i = 0; i < 60 && st().project?.name !== name; i++) await sleep(200);
+      await sleep(800);
+      const p = st().project;
+      if (p?.name === name) created.push(p.id);
+      if (tpl === 'music') {
+        log(p?.kind === 'audio' && p.bpm === 120 && p.timeSignature?.beatsPerBar === 4 && p.markers?.length === 4 && p.audioMaster?.target === 'music', 'zene-sablon: 120 BPM 4/4, 4 szerkezeti jelölő, zenei hangosság — a Hang Stúdióban nyílik', p ? `${p.bpm} BPM, jelölők: ${(p.markers ?? []).map((m) => `${m.label}@${m.time}`).join(', ')}` : 'nincs projekt');
+        log(true, 'FOTÓZHATÓ', 'a zene-sablonból nyílt Hang Stúdió a jelölőkkel');
+        await sleep(2000);
+      } else {
+        const voice = p?.tracks.find((t) => t.type === 'voiceover');
+        log(p?.audioMaster?.target === 'podcast' && p.audioMaster.duckTrigger === 'voiceover' && !!voice?.name, 'podcast-sablon: podcast-hangosság, a beszéd a halkítás kulcsa, a sávok elnevezve', p ? `${p.audioMaster?.target}, kulcs ${p.audioMaster?.duckTrigger}, beszéd-sáv „${voice?.name}”` : 'nincs projekt');
+      }
+    }
+  } finally {
+    router.replace('/studio' as Href);
+    await sleep(500);
+    // a létrehozás a felhőbe is ment (a dev a prodra mutat): a helyi ÉS a felhős tesztadat is törlődik,
+    // a korábbi futások név szerinti maradékai is
+    const { deleteCloudProject, listCloudProjectMetas } = await import('@/lib/cloudSync');
+    const leftovers = (await listCloudProjectMetas().catch(() => [])).filter((m) => m.name.startsWith('smoke sablon ')).map((m) => m.id);
+    for (const id of new Set([...created, ...leftovers])) {
+      await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:tpl-del', caught));
+      await deleteCloudProject(id);
+    }
+    const remain = (await listCloudProjectMetas().catch(() => [])).filter((m) => m.name.startsWith('smoke sablon ')).length;
+    log(remain === 0, 'takarítás: a teszt-projektek a felhőből is törölve', `${new Set([...created, ...leftovers]).size} törölve, maradt ${remain}`);
+  }
+}
+
 /** ✂️🎚️ Tartomány- és stem-export: a tartomány = a teljes export szelete (masterrel), Σ stem = keverés master nélkül, a némított sáv kimarad. */
 async function smokeStemExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7855,6 +7897,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'audiotemplate') {
+    await step(phase, () => smokeAudioTemplate(log));
     return;
   }
   if (phase === 'quickvol') {

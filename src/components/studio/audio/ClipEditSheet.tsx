@@ -55,10 +55,13 @@ export function ClipEditSheet({
   clip,
   fps,
   onClose,
+  onEditInstrument,
 }: {
   clip: AudioClip;
   fps: number;
   onClose: () => void;
+  /** 🎹🥁 a sütött hangszer-klip mintájának újraszerkesztése (a dobgép / piano roll nyílik) */
+  onEditInstrument?: (docId: string) => void;
 }) {
   const { t } = useTranslation();
   const updateClip = useEditorStore((s) => s.updateClip);
@@ -197,6 +200,17 @@ export function ClipEditSheet({
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
   useEffect(() => registerDevAction('clipEdit.done', () => onDoneRef.current()), []);
+  // 🧪 füstteszt: a „Minta szerkesztése” gomb
+  const editInstrumentNow = () => {
+    if (!clip.instrumentDocId || !onEditInstrument) return false;
+    const docId = clip.instrumentDocId;
+    onDoneRef.current();
+    onEditInstrument(docId);
+    return true;
+  };
+  const editInstRef = useRef(editInstrumentNow);
+  editInstRef.current = editInstrumentNow;
+  useEffect(() => registerDevAction('clipEdit.editInstrument', () => editInstRef.current()), []);
   // 🧪 a füstteszt a presetekhez görget (képernyőkép)
   const scrollRef = useRef<ScrollView>(null);
   const presetsY = useRef(0);
@@ -215,6 +229,18 @@ export function ClipEditSheet({
       </View>
 
       <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+        {clip.instrumentDocId && onEditInstrument ? (
+          <Pressable
+            testID="clip-edit-instrument"
+            // a lap helyi módosításai előbb mentődnek, aztán nyílik a minta
+            onPress={() => editInstRef.current()}
+            style={styles.instrumentBtn}
+            accessibilityRole="button"
+          >
+            <Ionicons name="create-outline" size={16} color="#fff" />
+            <Text style={styles.instrumentText}>{t('studio.audio.editInstrument')}</Text>
+          </Pressable>
+        ) : null}
         <TakePicker clip={clip} onSelect={pickTake} />
         {!clip.reversed && !clip.loopLength ? (
           <View style={styles.tempoRow} testID="tempo-match">
@@ -636,6 +662,8 @@ const styles = StyleSheet.create({
   orderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, borderWidth: 1, borderColor: palette.border, borderRadius: 10, paddingHorizontal: 10 },
   orderName: { flex: 1, color: palette.text, fontSize: 14, fontWeight: '600' },
   orderBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.border },
+  instrumentBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, borderRadius: 10, backgroundColor: palette.accent, marginBottom: 12 },
+  instrumentText: { color: '#fff', fontSize: 14, fontWeight: '800' },
   tempoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
   tempoLabel: { color: palette.textDim, fontSize: 12, fontWeight: '700' },
   tempoBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.border },

@@ -10,6 +10,7 @@ import { padTo, renderSynthPcm } from '@/lib/instrumentRender';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { palette } from '@/constants/editor';
 import { registerDevAction } from '@/lib/devActions';
+import type { InstrumentDoc } from '@/types/project';
 import { makeId } from '@/lib/id';
 import {
   cycleNoteVelocity,
@@ -51,23 +52,26 @@ export function PianoRollSheet({
   busy,
   onClose,
   onBake,
+  initial = null,
 }: {
   bpm: number;
   busy: boolean;
   onClose: () => void;
-  onBake: (notes: SynthNote[], wave: SynthWave) => void;
+  onBake: (notes: SynthNote[], wave: SynthWave, bars: number) => void;
+  /** 🎹 a szerkesztett hangszer-minta (újraszerkesztés); null = új dallam */
+  initial?: InstrumentDoc | null;
 }) {
   const { t } = useTranslation();
-  const [notes, setNotes] = useState<SynthNote[]>([]);
-  const [wave, setWave] = useState<SynthWave>('sine');
-  const [bars, setBars] = useState(4);
+  const [notes, setNotes] = useState<SynthNote[]>(() => initial?.synth?.notes.map((n) => ({ ...n })) ?? []);
+  const [wave, setWave] = useState<SynthWave>(() => initial?.synth?.wave ?? 'sine');
+  const [bars, setBars] = useState(() => initial?.bars ?? 4);
   /** az új hangok velocity-je */
   const [noteVel, setNoteVel] = useState<number>(100);
   // 🧪 füstteszt (R7): a hangjegyek beállítása + a jelenlegiek
   const notesRef = useRef(notes);
   notesRef.current = notes;
-  const bakeRef = useRef(() => onBake(notes, wave));
-  bakeRef.current = () => onBake(notes, wave);
+  const bakeRef = useRef(() => onBake(notes, wave, bars));
+  bakeRef.current = () => onBake(notes, wave, bars);
   useEffect(() => {
     const offs = [
       registerDevAction('synth.set', (arg) => {
@@ -207,7 +211,7 @@ export function PianoRollSheet({
           <Text style={styles.clearText}>{t('common.clear', { defaultValue: 'Törlés' })}</Text>
         </Pressable>
         <Pressable
-          onPress={() => onBake(notes, wave)}
+          onPress={() => onBake(notes, wave, bars)}
           disabled={busy || notes.length === 0}
           style={[styles.bakeBtn, (busy || notes.length === 0) && styles.disabled]}
         >

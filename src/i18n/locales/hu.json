@@ -3985,6 +3985,7 @@
       "master": "Master"
     },
     "audio": {
+      "editInstrument": "Minta szerkesztése",
       "fromVideo": "Hang videóból",
       "fromPhotos": "Fotók",
       "fromFiles": "Fájlok",

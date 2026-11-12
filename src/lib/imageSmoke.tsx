@@ -93,7 +93,7 @@ import { gccPhatLag, SYNC_MIN_CONFIDENCE } from '@/lib/audioSync';
 import { syncClipTo } from '@/lib/audioSyncClient';
 import { exportParts } from '@/components/studio/audio/exportParts';
 import { auditionDrum, auditionNote, lastLoopPcm, lastStartMs, playPcm, previewLooping, previewPosition, stopPreview, warmPreview } from '@/lib/instrumentPreview';
-import { DRUM_ACCENT, DRUM_SOFT, emptyPattern } from '@/lib/drums';
+import { DRUM_ACCENT, DRUM_SOFT, emptyPattern, patternHits } from '@/lib/drums';
 import { renderDrumsPcm, renderSamplerPcm, renderSynthPcm } from '@/lib/instrumentRender';
 import { decodeSample } from '@/lib/instrumentClient';
 import { USER_PRESETS_KEY, useUserPresets } from '@/store/userPresetStore';
@@ -5734,6 +5734,89 @@ async function smokeNewerSchema(log: Log) {
   await deleteProject('prj_smoke_v7').catch((caught) => logCaught('lib/imageSmoke.tsx:newerschema', caught));
 }
 
+/**
+ * 🎹🥁 AP2 (MU1): a sütött dob-klip mintája megmarad (mentés + újratöltés után is), a klipszerkesztőből
+ * újranyitható, módosítva újrasütve a klip hangja az új minta, a helye/hangereje/effektje marad; egy undo.
+ */
+async function smokeInstrumentEdit(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const api = (await loadAudioApi())!;
+  const left = async (uri: string) => (await api.decodeAudioData(uri, SR)).getChannelData(0);
+  const maxDiff = (a: Float32Array, b: Float32Array) => {
+    let d = 0;
+    for (let i = 0; i < Math.min(a.length, b.length); i++) d = Math.max(d, Math.abs(a[i] - b[i]));
+    return d;
+  };
+  const id = 'prj_smoke_instedit';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:instedit', caught));
+  await saveProject({ ...createEmptyProject('smoke minta', '9:16', undefined, 'audio'), id });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  const music = () => st().project!.tracks.find((t) => t.type === 'music')!.clips as AudioClip[];
+  const waitFor = async (cond: () => boolean, ms: number) => {
+    for (let i = 0; i < ms / 100 && !cond(); i++) await sleep(100);
+    return cond();
+  };
+  try {
+    // 1) sütés: kick az 1. és 9. lépésen, a 9. hangsúlyos, swing 20 %
+    runDevAction('audio.openDrums');
+    await sleep(800);
+    let p1 = emptyPattern(1);
+    p1 = { ...p1, kick: p1.kick.map((_, i) => i === 0 || i === 8) };
+    runDevAction('drums.set', { pattern: p1, velocity: { kick: Object.assign([], { 8: DRUM_ACCENT }) }, swing: 0.2 });
+    await sleep(300);
+    runDevAction('drums.bake');
+    const baked = await waitFor(() => music().length === 1, 10000);
+    const c0 = music()[0];
+    log(baked && !!c0?.instrumentDocId && st().project!.instrumentDocs?.length === 1, 'sütés: a klip a mintára hivatkozik, a minta a projektben', `${c0?.instrumentDocId}, ${st().project!.instrumentDocs?.length} minta`);
+    // a klipet a felhasználó beállítja: hely, hangerő, effekt
+    st().dispatch({ type: 'UPDATE_CLIP', clipId: c0.id, patch: { start: 1.5, volume: 0.6, audioFx: { reverb: 0.4 } } });
+    // 2) mentés + újratöltés („az app újraindult”)
+    await saveProject(st().project!);
+    const reloaded = await loadProject(id);
+    st().loadProject(reloaded!);
+    await sleep(500);
+    const doc0 = st().project!.instrumentDocs?.[0];
+    log(!!doc0 && doc0.drums?.pattern.kick[8] === true && doc0.drums?.velocity?.kick?.[8] === DRUM_ACCENT && doc0.drums?.swing === 0.2, 'mentés és újratöltés után a minta megvan (ütések, szint, swing)', `${reloaded?.instrumentDocs?.length} minta`);
+    // 3) „Minta szerkesztése” a klipszerkesztőből → a dobgép a mentett mintával nyílik
+    st().selectClip(music()[0].id);
+    runDevAction('audio.editClip');
+    await sleep(800);
+    const opened = runDevAction('clipEdit.editInstrument') === true;
+    await sleep(900);
+    const hits0 = runDevAction('drums.hits') as string;
+    log(opened && hits0 === 'kick0,kick8v127', 'a klipszerkesztő „Minta szerkesztése”: a dobgép a mentett mintával nyílik', hits0);
+    log(true, 'FOTÓZHATÓ', 'a dobgép a klip mentett mintájával');
+    await sleep(2000);
+    // 4) módosítás + újrasütés: snare a 2. és 4. negyeden, 2 ütem
+    const p2 = { ...emptyPattern(2), kick: emptyPattern(2).kick.map((_, i) => i === 0 || i === 8 || i === 16), snare: emptyPattern(2).snare.map((_, i) => i === 4 || i === 12 || i === 20 || i === 28) };
+    runDevAction('drums.set', { pattern: p2, swing: 0, bars: 2 });
+    await sleep(300);
+    const oldUri = music()[0].uri;
+    runDevAction('drums.bake');
+    const rebaked = await waitFor(() => music()[0].uri !== oldUri, 10000);
+    const c1 = music()[0];
+    const exp = renderDrumsPcm(patternHits(p2), 2, st().project!.bpm ?? 120)[0];
+    const got = await left(c1.uri);
+    const d = maxDiff(got, exp);
+    log(rebaked && music().length === 1 && d < 1e-4 && Math.abs(c1.duration - 4) < 1e-6, 'újrasütés: ugyanaz a klip, a hangja = az új minta (2 ütem, 4 s)', `eltérés ${d.toExponential(1)}, ${c1.duration} s`);
+    log(c1.start === 1.5 && c1.volume === 0.6 && c1.audioFx?.reverb === 0.4 && c1.instrumentDocId === c0.instrumentDocId, 'a klip helye, hangereje és effektje megmaradt', `kezdet ${c1.start}, hangerő ${c1.volume}, zengés ${c1.audioFx?.reverb}`);
+    // 5) egy undo: a régi hang és a régi minta
+    st().undo();
+    const u = music()[0];
+    const ud = st().project!.instrumentDocs?.[0];
+    log(u.uri === oldUri && ud?.bars === 1 && ud?.drums?.swing === 0.2, 'egy visszavonás: a régi hang és a régi minta', `${ud?.bars} ütem`);
+  } finally {
+    runDevAction('audio.closeDrums');
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:instedit-del', caught));
+  }
+}
+
 /** ✂️🎚️ Tartomány- és stem-export: a tartomány = a teljes export szelete (masterrel), Σ stem = keverés master nélkül, a némított sáv kimarad. */
 async function smokeStemExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7551,6 +7634,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'instredit') {
+    await step(phase, () => smokeInstrumentEdit(log));
     return;
   }
   if (phase === 'newerschema') {

@@ -3985,6 +3985,7 @@
       "master": "Master"
     },
     "audio": {
+      "editInstrument": "Edit pattern",
       "fromVideo": "Audio from video",
       "fromPhotos": "Photos",
       "fromFiles": "Files",

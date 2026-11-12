@@ -88,7 +88,9 @@ import { beatLinesForClips } from '@/lib/beatMarkers';
 import { registerDevAction } from '@/lib/devActions';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
-import type { Asset, AudioClip, TrackType } from '@/types/project';
+import type { Asset, AudioClip, InstrumentDoc, TrackType } from '@/types/project';
+import { bakeNewCommands, clipsOfDoc, drumsDoc, instrumentDocOf, rebakeCommands, synthDoc } from '@/lib/instrumentDoc';
+import type { DrumSource } from '@/components/studio/audio/DrumMachineSheet';
 import { downloadToCache, probeAudioDuration } from '@/lib/media';
 import { pauseVoiceRecording, prepareVoiceRecording, resumeVoiceRecording, startVoiceRecording, stopVoiceRecording, VOICE_RECORDING_OPTIONS, voiceoverClip } from '@/lib/voiceRecording';
 import { nextHot } from '@/lib/recordingMeter';
@@ -171,6 +173,8 @@ export function AudioStudioBody({
   const [adding, setAdding] = useState(false);
   const [tts, setTts] = useState(false);
   const [pianoRoll, setPianoRoll] = useState(false);
+  /** 🎹🥁 az újraszerkesztett hangszer-minta (null = új minta) */
+  const [editDocId, setEditDocId] = useState<string | null>(null);
   const [pianoBusy, setPianoBusy] = useState(false);
   const [drumMachine, setDrumMachine] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
@@ -704,8 +708,39 @@ export function AudioStudioBody({
     }
   };
 
-  // 🎹 a piano-roll hangjegyei → worker /synth-render → sima hang-klip a music-sávon a playheadnél
-  const bakeSynth = async (notes: SynthNote[], wave: SynthWave) => {
+  /**
+   * 🎹🥁 a sütött minta a sávra: új minta → a minta (`InstrumentDoc`) + egy új klip a playheadnél;
+   * újraszerkesztés → a minta + minden rá hivatkozó klip új hangja. Mindkettő egy kötegben (egy undo).
+   */
+  const placeInstrument = (doc: InstrumentDoc, res: { uri: string; durationSec: number }, label: string) => {
+    const store = useEditorStore.getState();
+    const asset: Asset = { id: makeId('ast'), kind: 'audio', uri: res.uri, provider: 'local', name: label, duration: res.durationSec };
+    const cur = store.project;
+    if (cur && clipsOfDoc(cur, doc.id).length > 0) {
+      store.applyBatch(rebakeCommands(cur, doc, res, asset), 'user');
+      return;
+    }
+    const clip: AudioClip = {
+      kind: 'audio',
+      id: makeId('clip'),
+      start: snapToFrame(playhead, fps),
+      duration: res.durationSec,
+      trimIn: 0,
+      sourceDuration: res.durationSec,
+      uri: res.uri,
+      label,
+      volume: 1,
+      fadeIn: 0,
+      fadeOut: 0,
+      source: 'imported',
+    };
+    if (store.applyBatch(bakeNewCommands(doc, 'music', clip, asset), 'user') > 0) {
+      store.selectClip(clip.id);
+    }
+  };
+
+  // 🎹 a piano-roll hangjegyei → a telefonon sütött hang-klip (a minta a projektben marad, szerkeszthető)
+  const bakeSynth = async (notes: SynthNote[], wave: SynthWave, bars: number) => {
     if (pianoBusy) {
       return;
     }
@@ -716,33 +751,26 @@ export function AudioStudioBody({
         Alert.alert(t('studio.pianoRoll.title', { defaultValue: 'Zeneszerzés' }), t('studio.pianoRoll.failed', { defaultValue: 'A renderelés nem sikerült (fut a render-worker?).' }));
         return;
       }
-      const start = snapToFrame(playhead, fps);
-      useEditorStore.getState().addClip(
-        'music',
-        {
-          kind: 'audio',
-          id: makeId('clip'),
-          start,
-          duration: res.durationSec,
-          trimIn: 0,
-          sourceDuration: res.durationSec,
-          uri: res.uri,
-          label: t('studio.pianoRoll.clipLabel', { defaultValue: 'Zene' }),
-          volume: 1,
-          fadeIn: 0,
-          fadeOut: 0,
-          source: 'imported',
-        },
-        { id: makeId('ast'), kind: 'audio', uri: res.uri, provider: 'local', name: t('studio.pianoRoll.clipLabel', { defaultValue: 'Zene' }), duration: res.durationSec }
-      );
+      placeInstrument(synthDoc(editDocId ?? makeId('inst'), bpm, bars, wave, notes), res, t('studio.pianoRoll.clipLabel', { defaultValue: 'Zene' }));
       setPianoRoll(false);
+      setEditDocId(null);
     } finally {
       setPianoBusy(false);
     }
   };
 
-  // 🥁 a dob-minta ütései → worker /drums-render → sima hang-klip a music-sávon a playheadnél
-  const bakeDrums = async (hits: DrumHit[], bars: number) => {
+  /** a klipszerkesztő „Minta szerkesztése”: a minta szerinti hangszer-lap nyílik a mentett tartalommal */
+  const editInstrument = (docId: string) => {
+    const doc = instrumentDocOf(useEditorStore.getState().project, docId);
+    if (!doc) return;
+    setEditing(false);
+    setEditDocId(doc.id);
+    if (doc.kind === 'drums') setDrumMachine(true);
+    else setPianoRoll(true);
+  };
+
+  // 🥁 a dob-minta ütései → a telefonon sütött hang-klip (a minta a projektben marad, szerkeszthető)
+  const bakeDrums = async (hits: DrumHit[], bars: number, src: DrumSource) => {
     if (drumBusy) {
       return;
     }
@@ -753,26 +781,9 @@ export function AudioStudioBody({
         Alert.alert(t('studio.drums.title', { defaultValue: 'Dob-gép' }), t('studio.pianoRoll.failed', { defaultValue: 'A renderelés nem sikerült (fut a render-worker?).' }));
         return;
       }
-      const start = snapToFrame(playhead, fps);
-      useEditorStore.getState().addClip(
-        'music',
-        {
-          kind: 'audio',
-          id: makeId('clip'),
-          start,
-          duration: res.durationSec,
-          trimIn: 0,
-          sourceDuration: res.durationSec,
-          uri: res.uri,
-          label: t('studio.drums.clipLabel', { defaultValue: 'Dob' }),
-          volume: 1,
-          fadeIn: 0,
-          fadeOut: 0,
-          source: 'imported',
-        },
-        { id: makeId('ast'), kind: 'audio', uri: res.uri, provider: 'local', name: t('studio.drums.clipLabel', { defaultValue: 'Dob' }), duration: res.durationSec }
-      );
+      placeInstrument(drumsDoc(editDocId ?? makeId('inst'), bpm, bars, src.pattern, src.velocity, src.swing), res, t('studio.drums.clipLabel', { defaultValue: 'Dob' }));
       setDrumMachine(false);
+      setEditDocId(null);
     } finally {
       setDrumBusy(false);
     }
@@ -972,13 +983,21 @@ export function AudioStudioBody({
       setMixerOpen={setMixerOpen}
       setAdding={setAdding}
       setTts={setTts}
-      setPianoRoll={setPianoRoll}
-      setDrumMachine={setDrumMachine}
+      setPianoRoll={(v) => {
+        setPianoRoll(v);
+        if (!v) setEditDocId(null);
+      }}
+      setDrumMachine={(v) => {
+        setDrumMachine(v);
+        if (!v) setEditDocId(null);
+      }}
       setSampler={setSampler}
       setSource={setSource}
       setAlbumOpen={setAlbumOpen}
-      onBakeSynth={(notes, wave) => void bakeSynth(notes, wave)}
-      onBakeDrums={(hits, bars) => void bakeDrums(hits, bars)}
+      onBakeSynth={(notes, wave, bars) => void bakeSynth(notes, wave, bars)}
+      onBakeDrums={(hits, bars, src) => void bakeDrums(hits, bars, src)}
+      editDoc={instrumentDocOf(project, editDocId ?? undefined)}
+      onEditInstrument={editInstrument}
       onBakeSampler={(uri, pattern, bars) => void bakeSampler(uri, pattern, bars)}
       onInsertSource={(asset) => {
         void insertSource(asset).catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:insertSource', caught); });

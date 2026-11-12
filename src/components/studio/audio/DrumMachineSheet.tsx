@@ -9,6 +9,7 @@ import { registerDevAction } from '@/lib/devActions';
 import { auditionDrum } from '@/lib/instrumentPreview';
 import { renderDrumsPcm } from '@/lib/instrumentRender';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
+import type { InstrumentDoc } from '@/types/project';
 import { palette } from '@/constants/editor';
 import {
   cycleVelocity,
@@ -30,6 +31,13 @@ import {
   type DrumVelocity,
 } from '@/lib/drums';
 
+/** a dobgép szerkeszthető állapota (a hangszer-minta forrása) */
+export interface DrumSource {
+  pattern: DrumPattern;
+  velocity: DrumVelocity;
+  swing: number;
+}
+
 /** lépés-cella: 44 pt magas (Apple HIG érintési minimum) — a workspace-ben van rá hely */
 const CELL_W = 30;
 const CELL_H = 44;
@@ -45,18 +53,21 @@ export function DrumMachineSheet({
   busy,
   onClose,
   onBake,
+  initial = null,
 }: {
   bpm: number;
   busy: boolean;
   onClose: () => void;
-  onBake: (hits: DrumHit[], bars: number) => void;
+  onBake: (hits: DrumHit[], bars: number, src: DrumSource) => void;
+  /** 🥁 a szerkesztett hangszer-minta (újraszerkesztés); null = új minta */
+  initial?: InstrumentDoc | null;
 }) {
   const { t } = useTranslation();
-  const [bars, setBars] = useState(1);
-  const [pattern, setPattern] = useState<DrumPattern>(() => emptyPattern(1));
-  const [velocity, setVelocity] = useState<DrumVelocity>({});
+  const [bars, setBars] = useState(() => initial?.bars ?? 1);
+  const [pattern, setPattern] = useState<DrumPattern>(() => initial?.drums?.pattern ?? emptyPattern(1));
+  const [velocity, setVelocity] = useState<DrumVelocity>(() => initial?.drums?.velocity ?? {});
   /** 0–0,6 (a lépés-hossz aránya) */
-  const [swing, setSwing] = useState(0);
+  const [swing, setSwing] = useState(() => initial?.drums?.swing ?? 0);
   const hitsOf = () => patternHits(pattern, velocity, swing);
   // 🧪 füstteszt: egy alap ütem (kick 1/3, snare 2/4, hihat nyolcadok)
   useEffect(
@@ -86,8 +97,8 @@ export function DrumMachineSheet({
   );
   const hitsRef = useRef(hitsOf);
   hitsRef.current = hitsOf;
-  const bakeRef = useRef(() => onBake(hitsOf(), bars));
-  bakeRef.current = () => onBake(hitsOf(), bars);
+  const bakeRef = useRef(() => onBake(hitsOf(), bars, { pattern, velocity, swing }));
+  bakeRef.current = () => onBake(hitsOf(), bars, { pattern, velocity, swing });
   useEffect(() => registerDevAction('drums.bake', () => bakeRef.current()), []);
   useEffect(() => registerDevAction('drums.hits', () => hitsRef.current().map((h) => `${h.voice}${h.step}${h.velocity ? `v${h.velocity}` : ''}`).join(',')), []);
 
@@ -222,7 +233,7 @@ export function DrumMachineSheet({
           <Text style={styles.clearText}>{t('common.clear', { defaultValue: 'Törlés' })}</Text>
         </Pressable>
         <Pressable
-          onPress={() => onBake(hitsOf(), bars)}
+          onPress={() => onBake(hitsOf(), bars, { pattern, velocity, swing })}
           disabled={busy || !hasHits(pattern)}
           style={[styles.bakeBtn, (busy || !hasHits(pattern)) && styles.disabled]}
         >

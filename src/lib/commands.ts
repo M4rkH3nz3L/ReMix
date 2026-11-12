@@ -5,7 +5,7 @@ import { imageDocsReference, withImageDocAssets } from '@/lib/imageDocMedia';
 import { canHostClip, findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
 import type { LiveDoc } from '@/types/live';
 import type { Model3DDoc } from '@/types/model3d';
-import type { AlbumDoc, AspectRatio, Asset, AudioBus, AudioMaster, Chapter, Clip, ImageDoc, Marker, ParticlesConfig, Project, TimelineRegion, Track, TrackType } from '@/types/project';
+import type { AlbumDoc, AspectRatio, Asset, AudioBus, AudioMaster, Chapter, Clip, ImageDoc, InstrumentDoc, Marker, ParticlesConfig, Project, TimelineRegion, Track, TrackType } from '@/types/project';
 
 /**
  * Command-réteg (full-plan F0): minden szerkesztő-művelet nevesített command,
@@ -74,6 +74,8 @@ export type EditorCommand =
    */
   | { type: 'UPSERT_IMAGE_DOC'; doc: ImageDoc; label?: string }
   | { type: 'REMOVE_IMAGE_DOC'; docId: string }
+  /** 🎹🥁 hangszer-minta beírása (létrehozás ÉS módosítás) — a sütött klip szerkeszthető forrása */
+  | { type: 'UPSERT_INSTRUMENT_DOC'; doc: InstrumentDoc }
   /** 🖼️📄 Kép-lapok ÁTRENDEZÉSE (galéria-sorrend): az `order` az új id-sorrend; a
    *  listában nem szereplő lapok a végükön maradnak (stabil). Undo-zható. */
   | { type: 'REORDER_IMAGE_DOCS'; order: string[] }
@@ -328,6 +330,18 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
         : [...docs, cmd.doc];
       // 🗄️ I2: a rétegek fájljai assetként regisztrálódnak (backup / relink / hiányzó-jelzés)
       return withImageDocAssets({ ...project, imageDocs: next }, cmd.doc);
+    }
+
+    case 'UPSERT_INSTRUMENT_DOC': {
+      const docs = project.instrumentDocs ?? [];
+      const index = docs.findIndex((d) => d.id === cmd.doc.id);
+      if (index >= 0 && JSON.stringify(docs[index]) === JSON.stringify(cmd.doc)) {
+        return null;
+      }
+      return {
+        ...project,
+        instrumentDocs: index >= 0 ? docs.map((d) => (d.id === cmd.doc.id ? cmd.doc : d)) : [...docs, cmd.doc],
+      };
     }
 
     case 'REMOVE_IMAGE_DOC': {
@@ -672,6 +686,8 @@ export function describeCommand(cmd: EditorCommand): string {
       );
     case 'REMOVE_IMAGE_DOC':
       return tr('lib.commands.removeImageDoc');
+    case 'UPSERT_INSTRUMENT_DOC':
+      return tr('lib.commands.upsertInstrumentDoc', { defaultValue: cmd.doc.kind === 'drums' ? 'Dobminta' : 'Dallam' });
     case 'REORDER_IMAGE_DOCS':
       return tr('lib.commands.reorderImageDocs', {
         count: cmd.order.length,

@@ -3990,6 +3990,7 @@
       "master": "Master"
     },
     "audio": {
+      "editInstrument": "Muster bearbeiten",
       "fromVideo": "Ton aus Video",
       "fromPhotos": "Fotos",
       "fromFiles": "Dateien",

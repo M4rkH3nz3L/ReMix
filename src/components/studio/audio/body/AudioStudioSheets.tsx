@@ -4,7 +4,7 @@ import { AudioSheetFrameContext, type AudioSheetFrameValue } from '@/components/
 import { AlbumSheet } from '@/components/studio/audio/AlbumSheet';
 import { ClipEditSheet } from '@/components/studio/audio/ClipEditSheet';
 import { MasterSheet } from '@/components/studio/audio/MasterSheet';
-import { DrumMachineSheet } from '@/components/studio/audio/DrumMachineSheet';
+import { DrumMachineSheet, type DrumSource } from '@/components/studio/audio/DrumMachineSheet';
 import { MixerSheet } from '@/components/studio/audio/MixerSheet';
 import { PianoRollSheet } from '@/components/studio/audio/PianoRollSheet';
 import { SamplerSheet } from '@/components/studio/audio/SamplerSheet';
@@ -12,7 +12,7 @@ import { TtsSheet } from '@/components/studio/audio/TtsSheet';
 import type { SynthNote, SynthWave } from '@/lib/synth';
 import type { DrumHit } from '@/lib/drums';
 import type { SamplerPattern } from '@/lib/sampler';
-import type { Asset, AudioClip } from '@/types/project';
+import type { Asset, AudioClip, InstrumentDoc } from '@/types/project';
 
 /**
  * 🗂️ Sheet-host — a hang-stúdió mód-állapotaitól (`editing`/`mastering`/`mixerOpen`/…)
@@ -54,6 +54,8 @@ export function AudioStudioSheets({
   onBakeSampler,
   onInsertSource,
   onShareAlbum,
+  editDoc = null,
+  onEditInstrument,
   frame = null,
 }: {
   selClip: AudioClip | null;
@@ -82,8 +84,12 @@ export function AudioStudioSheets({
   setSampler: (v: boolean) => void;
   setSource: (v: boolean) => void;
   setAlbumOpen: (v: boolean) => void;
-  onBakeSynth: (notes: SynthNote[], wave: SynthWave) => void;
-  onBakeDrums: (hits: DrumHit[], bars: number) => void;
+  onBakeSynth: (notes: SynthNote[], wave: SynthWave, bars: number) => void;
+  onBakeDrums: (hits: DrumHit[], bars: number, src: DrumSource) => void;
+  /** 🎹🥁 az újraszerkesztett hangszer-minta (null = új) */
+  editDoc?: InstrumentDoc | null;
+  /** a klipszerkesztő „Minta szerkesztése” gombja */
+  onEditInstrument?: (docId: string) => void;
   onBakeSampler: (uri: string, pattern: SamplerPattern, bars: number) => void;
   onInsertSource: (asset: Asset) => void;
   onShareAlbum: () => void;
@@ -92,7 +98,7 @@ export function AudioStudioSheets({
 }) {
   return (
     <AudioSheetFrameContext.Provider value={frame}>
-      {editing && selClip ? <ClipEditSheet key={`${selClip.id}:${selClip.kind === 'audio' ? `${selClip.activeTake ?? ''}:${selClip.speed ?? 1}` : ''}`} clip={selClip} fps={fps} onClose={() => setEditing(false)} /> : null}
+      {editing && selClip ? <ClipEditSheet key={`${selClip.id}:${selClip.kind === 'audio' ? `${selClip.activeTake ?? ''}:${selClip.speed ?? 1}:${selClip.uri}` : ''}`} clip={selClip} fps={fps} onClose={() => setEditing(false)} onEditInstrument={onEditInstrument} /> : null}
       {mastering ? <MasterSheet onClose={() => setMastering(false)} /> : null}
       {mixerOpen ? (
         <MixerSheet
@@ -127,10 +133,10 @@ export function AudioStudioSheets({
       ) : null}
       {tts ? <TtsSheet onClose={() => setTts(false)} /> : null}
       {pianoRoll ? (
-        <PianoRollSheet bpm={bpm} busy={pianoBusy} onClose={() => setPianoRoll(false)} onBake={(notes, wave) => onBakeSynth(notes, wave)} />
+        <PianoRollSheet key={editDoc?.id ?? 'new'} initial={editDoc?.kind === 'synth' ? editDoc : null} bpm={bpm} busy={pianoBusy} onClose={() => setPianoRoll(false)} onBake={(notes, wave, bars) => onBakeSynth(notes, wave, bars)} />
       ) : null}
       {drumMachine ? (
-        <DrumMachineSheet bpm={bpm} busy={drumBusy} onClose={() => setDrumMachine(false)} onBake={(hits, bars) => onBakeDrums(hits, bars)} />
+        <DrumMachineSheet key={editDoc?.id ?? 'new'} initial={editDoc?.kind === 'drums' ? editDoc : null} bpm={bpm} busy={drumBusy} onClose={() => setDrumMachine(false)} onBake={(hits, bars, src) => onBakeDrums(hits, bars, src)} />
       ) : null}
       {sampler ? (
         <SamplerSheet bpm={bpm} busy={samplerBusy} onClose={() => setSampler(false)} onBake={(uri, pattern, bars) => onBakeSampler(uri, pattern, bars)} />

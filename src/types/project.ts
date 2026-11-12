@@ -5,6 +5,8 @@
  */
 
 import type { PixelArt } from '@/lib/pixelArt';
+import type { DrumPattern, DrumVelocity } from '@/lib/drums';
+import type { SynthNote, SynthWave } from '@/lib/synth';
 import type { LiveDoc } from './live';
 import type { Model3DDoc } from './model3d';
 import type { PhotoDevelop } from '@/lib/photoDevelop';
@@ -1150,6 +1152,17 @@ export interface AudioTake {
   at?: string;
 }
 
+/** 🎹🥁 egy hangszer-minta (a sütött klip szerkeszthető forrása) */
+export interface InstrumentDoc {
+  id: string;
+  kind: 'synth' | 'drums';
+  /** a sütéskori tempó (a rács ehhez tartozik) */
+  bpm: number;
+  bars: number;
+  synth?: { wave: SynthWave; notes: SynthNote[] };
+  drums?: { pattern: DrumPattern; velocity?: DrumVelocity; swing?: number };
+}
+
 export interface AudioClip extends ClipBase {
   kind: 'audio';
   /** a hivatkozott asset; az uri denormalizált gyorsítás */
@@ -1188,6 +1201,11 @@ export interface AudioClip extends ClipBase {
   takes?: AudioTake[];
   /** az aktív take azonosítója (a `takes`-ből) */
   activeTake?: string;
+  /**
+   * 🎹🥁 a hangszer-minta (`project.instrumentDocs`), amiből a klip hangja sütve lett — a minta
+   * újraszerkeszthető, az újrasütés minden rá hivatkozó klipet frissít. Hiányzó = sima hangfájl.
+   */
+  instrumentDocId?: string;
   /** 0–1 */
   volume: number;
   /** sztereó pásztázás −1 (bal) … 0 (közép) … 1 (jobb); hiányzó = közép. A renderben */
@@ -1783,6 +1801,11 @@ export interface Project {
    * réteg-fa itt marad — ezért bármikor újraszerkeszthető.
    */
   imageDocs?: ImageDoc[];
+  /**
+   * 🎹🥁 Hangszer-minták (Hang Stúdió): a dobgép és a piano roll szerkeszthető forrása. A sütött
+   * hang-klip `instrumentDocId`-vel hivatkozik ide, így a minta a sütés után is szerkeszthető.
+   */
+  instrumentDocs?: InstrumentDoc[];
   /**
    * 🎧💿 Album (Hang Stúdió): több szám + borító. Jelenléte → a projekt album-mód (a
    * `project.tracks` az `album.activeSongId` számot tükrözi). Hiányzó = egy-idővonalas szám.

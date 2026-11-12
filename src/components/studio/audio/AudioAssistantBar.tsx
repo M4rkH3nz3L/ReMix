@@ -95,6 +95,7 @@ export function AudioAssistantBar({ onActions, onClose }: { onActions: (a: Audio
   useEffect(() => {
     const offs = [
       registerDevAction('assistant.apply', () => applyIntent(parseNow(textRef.current, t), onActionsRef.current)),
+      registerDevAction('assistant.text', () => textRef.current),
     ];
     return () => offs.forEach((off) => off());
   }, [t]);
@@ -103,7 +104,8 @@ export function AudioAssistantBar({ onActions, onClose }: { onActions: (a: Audio
   useEffect(() => {
     devSetText = setText;
     return () => {
-      devSetText = null;
+      // csak a sajátját törli: a lap új példánya már felülírhatta (különben a régi lebontása elvenné)
+      if (devSetText === setText) devSetText = null;
     };
   }, []);
 

@@ -5232,8 +5232,12 @@ async function smokeAudioAssistant(log: Log) {
   runDevAction('audio.assistant');
   await sleep(500);
   const sentence = 'Tegyél zengést a beszédre, halkítsd a zenét 3 dB-lel, halkuljon a zene a beszéd alatt és masterelj Spotify-ra';
-  devTypeAssistant(sentence);
-  await sleep(400);
+  // a sáv felcsatolása (a lassú eszközön 0,5 s-nál tovább tart): addig a beírásnak nincs címzettje
+  for (let i = 0; i < 50 && runDevAction('assistant.text') === undefined; i++) await sleep(100);
+  for (let k = 0; k < 5 && runDevAction('assistant.text') !== sentence; k++) {
+    devTypeAssistant(sentence);
+    await sleep(300);
+  }
   const tt = i18nT as unknown as (k: string) => string;
   const parsed = parseNow(sentence, tt);
   log(parsed.unknown.length === 0 && parsed.steps.map((x) => x.key).join(',') === 'fxOn,trackGain,duckOn,master', 'a mondat 4 lépésre bomlik, nincs nem értett rész', parsed.steps.map((x) => x.key).join(' · '));

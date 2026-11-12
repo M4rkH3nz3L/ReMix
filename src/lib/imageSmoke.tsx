@@ -59,7 +59,7 @@ import { analyzeMix } from '@/lib/analyzeMix';
 import { runDevAction } from '@/lib/devActions';
 import { recordingPhase } from '@/lib/interruption';
 import { CLIP_LEVEL, levelDb, trackLevelAt } from '@/lib/levelMeter';
-import { offlineMixPlan } from '@/lib/offlineMix';
+import { mixRange, offlineMixPlan } from '@/lib/offlineMix';
 import type { WaveformData } from '@/lib/waveform';
 import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncProbe';
 import { exportOfflineWav, measureStretchLatency, probeStretchTiming } from '@/lib/offlineMixClient';
@@ -2939,7 +2939,7 @@ async function smokeEngineFx(log: Log) {
   await sleep(5000);
   st().setPlaying(false);
   const stats = previewEngine.takeStats();
-  log(stats.late === 0 && stats.minLeadMs > 20, 'valós időben, akadás nélkül (3 sáv × teljes lánc)', `${stats.chunks} szelet, ${stats.late} késett, legkisebb előny ${stats.minLeadMs.toFixed(0)} ms`);
+  log(stats.late === 0 && stats.minLeadMs > 20, 'valós időben, akadás nélkül (3 sáv × teljes lánc)', `${stats.chunks} szelet, ${stats.late} késett, legkisebb előny ${stats.minLeadMs.toFixed(0)} ms, késések: ${stats.lateAt.join(',')} ms, indulás ${stats.startMs} ms, keverés ${(stats.mixMs / Math.max(1, stats.chunks)).toFixed(0)} ms/szelet (max ${stats.maxMixMs}) — a szelet 125 ms`);
   router.back();
 }
 
@@ -6130,6 +6130,34 @@ async function smokeVideoRef(log: Log) {
   }
 }
 
+/** ⏱️ DSP-profil az eszközön (Hermes): 3 klip 8 s-a fokozatonként (ideiglenes mérés). */
+async function smokeDspProf(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const src = Float32Array.from({ length: 20 * SR }, (_, i) => Math.sin(i / 20) * 0.3);
+  const run = (fx: object, master: boolean, sec = 2) => {
+    const base = createEmptyProject('x', '9:16', undefined, 'audio');
+    const mk = (cid: string, start: number, pan: number) => ({ kind: 'audio', id: cid, uri: 'file:///a.wav', label: cid, start, duration: 16, trimIn: 0, sourceDuration: 20, volume: 0.3, fadeIn: 0, fadeOut: 0, pan, audioFx: fx, source: 'imported' });
+    const project = { ...base, ...(master ? { audioMaster: { target: 'custom', lufs: -14, truePeak: -1, dynamics: 'balanced', eq: { low: 2, mid: -1, high: 1.5 }, multiband: true } } : {}), tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [mk('m', 0, -0.5)] } : t.type === 'sfx' ? { ...t, clips: [mk('s', 0.5, 0.5)] } : t.type === 'voiceover' ? { ...t, clips: [mk('v', 1, 0)] } : t)) } as unknown as Project;
+    const plan = { ...offlineMixPlan(project), masterGain: 1 };
+    const sources = new Map([['file:///a.wav', { channels: [src, src], sampleRate: SR }]]);
+    const state = new Map();
+    const CH = Math.round(0.125 * SR);
+    const t0 = Date.now();
+    for (let a = SR; a < (1 + sec) * SR; a += CH) {
+      const out: [Float32Array, Float32Array] = [new Float32Array(CH), new Float32Array(CH)];
+      mixRange(plan, sources as never, out, a, a + CH, 1, state);
+    }
+    return Math.round((Date.now() - t0) / (sec * 8));
+  };
+  const all = { highpass: 90, lowpass: 12000, eq: { low: 3, mid: -2, high: 2 }, gate: true, deEsser: true, compressor: true, reverb: 0.5, delay: 0.4, stereoWide: true, limiter: true };
+  run({}, false, 1);
+  const rows = [`semmi ${run({}, false)}`, `master ${run({}, true)}`];
+  for (const [k, v] of Object.entries(all)) rows.push(`${k} ${run({ [k]: v }, false)}`);
+  rows.push(`mind ${run(all, false)}`, `mind+master ${run(all, true)}`);
+  log(null, 'ms / 125 ms-os szelet (3 klip)', rows.join(' | '));
+}
+
 /** ✂️🎚️ Tartomány- és stem-export: a tartomány = a teljes export szelete (masterrel), Σ stem = keverés master nélkül, a némított sáv kimarad. */
 async function smokeStemExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7950,6 +7978,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'dspprof') {
+    await step(phase, () => smokeDspProf(log));
     return;
   }
   if (phase === 'videoref') {

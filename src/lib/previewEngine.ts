@@ -87,7 +87,7 @@ class PreviewEngine {
   private playStartedAt = 0;
   private endSample = 0;
   /** 🧪 mérés: késve ütemezett szeletek (= hallható rés), a legkisebb előny, a cserék */
-  private stats = { late: 0, minLeadMs: Infinity, replaced: 0, chunks: 0, lateAt: [] as number[], startMs: 0 };
+  private stats = { late: 0, minLeadMs: Infinity, replaced: 0, chunks: 0, lateAt: [] as number[], startMs: 0, mixMs: 0, maxMixMs: 0 };
 
   /** 🎛️ a master mért erősítései keverésenként, és a legutóbbi (amíg az új mérés tart) */
   private masterGains = new Map<string, number>();
@@ -418,9 +418,13 @@ class PreviewEngine {
       const from = this.nextSample;
       const to = Math.min(from + CHUNK_SAMPLES, end);
       const out: [Float32Array, Float32Array] = [new Float32Array(to - from), new Float32Array(to - from)];
+      const m0 = Date.now();
       if (this.plan) {
         mixRange(this.plan, this.sources, out, from, to, 1, this.fxState);
       }
+      const mixMs = Date.now() - m0;
+      this.stats.mixMs += mixMs;
+      this.stats.maxMixMs = Math.max(this.stats.maxMixMs, mixMs);
       this.meter.push(from, out[0], out[1]);
       if (this.metronome) addMetronome(out, from, to, SR, this.metronome);
       this.tap?.push({ from, left: out[0].slice() });
@@ -457,9 +461,9 @@ class PreviewEngine {
   }
 
   /** 🧪 füstteszt: az ütemezés mérőszámai (a nullázás a lekérdezéssel) */
-  takeStats(): { late: number; minLeadMs: number; replaced: number; chunks: number; lateAt: number[]; startMs: number } {
+  takeStats(): { late: number; minLeadMs: number; replaced: number; chunks: number; lateAt: number[]; startMs: number; mixMs: number; maxMixMs: number } {
     const out = this.stats;
-    this.stats = { late: 0, minLeadMs: Infinity, replaced: 0, chunks: 0, lateAt: [], startMs: 0 };
+    this.stats = { late: 0, minLeadMs: Infinity, replaced: 0, chunks: 0, lateAt: [], startMs: 0, mixMs: 0, maxMixMs: 0 };
     return out;
   }
 }

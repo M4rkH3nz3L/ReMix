@@ -341,8 +341,10 @@ export function mixRange(
       const read = (from: number, to: number): [Float32Array, Float32Array] => {
         const l = new Float32Array(to - from);
         const r = new Float32Array(to - from);
+        const loopRead = loopN > 0;
+        const offR = srcOffset - base;
         for (let i = from; i < to; i++) {
-          const s = srcIndex(i) - base;
+          const s = loopRead ? srcIndex(i) - base : i + offR;
           if (s >= 0 && s < left.length) {
             l[i - from] = left[s];
             r[i - from] = right[s];
@@ -366,34 +368,54 @@ export function mixRange(
       fxState.set(key, st);
     }
     // a blokk-rács a klip elejéhez igazodik (a darabos hívás se tolja el)
+    // ⚡ a mintánkénti ciklus a JIT nélküli Hermesben is gyors legyen: a mintán belül nincs allokáció
+    // (pásztázás-tömb, iterátor), closure-hívás csak hurok-klipnél — az aritmetika és a sorrend változatlan
     const firstBlock = clipFrom + Math.floor((a - clipFrom) / BLOCK) * BLOCK;
+    const loopIdx = loopN > 0;
+    const off = srcOffset - base;
+    const sLg = staticPan ? staticPan[0] : 0;
+    const sRg = staticPan ? staticPan[1] : 0;
+    const nSend = sendTo.length;
+    const dstL = dst[0];
+    const dstR = dst[1];
+    const keyL = key ? key[0] : null;
+    const keyR = key ? key[1] : null;
+    const leftLen = left.length;
     for (let blockStart = firstBlock; blockStart < b; blockStart += BLOCK) {
       const blockEnd = Math.min(b, blockStart + BLOCK);
       const level = sampleChannel(clip.volumeKf, (blockStart - clipFrom) / sr, clip.volume) * clip.gain * (mono ? monoGain : 1);
       for (let i = Math.max(a, blockStart); i < blockEnd; i++) {
-        const s = srcIndex(i) - base;
-        if (!fxL && (s < 0 || s >= left.length)) {
+        const s = loopIdx ? srcIndex(i) - base : i + off;
+        if (!fxL && (s < 0 || s >= leftLen)) {
           continue;
         }
         const t = (i - clipFrom) / sr;
         const g = hasFade ? level * fadeAt(clip, t) : level;
-        const [lg, rg] = staticPan ?? panGains(sampleChannel(clip.panKf, t, clip.pan));
+        let lg = sLg;
+        let rg = sRg;
+        if (!staticPan) {
+          const pg = panGains(sampleChannel(clip.panKf, t, clip.pan));
+          lg = pg[0];
+          rg = pg[1];
+        }
         const xl = fxL ? fxL[i - a] : left[s];
-        const xr = fxR ? fxR[i - a] : right[s];
+        const xr = fxR ? fxR![i - a] : right[s];
         const vl = xl * g * lg;
         const vr = xr * g * rg;
-        if (key) {
-          key[0][i - fromSample] += vl;
-          key[1][i - fromSample] += vr;
+        const o = i - fromSample;
+        if (keyL) {
+          keyL[o] += vl;
+          keyR![o] += vr;
         }
         if (!heard) {
           continue;
         }
-        dst[0][i - fromSample] += vl;
-        dst[1][i - fromSample] += vr;
-        for (const [bus, amt] of sendTo) {
-          bus![0][i - fromSample] += vl * amt;
-          bus![1][i - fromSample] += vr * amt;
+        dstL[o] += vl;
+        dstR[o] += vr;
+        for (let k = 0; k < nSend; k++) {
+          const send = sendTo[k];
+          send[0]![0][o] += vl * send[1];
+          send[0]![1][o] += vr * send[1];
         }
       }
     }

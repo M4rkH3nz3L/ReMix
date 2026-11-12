@@ -29,3 +29,17 @@ export function formatDb(volume: number): string {
 
 /** a legnagyobb lineáris szorzó (+12 dB) */
 export const CLIP_VOLUME_MAX = Math.pow(10, CLIP_DB_MAX / 20);
+
+/**
+ * a gyors (léptető) hangerő-vezérlő egy lépése dB-ben: a jelenlegi szintről `deltaDb`-vel, a csúszka
+ * tartományában (−60 … +12 dB); a −60 alatti a néma (0). Így a 0 dB fölötti klip sem esik vissza 0 dB-re.
+ */
+export function stepClipVolume(volume: number, deltaDb: number): number {
+  if (!(volume > 0)) return deltaDb > 0 ? dbToVolume(CLIP_DB_MIN + deltaDb) : 0;
+  const db = Math.round((20 * Math.log10(volume) + deltaDb) * 10) / 10;
+  if (db <= CLIP_DB_MIN) return 0;
+  return Math.pow(10, Math.min(CLIP_DB_MAX, db) / 20);
+}
+
+/** a fade felső határa a klipszerkesztővel azonos szabállyal: legfeljebb 5 s és a klip fele */
+export const maxClipFade = (duration: number): number => Math.max(0, Math.min(5, duration / 2));

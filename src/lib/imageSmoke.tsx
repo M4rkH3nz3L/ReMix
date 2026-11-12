@@ -6005,6 +6005,39 @@ async function smokeTtsDevice(log: Log) {
   }
 }
 
+/** 🔊 AP6: a videó-szerkesztő gyors hangerő-léptetője dB-ben lép — a +6 dB-es klip egy „−” után +5 dB (nem 0 dB). Valódi érintés (adb). */
+async function smokeQuickVolume(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_quickvol';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:quickvol', caught));
+  const base = createEmptyProject('smoke gyors hangerő', '9:16');
+  const uri = toneWav('smoke_quickvol.wav', 4);
+  const v6 = Math.pow(10, 6 / 20);
+  const clip: AudioClip = { kind: 'audio', id: 'qv', label: 'zene', start: 0, duration: 4, trimIn: 0, sourceDuration: 4, uri, volume: v6, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [clip] } : t)) });
+  router.push(`/editor/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1500);
+  const vol = () => (st().project!.tracks.find((t) => t.type === 'music')!.clips[0] as AudioClip).volume;
+  try {
+    st().selectClip('qv');
+    st().setPanel('audio');
+    await sleep(800);
+    log(null, 'READY', 'voldown');
+    for (let i = 0; i < 250 && Math.abs(vol() - v6) < 1e-9; i++) await sleep(100);
+    const db = 20 * Math.log10(vol());
+    log(Math.abs(db - 5) < 0.05, 'a „Hangerő −” egy érintésre +6 → +5 dB (eddig 0–1 közé vágott: 0 dB lett volna)', `${db.toFixed(2)} dB`);
+    log(true, 'FOTÓZHATÓ', 'a gyors hangerő-léptető dB-ben');
+    await sleep(1500);
+  } finally {
+    st().setPanel(null);
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:quickvol-del', caught));
+  }
+}
+
 /** ✂️🎚️ Tartomány- és stem-export: a tartomány = a teljes export szelete (masterrel), Σ stem = keverés master nélkül, a némított sáv kimarad. */
 async function smokeStemExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7822,6 +7855,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'quickvol') {
+    await step(phase, () => smokeQuickVolume(log));
     return;
   }
   if (phase === 'ttsdevice') {

@@ -77,11 +77,12 @@ export function Stepper({
     <View style={styles.stepperRow}>
       <Text style={styles.stepperLabel}>{label}</Text>
       <View style={styles.stepperControls}>
-        <Pressable onPress={onDec} hitSlop={6} style={styles.stepperButton}>
+        {/* ♿ a képernyőolvasó a gomb nevét és a mostani értéket is hallja */}
+        <Pressable onPress={onDec} hitSlop={6} style={styles.stepperButton} accessibilityRole="button" accessibilityLabel={`${label} −`} accessibilityValue={{ text: value }}>
           <Ionicons name="remove" size={16} color={palette.text} />
         </Pressable>
         <Text style={styles.stepperValue}>{value}</Text>
-        <Pressable onPress={onInc} hitSlop={6} style={styles.stepperButton}>
+        <Pressable onPress={onInc} hitSlop={6} style={styles.stepperButton} accessibilityRole="button" accessibilityLabel={`${label} +`} accessibilityValue={{ text: value }}>
           <Ionicons name="add" size={16} color={palette.text} />
         </Pressable>
       </View>

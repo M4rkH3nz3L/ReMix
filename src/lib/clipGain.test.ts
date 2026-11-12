@@ -1,4 +1,4 @@
-import { CLIP_VOLUME_MAX, dbToVolume, formatDb, volumeToDb } from './clipGain';
+import { CLIP_VOLUME_MAX, dbToVolume, formatDb, maxClipFade, stepClipVolume, volumeToDb } from './clipGain';
 
 describe('clipGain', () => {
   it('+6 dB = ×1,9953; +12 dB a teteje; 0 dB = 1', () => {
@@ -21,5 +21,24 @@ describe('clipGain', () => {
     expect(formatDb(1)).toBe('0.0 dB');
     expect(formatDb(dbToVolume(6))).toBe('+6.0 dB');
     expect(formatDb(0.5)).toBe('−6.0 dB');
+  });
+});
+
+describe('🔊 gyors hangerő-lépés (AP6)', () => {
+  it('a 0 dB fölötti klip egy lépéssel nem esik vissza 0 dB-re (eddig 0–1 közé vágott)', () => {
+    const v6 = Math.pow(10, 6 / 20);
+    expect(formatDb(stepClipVolume(v6, -1))).toBe('+5.0 dB');
+    expect(formatDb(stepClipVolume(v6, 1))).toBe('+7.0 dB');
+    expect(stepClipVolume(Math.pow(10, 11.5 / 20), 1)).toBeCloseTo(Math.pow(10, 12 / 20), 9);
+  });
+  it('lefelé a −60 dB alatt néma; némából felfelé −59 dB', () => {
+    expect(stepClipVolume(Math.pow(10, -59.5 / 20), -1)).toBe(0);
+    expect(formatDb(stepClipVolume(0, 1))).toBe('−59.0 dB');
+    expect(stepClipVolume(0, -1)).toBe(0);
+  });
+  it('a fade legfeljebb 5 s és a klip fele', () => {
+    expect(maxClipFade(20)).toBe(5);
+    expect(maxClipFade(3)).toBe(1.5);
+    expect(maxClipFade(0)).toBe(0);
   });
 });

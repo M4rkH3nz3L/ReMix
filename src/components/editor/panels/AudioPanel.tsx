@@ -20,6 +20,7 @@ import { downloadTrack, fetchSoundLibrary } from '@/lib/render';
 import type { LibraryTrack } from '@/lib/render';
 import { projectMusicTarget, rankLibrary, trackMatchScore } from '@/lib/musicMatch';
 import { useTtsEngine } from '@/hooks/useTtsEngine';
+import { formatDb, maxClipFade, stepClipVolume } from '@/lib/clipGain';
 import { clamp, formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import { guardPro } from '@/store/paywallStore';
@@ -480,23 +481,24 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
             label={t('panels.audio.openHangStudio')}
             onPress={() => useEditorStore.getState().openAudioStudio(clip.id)}
           />
+          {/* a Hang Stúdió klipszerkesztőjével azonos szabályok: dB-skála (+12 dB-ig), a fade a klip feléig */}
           <Stepper
             label={t('panels.audio.volume')}
-            value={`${Math.round(clip.volume * 100)}%`}
-            onDec={() => updateClip(clip.id, { volume: clamp(clip.volume - 0.1, 0, 1) })}
-            onInc={() => updateClip(clip.id, { volume: clamp(clip.volume + 0.1, 0, 1) })}
+            value={formatDb(clip.volume)}
+            onDec={() => updateClip(clip.id, { volume: stepClipVolume(clip.volume, -1) })}
+            onInc={() => updateClip(clip.id, { volume: stepClipVolume(clip.volume, 1) })}
           />
           <Stepper
             label="Fade in"
             value={t('panels.audio.seconds', { value: clip.fadeIn.toFixed(1) })}
-            onDec={() => updateClip(clip.id, { fadeIn: clamp(clip.fadeIn - 0.5, 0, 10) })}
-            onInc={() => updateClip(clip.id, { fadeIn: clamp(clip.fadeIn + 0.5, 0, 10) })}
+            onDec={() => updateClip(clip.id, { fadeIn: clamp(clip.fadeIn - 0.5, 0, maxClipFade(clip.duration)) })}
+            onInc={() => updateClip(clip.id, { fadeIn: clamp(clip.fadeIn + 0.5, 0, maxClipFade(clip.duration)) })}
           />
           <Stepper
             label="Fade out"
             value={t('panels.audio.seconds', { value: clip.fadeOut.toFixed(1) })}
-            onDec={() => updateClip(clip.id, { fadeOut: clamp(clip.fadeOut - 0.5, 0, 10) })}
-            onInc={() => updateClip(clip.id, { fadeOut: clamp(clip.fadeOut + 0.5, 0, 10) })}
+            onDec={() => updateClip(clip.id, { fadeOut: clamp(clip.fadeOut - 0.5, 0, maxClipFade(clip.duration)) })}
+            onInc={() => updateClip(clip.id, { fadeOut: clamp(clip.fadeOut + 0.5, 0, maxClipFade(clip.duration)) })}
           />
           {/* 🎚️ sztereó pásztázás (bal ↔ jobb) — a renderben */}
           <Stepper

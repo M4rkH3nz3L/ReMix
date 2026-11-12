@@ -9,6 +9,7 @@ import { maxVideoDuration } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { AudioClip, ImageClip, VideoClip } from '@/types/project';
+import { formatDb, stepClipVolume } from '@/lib/clipGain';
 
 /**
  * ⚡ Gyors (Strip) panel-változatok — MOBILE-UI §3.1.
@@ -148,11 +149,12 @@ export function VolumeQuick({ clip }: { clip: AudioClip }) {
           />
         ))}
       </ChipRow>
+      {/* dB-léptetés a klipszerkesztő tartományában (+12 dB-ig) — a 0 dB fölötti klip nem esik vissza */}
       <Stepper
         label={t('panels.audio.volume')}
-        value={`${Math.round(clip.volume * 100)}%`}
-        onDec={() => updateClip(clip.id, { volume: clamp(clip.volume - 0.1, 0, 1) })}
-        onInc={() => updateClip(clip.id, { volume: clamp(clip.volume + 0.1, 0, 1) })}
+        value={formatDb(clip.volume)}
+        onDec={() => updateClip(clip.id, { volume: stepClipVolume(clip.volume, -1) })}
+        onInc={() => updateClip(clip.id, { volume: stepClipVolume(clip.volume, 1) })}
       />
     </View>
   );

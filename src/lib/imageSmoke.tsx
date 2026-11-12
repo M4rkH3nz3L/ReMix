@@ -68,6 +68,7 @@ import { previewEngine } from '@/lib/previewEngine';
 import { barsBeatsLabel, beatSplitTimes } from '@/lib/audioTransport';
 import { useProgressStore } from '@/store/progressStore';
 import { useRecordPrefs } from '@/store/recordPrefsStore';
+import { clickSample } from '@/lib/metronome';
 import { useAuth } from '@/store/authStore';
 import { useCollabLive } from '@/store/collabLiveStore';
 import { ensureShared, inviteMember, pullSharedProject, removeMember, respondToInvite } from '@/lib/collab';
@@ -5876,6 +5877,90 @@ async function smokeBpmOffline(log: Log) {
   }
 }
 
+/**
+ * ⏱️ AP4: a metronóm a lejátszás alatt mintapontosan a rácson szól (hangsúlyos ütem-egy), a mérőbe és
+ * az exportba nem kerül; metronómos felvételnél a lejátszás a projekt végén túl is fut, a take a
+ * lejátszófejtől szól.
+ */
+async function smokeMetronome(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const silent = new File(Paths.document, 'smoke_metro_silence.wav');
+  if (silent.exists) silent.delete();
+  silent.create();
+  silent.write(encodeWav16([new Float32Array(4 * SR)], SR, () => 0.5));
+  const id = 'prj_smoke_metro';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:metro', caught));
+  const base = createEmptyProject('smoke metronóm', '9:16', undefined, 'audio');
+  const clip: AudioClip = { kind: 'audio', id: 'sil', label: 'csend', start: 0, duration: 4, trimIn: 0, sourceDuration: 4, uri: silent.uri, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, bpm: 120, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [clip] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1500);
+  const prefs = useRecordPrefs.getState();
+  const was = { metronome: prefs.metronome, gain: prefs.metronomeGain, countIn: prefs.countInBars, punch: prefs.punch };
+  try {
+    // 1) lejátszás metronómmal: a motor kimenete = a klikkek (a klip néma)
+    useRecordPrefs.setState({ metronome: true, metronomeGain: 0.6, countInBars: 0, punch: false });
+    await sleep(300);
+    previewEngine.debugTap(true);
+    st().setPlayhead(0);
+    st().setPlaying(true);
+    let lufs: number | null = null;
+    for (let i = 0; i < 25; i++) {
+      await sleep(100);
+      const r = previewEngine.loudness();
+      if (r) lufs = Math.max(lufs ?? -Infinity, r.shortTerm ?? -Infinity);
+    }
+    st().setPlaying(false);
+    const chunks = previewEngine.debugTap(false).sort((a, b) => a.from - b.from);
+    const total = chunks.length ? chunks[chunks.length - 1].from + chunks[chunks.length - 1].left.length : 0;
+    const out = new Float32Array(total);
+    for (const c of chunks) out.set(c.left, c.from);
+    const beats = [0, 1, 2, 3, 4].map((k) => Math.round(k * 0.5 * SR)).filter((at) => at + 2 < total);
+    const exact = beats.every((at) => (at === 0 || out[at - 1] === 0) && out[at] === 0 && Math.abs(out[at + 1] - 0.6 * clickSample(at === 0 || at === Math.round(2 * SR) ? true : false, 1, SR)) < 1e-6);
+    const pk = (at: number) => out.subarray(at, at + Math.round(0.04 * SR)).reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+    const ratio = beats.length > 1 ? pk(beats[0]) / pk(beats[1]) : 0;
+    log(exact && beats.length >= 4, 'lejátszás közben a klikkek mintapontosan a beateken (120 BPM: 0,5 s-onként)', `${beats.length} klikk, ${chunks.length} szelet`);
+    log(Math.abs(ratio - 0.8 / 0.55) < 0.05, 'az ütem-egy hangsúlyos (×1,45)', `×${ratio.toFixed(3)}`);
+    log(lufs === null || !Number.isFinite(lufs) || lufs < -70, 'a hangosságmérő nem látja a klikket (a mérés előtt keveredik)', `short-term ${lufs === null || !Number.isFinite(lufs) ? '−∞' : lufs.toFixed(1)} LUFS`);
+    // 2) az export néma (a metronóm nem kerül bele)
+    const { uri: exp } = await exportOfflineWav(st().project!, new File(projectExportDir(), 'smoke_metro_export.wav'));
+    const api = (await loadAudioApi())!;
+    const ex = (await api.decodeAudioData(exp, SR)).getChannelData(0);
+    const exPeak = ex.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+    // a 16 bites export TPDF-ditherrel készül: a „csend” ±1–2 LSB (a klikk 0,6 volna)
+    log(exPeak <= 2 / 32768, 'az export néma: a metronóm nem kerül bele (csak a 16 bites dither, ≤ 2 LSB)', `csúcs ${(exPeak * 32768).toFixed(1)} LSB`);
+    new File(exp).delete();
+    // 3) metronómos felvétel a projekt végén túl: 1 ütem előszámlálás, a take a lejátszófejtől
+    useRecordPrefs.setState({ countInBars: 1 });
+    st().setPlayhead(3);
+    await sleep(300);
+    await runDevAction('audio.recordToggle');
+    let maxHead = 0;
+    for (let i = 0; i < 45; i++) {
+      await sleep(100);
+      maxHead = Math.max(maxHead, st().playhead);
+    }
+    const through = st().playThrough && st().isPlaying;
+    await runDevAction('audio.recordToggle');
+    for (let i = 0; i < 40 && (st().project!.tracks.find((t) => t.type === 'voiceover')!.clips.length === 0); i++) await sleep(100);
+    const take = st().project!.tracks.find((t) => t.type === 'voiceover')!.clips[0] as AudioClip | undefined;
+    log(through && maxHead > 4.3, 'felvétel közben a lejátszás a projekt végén (4 s) túl is fut', `lejátszófej max ${maxHead.toFixed(2)} s`);
+    log(!!take && Math.abs(take.start - 3) < 0.15 && take.duration > 1.5 && !st().playThrough && !st().isPlaying, 'a take a lejátszófejtől (3 s) szól, az előszámlálás nélkül; leállítás után a transzport alaphelyzetben', take ? `kezdet ${take.start.toFixed(3)} s, ${take.duration.toFixed(2)} s, levágva ${(take.trimIn ?? 0).toFixed(3)} s` : 'nincs take');
+    log(true, 'FOTÓZHATÓ', 'a metronóm-gomb aktív a transzporton, a take a 3. mp-nél');
+    await sleep(2000);
+  } finally {
+    useRecordPrefs.setState({ metronome: was.metronome, metronomeGain: was.gain, countInBars: was.countIn, punch: was.punch });
+    st().setPlaying(false);
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:metro-del', caught));
+    if (silent.exists) silent.delete();
+  }
+}
+
 /** ✂️🎚️ Tartomány- és stem-export: a tartomány = a teljes export szelete (masterrel), Σ stem = keverés master nélkül, a némított sáv kimarad. */
 async function smokeStemExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7693,6 +7778,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'metronome') {
+    await step(phase, () => smokeMetronome(log));
     return;
   }
   if (phase === 'bpmoffline') {

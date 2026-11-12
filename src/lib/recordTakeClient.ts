@@ -84,13 +84,16 @@ export class PunchSession {
   constructor(
     private readonly recorder: AudioRecorder,
     readonly win: PunchWindow,
-    private readonly onEnd: () => void
+    private readonly onEnd: () => void,
+    /** ⏱️ nyitott (metronómos) felvétel: a lejátszás a projekt végén túl is fut, kézi leállításig */
+    readonly open = false
   ) {}
 
   start(): void {
     const st = useEditorStore.getState();
     this.loopWas = st.loop;
     if (st.loop) st.setLoop(false);
+    if (this.open) st.setPlayThrough(true);
     st.setPlayhead(this.win.playFrom);
     st.setPlaying(true);
     const tick = () => {
@@ -117,6 +120,7 @@ export class PunchSession {
     this.ended = true;
     const st = useEditorStore.getState();
     st.setPlaying(false);
+    if (this.open) st.setPlayThrough(false);
     if (this.loopWas) st.setLoop(true);
   }
 

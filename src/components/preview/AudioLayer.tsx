@@ -10,6 +10,8 @@ import { registerDevAction } from '@/lib/devActions';
 import { canSegment, isLongSource } from '@/lib/longSource';
 import { needsWholeWindow, offlineMixPlan, type OfflineMixPlan } from '@/lib/offlineMix';
 import { previewEngine } from '@/lib/previewEngine';
+import { useRecordPrefs } from '@/store/recordPrefsStore';
+import { DEFAULT_METER } from '@/lib/audioTransport';
 import { ensureStretchProxy, getStretchProxySync, stretchProxyKey } from '@/lib/stretchProxy';
 import { detectSystemPause, INITIAL_STALL } from '@/lib/interruption';
 import { audioSpeedOf, needsStretchProxy } from '@/lib/audioTrim';
@@ -180,6 +182,18 @@ function MixEngineLayer({ plan }: { plan: OfflineMixPlan | null }) {
   useEffect(() => {
     void previewEngine.setPlan(plan).catch((caught) => { logCaught('components/preview/AudioLayer.tsx:MixEngineLayer', caught); });
   }, [plan]);
+
+  // ⏱️ metronóm: a projekt tempóján és ütemjelzésén (csak hallható — az exportba nem kerül)
+  const isAudio = useEditorStore((s) => s.project?.kind === 'audio');
+  const metronomeOn = useRecordPrefs((s) => s.metronome) && isAudio;
+  const metronomeGain = useRecordPrefs((s) => s.metronomeGain);
+  const bpm = useEditorStore((s) => s.project?.bpm);
+  const beatsPerBar = useEditorStore((s) => (s.project?.timeSignature ?? DEFAULT_METER).beatsPerBar);
+  const beatUnit = useEditorStore((s) => (s.project?.timeSignature ?? DEFAULT_METER).beatUnit);
+  useEffect(() => {
+    previewEngine.setMetronome(metronomeOn ? { bpm, meter: { beatsPerBar, beatUnit }, gain: metronomeGain } : null);
+  }, [metronomeOn, metronomeGain, bpm, beatsPerBar, beatUnit]);
+  useEffect(() => () => previewEngine.setMetronome(null), []);
 
   useEffect(() => {
     if (isPlaying) {

@@ -3993,7 +3993,7 @@
       "extractFailed": "Couldn't extract the video's audio.",
       "tempo": {"title": "Tempo", "source": "Source", "match": "Match {{bpm}} BPM", "reset": "Original tempo", "outOfRange": "The tempo ratio must be between 0.5× and 2×."},
       "fxOrder": {"title": "Effect order", "up": "Move up", "down": "Move down", "hint": "The chain processes the sound top to bottom (normalize and limiter always last).", "stage": {"filters": "Filters", "eq": "EQ", "gate": "Noise gate", "deEsser": "De-esser", "compressor": "Compressor", "reverb": "Reverb", "delay": "Delay", "stereoWide": "Stereo widening"}},
-      "rec": {"pause": "Pause", "resume": "Resume", "level": "Input level", "hot": "Too loud — lower it or move back", "paused": "Paused", "options": "Recording options", "countIn": "Count-in: {{v}}", "off": "off", "bars_one": "{{count}} bar", "bars_other": "{{count}} bars", "punch": "Punch-in (In–Out): {{v}}", "on": "on", "done": "Done", "countingIn": "Count-in…", "punchArmed": "Punch — starts at In", "noRange": "Set an In–Out range for punch-in (at least 0.2 s).", "takes": "Takes ({{count}})", "take": "Take {{n}}", "activeTake": "active"},
+      "rec": {"metronomeLevel": "Metronome volume: {{v}}%", "pause": "Pause", "resume": "Resume", "level": "Input level", "hot": "Too loud — lower it or move back", "paused": "Paused", "options": "Recording options", "countIn": "Count-in: {{v}}", "off": "off", "bars_one": "{{count}} bar", "bars_other": "{{count}} bars", "punch": "Punch-in (In–Out): {{v}}", "on": "on", "done": "Done", "countingIn": "Count-in…", "punchArmed": "Punch — starts at In", "noRange": "Set an In–Out range for punch-in (at least 0.2 s).", "takes": "Takes ({{count}})", "take": "Take {{n}}", "activeTake": "active"},
       "spectrum": "Spectrum",
       "panAutomation": "Pan automation",
       "fxPitch": "Pitch (semitones)",
@@ -4137,6 +4137,7 @@
         }
       },
       "transport": {
+        "metronome": "Metronome",
         "auto": "Auto",
         "fit": "Fit",
         "ab": "A/B",

@@ -208,6 +208,8 @@ export interface EditorState {
   isPlaying: boolean;
   /** lejátszás újrakezdése a végén */
   loop: boolean;
+  /** ⏱️🎙️ a lejátszás a projekt végén se álljon meg (metronómos felvétel a végén túl); session-szintű */
+  playThrough: boolean;
   /** a zenesáv beat-rácsa idővonal-időben (jelölők + snap) */
   beatTimes: number[];
   downbeatTimes: number[];
@@ -401,6 +403,7 @@ export interface EditorState {
   setPlayhead: (t: number, snap?: boolean) => void;
   setPlaying: (playing: boolean) => void;
   setLoop: (loop: boolean) => void;
+  setPlayThrough: (on: boolean) => void;
   setBeatGrid: (beatTimes: number[], downbeatTimes: number[]) => void;
   /** 🥁 markerek a beat-rácsból (minden beat vagy csak az ütemegy); @returns hány új jelölő */
   markersFromBeats: (mode: 'beat' | 'downbeat') => number;
@@ -462,6 +465,7 @@ export const SESSION_RESET = {
   hiddenTracks: [] as TrackType[],
   autoTrackHeight: false,
   playbackRate: 1,
+  playThrough: false,
   rangeIn: null as number | null,
   rangeOut: null as number | null,
   showSafeZones: false,

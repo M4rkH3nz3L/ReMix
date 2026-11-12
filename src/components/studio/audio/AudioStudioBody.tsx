@@ -94,10 +94,10 @@ import type { DrumSource } from '@/components/studio/audio/DrumMachineSheet';
 import { downloadToCache, probeAudioDuration } from '@/lib/media';
 import { pauseVoiceRecording, prepareVoiceRecording, resumeVoiceRecording, startVoiceRecording, stopVoiceRecording, VOICE_RECORDING_OPTIONS, voiceoverClip } from '@/lib/voiceRecording';
 import { nextHot } from '@/lib/recordingMeter';
-import { punchCommands, punchWindow } from '@/lib/punchRecord';
+import { metronomeWindow, openTakePlacement, punchCommands, punchWindow } from '@/lib/punchRecord';
 import { insertSilenceCommands, joinableNext, joinCommands, type GapScope } from '@/lib/gapEdit';
 import { alignCountInTake, alignPunchTake, PunchSession, runCountIn } from '@/lib/recordTakeClient';
-import { useRecordPrefs } from '@/store/recordPrefsStore';
+import { METRONOME_LEVELS, useRecordPrefs } from '@/store/recordPrefsStore';
 import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
 import { recordingPhase } from '@/lib/interruption';
 import { logCaught } from '@/lib/logCaught';
@@ -174,6 +174,7 @@ export function AudioStudioBody({
   const [tts, setTts] = useState(false);
   const [pianoRoll, setPianoRoll] = useState(false);
   const autoBpmRef = useRef<() => Promise<void>>(async () => {});
+  const metronomeOn = useRecordPrefs((s) => s.metronome);
   /** 🎹🥁 az újraszerkesztett hangszer-minta (null = új minta) */
   const [editDocId, setEditDocId] = useState<string | null>(null);
   const [pianoBusy, setPianoBusy] = useState(false);
@@ -569,6 +570,18 @@ export function AudioStudioBody({
     if (!uri) return;
     const label = t('panels.audio.voiceoverLabel');
     const st = useEditorStore.getState();
+    if (punch?.open) {
+      // ⏱️ metronómos felvétel: a take a lejátszófejtől (In) szól, a felvevő idejéből igazítva — kivágás nélkül
+      const clockStart = punch.recording ? punch.startAt() : null;
+      if (clockStart === null || !st.project) return;
+      const end = clockStart + seconds;
+      const startAt = await alignPunchTake(st.project, 'voiceover', uri, clockStart, { ...punch.win, out: end, stopAt: end }, st.isTrackAudible);
+      const place = openTakePlacement({ seconds, startAt }, punch.win.in);
+      if (!place) return;
+      const { clip, asset } = voiceoverClip(uri, seconds, place.start, fps, label, makeId);
+      st.addClip('voiceover', { ...clip, start: place.start, trimIn: place.trimIn, duration: place.duration }, asset);
+      return;
+    }
     if (punch) {
       // 🎯 punch: a klip pontosan In-től Out-ig (a felvevő idejéből), alatta kivágva — egy undo
       const clockStart = punch.recording ? punch.startAt() : null;
@@ -628,6 +641,16 @@ export function AudioStudioBody({
         session.start();
         return;
       }
+      if (prefs.metronome) {
+        // ⏱️ metronómmal: a lejátszás (a többi sávval és a klikkel) a lejátszófej előtt az előszámlálásnyival
+        // indul, a felvevő a lejátszófejnél — a take a punch-mérés szerint igazodik, nyitott véggel
+        await prepareVoiceRecording(recorder);
+        const session = new PunchSession(recorder, metronomeWindow(playhead, prefs.countInBars, bpm, meter), () => void finishRecordingRef.current(), true);
+        punchRef.current = session;
+        setRecArmed(true);
+        session.start();
+        return;
+      }
       recordStartPlayhead.current = playhead;
       await startVoiceRecording(recorder);
       if (prefs.countInBars > 0) {
@@ -655,6 +678,14 @@ export function AudioStudioBody({
     Alert.alert(t('studio.audio.rec.options'), undefined, [
       { text: t('studio.audio.rec.countIn', { v: ci }), onPress: () => { p.setCountIn(((p.countInBars + 1) % 3) as 0 | 1 | 2); recordOptions(); } },
       { text: t('studio.audio.rec.punch', { v: t(p.punch ? 'studio.audio.rec.on' : 'studio.audio.rec.off') }), onPress: () => { p.setPunch(!p.punch); recordOptions(); } },
+      {
+        text: t('studio.audio.rec.metronomeLevel', { v: Math.round(p.metronomeGain * 100) }),
+        onPress: () => {
+          const i = METRONOME_LEVELS.findIndex((g) => Math.abs(g - p.metronomeGain) < 1e-6);
+          p.setMetronomeGain(METRONOME_LEVELS[(i + 1) % METRONOME_LEVELS.length]);
+          recordOptions();
+        },
+      },
       { text: t('studio.audio.rec.done'), style: 'cancel' },
     ]);
   };
@@ -1295,6 +1326,14 @@ export function AudioStudioBody({
         <View style={styles.tSep} />
         {/* loop + In/Out + range törlés */}
         <TBtn icon="repeat" active={loop} onPress={() => useEditorStore.getState().setLoop(!loop)} />
+        {/* ⏱️ metronóm: lejátszás és felvétel közben (az exportba nem kerül) */}
+        <TBtn
+          icon="timer-outline"
+          testID="audio-metronome"
+          active={metronomeOn}
+          onPress={() => useRecordPrefs.getState().setMetronome(!metronomeOn)}
+          accessibilityLabel={t('studio.audio.transport.metronome')}
+        />
         <TBtn label={t('studio.audio.transport.rangeIn')} onPress={() => useEditorStore.getState().setRangeIn()} />
         <TBtn label={t('studio.audio.transport.rangeOut')} onPress={() => useEditorStore.getState().setRangeOut()} />
         {rangeIn != null || rangeOut != null ? (
@@ -1384,7 +1423,7 @@ export function AudioStudioBody({
           durationMs={recorderState.durationMillis}
           onPauseResume={pauseResumeRecording}
           canPause={!punchRef.current && !recCountingIn}
-          status={recArmed && !recorderState.isRecording ? t('studio.audio.rec.punchArmed') : recCountingIn ? t('studio.audio.rec.countingIn') : null}
+          status={recArmed && !recorderState.isRecording ? t(punchRef.current?.open ? 'studio.audio.rec.countingIn' : 'studio.audio.rec.punchArmed') : recCountingIn ? t('studio.audio.rec.countingIn') : null}
         />
       ) : null}
 
@@ -1431,6 +1470,7 @@ function TBtn({
   onLongPress?: () => void;
   onPressOut?: () => void;
   delayLongPress?: number;
+  testID?: string;
   /** csak ikonos gombnál kötelező értelme van (VoiceOver/TalkBack) */
   accessibilityLabel?: string;
 }) {

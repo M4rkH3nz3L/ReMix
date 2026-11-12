@@ -17,6 +17,7 @@ type PlaybackSlice = Pick<
   | 'playhead'
   | 'isPlaying'
   | 'loop'
+  | 'playThrough'
   | 'playbackRate'
   | 'rangeIn'
   | 'rangeOut'
@@ -27,6 +28,7 @@ type PlaybackSlice = Pick<
   | 'setPlayhead'
   | 'setPlaying'
   | 'setLoop'
+  | 'setPlayThrough'
   | 'setPlaybackRate'
   | 'shuttle'
   | 'setRangeIn'
@@ -42,6 +44,7 @@ export const createPlaybackSlice: EditorSlice<PlaybackSlice> = (set, get) => ({
   playhead: 0,
   isPlaying: false,
   loop: false,
+  playThrough: SESSION_RESET.playThrough,
   playbackRate: SESSION_RESET.playbackRate,
   rangeIn: SESSION_RESET.rangeIn,
   rangeOut: SESSION_RESET.rangeOut,
@@ -67,8 +70,9 @@ export const createPlaybackSlice: EditorSlice<PlaybackSlice> = (set, get) => ({
   setVideoVoiceActive: (on) => set({ videoVoiceActive: on }),
 
   setPlayhead: (t, snap) => {
-    const { project } = get();
-    const max = project ? Math.max(projectDuration(project), 0) : 0;
+    const { project, playThrough } = get();
+    // ⏱️🎙️ metronómos felvételnél a lejátszófej a projekt végén túl is halad
+    const max = playThrough ? Number.POSITIVE_INFINITY : project ? Math.max(projectDuration(project), 0) : 0;
     const clamped = clamp(t, 0, Math.max(max, 0));
     // 🎞️ scrub/koppintáskor a frame-rácsra ül (fél-kocka csúszás már látszik); a
     // lejátszó-óra snap NÉLKÜL hívja (folytonos lejátszás, nem ugrál kockánként)
@@ -80,6 +84,7 @@ export const createPlaybackSlice: EditorSlice<PlaybackSlice> = (set, get) => ({
   setLoop: (loop) => set({ loop }),
 
   setPlaybackRate: (rate) => set({ playbackRate: rate }),
+  setPlayThrough: (playThrough) => set({ playThrough }),
 
   shuttle: (dir) => {
     // sebesség-létra: 1× → 2× → 4× (irány szerint előjelezve). Ellentétes irányba

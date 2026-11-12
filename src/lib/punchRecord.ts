@@ -58,6 +58,23 @@ export function punchWindow(rangeIn: number | null, rangeOut: number | null, pre
 }
 
 /**
+ * ⏱️🎙️ metronómos felvétel (AP4): a lejátszás `countInBars` ütemmel a lejátszófej előtt indul (a
+ * metronóm ezalatt számol be), a felvevő kicsit a lejátszófej előtt; nyitott vég (kézi leállításig).
+ */
+export function metronomeWindow(playhead: number, countInBars: number, bpm: number | undefined, meter: Meter = DEFAULT_METER): PunchWindow {
+  const playFrom = Math.max(0, playhead - countInSeconds(countInBars, bpm, meter));
+  return { playFrom, recordAt: Math.max(playFrom, playhead - PUNCH_LEAD), in: playhead, out: Number.POSITIVE_INFINITY, stopAt: Number.POSITIVE_INFINITY };
+}
+
+/** a nyitott take helye: a lejátszófejtől (In) szól, az előtte felvett rész levágva; túl rövid → null */
+export function openTakePlacement(rec: { seconds: number; startAt: number }, inSec: number): { start: number; trimIn: number; duration: number } | null {
+  const start = Math.max(inSec, rec.startAt);
+  const trimIn = Math.max(0, start - rec.startAt);
+  const duration = rec.seconds - trimIn;
+  return duration >= MIN_CLIP_DURATION ? { start, trimIn, duration } : null;
+}
+
+/**
  * a felvétel 0. mintájának helye a projekt idejében: medián(lejátszófej − felvett idő); a még 0 ms-os
  * (el sem indult) minták kimaradnak. Nincs használható minta → null.
  */

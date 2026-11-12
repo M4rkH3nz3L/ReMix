@@ -5,6 +5,7 @@ import type { FxState } from '@/lib/audioDsp';
 import { logCaught } from '@/lib/logCaught';
 import { LongSource, longUris } from '@/lib/longSource';
 import { LiveLoudness, type LoudnessReading } from '@/lib/liveLoudness';
+import { addMetronome, type MetronomeConfig } from '@/lib/metronome';
 import { measureMasterGain, mixRange, OFFLINE_SAMPLE_RATE, sourceRanges, stretchJobs, withNormalizeGains, type DecodedSource, type OfflineMixPlan } from '@/lib/offlineMix';
 import { stretchSegment } from '@/lib/offlineMixClient';
 
@@ -91,6 +92,25 @@ class PreviewEngine {
   /** 🎛️ a master mért erősítései keverésenként, és a legutóbbi (amíg az új mérés tart) */
   private masterGains = new Map<string, number>();
   private lastMasterGain = 1;
+
+  /** ⏱️ a metronóm (null = ki): a szeletekhez a hangosságmérés UTÁN adódik — az exportba és a mérőbe nem kerül */
+  private metronome: MetronomeConfig | null = null;
+  /** 🧪 mérés: a ténylegesen ütemezett szeletek (idővonal-minta + bal csatorna), ha be van kapcsolva */
+  private tap: { from: number; left: Float32Array }[] | null = null;
+
+  /** ⏱️ a metronóm be/ki; futó lejátszásnál a még el nem indult szeletek már vele szólnak */
+  setMetronome(cfg: MetronomeConfig | null): void {
+    const same = JSON.stringify(cfg) === JSON.stringify(this.metronome);
+    this.metronome = cfg;
+    if (!same && this.playing) this.rescheduleFrom(this.position() + EDIT_LEAD_SEC);
+  }
+
+  /** 🧪 füstteszt: a lejátszott szeletek rögzítése (be) / kiolvasása és leállítása (ki) */
+  debugTap(on: boolean): { from: number; left: Float32Array }[] {
+    const got = this.tap ?? [];
+    this.tap = on ? [] : null;
+    return got;
+  }
 
   /** 🧪 füstteszt: a klipenkénti lejátszók útja (a még nem támogatott effektes projektek útja) */
   forceFallback = false;
@@ -392,14 +412,18 @@ class PreviewEngine {
     if (this.longUris.size > 0) {
       void this.prefetch(this.nextSample, until + 3 * SR).catch((caught) => { logCaught('lib/previewEngine.ts:prefetch', caught); });
     }
-    while (this.nextSample < until && this.nextSample < this.endSample) {
+    // ⏱️ bekötött metronómnál a projekt vége után is szól (felvétel a végén túl)
+    const end = this.metronome ? Number.POSITIVE_INFINITY : this.endSample;
+    while (this.nextSample < until && this.nextSample < end) {
       const from = this.nextSample;
-      const to = Math.min(from + CHUNK_SAMPLES, this.endSample);
+      const to = Math.min(from + CHUNK_SAMPLES, end);
       const out: [Float32Array, Float32Array] = [new Float32Array(to - from), new Float32Array(to - from)];
       if (this.plan) {
         mixRange(this.plan, this.sources, out, from, to, 1, this.fxState);
       }
       this.meter.push(from, out[0], out[1]);
+      if (this.metronome) addMetronome(out, from, to, SR, this.metronome);
+      this.tap?.push({ from, left: out[0].slice() });
       const buf = ctx.createBuffer(2, to - from, SR);
       buf.copyToChannel(out[0] as Float32Array<ArrayBuffer>, 0);
       buf.copyToChannel(out[1] as Float32Array<ArrayBuffer>, 1);

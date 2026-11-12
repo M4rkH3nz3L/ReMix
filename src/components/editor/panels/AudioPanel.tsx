@@ -19,7 +19,7 @@ import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
 import { downloadTrack, fetchSoundLibrary } from '@/lib/render';
 import type { LibraryTrack } from '@/lib/render';
 import { projectMusicTarget, rankLibrary, trackMatchScore } from '@/lib/musicMatch';
-import { fetchTtsVoices, generateTts, type TtsVoice } from '@/lib/tts';
+import { useTtsEngine } from '@/hooks/useTtsEngine';
 import { clamp, formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import { guardPro } from '@/store/paywallStore';
@@ -32,7 +32,7 @@ import { logCaught } from '@/lib/logCaught';
  * keverése (hangerő, fade in/out).
  */
 export function AudioPanel({ clip }: { clip: AudioClip | null }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const updateClip = useEditorStore((s) => s.updateClip);
   const addClip = useEditorStore((s) => s.addClip);
   // 🥁 beat → marker / vágás
@@ -135,22 +135,15 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
 
   // 🗣️ AI-hang (TTS)
   const [ttsText, setTtsText] = useState('');
-  const [ttsVoices, setTtsVoices] = useState<TtsVoice[]>([]);
-  const [ttsVoice, setTtsVoice] = useState<string | undefined>(undefined);
-  const [ttsAvailable, setTtsAvailable] = useState<boolean | null>(null);
   const [ttsBusy, setTtsBusy] = useState(false);
+  // 📱 a telefon hangja (offline, minden szinten); szerveres hang csak tartalékként (Pro)
+  const tts = useTtsEngine(i18n.language);
+  const ttsAvailable = tts.available;
 
   useEffect(() => {
     fetchSoundLibrary()
       .then(setLibrary)
       .catch((caught) => { logCaught('components/editor/panels/AudioPanel.tsx:AudioPanel', caught); return setLibraryError(true); });
-    fetchTtsVoices()
-      .then((r) => {
-        setTtsAvailable(r.available);
-        setTtsVoices(r.voices);
-        setTtsVoice(r.voices[0]?.name);
-      })
-      .catch((caught) => { logCaught('components/editor/panels/AudioPanel.tsx:AudioPanel', caught); return setTtsAvailable(false); });
   }, []);
 
   const generateVoice = () => {
@@ -159,11 +152,12 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
       return;
     }
     setTtsBusy(true);
-    generateTts(text, ttsVoice)
-      .then(({ uri, duration }) => {
-        addAudioClip(uri, t('panels.audio.aiVoiceLabel'), duration, 'local', 'voiceover');
-        setTtsText('');
-      })
+    const run = async () => {
+      const { uri, duration } = await tts.generate(text);
+      addAudioClip(uri, t('panels.audio.aiVoiceLabel'), duration, 'local', 'voiceover');
+      setTtsText('');
+    };
+    (tts.needsPro ? guardPro(run, (err) => Alert.alert(t('panels.audio.aiVoiceLabel'), err.message)) : run())
       .catch((err: Error) => { logCaught('components/editor/panels/AudioPanel.tsx:generateVoice', err); return Alert.alert(t('panels.audio.aiVoiceLabel'), err.message); })
       .finally(() => setTtsBusy(false));
   };
@@ -190,15 +184,14 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
     const text = caps.map((c) => c.text).join(' ').trim().slice(0, 4000);
     setTtsBusy(true);
     try {
-      await guardPro(
-        async () => {
-          const { uri, duration } = await generateTts(text, ttsVoice);
-          state.setPlayhead(Math.max(0, caps[0].start));
-          addAudioClip(uri, t('panels.audio.dubLabel'), duration, 'local', 'voiceover');
-          Alert.alert(t('panels.audio.dubTitle'), t('panels.audio.dubDone'));
-        },
-        (e) => Alert.alert(t('panels.audio.dubTitle'), e.message)
-      );
+      const run = async () => {
+        const { uri, duration } = await tts.generate(text);
+        state.setPlayhead(Math.max(0, caps[0].start));
+        addAudioClip(uri, t('panels.audio.dubLabel'), duration, 'local', 'voiceover');
+        Alert.alert(t('panels.audio.dubTitle'), t('panels.audio.dubDone'));
+      };
+      if (tts.needsPro) await guardPro(run, (e) => Alert.alert(t('panels.audio.dubTitle'), e.message));
+      else await run();
     } finally {
       setTtsBusy(false);
     }
@@ -388,15 +381,10 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
               style={styles.ttsInput}
               multiline
             />
-            {ttsVoices.length > 0 ? (
+            {tts.choices.length > 0 ? (
               <View style={styles.chipRow}>
-                {ttsVoices.map((v) => (
-                  <Chip
-                    key={v.name}
-                    label={`${v.name} · ${v.locale.slice(0, 2)}`}
-                    active={ttsVoice === v.name}
-                    onPress={() => setTtsVoice(v.name)}
-                  />
+                {tts.choices.map((v) => (
+                  <Chip key={v.key} label={v.label} active={tts.selected === v.key} onPress={() => tts.setSelected(v.key)} />
                 ))}
               </View>
             ) : null}

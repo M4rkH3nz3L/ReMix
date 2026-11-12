@@ -69,6 +69,7 @@ import { barsBeatsLabel, beatSplitTimes } from '@/lib/audioTransport';
 import { useProgressStore } from '@/store/progressStore';
 import { useRecordPrefs } from '@/store/recordPrefsStore';
 import { clickSample } from '@/lib/metronome';
+import { canSpeakOnDevice } from '@/lib/ttsOnDevice';
 import { useAuth } from '@/store/authStore';
 import { useCollabLive } from '@/store/collabLiveStore';
 import { ensureShared, inviteMember, pullSharedProject, removeMember, respondToInvite } from '@/lib/collab';
@@ -5961,6 +5962,49 @@ async function smokeMetronome(log: Log) {
   }
 }
 
+/** 🗣️ AP5: az AI-hang a telefonon készül (offline, szerver nélkül): WAV a voiceover sávon, valódi beszéd, egy undo. */
+async function smokeTtsDevice(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_tts';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:tts', caught));
+  await saveProject({ ...createEmptyProject('smoke tts', '9:16', undefined, 'audio'), id });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  const voice = () => st().project!.tracks.find((t) => t.type === 'voiceover')!.clips as AudioClip[];
+  try {
+    runDevAction('audio.openTts');
+    let info: { device: string[] | null; server: number } = { device: null, server: 0 };
+    for (let i = 0; i < 50 && !info.device; i++) {
+      await sleep(200);
+      info = (runDevAction('tts.voices') as typeof info) ?? info;
+    }
+    log(canSpeakOnDevice() && (info.device?.length ?? 0) > 0, 'a telefon beszédhangjai elérhetők (szerver nélkül)', `${info.device?.length ?? 0} nyelv: ${(info.device ?? []).slice(0, 6).join(', ')}`);
+    log(true, 'FOTÓZHATÓ', 'az AI-hang lap a telefon hangjaival');
+    await sleep(1500);
+    runDevAction('tts.text', 'Szia! Ez a ReMix telefonos hangja. Egy, kettő, három, négy.');
+    await sleep(300);
+    const head = st().playhead;
+    const t0 = Date.now();
+    const ok = (await runDevAction('tts.generate')) as boolean;
+    const ms = Date.now() - t0;
+    const clip = voice()[0];
+    const api = (await loadAudioApi())!;
+    const buf = clip ? await api.decodeAudioData(clip.uri, 44100) : null;
+    const l = buf?.getChannelData(0);
+    const lufs = l ? integratedLoudness(l, l, 44100) : -Infinity;
+    log(ok && !!clip && clip.uri.startsWith('file:') && clip.uri.endsWith('.wav') && Math.abs(clip.start - head) < 0.05 && clip.duration > 1.5, 'a beszéd a telefonon készült (WAV a projekt-mappában), klipként a lejátszófejnél a voiceover sávon', clip ? `${ms} ms, ${clip.duration.toFixed(2)} s, kezdet ${clip.start}` : 'nincs klip');
+    log(lufs > -40, 'a fájlban valódi beszéd szól (nem csend)', `${lufs.toFixed(1)} LUFS`);
+    st().undo();
+    log(voice().length === 0, 'egy visszavonás: a klip eltűnik', `${voice().length} klip`);
+  } finally {
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:tts-del', caught));
+  }
+}
+
 /** ✂️🎚️ Tartomány- és stem-export: a tartomány = a teljes export szelete (masterrel), Σ stem = keverés master nélkül, a némított sáv kimarad. */
 async function smokeStemExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7778,6 +7822,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'ttsdevice') {
+    await step(phase, () => smokeTtsDevice(log));
     return;
   }
   if (phase === 'metronome') {

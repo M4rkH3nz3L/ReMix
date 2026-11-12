@@ -4024,6 +4024,8 @@
       "library": "Library",
       "libraryEmpty": "No library audio available.",
       "ttsTitle": "AI voice (TTS)",
+      "ttsFailed": "Couldn’t create the speech. Try another voice.",
+      "ttsOnDevice": "Uses your phone’s voice — works offline.",
       "ttsPlaceholder": "Type the text to speak…",
       "ttsGenerate": "Generate voice",
       "ttsWorking": "Generating…",

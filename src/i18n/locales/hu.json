@@ -4024,6 +4024,8 @@
       "library": "Könyvtár",
       "libraryEmpty": "Nincs elérhető könyvtári hang.",
       "ttsTitle": "AI-hang (TTS)",
+      "ttsFailed": "Nem sikerült a beszédet elkészíteni. Próbálj másik hangot.",
+      "ttsOnDevice": "A telefon hangja szól — net nélkül is működik.",
       "ttsPlaceholder": "Írd be a felolvasandó szöveget…",
       "ttsGenerate": "Hang generálása",
       "ttsWorking": "Generálás…",

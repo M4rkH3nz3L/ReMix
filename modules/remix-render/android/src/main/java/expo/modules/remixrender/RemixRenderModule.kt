@@ -75,10 +75,99 @@ class RemixRenderModule : Module() {
       }
     }
 
+    // 🗣️ a telefonon lévő beszédhangok (csak a net nélkül is szólók)
+    AsyncFunction("ttsVoices") { promise: Promise ->
+      withTts(promise) { engine ->
+        val voices = (engine.voices ?: emptySet()).filter {
+          !it.isNetworkConnectionRequired && !it.features.contains(android.speech.tts.TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
+        }
+        promise.resolve(voices.map { mapOf("id" to it.name, "name" to it.name, "language" to it.locale.toLanguageTag(), "quality" to it.quality) })
+      }
+    }
+
+    // 🗣️ szöveg → beszéd WAV-fájlba a telefonon (TextToSpeech.synthesizeToFile); `rate` 0–1 (0,5 = alap)
+    AsyncFunction("synthesizeSpeech") { text: String, voiceId: String?, language: String?, rate: Double, outputPath: String, promise: Promise ->
+      withTts(promise) { engine ->
+        val out = java.io.File(toPath(outputPath))
+        out.delete()
+        val voice = voiceId?.let { id -> engine.voices?.firstOrNull { it.name == id } }
+        if (voice != null) {
+          engine.voice = voice
+        } else if (language != null) {
+          engine.language = java.util.Locale.forLanguageTag(language)
+        }
+        engine.setSpeechRate((rate.coerceIn(0.0, 1.0) * 2.0).toFloat().coerceAtLeast(0.1f))
+        val id = java.util.UUID.randomUUID().toString()
+        val done = java.util.concurrent.atomic.AtomicBoolean(false)
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        val timeout = Runnable {
+          if (done.compareAndSet(false, true)) promise.reject("ERR_TTS", "beszéd: időtúllépés", null)
+        }
+        engine.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+          override fun onStart(utteranceId: String?) {}
+          override fun onDone(utteranceId: String?) {
+            if (utteranceId != id || !done.compareAndSet(false, true)) return
+            main.removeCallbacks(timeout)
+            if (out.length() <= 44) promise.reject("ERR_TTS", "beszéd: üres kimenet", null)
+            else promise.resolve(mapOf("bytes" to out.length()))
+          }
+          @Deprecated("Deprecated in Java")
+          override fun onError(utteranceId: String?) {
+            if (utteranceId != id || !done.compareAndSet(false, true)) return
+            main.removeCallbacks(timeout)
+            promise.reject("ERR_TTS", "beszéd: a szintézis nem sikerült", null)
+          }
+          override fun onError(utteranceId: String?, errorCode: Int) {
+            if (utteranceId != id || !done.compareAndSet(false, true)) return
+            main.removeCallbacks(timeout)
+            promise.reject("ERR_TTS", "beszéd: a szintézis nem sikerült ($errorCode)", null)
+          }
+        })
+        main.postDelayed(timeout, 60_000)
+        val r = engine.synthesizeToFile(text, android.os.Bundle(), out, id)
+        if (r != android.speech.tts.TextToSpeech.SUCCESS && done.compareAndSet(false, true)) {
+          main.removeCallbacks(timeout)
+          promise.reject("ERR_TTS", "beszéd: nem indult el", null)
+        }
+      }
+    }
+
     // A futó render megszakítása — a natív decode/encode loop a következő
     // iterációnál kilép, a részfájlt törli. (Az `exportPlan` indításkor nullázza.)
     AsyncFunction("cancel") {
       cancelRequested = true
+    }
+  }
+
+  // 🗣️ a beszédmotor lusta indítása: az első hívás várja az inicializálást, a többi azonnal kapja
+  private var tts: android.speech.tts.TextToSpeech? = null
+  private var ttsReady = false
+  private val ttsWaiting = mutableListOf<Pair<Promise, (android.speech.tts.TextToSpeech) -> Unit>>()
+
+  private fun withTts(promise: Promise, run: (android.speech.tts.TextToSpeech) -> Unit) {
+    val ctx = appContext.reactContext ?: return promise.reject("ERR_TTS", "nincs alkalmazás-környezet", null)
+    android.os.Handler(android.os.Looper.getMainLooper()).post {
+      val engine = tts
+      if (engine != null && ttsReady) {
+        try { run(engine) } catch (e: Exception) { promise.reject("ERR_TTS", e.message ?: "beszéd", e) }
+        return@post
+      }
+      ttsWaiting.add(promise to run)
+      if (engine != null) return@post
+      tts = android.speech.tts.TextToSpeech(ctx) { status ->
+        val waiting = ttsWaiting.toList()
+        ttsWaiting.clear()
+        if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+          ttsReady = true
+          for ((p, r) in waiting) {
+            try { r(tts!!) } catch (e: Exception) { p.reject("ERR_TTS", e.message ?: "beszéd", e) }
+          }
+        } else {
+          tts?.shutdown()
+          tts = null
+          for ((p, _) in waiting) p.reject("ERR_TTS", "nincs beszédmotor a telefonon", null)
+        }
+      }
     }
   }
 

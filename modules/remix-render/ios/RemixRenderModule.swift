@@ -128,6 +128,8 @@ public class RemixRenderModule: Module {
   private let stateLock = NSLock()
   private var activeExport: AVAssetExportSession?
   private var cancelRequested = false
+  /// 🗣️ a futó beszéd-szintézisek (a szintetizátor élete a befejezésig)
+  private var speechJobs: [SpeechFileJob] = []
   // SOROS queue: egyszerre EGY render fut. Gyors cancel→újraindítás esetén a
   // régi export még pöröghet, miközben az új már jönne — konkurens futásnál
   // közös lenne az activeExport/progressTimer (és akár a kimeneti fájl is).
@@ -165,6 +167,33 @@ public class RemixRenderModule: Module {
       let s = AVAudioSession.sharedInstance()
       let route = s.currentRoute.outputs.map { $0.portType.rawValue }.joined(separator: ",")
       return ["output": s.outputLatency, "input": s.inputLatency, "buffer": s.ioBufferDuration, "category": s.category.rawValue, "route": route, "options": s.categoryOptions.rawValue]
+    }
+
+    /// 🗣️ a rendszer beszédhangjai (a telefonon lévők — net nélkül is szólnak)
+    AsyncFunction("ttsVoices") { () -> [[String: Any]] in
+      AVSpeechSynthesisVoice.speechVoices().map {
+        ["id": $0.identifier, "name": $0.name, "language": $0.language, "quality": $0.quality.rawValue]
+      }
+    }
+
+    /// 🗣️ szöveg → beszéd WAV-fájlba a telefonon (AVSpeechSynthesizer.write): a hang nem szól, csak íródik.
+    /// `rate`: 0–1 (az iOS saját skálája; 0,5 = alap). Visszaad: { frames, sampleRate }.
+    AsyncFunction("synthesizeSpeech") { (text: String, voiceId: String?, language: String?, rate: Double, outputPath: String, promise: Promise) in
+      DispatchQueue.main.async {
+        let out = URL(fileURLWithPath: outputPath)
+        try? FileManager.default.removeItem(at: out)
+        let utt = AVSpeechUtterance(string: text)
+        if let id = voiceId, let v = AVSpeechSynthesisVoice(identifier: id) {
+          utt.voice = v
+        } else if let lang = language, let v = AVSpeechSynthesisVoice(language: lang) {
+          utt.voice = v
+        }
+        utt.rate = Float(min(max(rate, 0), 1)) * (AVSpeechUtteranceMaximumSpeechRate - AVSpeechUtteranceMinimumSpeechRate) + AVSpeechUtteranceMinimumSpeechRate
+        let job = SpeechFileJob(out: out, promise: promise)
+        self.speechJobs.append(job)
+        job.onFinish = { [weak self] in self?.speechJobs.removeAll { $0 === job } }
+        job.start(utt)
+      }
     }
 
     /// 🎬→🎵 a videó hangsávja külön M4A-ba: átkódolás nélkül (a minták változatlanok), ha a forrás
@@ -663,5 +692,104 @@ public class RemixRenderModule: Module {
     return preferred
       .concatenating(CGAffineTransform(scaleX: scale, y: scale))
       .concatenating(CGAffineTransform(translationX: tx, y: ty))
+  }
+}
+
+
+/// 🗣️ egy szöveg → WAV szintézis: a pufferek 16 bites WAV-ba íródnak; a vég a nulla hosszú puffer
+/// VAGY a delegált `didFinish` (amelyik előbb jön); 60 s után hiba (soha nem lóg).
+final class SpeechFileJob: NSObject, AVSpeechSynthesizerDelegate {
+  private let synth = AVSpeechSynthesizer()
+  private let out: URL
+  private var promise: Promise?
+  private var file: AVAudioFile?
+  private var frames: AVAudioFramePosition = 0
+  private var sampleRate: Double = 0
+  private var writeError: Error?
+  private let lock = NSLock()
+  var onFinish: (() -> Void)?
+
+  init(out: URL, promise: Promise) {
+    self.out = out
+    self.promise = promise
+    super.init()
+    synth.delegate = self
+  }
+
+  func start(_ utt: AVSpeechUtterance) {
+    synth.write(utt) { [weak self] buffer in
+      guard let self, let pcm = buffer as? AVAudioPCMBuffer else { return }
+      if pcm.frameLength == 0 {
+        self.finish()
+        return
+      }
+      self.lock.lock()
+      defer { self.lock.unlock() }
+      do {
+        if self.file == nil {
+          let settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: pcm.format.sampleRate,
+            AVNumberOfChannelsKey: pcm.format.channelCount,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+          ]
+          self.file = try AVAudioFile(forWriting: self.out, settings: settings, commonFormat: pcm.format.commonFormat, interleaved: pcm.format.isInterleaved)
+          self.sampleRate = pcm.format.sampleRate
+        }
+        try self.file?.write(from: pcm)
+        self.frames += AVAudioFramePosition(pcm.frameLength)
+      } catch {
+        self.writeError = error
+      }
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 60) { [weak self] in
+      self?.fail(RenderError.exportFailed("beszéd: időtúllépés"))
+    }
+  }
+
+  func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+    finish()
+  }
+
+  func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+    fail(RenderError.cancelled)
+  }
+
+  private func finish() {
+    lock.lock()
+    let p = promise
+    promise = nil
+    file = nil // a fájl lezárul
+    let frames = self.frames
+    let sr = self.sampleRate
+    let err = writeError
+    lock.unlock()
+    guard let p else { return }
+    DispatchQueue.main.async {
+      if let err {
+        p.reject(err)
+      } else if frames == 0 {
+        p.reject(RenderError.exportFailed("beszéd: üres kimenet (nincs ilyen hang a telefonon?)"))
+      } else {
+        p.resolve(["frames": frames, "sampleRate": sr])
+      }
+      self.onFinish?()
+    }
+  }
+
+  private func fail(_ error: Error) {
+    lock.lock()
+    let p = promise
+    promise = nil
+    file = nil
+    lock.unlock()
+    guard let p else { return }
+    synth.stopSpeaking(at: .immediate)
+    DispatchQueue.main.async {
+      p.reject(error)
+      self.onFinish?()
+    }
   }
 }

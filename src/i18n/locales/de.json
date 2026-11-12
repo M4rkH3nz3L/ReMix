@@ -4029,6 +4029,8 @@
       "library": "Bibliothek",
       "libraryEmpty": "Keine Bibliotheks-Audios verfügbar.",
       "ttsTitle": "KI-Stimme (TTS)",
+      "ttsFailed": "Die Sprachausgabe konnte nicht erstellt werden. Versuche eine andere Stimme.",
+      "ttsOnDevice": "Die Stimme deines Telefons — funktioniert auch offline.",
       "ttsPlaceholder": "Text zum Vorlesen eingeben…",
       "ttsGenerate": "Stimme erzeugen",
       "ttsWorking": "Wird erzeugt…",

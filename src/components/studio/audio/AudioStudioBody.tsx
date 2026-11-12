@@ -296,6 +296,7 @@ export function AudioStudioBody({
       registerDevAction('audio.editClip', () => devRef.current.editClip()),
       registerDevAction('audio.closeDrums', () => devRef.current.closeDrums()),
       registerDevAction('audio.autoBpm', () => devRef.current.autoBpm()),
+      registerDevAction('audio.openTts', () => setTts(true)),
       registerDevAction('audio.openPianoRoll', () => devRef.current.pianoRoll(true)),
       registerDevAction('audio.closePianoRoll', () => devRef.current.pianoRoll(false)),
       registerDevAction('audio.assistant', () => devRef.current.assistant()),

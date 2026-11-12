@@ -4024,6 +4024,7 @@
       "library": "Könyvtár",
       "libraryEmpty": "Nincs elérhető könyvtári hang.",
       "template": {"label": "Kiindulás", "blank": "Üres", "podcast": "Podcast", "music": "Zene", "voiceover": "Hangalámondás", "blankHint": "Üres projekt, a te beállításaiddal.", "podcastHint": "Beszéd- és zenesáv, podcast-hangosság; a zene a beszéd alatt halkulhat.", "musicHint": "120 BPM, 4/4, szerkezeti jelölők (Intro, Verze, Refrén, Outro), zenei hangosság.", "voiceoverHint": "Beszédsáv videóhoz, videós hangosság.", "trackVoice": "Beszéd", "trackMusic": "Zene", "trackSfx": "Hangok", "intro": "Intro", "verse": "Verze", "chorus": "Refrén", "outro": "Outro"},
+      "videoRef": "Videó-képkocka itt: {{time}}",
       "ttsTitle": "AI-hang (TTS)",
       "ttsFailed": "Nem sikerült a beszédet elkészíteni. Próbálj másik hangot.",
       "ttsOnDevice": "A telefon hangja szól — net nélkül is működik.",

@@ -6080,6 +6080,52 @@ async function smokeAudioTemplate(log: Log) {
   }
 }
 
+/** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
+async function smokeVideoRef(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const { downloadToCache } = await import('@/lib/media');
+  const vid = await downloadToCache(`${smokeFileHost()}/vid_audio.mp4`, 'smoke_videoref.mp4');
+  if (!vid) {
+    log(false, 'a teszt-videó letöltése', 'nincs');
+    return;
+  }
+  const id = 'prj_smoke_videoref';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:videoref', caught));
+  const base = createEmptyProject('smoke videó-referencia', '9:16');
+  const video = { kind: 'video', id: 'vv', uri: vid, label: 'videó', start: 0, duration: 6, trimIn: 0, speed: 1, volume: 1 } as unknown as AudioClip;
+  const music: AudioClip = { kind: 'audio', id: 'aa', label: 'zene', start: 0, duration: 6, trimIn: 0, sourceDuration: 6, uri: toneWav('smoke_videoref.wav', 6), volume: 0.3, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, fps: 30, tracks: base.tracks.map((t) => (t.type === 'video' ? { ...t, clips: [video] } : t.type === 'music' ? { ...t, clips: [music] } : t)) });
+  router.push(`/editor/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1500);
+  try {
+    st().openAudioStudio('aa');
+    await sleep(1200);
+    for (const at of [2.5, 4.0]) {
+      st().setPlayhead(at);
+      type Ref = { ms: number; clipId: string; uri: string; at: number };
+      let ref = null as Ref | null;
+      for (let i = 0; i < 40; i++) {
+        await sleep(100);
+        ref = runDevAction('audio.videoRef') as Ref | null;
+        if (ref && Math.abs(ref.at - at) < 1e-6) break;
+      }
+      const ok = !!ref && ref.clipId === 'vv' && Math.abs(ref.ms - at * 1000) <= 34 && new File(ref.uri).exists;
+      log(ok, `lejátszófej ${at} s → a videó ${at} s-os képkockája látszik (± 1 kocka)`, ref ? `${ref.ms} ms, ${ref.clipId}` : 'nincs kép');
+      if (at === 2.5) {
+        log(true, 'FOTÓZHATÓ', 'a videóból nyitott Hang Stúdió a lebegő videó-képkockával');
+        await sleep(2000);
+      }
+    }
+  } finally {
+    st().closeAudioStudio();
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:videoref-del', caught));
+  }
+}
+
 /** ✂️🎚️ Tartomány- és stem-export: a tartomány = a teljes export szelete (masterrel), Σ stem = keverés master nélkül, a némított sáv kimarad. */
 async function smokeStemExport(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7897,6 +7943,10 @@ export async function runImageSmoke(
   }
   if (phase === 'bleed') {
     await step(phase, () => smokeBleed(log));
+    return;
+  }
+  if (phase === 'videoref') {
+    await step(phase, () => smokeVideoRef(log));
     return;
   }
   if (phase === 'audiotemplate') {

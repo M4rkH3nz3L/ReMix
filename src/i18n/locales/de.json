@@ -4029,6 +4029,7 @@
       "library": "Bibliothek",
       "libraryEmpty": "Keine Bibliotheks-Audios verfügbar.",
       "template": {"label": "Vorlage", "blank": "Leer", "podcast": "Podcast", "music": "Musik", "voiceover": "Voice-over", "blankHint": "Ein leeres Projekt mit deinen Einstellungen.", "podcastHint": "Sprach- und Musikspur, Podcast-Lautheit; Musik kann unter der Sprache abgesenkt werden.", "musicHint": "120 BPM, 4/4, Abschnittsmarker (Intro, Strophe, Refrain, Outro), Musik-Lautheit.", "voiceoverHint": "Eine Sprachspur für Video, Video-Lautheit.", "trackVoice": "Sprache", "trackMusic": "Musik", "trackSfx": "Sounds", "intro": "Intro", "verse": "Strophe", "chorus": "Refrain", "outro": "Outro"},
+      "videoRef": "Videobild bei {{time}}",
       "ttsTitle": "KI-Stimme (TTS)",
       "ttsFailed": "Die Sprachausgabe konnte nicht erstellt werden. Versuche eine andere Stimme.",
       "ttsOnDevice": "Die Stimme deines Telefons — funktioniert auch offline.",

@@ -65,6 +65,13 @@ async function prepareOffline(mix: Project, onProgress?: (u: ProgressUpdate) => 
     throw new Error(tr('studio.audio.offline.noDecoder'));
   }
   const sources = new Map<string, DecodedSource>();
+  // a hiányzó fájl elvárt helyzet (újracsatolásra vár), nem programhiba: érthető üzenet, napló nélkül —
+  // MINDEN forrásra előre (a hosszú, szakaszos forrás is: eddig csendben néma szakaszt adott)
+  for (const u of new Set(plan.clips.map((c) => c.uri))) {
+    if (u.startsWith('file:') && !new File(u).exists) {
+      throw new Error(tr('studio.audio.offline.decodeFailed', { name: decodeURIComponent(u.split('/').pop() ?? '') }));
+    }
+  }
   // 🎧 a hosszú forrás szakaszosan (nem dekódolódik egészben); az egész-ablakos feldolgozás
   // (zajszűrés, normalizálás, nyújtás…) hosszú forráson a telefonon nem érhető el
   const long = longUris(plan.clips);
@@ -81,10 +88,6 @@ async function prepareOffline(mix: Project, onProgress?: (u: ProgressUpdate) => 
       throw new RenderCancelledError();
     }
     onProgress?.({ phase: tr('studio.audio.offline.decoding'), ratio: (i / uris.length) * 0.4 });
-    // a hiányzó fájl elvárt helyzet (újracsatolásra vár), nem programhiba: érthető üzenet, napló nélkül
-    if (uris[i].startsWith('file:') && !new File(uris[i]).exists) {
-      throw new Error(tr('studio.audio.offline.decodeFailed', { name: decodeURIComponent(uris[i].split('/').pop() ?? '') }));
-    }
     try {
       const buf = await api.decodeAudioData(uris[i], OFFLINE_SAMPLE_RATE);
       markAudioApi(true);

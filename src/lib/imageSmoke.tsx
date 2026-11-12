@@ -7101,7 +7101,10 @@ async function smokeAudioEdge(log: Log) {
   // 3) túl hosszú projekt: a felső határ érthető
   const long: Project = { ...withMissing, tracks: withMissing.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [{ ...missing, duration: 21 * 60, sourceDuration: 21 * 60 }] } : tr)) };
   const errLong = await exportOfflineWav(long, new File(projectExportDir(), 'smoke_long.wav')).then(() => 'nincs hiba', (e: Error) => e.message);
-  log(/20/.test(errLong), 'túl hosszú projekt: érthető üzenet a határral', errLong);
+  log(errLong.includes('nincs_ilyen.wav'), 'hiányzó HOSSZÚ (szakaszos) forrás: érthető hiba a fájl nevével, nem néma export', errLong);
+  const tooLong: Project = { ...long, tracks: long.tracks.map((tr) => (tr.type === 'music' ? { ...tr, clips: [{ ...missing, duration: 3 * 3600 + 60, sourceDuration: 3 * 3600 + 60 }] } : tr)) };
+  const errTooLong = await exportOfflineWav(tooLong, new File(projectExportDir(), 'smoke_toolong.wav')).then(() => 'nincs hiba', (e: Error) => e.message);
+  log(/180/.test(errTooLong), 'túl hosszú projekt (3 óra fölött): érthető üzenet a határral', errTooLong);
   // 4) gyors nyitás-zárás a stúdióban
   const id = 'prj_smoke_audioedge';
   await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:audioEdge', caught));

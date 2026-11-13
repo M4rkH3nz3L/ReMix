@@ -2905,6 +2905,7 @@
     },
     "backend": {
       "proRequired": "Die Funktion „{{label}}“ erfordert ein Remix-Pro-Abo.",
+      "cloudUnavailable": "Der Cloud-Dienst ist in dieser Version noch nicht verfügbar. Alles, was auf dem Telefon läuft (Export, Messung, Instrumente, KI-Stimme), funktioniert weiterhin.",
       "insecureUrl": "Die Cloud-Adresse ist nicht sicher (https erforderlich): {{url}}"
     },
     "batchEdit": {
@@ -4079,6 +4080,7 @@
         "downloadFailed": "Das gerenderte Audio von „{{name}}“ konnte nicht geladen werden."
       },
       "exportSheet": {
+        "phoneFallback": "Der Server ist gerade nicht erreichbar — die WAV wird auf dem Telefon erstellt.",
         "scope": "Bereich",
         "whole": "Ganzes Projekt",
         "rangeChip": "In–Out ({{from}}–{{to}})",

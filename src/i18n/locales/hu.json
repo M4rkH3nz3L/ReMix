@@ -2905,6 +2905,7 @@
     },
     "backend": {
       "proRequired": "A(z) „{{label}}” funkció Remix Pro-előfizetést igényel.",
+      "cloudUnavailable": "A felhő-szolgáltatás ebben a verzióban még nem érhető el. A telefonon futó funkciók (export, mérés, hangszerek, AI-hang) ettől függetlenül működnek.",
       "insecureUrl": "A felhő-szolgáltatás címe nem biztonságos (https kell): {{url}}"
     },
     "batchEdit": {
@@ -4074,6 +4075,7 @@
         "downloadFailed": "A(z) „{{name}}” szám renderelt hangja nem töltődött le."
       },
       "exportSheet": {
+        "phoneFallback": "A szerver most nem érhető el — a WAV a telefonon készül.",
         "scope": "Tartomány",
         "whole": "Teljes projekt",
         "rangeChip": "In–Out ({{from}}–{{to}})",

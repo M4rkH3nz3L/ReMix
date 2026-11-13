@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { PixelRatio, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { smokeEnabled } from '@/lib/devActions';
 import { goBackOrHome } from '@/lib/nav';
 
 /**
@@ -17,7 +18,7 @@ const AUTO_EXIT_MS = 10000;
 
 export default function ImageSmokeScreen() {
   const { phase = 'all' } = useLocalSearchParams<{ phase?: string }>();
-  if (!__DEV__) {
+  if (!smokeEnabled()) {
     return null;
   }
   return <Smoke phase={String(phase)} />;
@@ -39,19 +40,28 @@ function Smoke({ phase }: { phase: string }) {
       return;
     }
     started.current = phase;
+    // 📤 release-mérésnél nincs Metro: a sorok a Mac gyűjtőjének mennek, sorrendben
+    const sink = process.env.EXPO_PUBLIC_SMOKE_SINK;
+    let chain: Promise<unknown> = Promise.resolve();
+    const send = (text: string) => {
+      if (!sink) return;
+      chain = chain.then(() => fetch(sink, { method: 'POST', body: text }).catch(() => undefined));
+    };
     const log = (ok: boolean | null, name: string, detail = '') => {
       const line = `${ok === null ? 'INFO' : ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`;
       console.log(`${TAG} ${line}`);
+      send(`${TAG} ${line}`);
       setLines((l) => [...l, line]);
     };
-    // a __DEV__-ág miatt a smoke-kód a release bundle-ből kimarad (mint a renderSmoke)
-    if (!__DEV__) {
+    // a smoke-kód csak dev-buildben vagy a kifejezetten mérésre készült release-buildben fut
+    if (!smokeEnabled()) {
       return;
     }
     void (async () => {
       const m = await import('@/lib/imageSmoke');
       await m.runImageSmoke(phase, log, setHarness, PixelRatio.get(), SMOKE_KILL_ID);
       console.log(`${TAG} DONE phase=${phase}`);
+      send(`${TAG} DONE phase=${phase}`);
       // a teszt nem maradhat a telefonon: az ál-lapok gombjai üresek, a user beragadna
       if (phase === 'tablet') {
         router.replace(`/studio/image/${await m.tabletProject(SMOKE_KILL_ID)}`);

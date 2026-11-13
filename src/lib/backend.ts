@@ -57,10 +57,26 @@ export function renderServerUrl(): string {
  *   1. EXPO_PUBLIC_CLOUD_URL — a hosztolt render/AI szolgáltatásunk (prod)
  *   2. renderServerUrl()     — dev-fallback (a helyi worker a Metró gépén)
  */
+/** van-e felhő-szolgáltatás ebben a buildben (dev: a helyi worker; release: csak beállított címmel) */
+export function cloudAvailable(): boolean {
+  return __DEV__ || !!process.env.EXPO_PUBLIC_CLOUD_URL?.trim();
+}
+
+/** hálózati hiba-e (nincs net, a szerver nem érhető el) — ilyenkor a telefonos út a tartalék */
+export function isNetworkError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /network request failed|failed to fetch|internet connection|offline|timed? ?out|ECONN|ENOTFOUND/i.test(msg) || msg === tr('lib.backend.cloudUnavailable');
+}
+
 export function cloudBaseUrl(): string {
   const hosted = process.env.EXPO_PUBLIC_CLOUD_URL?.trim();
   if (hosted) {
     return assertSecureUrl(hosted.replace(/\/+$/, ''));
+  }
+  // release-ben a helyi worker nem létezik: érthető üzenet a belső (localhost) cím helyett —
+  // a telefonos utak (export, mérés, hangszerek, AI-hang) ettől függetlenül működnek
+  if (!__DEV__) {
+    throw new Error(tr('lib.backend.cloudUnavailable'));
   }
   return assertSecureUrl(renderServerUrl());
 }

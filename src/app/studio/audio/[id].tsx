@@ -42,6 +42,7 @@ import { logCaught } from '@/lib/logCaught';
 import { registerDevAction } from '@/lib/devActions';
 import { myMembership } from '@/lib/collab';
 import { useLiveCollab } from '@/hooks/useLiveCollab';
+import { cloudAvailable, isNetworkError } from '@/lib/backend';
 
 /**
  * 🎧 HANG STÚDIÓ képernyő (`kind: 'audio'` projekt). Vékony burkoló: betölti a
@@ -173,9 +174,10 @@ export default function AudioStudioScreen() {
       return Promise.resolve();
     }
     const info = audioFormatInfo(format);
-    // A26: Free — a WAV szerver nélkül, a telefonon készül
-    if (!useEntitlement.getState().isPro()) {
-      return withCancellableProgress(t('studio.audio.exportRendering', { format: 'WAV' }), async (report, signal) => {
+    // A26: Free — és felhő nélkül (nincs net / ebben a buildben nincs felhő) bárki — a WAV a telefonon készül
+    const phoneExport = (note?: string) =>
+      withCancellableProgress(t('studio.audio.exportRendering', { format: 'WAV' }), async (report, signal) => {
+        if (note) Alert.alert(t('studio.export'), note);
         const target = new File(projectExportDir(), audioExportFileName(project.name, 'wav'));
         const { uri, unsupported } = await exportOfflineWav(mix, target, report, signal);
         if (unsupported.length > 0) {
@@ -198,6 +200,8 @@ export default function AudioStudioScreen() {
           Alert.alert(t('studio.export'), e.message);
         }
       });
+    if (!useEntitlement.getState().isPro() || !cloudAvailable()) {
+      return phoneExport();
     }
     return guardPro(
       () =>
@@ -213,9 +217,13 @@ export default function AudioStudioScreen() {
           }
         }),
       (e) => {
-        if (!isRenderCancelledError(e)) {
-          Alert.alert(t('studio.export'), e.message);
+        if (isRenderCancelledError(e)) return;
+        // 📱 a szerver nem érhető el (nincs net): a telefonos WAV a tartalék, nem hibaüzenet
+        if (isNetworkError(e)) {
+          void phoneExport(t('studio.audio.exportSheet.phoneFallback'));
+          return;
         }
+        Alert.alert(t('studio.export'), e.message);
       }
     );
   };
@@ -237,7 +245,7 @@ export default function AudioStudioScreen() {
             sendToVideo();
           }}
           onDownload={(format, quality) => void downloadAudio(format, quality)}
-          onDevice={!isPro}
+          onDevice={!isPro || !cloudAvailable()}
           onProRequired={() => {
             setExporting(false);
             usePaywall.getState().open('cloudRender');

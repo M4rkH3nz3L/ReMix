@@ -5,7 +5,13 @@
 type Action = (arg?: unknown) => unknown;
 const actions = new Map<string, Action>();
 
-const enabled = () => typeof __DEV__ !== 'undefined' && __DEV__;
+/**
+ * a füstteszt él-e: dev-buildben mindig; release-ben CSAK a kifejezetten mérésre készült buildben
+ * (`EXPO_PUBLIC_RELEASE_SMOKE=1` a build idején) — a kiadott appban nincs hatása
+ */
+export const smokeEnabled = (): boolean => (typeof __DEV__ !== 'undefined' && __DEV__) || process.env.EXPO_PUBLIC_RELEASE_SMOKE === '1';
+
+const enabled = smokeEnabled;
 
 export function registerDevAction(name: string, fn: Action): () => void {
   if (!enabled()) {

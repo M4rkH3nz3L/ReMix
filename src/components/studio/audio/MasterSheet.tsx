@@ -7,19 +7,17 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { useMixAssist } from '@/store/mixAssistStore';
 import { useReference } from '@/store/referenceStore';
 import { applyReference, measureReference, pickReferenceFile } from '@/lib/referenceClient';
-import { measureMastered } from '@/lib/mixAssistClient';
+import { analyzeMixOnDevice, measureMastered } from '@/lib/mixAssistClient';
 import { UserPresetRow } from '@/components/studio/audio/UserPresetRow';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { Chip, PrimaryButton, Stepper } from '@/components/ui/controls';
 import { Slider } from '@/components/studio/audio/primitives';
 import { palette } from '@/constants/editor';
-import { analyzeMix } from '@/lib/analyzeMix';
 import type { LoudnessStats } from '@/lib/audioAnalyze';
 import { mixForExport } from '@/lib/audioExportMix';
 import { AUDIO_MASTER_TARGETS, masterPreset } from '@/lib/audioMaster';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
-import { guardPro } from '@/store/paywallStore';
 import { withCancellableProgress } from '@/store/progressStore';
 import { isRenderCancelledError } from '@/lib/render';
 import type { AudioMaster, AudioMasterDynamics } from '@/types/project';
@@ -61,22 +59,17 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
       return;
     }
     setAnalyzing(true);
-    guardPro(
-      () =>
-        withCancellableProgress(t('studio.master.analyze'), (report, signal) =>
-          analyzeMix(mix, report, signal).then((r) => {
-            setStats(r);
-            setSpectrum(r.spectrum ?? null);
-          })
-        ),
-      (e) => {
-        logCaught('components/studio/audio/MasterSheet.tsx:onAnalyze', e);
-        if (!isRenderCancelledError(e)) {
-          Alert.alert(t('studio.master.analyze'), e.message);
-        }
-      }
+    // 📱 offline-first: a mérés a telefonon, az export keverő-útján (szerver, Pro és net nélkül)
+    withCancellableProgress(t('studio.master.analyze'), (report, signal) =>
+      analyzeMixOnDevice(mix, report, signal).then((r) => {
+        setStats(r);
+        setSpectrum(null);
+      })
     )
-      .catch((e: Error) => { logCaught('components/studio/audio/MasterSheet.tsx:onAnalyze', e); })
+      .catch((e: Error) => {
+        logCaught('components/studio/audio/MasterSheet.tsx:onAnalyze', e);
+        if (!isRenderCancelledError(e)) Alert.alert(t('studio.master.analyze'), e.message);
+      })
       .finally(() => setAnalyzing(false));
   };
 

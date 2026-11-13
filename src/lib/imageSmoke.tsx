@@ -55,7 +55,7 @@ import { exportAudioFile, exportAudioToFile, isRenderCancelledError } from '@/li
 import { audioExportFileName, audioExportSettings } from '@/lib/audioExportOptions';
 import { projectExportDir } from '@/lib/model3dRenderClient';
 import { AudioExportSheet } from '@/components/studio/audio/AudioExportSheet';
-import { analyzeMix } from '@/lib/analyzeMix';
+import { analyzeMixOnDevice } from '@/lib/mixAssistClient';
 import { runDevAction } from '@/lib/devActions';
 import { recordingPhase } from '@/lib/interruption';
 import { CLIP_LEVEL, levelDb, trackLevelAt } from '@/lib/levelMeter';
@@ -68,6 +68,7 @@ import { previewEngine } from '@/lib/previewEngine';
 import { barsBeatsLabel, beatSplitTimes } from '@/lib/audioTransport';
 import { useProgressStore } from '@/store/progressStore';
 import { useRecordPrefs } from '@/store/recordPrefsStore';
+import { cloudAvailable } from '@/lib/backend';
 import { clickSample } from '@/lib/metronome';
 import { highShelfNorm, KERNEL, nativeDspActive, runKernel, runKernelJs, type KernelKind } from '@/lib/dspKernels';
 import '@/lib/dspNativeClient';
@@ -3483,9 +3484,16 @@ async function smokeMeter(log: Log) {
   router.back();
 }
 
+/** van-e felhő ebben a buildben (dev: a helyi worker; release: csak beállított `EXPO_PUBLIC_CLOUD_URL`-lel) */
+function cloudInThisBuild(): boolean {
+  return cloudAvailable();
+}
+
 /** 🧪 a Mac próbafájl-szervere (8799) a Metro címén — Wi-Fin és USB-n (169.254) is */
 function smokeFileHost(): string {
-  return `http://${serverHost(undefined, Constants.expoConfig?.hostUri, true)}:8799`;
+  // release-mérésnél nincs Metro-cím: a build idején megadott Mac-cím
+  const fixed = process.env.EXPO_PUBLIC_SMOKE_HOST?.trim();
+  return `http://${fixed || serverHost(undefined, Constants.expoConfig?.hostUri, true)}:8799`;
 }
 
 /** a sáv megjelenített neve (a stem-fájlnévhez) */
@@ -6883,6 +6891,11 @@ async function smokeOfflineExport(log: Log) {
   const ms = Date.now() - started;
   const size = new File(out).size ?? 0;
   log(Math.abs(size - (44 + 2.5 * 44100 * 4)) < 8, 'A26 a WAV a telefonon készült, a várt hosszal', `${size} bájt, ${ms} ms`);
+  if (!cloudInThisBuild()) {
+    log(!cloudAvailable(), 'felhő nélküli build: a Pro felhasználó is a telefonos WAV-ot kapja (az export-lap telefonos módban)', `felhő: ${cloudAvailable()}`);
+    log(null, 'A26 telefon = szerver: kimarad', 'ebben a buildben nincs felhő-cím (a telefonos út a fenti)');
+    return;
+  }
   const serverFile = new File(projectExportDir(), 'smoke_server.wav');
   await exportAudioToFile(project, audioExportSettings('wav', { bitrateKbps: 0, bitDepth: 24, sampleRate: 44100, channels: 2 }), serverFile);
   const api = await loadAudioApi();
@@ -7716,7 +7729,7 @@ async function smokeAudioMix(log: Log, setHarness: (n: ReactNode) => void) {
   };
   const measure = async (masterVolume: number) => {
     const mix = mixForExport(project, () => true, masterVolume);
-    return mix ? analyzeMix(mix) : null;
+    return mix ? analyzeMixOnDevice(mix) : null;
   };
   const full = await measure(1);
   const half = await measure(0.5);
@@ -7725,6 +7738,10 @@ async function smokeAudioMix(log: Log, setHarness: (n: ReactNode) => void) {
   log(Math.abs(drop - 6) < 1, 'A19 a master-hangerő a mért értékben is látszik', `${drop.toFixed(1)} dB esés`);
   log(mixForExport(project, () => false, 1) === null, 'A15 némított projektből nincs export');
 
+  if (!cloudInThisBuild()) {
+    log(null, 'A28–A32 szerveres album-export: kimarad', 'ebben a buildben nincs felhő-cím');
+    return;
+  }
   // A32 album-út: veszteségmentes render, helyi fájlba letöltve (nem lejáró link)
   const url = await exportAudioFile(project, 'flac');
   const local = await downloadToCache(url, 'smoke_album.flac');

@@ -7,6 +7,8 @@ import { OFFLINE_SAMPLE_RATE } from '@/lib/offlineMix';
 import { streamOfflinePasses } from '@/lib/offlineMixClient';
 import type { ProgressUpdate } from '@/lib/progress';
 import type { Project, TrackType } from '@/types/project';
+import { LiveLoudness } from '@/lib/liveLoudness';
+import type { LoudnessStats } from '@/lib/audioAnalyze';
 
 /**
  * 🎚️🤖 A mixjavaslat és a mastering-segéd mérése a telefonon: azt a keverést méri, amit az export
@@ -42,6 +44,18 @@ export async function analyzeMixTracks(project: Project, view: View, onProgress?
   const tracks: Partial<Record<TrackType, TrackStats>> = {};
   for (const [t, a] of analyzers) tracks[t] = a.finish();
   return { tracks, mix: whole.finish() };
+}
+
+/**
+ * 📏 A19: a jelenlegi keverés (master után) hangossága a TELEFONON — integrált LUFS, true-peak (4×
+ * túlmintavétel), LRA; ugyanazon a keverő-úton, mint az export. Szerver és net nélkül (offline-first).
+ */
+export async function analyzeMixOnDevice(mix: Project, onProgress?: (u: ProgressUpdate) => void, signal?: AbortSignal): Promise<LoudnessStats> {
+  const meter = new LiveLoudness(OFFLINE_SAMPLE_RATE);
+  let pos = 0;
+  await streamOfflinePasses(mix, [{ master: true, sink: (l, r) => { meter.push(pos, l, r); pos += l.length; } }], onProgress, signal);
+  const reading = meter.readAt(pos);
+  return { lufs: reading.integrated, truePeak: reading.truePeakMax, lra: meter.loudnessRange() };
 }
 
 /** a masteres keverés mérése (a mastering-segéd ellenőrzése: elérte-e a célt) */

@@ -2,12 +2,13 @@ import { Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { logCaught } from '@/lib/logCaught';
+import { smokeEnabled } from '@/lib/devActions';
 
 let override: number | null = null;
 
 /** 🧪 füstteszt: a betelt lemez ugyanazon a kódúton, a lemez tényleges teleírása nélkül */
 export function setFreeDiskOverride(bytes: number | null): void {
-  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  if (smokeEnabled()) {
     override = bytes;
   }
 }

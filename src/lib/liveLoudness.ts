@@ -125,6 +125,27 @@ export class LiveLoudness {
     this.next = from + n;
   }
 
+  /**
+   * 📏 hangosság-tartomány (LRA, EBU Tech 3342): a 3 s-os rövid távú hangosság 100 ms-onként, abszolút
+   * kapu −70 LUFS, relatív kapu −20 LU az átlag alatt, LRA = a 95. és a 10. percentilis különbsége (LU)
+   */
+  loudnessRange(): number {
+    const st: number[] = [];
+    let sum = 0;
+    for (let i = 0; i < this.energy.length; i++) {
+      sum += this.energy[i];
+      if (i >= 30) sum -= this.energy[i - 30];
+      if (i >= 29) st.push(sum / 30);
+    }
+    const abs = st.filter((p) => lufs(p) > -70);
+    if (abs.length === 0) return 0;
+    const gate = lufs(abs.reduce((a, b) => a + b, 0) / abs.length) - 20;
+    const rel = abs.filter((p) => lufs(p) > gate).map(lufs).sort((a, b) => a - b);
+    if (rel.length < 2) return 0;
+    const at = (q: number) => rel[Math.min(rel.length - 1, Math.max(0, Math.round(q * (rel.length - 1))))];
+    return at(0.95) - at(0.1);
+  }
+
   /** a mérés a projekt `at`. mintájáig (a lejátszófej); a még be nem ért blokkok nem számítanak */
   readAt(at: number): LoudnessReading {
     const upto = Math.max(0, Math.min(this.energy.length, Math.floor((at - this.start) / this.blockLen)));

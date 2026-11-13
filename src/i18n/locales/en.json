@@ -2905,6 +2905,7 @@
     },
     "backend": {
       "proRequired": "The “{{label}}” feature requires a Remix Pro subscription.",
+      "cloudUnavailable": "The cloud service isn’t available in this version yet. Everything that runs on your phone (export, metering, instruments, AI voice) still works.",
       "insecureUrl": "The cloud service URL is not secure (https required): {{url}}"
     },
     "batchEdit": {
@@ -4074,6 +4075,7 @@
         "downloadFailed": "The rendered audio of “{{name}}” could not be downloaded."
       },
       "exportSheet": {
+        "phoneFallback": "The server can’t be reached right now — the WAV is made on your phone.",
         "scope": "Range",
         "whole": "Whole project",
         "rangeChip": "In–Out ({{from}}–{{to}})",

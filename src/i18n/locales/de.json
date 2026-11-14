@@ -4071,6 +4071,42 @@
       "master": "Master"
     },
     "audio": {
+      "loops": {
+        "title": "Loops",
+        "open": "Loops",
+        "hint": "Eingebaute Loops: dein Handy rendert sie im Projekttempo ({{bpm}} BPM) — offline, kostenlos und danach im Drumcomputer oder Piano Roll bearbeitbar.",
+        "placing": "Loop wird gerendert…",
+        "a11y": "Loop hinzufügen: {{name}}",
+        "cloud": "Ganze Bibliothek (Cloud, Pro)",
+        "cat": {
+          "drums": "Drums",
+          "bass": "Bass",
+          "chords": "Akkorde",
+          "melody": "Melodie"
+        },
+        "name": {
+          "rock": "Rock",
+          "house": "House",
+          "hiphop": "Hip-Hop",
+          "trap": "Trap",
+          "funk": "Funk",
+          "lofi": "Lo-fi",
+          "dnb": "Drum & Bass",
+          "reggaeton": "Reggaeton",
+          "bassPulse": "Pulsierender Bass",
+          "bassWalk": "Walking Bass",
+          "bassDisco": "Disco-Oktaven",
+          "bassSub": "Tiefer Sub",
+          "chordsPop": "Pop-Akkorde (vi–IV–I–V)",
+          "chordsPad": "Weiches Pad",
+          "chordsJazz": "Jazz ii–V–I",
+          "chordsStabs": "Offbeat-Stabs",
+          "arpMinor": "Moll-Arpeggio",
+          "pentaRiff": "Pentatonik-Riff",
+          "pluck": "Pluck",
+          "bells": "Glocken"
+        }
+      },
       "fxParam": {
         "parametric": "Parametrischer EQ (Frequenz und Güte)",
         "freq": "{{band}} – Frequenz",

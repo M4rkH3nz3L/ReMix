@@ -87,7 +87,9 @@ import { withCancellableProgress } from '@/store/progressStore';
 import { renderSynthToClip } from '@/lib/synthClient';
 import type { SynthNote, SynthWave } from '@/lib/synth';
 import { renderDrumsToClip } from '@/lib/drumsClient';
-import type { DrumHit } from '@/lib/drums';
+import { patternHits, type DrumHit } from '@/lib/drums';
+import { BUILTIN_LOOPS, LOOP_BARS, loopDrums, loopNotes, type BuiltinLoop } from '@/lib/loopLibrary';
+import { LoopLibrarySheet } from '@/components/studio/audio/LoopLibrarySheet';
 import { renderSamplerToClip } from '@/lib/samplerClient';
 import type { SamplerPattern } from '@/lib/sampler';
 import { detectBeats } from '@/lib/beats';
@@ -241,6 +243,10 @@ export function AudioStudioBody({
   const [drumBusy, setDrumBusy] = useState(false);
   const [sampler, setSampler] = useState(false);
   const [samplerBusy, setSamplerBusy] = useState(false);
+  // 🔁 V2: beépített loopok (a lap, és a most sütött loop azonosítója)
+  const [loopsOpen, setLoopsOpen] = useState(false);
+  const [loopBusy, setLoopBusy] = useState<string | null>(null);
+  const placeLoopRef = useRef<(id: string) => Promise<string | null>>(async () => null);
   const [bpmBusy, setBpmBusy] = useState(false);
   const [detectedBeats, setDetectedBeats] = useState<{ uri: string; beats: number[] } | null>(null);
   const [source, setSource] = useState(false);
@@ -358,6 +364,8 @@ export function AudioStudioBody({
       registerDevAction('audio.speechUpgrade', () => devRef.current.speechUpgrade()),
       registerDevAction('audio.syncSelected', () => devRef.current.syncSelected()),
       registerDevAction('audio.openDrums', () => devRef.current.openDrums()),
+      registerDevAction('audio.loops', () => setLoopsOpen(true)),
+      registerDevAction('loops.place', (id) => placeLoopRef.current(String(id))),
       registerDevAction('audio.editClip', () => devRef.current.editClip()),
       registerDevAction('audio.closeDrums', () => devRef.current.closeDrums()),
       registerDevAction('audio.autoBpm', () => devRef.current.autoBpm()),
@@ -841,7 +849,8 @@ export function AudioStudioBody({
     const clip: AudioClip = {
       kind: 'audio',
       id: makeId('clip'),
-      start: snapToFrame(playhead, grid),
+      // a hívás pillanatának lejátszófeje (a sütés aszinkron — a render-kori érték addigra elavulhat)
+      start: snapToFrame(store.playhead, grid),
       duration: res.durationSec,
       trimIn: 0,
       sourceDuration: res.durationSec,
@@ -906,6 +915,38 @@ export function AudioStudioBody({
     } finally {
       setDrumBusy(false);
     }
+  };
+
+  /**
+   * 🔁 V2: egy beépített loop a lejátszófejnél — a telefon a projekt tempóján süti ki (a dob-géppel vagy a
+   * szintivel), a minta szerkeszthető hangszer-dokumentum lesz (egy undo). Visszaadja az új klip azonosítóját.
+   */
+  const placeLoop = async (loop: BuiltinLoop): Promise<string | null> => {
+    if (loopBusy) return null;
+    setLoopBusy(loop.id);
+    try {
+      const label = t(`studio.audio.loops.name.${loop.id}`);
+      const before = new Set(useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips.map((c) => c.id)) ?? []);
+      if (loop.def.kind === 'drums') {
+        const src = loopDrums(loop.def);
+        const res = await renderDrumsToClip(patternHits(src.pattern, src.velocity, src.swing), { bpm, bars: LOOP_BARS });
+        if (!res) return null;
+        placeInstrument(drumsDoc(makeId('inst'), bpm, LOOP_BARS, src.pattern, src.velocity, src.swing), res, label);
+      } else {
+        const res = await renderSynthToClip(loopNotes(loop.def), { bpm, wave: loop.def.wave });
+        if (!res) return null;
+        placeInstrument(synthDoc(makeId('inst'), bpm, LOOP_BARS, loop.def.wave, loopNotes(loop.def)), res, label);
+      }
+      const added = useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).find((c) => !before.has(c.id));
+      setLoopsOpen(false);
+      return added?.id ?? null;
+    } finally {
+      setLoopBusy(null);
+    }
+  };
+  placeLoopRef.current = async (id: string) => {
+    const loop = BUILTIN_LOOPS.find((l) => l.id === id);
+    return loop ? placeLoop(loop) : null;
   };
 
   // 🎛️🔊 a sampler step-mintája (saját minta a rácson) → a telefonon sütött klip a playheadnél;
@@ -1107,6 +1148,7 @@ export function AudioStudioBody({
       onBakeDrums={(hits, bars, src) => void bakeDrums(hits, bars, src)}
       editDoc={instrumentDocOf(project, editDocId ?? undefined)}
       onEditInstrument={editInstrument}
+      onOpenLoops={() => setLoopsOpen(true)}
       onBakeSampler={(uri, pattern, bars, name) => void bakeSampler(uri, pattern, bars, name)}
       onInsertSource={(asset) => {
         void insertSource(asset).catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:insertSource', caught); });
@@ -1393,6 +1435,7 @@ export function AudioStudioBody({
             <TBtn icon="musical-notes-outline" label={t('studio.pianoRoll.title')} active={pianoRoll} onPress={() => setPianoRoll(true)} testID="music-pianoroll" />
             <TBtn icon="grid-outline" label={t('studio.drums.title')} active={drumMachine} onPress={() => setDrumMachine(true)} testID="music-drums" />
             <TBtn icon="color-filter-outline" label={t('studio.sampler.title')} active={sampler} onPress={() => setSampler(true)} testID="music-sampler" />
+            <TBtn icon="repeat-outline" label={t('studio.audio.loops.title')} active={loopsOpen} onPress={() => setLoopsOpen(true)} testID="music-loops" />
             <View style={styles.tSep} />
           </>
         ) : null}
@@ -1542,6 +1585,7 @@ export function AudioStudioBody({
       )}
 
       {sheetsInDock ? null : sheets}
+      {loopsOpen ? <LoopLibrarySheet bpm={bpm} busyId={loopBusy} onPick={(l) => void placeLoop(l)} onClose={() => setLoopsOpen(false)} /> : null}
     </View>
     </UndoGestureArea>
   );

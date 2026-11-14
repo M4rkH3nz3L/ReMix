@@ -56,6 +56,7 @@ export function AudioStudioSheets({
   onShareAlbum,
   editDoc = null,
   onEditInstrument,
+  onOpenLoops,
   frame = null,
 }: {
   selClip: AudioClip | null;
@@ -90,6 +91,8 @@ export function AudioStudioSheets({
   editDoc?: InstrumentDoc | null;
   /** a klipszerkesztő „Minta szerkesztése” gombja */
   onEditInstrument?: (docId: string) => void;
+  /** 🔁 V2: a beépített loopok lapja */
+  onOpenLoops?: () => void;
   onBakeSampler: (uri: string, pattern: SamplerPattern, bars: number, sampleName?: string) => void;
   onInsertSource: (asset: Asset) => void;
   onShareAlbum: () => void;
@@ -129,6 +132,14 @@ export function AudioStudioSheets({
             setAdding(false);
             setSampler(true);
           }}
+          onLoops={
+            onOpenLoops
+              ? () => {
+                  setAdding(false);
+                  onOpenLoops();
+                }
+              : undefined
+          }
         />
       ) : null}
       {tts ? <TtsSheet onClose={() => setTts(false)} /> : null}

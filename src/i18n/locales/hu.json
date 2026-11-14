@@ -4066,6 +4066,42 @@
       "master": "Master"
     },
     "audio": {
+      "loops": {
+        "title": "Loopok",
+        "open": "Loopok",
+        "hint": "Beépített loopok: a telefon a projekt tempóján ({{bpm}} BPM) süti ki — offline, ingyen, és utána a dob-gépben vagy a piano rollban szerkeszthető.",
+        "placing": "Loop sütése…",
+        "a11y": "Loop hozzáadása: {{name}}",
+        "cloud": "Teljes könyvtár (felhő, Pro)",
+        "cat": {
+          "drums": "Dob",
+          "bass": "Basszus",
+          "chords": "Akkordok",
+          "melody": "Dallam"
+        },
+        "name": {
+          "rock": "Rock",
+          "house": "House",
+          "hiphop": "Hip-hop",
+          "trap": "Trap",
+          "funk": "Funk",
+          "lofi": "Lo-fi",
+          "dnb": "Drum & bass",
+          "reggaeton": "Reggaeton",
+          "bassPulse": "Pulzáló basszus",
+          "bassWalk": "Sétáló basszus",
+          "bassDisco": "Disco-oktávok",
+          "bassSub": "Mély szub",
+          "chordsPop": "Pop-akkordok (vi–IV–I–V)",
+          "chordsPad": "Lágy pad",
+          "chordsJazz": "Jazz ii–V–I",
+          "chordsStabs": "Ütemre szúrt akkordok",
+          "arpMinor": "Moll arpeggio",
+          "pentaRiff": "Pentaton riff",
+          "pluck": "Pengetés",
+          "bells": "Csengők"
+        }
+      },
       "fxParam": {
         "parametric": "Parametrikus EQ (frekvencia és Q)",
         "freq": "{{band}} – frekvencia",

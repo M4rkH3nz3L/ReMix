@@ -2888,6 +2888,11 @@ async function smokeEngineStudio(log: Log, setHarness: (n: ReactNode) => void) {
 /** 🎛️ Szűrők + EQ a közös DSP-ben: a telefonos export = a szerveres (ffmpeg) export, kivonva. */
 async function smokeOfflineFx(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  // a telefon ↔ szerver összevetéshez felhő kell — felhő nélküli (release) buildben jelzetten kimarad
+  if (!cloudInThisBuild()) {
+    log(null, 'felhő nélküli build: a telefon ↔ szerver összevetés kimarad (az élesítéskor újramérendő)', '');
+    return;
+  }
   const SR = 44100;
   let seed = 7;
   const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 2 - 1;
@@ -7383,6 +7388,86 @@ async function smokeDecodeDiag(log: Log) {
   }
 }
 
+/** 🔁 V2: beépített loopok — a telefon a projekt tempóján süti (100 BPM): a house-loop lábdobja 0,600 s-onként,
+ *  a klip 4 ütem, a minta szerkeszthető hangszer-dokumentum; a dallamos loop is; egy visszavonás eltávolítja. */
+async function smokeLoops(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_loops';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:loops', caught));
+  const base = createEmptyProject('smoke loopok', '9:16', undefined, 'audio');
+  await saveProject({ ...base, id, bpm: 100 });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1000);
+  const uris: string[] = [];
+  try {
+    st().setPlayhead(0);
+    runDevAction('audio.loops');
+    await sleep(600);
+    const t0 = Date.now();
+    const clipId = (await runDevAction('loops.place', 'house')) as string | null;
+    const ms = Date.now() - t0;
+    const p1 = st().project!;
+    const clip = p1.tracks.flatMap((t) => t.clips).find((c) => c.id === clipId) as AudioClip | undefined;
+    const doc = p1.instrumentDocs?.find((d) => d.id === clip?.instrumentDocId);
+    const bar = (4 * 60) / 100;
+    log(!!clip && Math.abs(clip.duration - 4 * bar) < 0.7 && doc?.kind === 'drums' && doc.bars === 4 && doc.bpm === 100, 'a house-loop a lejátszófejnél: 4 ütem 100 BPM-en, szerkeszthető dob-minta', `${clip?.duration.toFixed(3)} s (4 ütem = ${(4 * bar).toFixed(1)} s) · minta ${doc?.kind} ${doc?.bars} ütem ${doc?.bpm} BPM · ${ms} ms`);
+    // a lábdob (minden negyed) a telefonos exportban 0,600 s-onként
+    const out = await exportOfflineWav(p1, new File(projectExportDir(), 'smoke_loops_house.wav'), undefined, undefined, 'float32');
+    uris.push(out.uri);
+    const h = new File(out.uri).open();
+    let l: Float32Array;
+    try {
+      const b = h.readBytes(h.size ?? 0);
+      const f = new Float32Array(b.buffer.slice(b.byteOffset + 44, b.byteOffset + b.length));
+      l = Float32Array.from({ length: f.length / 2 }, (_, i) => f[i * 2]);
+    } finally {
+      h.close();
+    }
+    // energia-burkoló 5 ms-os ablakokban, a kezdetek a hirtelen emelkedésnél (≥ 0,5 s távolsággal)
+    const SR = 44100;
+    const win = Math.round(0.005 * SR);
+    const env: number[] = [];
+    for (let i = 0; i + win <= l.length; i += win) {
+      let e = 0;
+      for (let k = i; k < i + win; k++) e += l[k] * l[k];
+      env.push(e);
+    }
+    const peak = Math.max(...env);
+    const onsets: number[] = [];
+    for (let j = 1; j < env.length; j++) {
+      const t = (j * win) / SR;
+      if (env[j] > peak * 0.25 && env[j - 1] < env[j] * 0.3 && (onsets.length === 0 || t - onsets[onsets.length - 1] > 0.45)) onsets.push(t);
+    }
+    const gaps = onsets.slice(1, 9).map((t, i) => t - onsets[i]);
+    const worst = Math.max(...gaps.map((g) => Math.abs(g - 0.6)));
+    log(gaps.length >= 6 && worst < 0.012, 'a lábdob a telefonos exportban 0,600 s-onként (100 BPM, negyedek) — ütemre, nyújtás nélkül', `közök ${gaps.map((g) => g.toFixed(3)).join(' ')} s · legnagyobb eltérés ${(worst * 1000).toFixed(1)} ms`);
+    // dallamos loop: szinti-minta
+    st().setPlayhead(4 * bar);
+    const c2 = (await runDevAction('loops.place', 'chordsPop')) as string | null;
+    const p2 = st().project!;
+    const clip2 = p2.tracks.flatMap((t) => t.clips).find((c) => c.id === c2) as AudioClip | undefined;
+    const doc2 = p2.instrumentDocs?.find((d) => d.id === clip2?.instrumentDocId);
+    log(!!clip2 && Math.abs(clip2.start - 4 * bar) < 1e-3 && doc2?.kind === 'synth' && (doc2.synth?.notes.length ?? 0) === 12, 'az akkord-loop a 4. ütem végén: szinti-minta (12 hang), a piano rollban szerkeszthető', `kezdet ${clip2?.start.toFixed(3)} s · ${doc2?.kind} · ${doc2?.synth?.notes.length} hang`);
+    st().undo();
+    const p3 = st().project!;
+    log(!p3.tracks.flatMap((t) => t.clips).some((c) => c.id === c2) && !(p3.instrumentDocs ?? []).some((d) => d.id === doc2?.id), 'egy visszavonás: a klip és a minta is eltűnik', `${p3.tracks.flatMap((t) => t.clips).length} klip, ${(p3.instrumentDocs ?? []).length} minta`);
+    runDevAction('audio.loops');
+    await sleep(800);
+    log(true, 'FOTÓZHATÓ', 'a Loopok lap');
+    await sleep(1500);
+  } finally {
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:loops-del', caught));
+    for (const u of uris) {
+      const f = new File(u);
+      if (f.exists) f.delete();
+    }
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -9575,6 +9660,10 @@ export async function runImageSmoke(
   }
   if (phase === 'decodediag') {
     await step(phase, () => smokeDecodeDiag(log));
+    return;
+  }
+  if (phase === 'loops') {
+    await step(phase, () => smokeLoops(log));
     return;
   }
   if (phase === 'midi') {

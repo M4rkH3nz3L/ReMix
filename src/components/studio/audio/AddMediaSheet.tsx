@@ -32,6 +32,7 @@ export function AddMediaSheet({
   onPianoRoll,
   onDrums,
   onSampler,
+  onLoops,
 }: {
   track: TrackType;
   onClose: () => void;
@@ -39,6 +40,8 @@ export function AddMediaSheet({
   onPianoRoll?: () => void;
   onDrums?: () => void;
   onSampler?: () => void;
+  /** 🔁 V2: beépített loopok (a telefon süti, offline) */
+  onLoops?: () => void;
 }) {
   const { t } = useTranslation();
   const [rows, setRows] = useState<{ provider: StorageProvider; entry: StorageEntry }[] | null>(null);
@@ -222,6 +225,12 @@ export function AddMediaSheet({
             <Pressable onPress={onDrums} disabled={busy} style={[styles.importRow, { marginTop: 8 }]}>
               <Ionicons name="grid-outline" size={18} color={palette.accent} />
               <Text style={styles.importText}>{t('studio.drums.entry', { defaultValue: 'Dob-gép (step-sequencer)' })}</Text>
+            </Pressable>
+          ) : null}
+          {onLoops ? (
+            <Pressable onPress={onLoops} disabled={busy} style={[styles.importRow, { marginTop: 8 }]} testID="add-loops">
+              <Ionicons name="repeat-outline" size={18} color={palette.accent} />
+              <Text style={styles.importText}>{t('studio.audio.loops.open')}</Text>
             </Pressable>
           ) : null}
           {onSampler ? (

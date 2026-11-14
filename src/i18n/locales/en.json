@@ -4066,6 +4066,42 @@
       "master": "Master"
     },
     "audio": {
+      "loops": {
+        "title": "Loops",
+        "open": "Loops",
+        "hint": "Built-in loops: your phone renders them at the project tempo ({{bpm}} BPM) — offline, free, and editable afterwards in the drum machine or piano roll.",
+        "placing": "Rendering loop…",
+        "a11y": "Add loop: {{name}}",
+        "cloud": "Full library (cloud, Pro)",
+        "cat": {
+          "drums": "Drums",
+          "bass": "Bass",
+          "chords": "Chords",
+          "melody": "Melody"
+        },
+        "name": {
+          "rock": "Rock",
+          "house": "House",
+          "hiphop": "Hip-hop",
+          "trap": "Trap",
+          "funk": "Funk",
+          "lofi": "Lo-fi",
+          "dnb": "Drum & bass",
+          "reggaeton": "Reggaeton",
+          "bassPulse": "Pulsing bass",
+          "bassWalk": "Walking bass",
+          "bassDisco": "Disco octaves",
+          "bassSub": "Deep sub",
+          "chordsPop": "Pop chords (vi–IV–I–V)",
+          "chordsPad": "Soft pad",
+          "chordsJazz": "Jazz ii–V–I",
+          "chordsStabs": "Offbeat stabs",
+          "arpMinor": "Minor arpeggio",
+          "pentaRiff": "Pentatonic riff",
+          "pluck": "Pluck",
+          "bells": "Bells"
+        }
+      },
       "fxParam": {
         "parametric": "Parametric EQ (frequency and Q)",
         "freq": "{{band}} – frequency",

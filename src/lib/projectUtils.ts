@@ -107,7 +107,7 @@ export function createEmptyProject(
       : {}),
     // 🎚️ a hang-projekt alap master-célja (az első beállítás): a loudness/plafon
     // preset a cél szerint (podcast/zene/social/videó) — a MasterSheet később módosítja.
-    ...(kind === 'audio' && config?.audioMasterTarget
+    ...((kind === 'audio' || kind === 'music') && config?.audioMasterTarget
       ? { audioMaster: masterPreset(config.audioMasterTarget) }
       : {}),
     // 🎥 a live-stúdió a scene/forrás-grafet szerkeszti → egy kiinduló live-doc

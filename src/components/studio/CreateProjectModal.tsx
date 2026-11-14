@@ -368,7 +368,7 @@ export function CreateProjectModal(props: {
             ) : null}
 
             {/* 🎚️ HANG-projekt: master-cél (az alap hangosság/plafon preset) */}
-            {kind === 'audio' ? (
+            {kind === 'audio' || kind === 'music' ? (
               <>
                 {/* 🧩 indító-sablon: sávok, tempó, jelölők, hangosság */}
                 <Text style={styles.fieldLabel}>{t('studio.audio.template.label')}</Text>

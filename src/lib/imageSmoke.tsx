@@ -6294,6 +6294,54 @@ async function smokeAudioTemplate(log: Log) {
   }
 }
 
+/**
+ * 🎵 S10 (MU0): a „+ Új projekt → Zene" a VALÓDI létrehozási úton egy kész ütemrácsos projektet nyit a Hang
+ * Stúdió Zene munkaterületén (a `music` fajta útvonala → `?ws=music`), a hangszerek elöl; offline.
+ */
+async function smokeMusicWorkspace(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const st = useEditorStore.getState;
+  const name = 'smoke zene munkaterület';
+  let createdId: string | null = null;
+  try {
+    router.replace('/studio' as Href);
+    await sleep(1500);
+    runDevAction('studio.fillCreate', { name, kind: 'music' });
+    await sleep(400);
+    await runDevAction('studio.create');
+    for (let i = 0; i < 60 && st().project?.name !== name; i++) await sleep(200);
+    await sleep(1200);
+    const p = st().project;
+    createdId = p?.name === name ? p.id : null;
+    log(p?.kind === 'music' && p.bpm === 120 && p.timeSignature?.beatsPerBar === 4 && (p.markers?.length ?? 0) === 4 && p.audioMaster?.target === 'music', '„Zene" projekt: a fajta music, a Zene-sablon alkalmazva (120 BPM, 4/4, 4 jelölő, zenei hangosság)', p ? `${p.kind}, ${p.bpm} BPM, ${p.markers?.length} jelölő, cél ${p.audioMaster?.target}` : 'nincs projekt');
+    const ws = runDevAction('audio.workspace');
+    log(ws === 'music', 'a music útvonal a Hang Stúdiót nyitja a Zene munkaterületen (átirányítás ?ws=music)', `${ws}`);
+    // a hangszerek elöl: a piano roll a munkaterület gombjáról nyílik és zárul (a lassú eszközön megvárjuk a lapot)
+    runDevAction('audio.openPianoRoll');
+    let notesBefore: unknown;
+    for (let i = 0; i < 50 && notesBefore === undefined; i++) {
+      await sleep(100);
+      notesBefore = runDevAction('synth.notes');
+    }
+    runDevAction('audio.closePianoRoll');
+    await sleep(300);
+    log(notesBefore !== undefined, 'a Zene munkaterület hangszerei élnek (piano roll nyílik a mentett tempón)', notesBefore === undefined ? 'nem nyílt meg' : `${String(notesBefore).slice(0, 40) || '(üres rács)'}`);
+    log(true, 'FOTÓZHATÓ', 'a Hang Stúdió Zene munkaterülete: hangszerek a transzport elején');
+    await sleep(1500);
+  } finally {
+    router.replace('/studio' as Href);
+    await sleep(500);
+    const { deleteCloudProject, listCloudProjectMetas } = await import('@/lib/cloudSync');
+    const leftovers = (await listCloudProjectMetas().catch(() => [])).filter((m) => m.name === name).map((m) => m.id);
+    for (const id of new Set([...(createdId ? [createdId] : []), ...leftovers])) {
+      await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:musicws-del', caught));
+      await deleteCloudProject(id);
+    }
+    const remain = (await listCloudProjectMetas().catch(() => [])).filter((m) => m.name === name).length;
+    log(remain === 0, 'takarítás: a teszt-projekt a felhőből is törölve', `maradt ${remain}`);
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -8421,6 +8469,10 @@ export async function runImageSmoke(
   }
   if (phase === 'linkedmix') {
     await step(phase, () => smokeLinkedMix(log));
+    return;
+  }
+  if (phase === 'musicws') {
+    await step(phase, () => smokeMusicWorkspace(log));
     return;
   }
   if (phase === 'modeldl') {

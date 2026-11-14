@@ -125,12 +125,15 @@ function pasteTargetOf(s: { selectedClipId: string | null; project: { tracks: { 
  */
 export function AudioStudioBody({
   mode,
+  workspace,
   title,
   onExit,
   onExport,
   onRequestCheck,
 }: {
   mode: 'project' | 'scoped';
+  /** 🎵 Zene munkaterület (S10): a hangszer-eszközök a transzport elején (a `music` fajta / `?ws=music`) */
+  workspace?: 'music';
   title: string;
   onExit: () => void;
   onExport?: () => void;
@@ -138,6 +141,8 @@ export function AudioStudioBody({
   onRequestCheck?: () => void;
 }) {
   const { t } = useTranslation();
+  // 🧪 füstteszt: melyik munkaterület él
+  useEffect(() => registerDevAction('audio.workspace', () => workspace ?? 'audio'), [workspace]);
   const fxBypass = useEditorStore((s) => s.fxBypass);
   const canPaste = useEditorStore((s) => (s.clipClipboard ? s.canPasteTo(pasteTargetOf(s)) : false));
   const projectTracks = useEditorStore((s) => s.project?.tracks);
@@ -1312,6 +1317,15 @@ export function AudioStudioBody({
         keyboardShouldPersistTaps="handled"
       >
         {/* undo / redo */}
+        {/* 🎵 Zene munkaterület (S10): a hangszerek elöl — piano roll, dobgép, sampler */}
+        {workspace === 'music' ? (
+          <>
+            <TBtn icon="musical-notes-outline" label={t('studio.pianoRoll.title')} active={pianoRoll} onPress={() => setPianoRoll(true)} testID="music-pianoroll" />
+            <TBtn icon="grid-outline" label={t('studio.drums.title')} active={drumMachine} onPress={() => setDrumMachine(true)} testID="music-drums" />
+            <TBtn icon="color-filter-outline" label={t('studio.sampler.title')} active={sampler} onPress={() => setSampler(true)} testID="music-sampler" />
+            <View style={styles.tSep} />
+          </>
+        ) : null}
         <TBtn icon="arrow-undo" onPress={() => useEditorStore.getState().undo()} disabled={!canUndo} accessibilityLabel={t('editor.transportBar.undo')} />
         <TBtn icon="arrow-redo" onPress={() => useEditorStore.getState().redo()} disabled={!canRedo} accessibilityLabel={t('editor.transportBar.redo')} />
         <View style={styles.tSep} />

@@ -34,7 +34,9 @@ export const PROJECT_KINDS: Record<ProjectKind, ProjectKindMeta> = {
   // ── CreativeDocument-bővítés (stúdió TBD) ──────────────────────────────────
   writing: { id: 'writing', emoji: '✍️', icon: 'document-text', label: 'studio.kind.writing', editable: false, route: (id) => `/studio/writing/${id}` },
   code: { id: 'code', emoji: '💻', icon: 'code-slash', label: 'studio.kind.code', editable: false, route: (id) => `/studio/code/${id}` },
-  music: { id: 'music', emoji: '🎵', icon: 'musical-note', label: 'studio.kind.music', editable: false, route: (id) => `/studio/music/${id}` },
+  // 🎵 Music = az Audio Stúdió zenei MUNKATERÜLETE (K1, AUDIO-PROD S10): ugyanaz a projekt-modell,
+  //    az útvonal a Hang Stúdiót nyitja a Zene munkaterületre állítva (`?ws=music`)
+  music: { id: 'music', emoji: '🎵', icon: 'musical-note', label: 'studio.kind.music', editable: true, route: (id) => `/studio/music/${id}` },
   design: { id: 'design', emoji: '🎨', icon: 'color-palette', label: 'studio.kind.design', editable: false, route: (id) => `/studio/design/${id}` },
   // ── 🎥 Live Studio — van stúdiója (/live/studio/[id]), de a Live-hubból
   //    („Go live") jön létre, ezért `editable: false` → kimarad a generikus

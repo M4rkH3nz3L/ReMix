@@ -659,6 +659,7 @@
     "missingFieldsHint": "Jumps to the first missing field",
     "descriptionPlaceholder_image": "What does the image show? With keywords…",
     "descriptionPlaceholder_audio": "What's the audio about? With keywords…",
+    "descriptionPlaceholder_music": "What is the music about? With keywords…",
     "hashtagsLabel": "Hashtags",
     "hashtagsPlaceholder": "#reels #recipe (space or comma)",
     "keywordsLabel": "Keywords",
@@ -3285,7 +3286,8 @@
       "model3d": "LiDAR scan to 3D model",
       "video": "Timeline video editor",
       "image": "Layer-based image editor",
-      "audio": "Sound & music editor"
+      "audio": "Sound & music editor",
+      "music": "Music: piano roll, drum machine, sampler, tempo — the Audio Studio’s music workspace"
     },
     "export": "Export",
     "notFound": "Project not found.",

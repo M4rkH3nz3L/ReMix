@@ -22,6 +22,7 @@ export function supportedSourceKinds(kind: ProjectKind | undefined): SourceKind[
     case 'image':
       return ['image'];
     case 'audio':
+    case 'music':
       return ['audio'];
     case 'model3d':
       // 🧊 a 3D-modell CSAK az eszközön, LiDAR-ral készül — kívülről semmi nem importálható

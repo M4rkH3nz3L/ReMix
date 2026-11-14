@@ -659,6 +659,7 @@
     "missingFieldsHint": "Springt zum ersten fehlenden Feld",
     "descriptionPlaceholder_image": "Was zeigt das Bild? Mit Schlüsselwörtern…",
     "descriptionPlaceholder_audio": "Worum geht's im Audio? Mit Schlüsselwörtern…",
+    "descriptionPlaceholder_music": "Worum geht es in der Musik? Mit Schlüsselwörtern…",
     "hashtagsLabel": "Hashtags",
     "hashtagsPlaceholder": "#reels #rezept (Leerzeichen oder Komma)",
     "keywordsLabel": "Schlüsselwörter",
@@ -3285,7 +3286,8 @@
       "model3d": "LiDAR-Scan zum 3D-Modell",
       "video": "Zeitleisten-Videoeditor",
       "image": "Ebenenbasierter Bildeditor",
-      "audio": "Ton- & Musikeditor"
+      "audio": "Ton- & Musikeditor",
+      "music": "Musik: Piano-Roll, Drum-Machine, Sampler, Tempo – der Musik-Arbeitsbereich des Audio-Studios"
     },
     "export": "Export",
     "notFound": "Projekt nicht gefunden.",

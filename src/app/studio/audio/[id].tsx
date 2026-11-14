@@ -55,7 +55,8 @@ import { cloudAvailable, isNetworkError } from '@/lib/backend';
  * videóból nyíló scoped Modalban is).
  */
 export default function AudioStudioScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `ws=music`: a Zene munkaterület (a `music` fajta útvonala ide irányít — S10)
+  const { id, ws } = useLocalSearchParams<{ id: string; ws?: string }>();
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   const [loading, setLoading] = useState(true);
@@ -288,7 +289,7 @@ export default function AudioStudioScreen() {
     <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
       <AudioLayer />
       <StudioStatusBanners saveFailed={saveFailed} missingCount={missing.length} relinking={relinking} onRelink={() => void relink()} />
-      <AudioStudioBody mode="project" title={project.name} onExit={exit} onExport={() => setExporting(true)} onRequestCheck={() => void runCheck()} />
+      <AudioStudioBody mode="project" workspace={ws === 'music' || project.kind === 'music' ? 'music' : undefined} title={project.name} onExit={exit} onExport={() => setExporting(true)} onRequestCheck={() => void runCheck()} />
       {exporting ? (
         <AudioExportSheet
           onClose={() => setExporting(false)}

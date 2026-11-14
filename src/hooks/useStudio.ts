@@ -231,7 +231,7 @@ export function useStudio() {
         // érvénytelen hex → essen vissza az alap sötétre (a 'transparent' átmegy)
         background: bg === 'transparent' || isHexColor(bg) ? bg : BG_SWATCHES[0],
       };
-    } else if (kind === 'audio') {
+    } else if (kind === 'audio' || kind === 'music') {
       config.audioMasterTarget = audioTarget;
     } else if (kind === 'model3d') {
       config.model3dStorageFormat = model3dFormat;
@@ -244,9 +244,10 @@ export function useStudio() {
       kind,
       config
     );
+    // 🎵 a „Zene" belépési pont (S10): ugyanaz a hang-projekt, a Zene-sablonnal (ha a felhasználó nem választott mást)
     const base =
-      kind === 'audio'
-        ? applyAudioTemplate(created, audioTemplate, {
+      kind === 'audio' || kind === 'music'
+        ? applyAudioTemplate(created, kind === 'music' && audioTemplate === 'blank' ? 'music' : audioTemplate, {
             voice: t('studio.audio.template.trackVoice'),
             music: t('studio.audio.template.trackMusic'),
             sfx: t('studio.audio.template.trackSfx'),

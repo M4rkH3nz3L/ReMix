@@ -659,6 +659,7 @@
     "missingFieldsHint": "Az első hiányzó mezőre ugrik",
     "descriptionPlaceholder_image": "Mit ábrázol a kép? Kulcsszavakkal…",
     "descriptionPlaceholder_audio": "Miről szól a hanganyag? Kulcsszavakkal…",
+    "descriptionPlaceholder_music": "Miről szól a zene? Kulcsszavakkal…",
     "hashtagsLabel": "Hashtagek",
     "hashtagsPlaceholder": "#reels #recept (szóköz vagy vessző)",
     "keywordsLabel": "Kulcsszavak",
@@ -3285,7 +3286,8 @@
       "model3d": "LiDAR-szken 3D-modellé",
       "video": "Idővonalas videószerkesztő",
       "image": "Réteg-alapú képszerkesztő",
-      "audio": "Hang- és zeneszerkesztő"
+      "audio": "Hang- és zeneszerkesztő",
+      "music": "Zene: piano roll, dobgép, sampler, tempó — a Hang Stúdió zenei munkaterülete"
     },
     "export": "Export",
     "notFound": "A projekt nem található.",

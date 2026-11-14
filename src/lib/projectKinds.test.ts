@@ -25,7 +25,8 @@ describe('projectKinds — CreativeDocument katalógus', () => {
     expect(isEditableKind('audio')).toBe(true);
     expect(isEditableKind('writing')).toBe(false);
     expect(isEditableKind('code')).toBe(false);
-    expect(isEditableKind('music')).toBe(false);
+    // 🎵 Music = az Audio Stúdió zenei munkaterülete (K1, S10): belépési pont, saját stúdió nélkül
+    expect(isEditableKind('music')).toBe(true);
     expect(isEditableKind('design')).toBe(false);
   });
 
@@ -34,8 +35,8 @@ describe('projectKinds — CreativeDocument katalógus', () => {
     expect(projectKindMeta(undefined).id).toBe('video');
   });
 
-  it('creatableKinds CSAK a kész stúdiókat adja (video/image/audio, sorrendben)', () => {
-    expect(creatableKinds().map((m) => m.id)).toEqual(['video', 'image', 'audio']);
+  it('creatableKinds CSAK a kész stúdiókat és a munkaterület-belépőt adja (video/image/audio/music, sorrendben)', () => {
+    expect(creatableKinds().map((m) => m.id)).toEqual(['video', 'image', 'audio', 'music']);
   });
 
   it('az editable fajták a saját stúdió-útvonalukra mutatnak', () => {
@@ -50,6 +51,7 @@ describe('projectKinds — CreativeDocument katalógus', () => {
     expect(studioRoute(undefined, 'p1')).toBe('/editor/p1');
     // CreativeDocument-bővítés (stúdió TBD) → biztonságos videó-editor fallback
     expect(studioRoute('writing', 'p1')).toBe('/editor/p1');
-    expect(studioRoute('music', 'p1')).toBe('/editor/p1');
+    // 🎵 a zene a saját belépési útvonalára (az a Hang Stúdiót nyitja a Zene munkaterületen)
+    expect(studioRoute('music', 'p1')).toBe('/studio/music/p1');
   });
 });

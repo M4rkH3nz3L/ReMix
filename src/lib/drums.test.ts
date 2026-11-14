@@ -114,3 +114,45 @@ describe('🥁 velocity + swing (R7)', () => {
     }
   });
 });
+
+// ── 🥁 S12 (MU3): 8 hang, a régi minta kiegészítése, beépített készletek ─────────────────────
+import { DRUM_KITS, drumKit, normalizePattern, type DrumPattern } from '@/lib/drums';
+
+describe('drums — S12: 8 hang, normalizálás, készletek', () => {
+  it('8 hang: a régi négy + tom, rim, crash, perc; az üres minta minden hangra', () => {
+    expect(DRUM_VOICES).toEqual(['kick', 'snare', 'hihat', 'clap', 'tom', 'rim', 'crash', 'perc']);
+    expect(Object.keys(emptyPattern(1))).toEqual(DRUM_VOICES);
+  });
+
+  it('normalizePattern: a 4 soros mentett minta a 8 hangra, a rács hosszára; a meglévő ütések maradnak', () => {
+    const old = { kick: [true, false, false, false], snare: [false, false, true] } as unknown as DrumPattern;
+    const p = normalizePattern(old, 1);
+    expect(Object.keys(p)).toEqual(DRUM_VOICES);
+    expect(p.kick.length).toBe(16);
+    expect(p.kick[0]).toBe(true);
+    expect(p.snare[2]).toBe(true);
+    expect(p.tom.every((x) => x === false)).toBe(true);
+    expect(normalizePattern(null, 2).crash.length).toBe(32);
+  });
+
+  it('drumKit: a három készlet; a House 4-on-floor + clap + offbeat hihat + perc, hangsúlyos kick; a Hip-hop swinggel, tom/rim; 2 ütemre ismételve', () => {
+    expect(DRUM_KITS).toEqual(['basic', 'house', 'hiphop']);
+    const house = drumKit('house', 1);
+    expect(house.pattern.kick.map((x, i) => (x ? i : -1)).filter((i) => i >= 0)).toEqual([0, 4, 8, 12]);
+    expect(house.pattern.clap.filter(Boolean).length).toBe(2);
+    expect(house.pattern.hihat.map((x, i) => (x ? i : -1)).filter((i) => i >= 0)).toEqual([2, 6, 10, 14]);
+    expect(house.pattern.perc.filter(Boolean).length).toBe(2);
+    expect(house.velocity.kick?.[0]).toBe(127);
+    expect(house.swing).toBe(0);
+    const hh = drumKit('hiphop', 2);
+    expect(hh.swing).toBe(0.2);
+    expect(hh.pattern.kick.length).toBe(32);
+    expect(hh.pattern.kick.filter(Boolean).length).toBe(8); // 4 ütésenként, 2 ütem
+    expect(hh.pattern.tom.map((x, i) => (x ? i : -1)).filter((i) => i >= 0)).toEqual([14, 30]);
+    expect(hh.velocity.snare?.[4]).toBe(127);
+    expect(hh.velocity.snare?.[20]).toBe(127);
+    const basic = drumKit('basic', 1);
+    expect(basic.pattern.hihat.filter(Boolean).length).toBe(8);
+    expect(hasHits(basic.pattern)).toBe(true);
+  });
+});

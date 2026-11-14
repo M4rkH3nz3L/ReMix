@@ -14,11 +14,15 @@ import { palette } from '@/constants/editor';
 import {
   cycleVelocity,
   DRUM_ACCENT,
+  DRUM_KITS,
   DRUM_LABEL,
   DRUM_SOFT,
   DRUM_VOICES,
+  drumKit,
   emptyPattern,
   hasHits,
+  normalizePattern,
+  type DrumKitId,
   patternDurationSec,
   patternHits,
   resizeVelocity,
@@ -64,7 +68,8 @@ export function DrumMachineSheet({
 }) {
   const { t } = useTranslation();
   const [bars, setBars] = useState(() => initial?.bars ?? 1);
-  const [pattern, setPattern] = useState<DrumPattern>(() => initial?.drums?.pattern ?? emptyPattern(1));
+  // 🥁 S12: a régi (4 soros) mentett minta a 8 hangra kiegészítve
+  const [pattern, setPattern] = useState<DrumPattern>(() => (initial?.drums?.pattern ? normalizePattern(initial.drums.pattern, initial.bars ?? 1) : emptyPattern(1)));
   const [velocity, setVelocity] = useState<DrumVelocity>(() => initial?.drums?.velocity ?? {});
   /** 0–0,6 (a lépés-hossz aránya) */
   const [swing, setSwing] = useState(() => initial?.drums?.swing ?? 0);
@@ -100,6 +105,25 @@ export function DrumMachineSheet({
   const bakeRef = useRef(() => onBake(hitsOf(), bars, { pattern, velocity, swing }));
   bakeRef.current = () => onBake(hitsOf(), bars, { pattern, velocity, swing });
   useEffect(() => registerDevAction('drums.bake', () => bakeRef.current()), []);
+  // 🥁 S12: beépített készlet (a rács felülíródik; a sütött klip visszavonható)
+  const barsRef = useRef(bars);
+  barsRef.current = bars;
+  const applyKit = (kit: DrumKitId) => {
+    const k = drumKit(kit, barsRef.current);
+    setPattern(k.pattern);
+    setVelocity(k.velocity);
+    setSwing(k.swing);
+  };
+  const applyKitRef = useRef(applyKit);
+  applyKitRef.current = applyKit;
+  useEffect(
+    () =>
+      registerDevAction('drums.kit', (arg) => {
+        applyKitRef.current(arg as DrumKitId);
+        return true;
+      }),
+    []
+  );
   useEffect(() => registerDevAction('drums.hits', () => hitsRef.current().map((h) => `${h.voice}${h.step}${h.velocity ? `v${h.velocity}` : ''}`).join(',')), []);
 
   const steps = stepCount(bars);
@@ -169,6 +193,16 @@ export function DrumMachineSheet({
           setSwing(v.swing ?? 0);
         }}
       />
+
+      {/* 🥁 beépített minta-készletek: gyors kezdés (Alap · House · Hip-hop) */}
+      <View style={styles.controls}>
+        <Text style={styles.info}>{t('studio.drums.kit')}</Text>
+        {DRUM_KITS.map((kit) => (
+          <Pressable key={kit} testID={`drums-kit-${kit}`} onPress={() => applyKit(kit)} style={styles.kitBtn} accessibilityRole="button" accessibilityLabel={`${t('studio.drums.kit')}: ${t(`studio.drums.kit_${kit}`)}`} accessibilityHint={t('studio.drums.kitHint')}>
+            <Text style={styles.kitText}>{t(`studio.drums.kit_${kit}`)}</Text>
+          </Pressable>
+        ))}
+      </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator>
         <View>
@@ -254,6 +288,8 @@ const styles = StyleSheet.create({
   stepBtn: { padding: 5, borderWidth: 1, borderColor: palette.border, borderRadius: 8 },
   barsText: { color: palette.text, fontSize: 13, fontWeight: '700', minWidth: 52, textAlign: 'center' },
   info: { color: palette.textDim, fontSize: 12, fontWeight: '600' },
+  kitBtn: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surfaceHigh },
+  kitText: { color: palette.text, fontSize: 12, fontWeight: '700' },
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   rowLabel: { width: 52 },
   rowLabelText: { color: palette.text, fontSize: 12, fontWeight: '700' },

@@ -6441,6 +6441,78 @@ async function smokePianoRoll2(log: Log) {
   }
 }
 
+/**
+ * 🥁 S12 (MU3): dobgép 8 hanggal (tom, rim, crash, perc) és beépített készletekkel (Alap · House · Hip-hop):
+ * a készlet a rácsot tölti (hangsúlyok, swing), a régi 4 soros minta újranyitva 8 sorra egészül ki, a sütés egy undo.
+ */
+async function smokeDrumKit(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const api = (await loadAudioApi())!;
+  const left = async (uri: string) => (await api.decodeAudioData(uri, SR)).getChannelData(0);
+  const peak = (a: Float32Array) => a.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+  const id = 'prj_smoke_drumkit';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:drumkit', caught));
+  await saveProject({ ...createEmptyProject('smoke dobkészlet', '9:16', undefined, 'audio'), id, bpm: 120 });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  const music = () => st().project!.tracks.find((t) => t.type === 'music')!.clips as AudioClip[];
+  const waitFor = async (cond: () => boolean, ms: number) => {
+    for (let i = 0; i < ms / 100 && !cond(); i++) await sleep(100);
+    return cond();
+  };
+  try {
+    runDevAction('audio.openDrums');
+    let ready = false;
+    for (let i = 0; i < 50 && !ready; i++) {
+      await sleep(100);
+      ready = runDevAction('drums.hits') !== undefined;
+    }
+    log(ready, 'a dobgép nyílik', `${ready}`);
+    // 1) House-készlet: 4-on-floor kick (az első hangsúlyos), clap 2/4, offbeat hihat, perc
+    runDevAction('drums.kit', 'house');
+    let hits = '';
+    await waitFor(() => (hits = String(runDevAction('drums.hits') ?? '')).includes('perc'), 3000);
+    log(hits.includes('kick0v127') && hits.includes('kick4') && hits.includes('clap4') && hits.includes('hihat2') && hits.includes('perc3'), 'House-készlet: 4-on-floor (hangsúlyos 1.), clap, offbeat hihat, perc', hits.slice(0, 80));
+    // 2) Hip-hop: swing (a páros 16-odok 0,2 lépéssel), rim, tom
+    runDevAction('drums.kit', 'hiphop');
+    await waitFor(() => (hits = String(runDevAction('drums.hits') ?? '')).includes('rim'), 3000);
+    log(hits.includes('kick3.2') && hits.includes('rim7.2') && hits.includes('tom14') && hits.includes('snare4v127'), 'Hip-hop-készlet: swing a páros 16-odokon, rim és tom, hangsúlyos snare', hits.slice(0, 90));
+    // 3) sütés: az új hangok a klipben hallhatók (nem csend), a minta a projektben 8 sorral
+    runDevAction('drums.bake');
+    const baked = await waitFor(() => music().length === 1, 15000);
+    const c = music()[0];
+    const doc = c ? instrumentDocOf(st().project, c.instrumentDocId) : null;
+    const pcm = c ? await left(c.uri) : new Float32Array(0);
+    log(baked && doc?.kind === 'drums' && Object.keys(doc.drums?.pattern ?? {}).length === 8 && doc.drums?.swing === 0.2 && peak(pcm) > 0.2, 'sütés: a minta 8 sorral és swinggel a projektben, a klip hangja nem csend', `${Object.keys(doc?.drums?.pattern ?? {}).length} sor, csúcs ${peak(pcm).toFixed(3)}`);
+    // 4) a régi (4 soros) minta újranyitva 8 sorra egészül ki — a doc-ot 4 sorosra szűkítjük, és újranyitjuk
+    if (doc) {
+      const four = { ...doc, drums: { ...doc.drums!, pattern: { kick: doc.drums!.pattern.kick, snare: doc.drums!.pattern.snare, hihat: doc.drums!.pattern.hihat, clap: doc.drums!.pattern.clap } as never } };
+      st().dispatch({ type: 'UPSERT_INSTRUMENT_DOC', doc: four });
+      runDevAction('audio.closeDrums');
+      await sleep(300);
+      st().selectClip(c.id);
+      runDevAction('audio.editClip');
+      await sleep(800);
+      const opened = runDevAction('clipEdit.editInstrument') === true;
+      await sleep(900);
+      const h2 = String(runDevAction('drums.hits') ?? '');
+      log(opened && h2.includes('kick0') && h2.includes('snare4v127') && !h2.includes('tom'), 'régi 4 soros minta újranyitva: a sorok 8-ra egészülnek ki, az ütések maradnak', h2.slice(0, 60));
+    }
+    st().undo();
+    st().undo();
+    await sleep(300);
+    log(music().length === 0, 'visszavonás: nincs klip', `${music().length}`);
+  } finally {
+    runDevAction('audio.closeDrums');
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:drumkit-del', caught));
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -8576,6 +8648,10 @@ export async function runImageSmoke(
   }
   if (phase === 'pianoroll2') {
     await step(phase, () => smokePianoRoll2(log));
+    return;
+  }
+  if (phase === 'drumkit') {
+    await step(phase, () => smokeDrumKit(log));
     return;
   }
   if (phase === 'modeldl') {

@@ -6,6 +6,15 @@ describe('drums — ütés → időzítés/generátor', () => {
     expect(stepSec(60)).toBeCloseTo(0.25, 6);
   });
 
+  test('voiceSource: a négy új hang generátora (S12: tom, rim, crash, perc) — a telefonos képletekkel egyező', () => {
+    expect(voiceSource('tom')).toContain('aevalsrc');
+    expect(voiceSource('tom')).toContain('120+60*exp(-t*12)');
+    expect(voiceSource('rim')).toContain('1800');
+    expect(voiceSource('crash')).toContain('highpass=f=5000');
+    expect(voiceSource('perc')).toContain('bandpass=f=2500');
+    expect(voiceSource('nincs')).toBeNull();
+  });
+
   test('voiceSource: a négy hang generátora', () => {
     expect(voiceSource('kick')).toContain('aevalsrc');
     expect(voiceSource('kick')).toContain('sin(');

@@ -5,7 +5,8 @@ const { spawn } = require('child_process');
 
 const STEPS_PER_BAR = 16;
 const MAX_HITS = 512; // render-plafon
-const VOICES = ['kick', 'snare', 'hihat', 'clap'];
+// 🥁 S12: 8 hang — a régi 4 + tom, rim, crash, perc (a telefonos `drumVoicePcm` képleteivel egyező)
+const VOICES = ['kick', 'snare', 'hihat', 'clap', 'tom', 'rim', 'crash', 'perc'];
 
 /** Egy dob-hang ffmpeg forrás-lánca (önálló, saját hosszal + lecsengéssel). */
 function voiceSource(voice) {
@@ -22,6 +23,18 @@ function voiceSource(voice) {
     case 'clap':
       // közép-sávú zaj-burst
       return `anoisesrc=d=0.13:a=0.6:c=white,bandpass=f=1200:width_type=h:w=1200,afade=t=out:st=0.01:d=0.12`;
+    case 'tom':
+      // mély, lecsengő sine lassabb pitch-eséssel (a kicknél magasabb, hosszabb)
+      return `aevalsrc=exprs='exp(-t*9)*sin(2*PI*(120+60*exp(-t*12))*t)':d=0.35:s=44100`;
+    case 'rim':
+      // rövid, kattanó sine-burst, nagyon gyors lecsengés
+      return `aevalsrc=exprs='exp(-t*90)*sin(2*PI*1800*t)*0.8':d=0.05:s=44100`;
+    case 'crash':
+      // hosszú, fényes zaj-lecsengés
+      return `anoisesrc=d=0.9:a=0.4:c=white,highpass=f=5000,afade=t=out:st=0:d=0.9:curve=exp`;
+    case 'perc':
+      // rövid, fás ütés: sávszűrt zaj-burst a közép-magas tartományban
+      return `anoisesrc=d=0.09:a=0.6:c=white,bandpass=f=2500:width_type=h:w=1500,afade=t=out:st=0.005:d=0.08`;
     default:
       return null;
   }

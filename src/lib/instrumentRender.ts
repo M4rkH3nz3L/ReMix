@@ -100,6 +100,27 @@ export function drumVoicePcm(voice: DrumVoice, sr = INSTRUMENT_SR, seed = 1): Fl
       const x = filt(make(0.06, () => n()), [highpass(8000, sr)]);
       return x.map((v, i) => v * fadeOut(i / sr, 0, 0.06));
     }
+    // ── 🥁 S12: a négy új hang (a szerver `voiceSource`-ával azonos képletek) ──
+    case 'tom':
+      // mély, lecsengő sine lassabb pitch-eséssel (a kicknél magasabb, hosszabb)
+      return make(0.35, (t) => Math.exp(-t * 9) * Math.sin(2 * Math.PI * (120 + 60 * Math.exp(-t * 12)) * t));
+    case 'rim': {
+      // rövid, kattanó: magas sine-burst + kis zaj, nagyon gyors lecsengés
+      const n = noise(seed + 3, 0.25);
+      return make(0.05, (t) => Math.exp(-t * 90) * (Math.sin(2 * Math.PI * 1800 * t) * 0.8 + n()));
+    }
+    case 'crash': {
+      // hosszú, fényes zaj-lecsengés
+      const n = noise(seed + 4, 0.4);
+      const x = filt(make(0.9, () => n()), [highpass(5000, sr)]);
+      return x.map((v, i) => v * Math.exp(-(i / sr) * 4));
+    }
+    case 'perc': {
+      // rövid, fás ütés: sávszűrt zaj-burst a közép-magas tartományban
+      const n = noise(seed + 5, 0.6);
+      const x = filt(make(0.09, () => n()), [bandpass(2500, 1500, sr)]);
+      return x.map((v, i) => v * fadeOut(i / sr, 0.005, 0.08));
+    }
     default: {
       const n = noise(seed + 2, 0.6);
       const x = filt(make(0.13, () => n()), [bandpass(1200, 1200, sr)]);

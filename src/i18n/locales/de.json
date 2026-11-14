@@ -3243,6 +3243,11 @@
       "duckHint": "DUCK: Musik/SFX werden automatisch leiser, wenn das Voiceover spricht (Sidechain)."
     },
     "drums": {
+      "kit": "Kit",
+      "kit_basic": "Basis",
+      "kit_house": "House",
+      "kit_hiphop": "Hip-Hop",
+      "kitHint": "Eingebautes Pattern-Kit: ersetzt das Raster",
       "title": "Drumcomputer",
       "entry": "Drumcomputer (Step-Sequencer)",
       "clipLabel": "Drums",

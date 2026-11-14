@@ -6,9 +6,10 @@
  * lépés-mp), hogy önmagában tesztelhető legyen. Expo-mentes.
  */
 
-export type DrumVoice = 'kick' | 'snare' | 'hihat' | 'clap';
+/** 🥁 S12 (MU3): 8 hang — a régi 4 + tom, rim, crash, perc; a régi minták (4 sor) változatlanul érvényesek */
+export type DrumVoice = 'kick' | 'snare' | 'hihat' | 'clap' | 'tom' | 'rim' | 'crash' | 'perc';
 
-export const DRUM_VOICES: DrumVoice[] = ['kick', 'snare', 'hihat', 'clap'];
+export const DRUM_VOICES: DrumVoice[] = ['kick', 'snare', 'hihat', 'clap', 'tom', 'rim', 'crash', 'perc'];
 export const STEPS_PER_BAR = 16; // 16-od felbontás
 
 export type DrumPattern = Record<DrumVoice, boolean[]>;
@@ -121,4 +122,51 @@ export const DRUM_LABEL: Record<DrumVoice, string> = {
   snare: 'Snare',
   hihat: 'Hihat',
   clap: 'Clap',
+  tom: 'Tom',
+  rim: 'Rim',
+  crash: 'Crash',
+  perc: 'Perc',
 };
+
+/** a régi (4 soros) vagy hiányos minta kiegészítése minden hangra, a rács hosszára (immutábilis) */
+export function normalizePattern(pattern: Partial<DrumPattern> | null | undefined, bars: number): DrumPattern {
+  const n = stepCount(bars);
+  const out = {} as DrumPattern;
+  for (const v of DRUM_VOICES) {
+    const row = pattern?.[v] ?? [];
+    out[v] = Array.from({ length: n }, (_, i) => row[i] === true);
+  }
+  return out;
+}
+
+// ── 🥁 beépített minta-készletek (S12): gyors kezdés — a rács felülíródik ──────────────────────
+
+export type DrumKitId = 'basic' | 'house' | 'hiphop';
+export const DRUM_KITS: readonly DrumKitId[] = ['basic', 'house', 'hiphop'];
+
+/** egy 1 ütemes (16 lépéses) készlet: hangonként a lépések, ahol üt; `accent` = hangsúlyos lépések */
+const KIT_STEPS: Record<DrumKitId, Partial<Record<DrumVoice, number[]>> & { accent?: Partial<Record<DrumVoice, number[]>>; swing?: number }> = {
+  basic: { kick: [0, 8], snare: [4, 12], hihat: [0, 2, 4, 6, 8, 10, 12, 14] },
+  house: { kick: [0, 4, 8, 12], clap: [4, 12], hihat: [2, 6, 10, 14], perc: [3, 11], accent: { kick: [0] } },
+  hiphop: { kick: [0, 3, 8, 10], snare: [4, 12], hihat: [0, 2, 4, 6, 8, 10, 12, 14], rim: [7, 15], tom: [14], accent: { snare: [4, 12] }, swing: 0.2 },
+};
+
+/** a készlet mintája `bars` ütemre ismételve (+ hangsúlyok, swing) */
+export function drumKit(kit: DrumKitId, bars: number): { pattern: DrumPattern; velocity: DrumVelocity; swing: number } {
+  const def = KIT_STEPS[kit];
+  const b = Math.max(1, Math.min(4, Math.floor(bars) || 1));
+  const pattern = emptyPattern(b);
+  const velocity: DrumVelocity = {};
+  for (const v of DRUM_VOICES) {
+    const steps = def[v] ?? [];
+    const acc = def.accent?.[v] ?? [];
+    for (let bar = 0; bar < b; bar++) {
+      for (const s of steps) pattern[v][bar * STEPS_PER_BAR + s] = true;
+      for (const s of acc) {
+        velocity[v] = velocity[v] ?? [];
+        velocity[v]![bar * STEPS_PER_BAR + s] = DRUM_ACCENT;
+      }
+    }
+  }
+  return { pattern, velocity, swing: def.swing ?? 0 };
+}

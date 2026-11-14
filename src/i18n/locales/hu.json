@@ -3243,6 +3243,11 @@
       "duckHint": "A DUCK: a zene/sfx automatikusan lehalkul, amikor a voiceover szól (sidechain)."
     },
     "drums": {
+      "kit": "Készlet",
+      "kit_basic": "Alap",
+      "kit_house": "House",
+      "kit_hiphop": "Hip-hop",
+      "kitHint": "Beépített minta-készlet: a rács felülíródik (egy visszavonás a lapon belül nincs — a „Sávra\" után a klip visszavonható)",
       "title": "Dob-gép",
       "entry": "Dob-gép (step-sequencer)",
       "clipLabel": "Dob",

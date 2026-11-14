@@ -3243,6 +3243,11 @@
       "duckHint": "DUCK: music/sfx automatically dip while the voiceover plays (sidechain)."
     },
     "drums": {
+      "kit": "Kit",
+      "kit_basic": "Basic",
+      "kit_house": "House",
+      "kit_hiphop": "Hip-hop",
+      "kitHint": "Built-in pattern kit: replaces the grid",
       "title": "Drum machine",
       "entry": "Drum machine (step sequencer)",
       "clipLabel": "Drums",

@@ -77,3 +77,20 @@ describe('🎛️ sampler', () => {
     expect(r[at + 100]).toBeCloseTo(right[100], 6);
   });
 });
+
+// ── 🥁 S12: a négy új dob-hang ──────────────────────────────────────────────────────────────────
+describe('instrumentRender — S12: tom, rim, crash, perc', () => {
+  it('a négy új hang nem üres, determinisztikus, a várt hosszal (tom 0,35 s · rim 0,05 · crash 0,9 · perc 0,09)', () => {
+    const peak = (x: Float32Array) => x.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+    const lens: Record<string, number> = { tom: 0.35, rim: 0.05, crash: 0.9, perc: 0.09 };
+    for (const v of ['tom', 'rim', 'crash', 'perc'] as const) {
+      const x = drumVoicePcm(v);
+      expect(x.length).toBe(Math.round(lens[v] * 44100));
+      expect(peak(x)).toBeGreaterThan(0.1);
+      expect(Array.from(drumVoicePcm(v))).toEqual(Array.from(x));
+    }
+    // a crash lecseng: a vége halkabb, mint az eleje
+    const c = drumVoicePcm('crash');
+    expect(peak(c.subarray(c.length - 4410))).toBeLessThan(peak(c.subarray(0, 4410)) * 0.2);
+  });
+});

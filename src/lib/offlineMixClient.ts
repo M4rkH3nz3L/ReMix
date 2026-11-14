@@ -435,6 +435,26 @@ export async function probeStretchTiming(speed: number, count = 6): Promise<numb
 const STRETCH_PREROLL = 0.5;
 
 /**
+ * 🎤 V3.2: egy puffer hangmagasságának eltolása (cent) a hossz megtartásával — a natív nyújtóval, a késése
+ * kompenzálva (mint a `stretchSegment`); az előtöltés csend. `null`, ha nincs natív hang-motor.
+ */
+export async function pitchShiftBuffer(input: Float32Array[], cents: number, sr = OFFLINE_SAMPLE_RATE): Promise<Float32Array[] | null> {
+  const api = await loadAudioApi();
+  if (!api) return null;
+  const n = input[0]?.length ?? 0;
+  if (n === 0 || cents === 0) return input.map((ch) => Float32Array.from(ch));
+  const lat = await stretchLatency(api, 1, sr, Math.round(cents));
+  const pre = Math.round(STRETCH_PREROLL * sr);
+  const padded = input.map((ch) => {
+    const x = new Float32Array(pre + n + lat);
+    x.set(ch, pre);
+    return x;
+  });
+  const out = await renderStretched(api, padded, 1, pre + n + lat, sr, Math.round(cents));
+  return out.map((ch) => ch.slice(pre + lat, pre + lat + n));
+}
+
+/**
  * Egy szakasz nyújtása: a natív `OfflineAudioContext` hangmagasság-tartó (`pitchCorrection`)
  * forrása `speed`-del játssza le a kivágott (és igény szerint megfordított) ablakot, a
  * hangmagasságot `detune` tolja el (a hossz marad — eszközön mérve). A nyújtó

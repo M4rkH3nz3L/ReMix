@@ -4081,6 +4081,22 @@
       "master": "Master"
     },
     "audio": {
+      "tune": {
+        "title": "Vocal tuning",
+        "hint": "Your phone tunes the vocal note by note to the scale (keeping its character) and can add a key-aware harmony on its own lane. The original is kept.",
+        "strength": "Strength",
+        "harmony": {
+          "none": "No harmony",
+          "thirdUp": "Third above",
+          "thirdDown": "Third below",
+          "fifthUp": "Fifth above"
+        },
+        "apply": "Apply tuning",
+        "reset": "Original",
+        "working": "Tuning vocal…",
+        "failed": "Tuning failed (recording too long or unreadable).",
+        "harmonyLane": "Harmony"
+      },
       "chords": {
         "title": "Chord progression",
         "open": "Chords",

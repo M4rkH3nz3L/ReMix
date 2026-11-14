@@ -4086,6 +4086,22 @@
       "master": "Master"
     },
     "audio": {
+      "tune": {
+        "title": "Gesangs-Tuning",
+        "hint": "Dein Handy stimmt den Gesang Ton für Ton auf die Tonleiter (die Klangfarbe bleibt) und legt auf Wunsch eine tonartgerechte Harmonie auf eine eigene Spur. Das Original bleibt erhalten.",
+        "strength": "Stärke",
+        "harmony": {
+          "none": "Ohne Harmonie",
+          "thirdUp": "Terz darüber",
+          "thirdDown": "Terz darunter",
+          "fifthUp": "Quinte darüber"
+        },
+        "apply": "Tuning anwenden",
+        "reset": "Original",
+        "working": "Gesang wird gestimmt…",
+        "failed": "Tuning fehlgeschlagen (Aufnahme zu lang oder nicht lesbar).",
+        "harmonyLane": "Harmonie"
+      },
       "chords": {
         "title": "Akkordfolge",
         "open": "Akkorde",

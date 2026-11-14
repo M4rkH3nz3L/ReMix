@@ -83,7 +83,7 @@ import { projectDuration } from '@/lib/projectUtils';
 import { exportAudioFile, isRenderCancelledError } from '@/lib/render';
 import { mixForExport } from '@/lib/audioExportMix';
 import { guardPro } from '@/store/paywallStore';
-import { withCancellableProgress } from '@/store/progressStore';
+import { withCancellableProgress, withProgress } from '@/store/progressStore';
 import { renderSynthToClip } from '@/lib/synthClient';
 import type { SynthNote, SynthWave } from '@/lib/synth';
 import { renderDrumsToClip } from '@/lib/drumsClient';
@@ -93,6 +93,7 @@ import { LoopLibrarySheet } from '@/components/studio/audio/LoopLibrarySheet';
 import { CHORD_PARTS, ChordSheet, type ChordPart } from '@/components/studio/audio/ChordSheet';
 import type { MusicKey } from '@/lib/pitch';
 import { chordParts, PROGRESSIONS, type ChordProgressionId } from '@/lib/chords';
+import { tuneVocal } from '@/lib/vocalTuneClient';
 import { decodeSample, samplerNotesOnDevice, samplerPadsOnDevice } from '@/lib/instrumentClient';
 import { playPcm } from '@/lib/instrumentPreview';
 import { DEFAULT_ROOT_MIDI, renderSamplerNotesPcm } from '@/lib/samplerPlus';
@@ -258,6 +259,7 @@ export function AudioStudioBody({
   const [chordsOpen, setChordsOpen] = useState(false);
   const [chordBusy, setChordBusy] = useState(false);
   const chordBusyRef = useRef(false);
+  const applyTuneRef = useRef<(id: string, s: { root: number; minor: boolean; strength: number; harmonySteps?: number }) => Promise<unknown>>(async () => null);
   const placeChordsRef = useRef<(arg: { key: MusicKey; prog: ChordProgressionId; parts: ChordPart[] }) => Promise<string[]>>(async () => []);
   // 🎛️ V2.3: a sampler Dallam módja (a piano roll a minta hangjával)
   const [samplerMelody, setSamplerMelody] = useState<{ sampleUri: string; sampleName: string; rootMidi: number } | null>(null);
@@ -386,6 +388,10 @@ export function AudioStudioBody({
       registerDevAction('audio.loops', () => setLoopsOpen(true)),
       registerDevAction('loops.place', (id) => placeLoopRef.current(String(id))),
       registerDevAction('audio.chords', () => setChordsOpen(true)),
+      registerDevAction('tune.apply', (arg) => {
+        const a = arg as { clipId: string; root: number; minor: boolean; strength: number; harmonySteps?: number };
+        return applyTuneRef.current(a.clipId, a);
+      }),
       registerDevAction('chords.place', (arg) => placeChordsRef.current(arg as { key: MusicKey; prog: ChordProgressionId; parts: ChordPart[] })),
       registerDevAction('loops.placeCloud', (track) => placeCloudRef.current(track as LibraryTrack)),
       registerDevAction('audio.editClip', () => devRef.current.editClip()),
@@ -1091,6 +1097,57 @@ export function AudioStudioBody({
   };
   placeChordsRef.current = (arg) => placeChords(arg.key, arg.prog, arg.parts);
 
+  /**
+   * 🎤 V3.2: ének-hangolás hangonként — a telefon a klip EREDETI forrásából dolgozik (újrahangolásnál is), az
+   * eredmény új fájl; a klip erre mutat (a beállítások és az eredeti a klipen), a harmónia külön sávra. Egy undo.
+   */
+  const applyTune = async (clipId: string, s: { root: number; minor: boolean; strength: number; harmonySteps?: number }): Promise<{ notes: number; shifted: number; harmonyClipId: string | null; timings: Record<string, number> } | null> => {
+    const st0 = useEditorStore.getState();
+    const clip = st0.project?.tracks.flatMap((tr) => tr.clips).find((c) => c.id === clipId) as AudioClip | undefined;
+    if (!clip || clip.kind !== 'audio') return null;
+    const sourceUri = clip.tune?.sourceUri ?? clip.uri;
+    const key: MusicKey = { root: s.root, scale: s.minor ? 'naturalMinor' : 'major' };
+    const res = await withProgress(t('studio.audio.tune.working'), (report) =>
+      tuneVocal(sourceUri, { key, strength: s.strength, harmonySteps: s.harmonySteps }, (r) => report({ phase: t('studio.audio.tune.working'), ratio: r }))
+    );
+    if (!res) {
+      Alert.alert(t('studio.audio.tune.title'), t('studio.audio.tune.failed'));
+      return null;
+    }
+    const cmds: EditorCommand[] = [];
+    if (res.tunedUri) {
+      const asset: Asset = { id: makeId('ast'), kind: 'audio', uri: res.tunedUri, provider: 'local', name: `${clip.label} (hangolt)`, duration: res.durationSec };
+      cmds.push({ type: 'ADD_ASSET', asset });
+      cmds.push({ type: 'UPDATE_CLIP', clipId, patch: { uri: res.tunedUri, assetId: asset.id, tune: { sourceUri, ...(clip.tune?.sourceAssetId ?? clip.assetId ? { sourceAssetId: clip.tune?.sourceAssetId ?? clip.assetId } : {}), root: s.root, minor: s.minor, strength: s.strength, ...(s.harmonySteps ? { harmonySteps: s.harmonySteps } : {}) } } });
+    }
+    let harmonyClipId: string | null = null;
+    if (res.harmonyUri) {
+      const lanes = (st0.project?.tracks ?? []).map((tr) => tr.type);
+      const free = (['aux1', 'aux2', 'aux3', 'aux4', 'aux5'] as TrackType[]).find((ty) => lanes.includes(ty) && !st0.project?.tracks.find((tr) => tr.type === ty)?.clips.length);
+      const lane = free ?? nextExtraTrack(lanes);
+      if (lane) {
+        if (!free) cmds.push({ type: 'ADD_TRACK', track: { id: makeId('trk'), type: lane, name: t('studio.audio.tune.harmonyLane'), clips: [] } });
+        const asset: Asset = { id: makeId('ast'), kind: 'audio', uri: res.harmonyUri, provider: 'local', name: t('studio.audio.tune.harmonyLane'), duration: res.durationSec };
+        harmonyClipId = makeId('clip');
+        cmds.push({
+          type: 'ADD_CLIP',
+          trackType: lane,
+          asset,
+          clip: { kind: 'audio', id: harmonyClipId, start: clip.start, duration: clip.duration, trimIn: clip.trimIn ?? 0, sourceDuration: res.durationSec, uri: res.harmonyUri, label: t('studio.audio.tune.harmonyLane'), volume: clip.volume * 0.7, fadeIn: clip.fadeIn, fadeOut: clip.fadeOut, source: 'imported' },
+        });
+      }
+    }
+    if (cmds.length > 0) useEditorStore.getState().applyBatch(cmds, 'user');
+    return { notes: res.notes, shifted: res.shifted, harmonyClipId, timings: res.timings };
+  };
+  applyTuneRef.current = applyTune;
+  /** 🎤 az eredeti forrás vissza (a hangolás nélkül), egy undo */
+  const resetTune = (clipId: string) => {
+    const clip = useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).find((c) => c.id === clipId) as AudioClip | undefined;
+    if (!clip?.tune) return;
+    useEditorStore.getState().dispatch({ type: 'UPDATE_CLIP', clipId, patch: { uri: clip.tune.sourceUri, ...(clip.tune.sourceAssetId ? { assetId: clip.tune.sourceAssetId } : {}), tune: undefined } }, 'user');
+  };
+
   placeLoopRef.current = async (id: string) => {
     const loop = BUILTIN_LOOPS.find((l) => l.id === id);
     return loop ? placeLoop(loop) : null;
@@ -1296,6 +1353,14 @@ export function AudioStudioBody({
       editDoc={instrumentDocOf(project, editDocId ?? undefined)}
       onEditInstrument={editInstrument}
       onOpenLoops={() => setLoopsOpen(true)}
+      onTune={(id, s) => {
+        setEditing(false);
+        void applyTune(id, s);
+      }}
+      onResetTune={(id) => {
+        setEditing(false);
+        resetTune(id);
+      }}
       onBakeSamplerPads={(uri, slices, pads, bars, name) => void bakeSamplerPads(uri, slices, pads, bars, name)}
       onSamplerMelody={(uri, name, rootMidi) => {
         setSampler(false);

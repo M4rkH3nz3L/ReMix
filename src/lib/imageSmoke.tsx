@@ -7702,6 +7702,95 @@ async function smokeChords(log: Log) {
   }
 }
 
+/** 🎤 V3.2: ének-hangolás hangonként — a hamis hangok a skálára (±10 cent), a tiszta marad; a terc-harmónia a
+ *  hangnem szerint (G4 · B4 · C4) külön sávon; a hangszín marad; egy visszavonás az eredetit adja vissza. */
+async function smokeVocalTune(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const { pitchTrack } = await import('@/lib/vocalTune');
+  const SR = 44100;
+  const voice = (hz: number, sec: number) => {
+    let ph = 0;
+    return Float32Array.from({ length: Math.round(sec * SR) }, (_, i) => {
+      ph += (2 * Math.PI * hz * (1 + 0.003 * Math.sin((2 * Math.PI * 5 * i) / SR))) / SR;
+      const env = Math.min(1, i / 400, (sec * SR - i) / 400);
+      return env * (0.3 * Math.sin(ph) + 0.15 * Math.sin(2 * ph) + 0.08 * Math.sin(3 * ph));
+    });
+  };
+  const parts = [voice(329.63 * 2 ** (35 / 1200), 0.8), new Float32Array(Math.round(0.25 * SR)), voice(392 * 2 ** (-40 / 1200), 0.8), new Float32Array(Math.round(0.1 * SR)), voice(220, 0.8), new Float32Array(Math.round(0.3 * SR))];
+  const x = new Float32Array(parts.reduce((n, p) => n + p.length, 0));
+  let at = 0;
+  for (const p of parts) {
+    x.set(p, at);
+    at += p.length;
+  }
+  const f = new File(Paths.document, 'smoke_vocal_sung.wav');
+  if (f.exists) f.delete();
+  f.create();
+  f.write(encodeWav16([x, x], SR, () => 0.5));
+  const id = 'prj_smoke_vocaltune';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:vocaltune', caught));
+  const base = createEmptyProject('smoke ének-hangolás', '9:16', undefined, 'audio');
+  const dur = x.length / SR;
+  const c: AudioClip = { kind: 'audio', id: 'v', label: 'ének', uri: f.uri, start: 0, duration: dur, trimIn: 0, sourceDuration: dur, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1000);
+  const exportOne = async (clipId: string, name: string) => {
+    const p = st().project!;
+    const only = { ...p, tracks: p.tracks.map((t) => ({ ...t, clips: t.clips.filter((cl) => cl.id === clipId) })) };
+    const out = await exportOfflineWav(only, new File(projectExportDir(), name), undefined, undefined, 'float32');
+    const h = new File(out.uri).open();
+    try {
+      const b = h.readBytes(h.size ?? 0);
+      const fl = new Float32Array(b.buffer.slice(b.byteOffset + 44, b.byteOffset + b.length));
+      return Float32Array.from({ length: fl.length / 2 }, (_, i) => fl[i * 2]);
+    } finally {
+      h.close();
+      new File(out.uri).delete();
+    }
+  };
+  const pitchAt = (y: Float32Array, t0: number, t1: number) => {
+    const fr = pitchTrack(y, SR).filter((p) => p.time >= t0 && p.time <= t1 && p.hz > 0).map((p) => p.hz).sort((a, b) => a - b);
+    return fr[fr.length >> 1] ?? 0;
+  };
+  const cents = (hz: number, want: number) => (hz > 0 ? 1200 * Math.log2(hz / want) : 9999);
+  try {
+    const t0 = Date.now();
+    const r = (await runDevAction('tune.apply', { clipId: 'v', root: 0, minor: false, strength: 1, harmonySteps: 2 })) as { notes: number; shifted: number; harmonyClipId: string | null; timings?: Record<string, number> } | null;
+    const ms = Date.now() - t0;
+    log(null, 'időmérés (ms)', JSON.stringify(r?.timings ?? {}));
+    const clip = st().project!.tracks.flatMap((t) => t.clips).find((cl) => cl.id === 'v') as AudioClip;
+    log(!!r && r.notes === 3 && r.shifted === 2 && clip.uri !== f.uri && clip.tune?.sourceUri === f.uri && !!r.harmonyClipId, 'hangolás: 3 hang felismerve, 2 hamis tolva, a klip az új fájlra mutat, az eredeti megjegyezve, harmónia-sáv', `${r?.notes} hang · ${r?.shifted} tolva · ${ms} ms`);
+    const y = await exportOne('v', 'smoke_vocal_tuned.wav');
+    const notes = [[0.2, 0.6, 329.63], [1.25, 1.65, 392], [2.25, 2.65, 220]] as const;
+    const got = notes.map(([a, b, want]) => cents(pitchAt(y, a, b), want));
+    log(got.every((cc) => Math.abs(cc) < 10), 'a telefonos exportban a hangok a skálán: E4 · G4 · A3 (±10 cent)', got.map((cc) => `${cc >= 0 ? '+' : ''}${cc.toFixed(1)}`).join(' · ') + ' cent (előtte +35 · −40 · 0)');
+    const hy = await exportOne(r!.harmonyClipId!, 'smoke_vocal_harm.wav');
+    const harm = [[0.2, 0.6, 392], [1.25, 1.65, 493.88], [2.25, 2.65, 261.63]] as const;
+    const hg = harm.map(([a, b, want]) => cents(pitchAt(hy, a, b), want));
+    log(hg.every((cc) => Math.abs(cc) < 15), 'a terc-harmónia a hangnem szerint: G4 · B4 · C4 (±15 cent), külön sávon', hg.map((cc) => `${cc >= 0 ? '+' : ''}${cc.toFixed(1)}`).join(' · ') + ' cent');
+    st().undo();
+    const back = st().project!.tracks.flatMap((t) => t.clips);
+    log((back.find((cl) => cl.id === 'v') as AudioClip).uri === f.uri && !back.some((cl) => cl.id === r!.harmonyClipId), 'egy visszavonás: az eredeti ének és nincs harmónia-klip', `${back.length} klip`);
+  } finally {
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:vocaltune-del', caught));
+  }
+}
+
+/** 🔬 diagnózis: a natív nyújtó késése 1-es sebességen különböző hangmagasság-eltolásoknál */
+async function smokeShiftLatency(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  for (const c of [0, -35, 40, 100, 265, 440, -300, 700]) {
+    const t0 = Date.now();
+    const lat = await measureStretchLatency(1, c);
+    log(null, `késés ${c} cent`, `${lat} minta (${Date.now() - t0} ms mérés)`);
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -9910,6 +9999,14 @@ export async function runImageSmoke(
   }
   if (phase === 'chords') {
     await step(phase, () => smokeChords(log));
+    return;
+  }
+  if (phase === 'vocaltune') {
+    await step(phase, () => smokeVocalTune(log));
+    return;
+  }
+  if (phase === 'shiftlat') {
+    await step(phase, () => smokeShiftLatency(log));
     return;
   }
   if (phase === 'midi') {

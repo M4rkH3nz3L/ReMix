@@ -4081,6 +4081,22 @@
       "master": "Master"
     },
     "audio": {
+      "tune": {
+        "title": "Ének-hangolás",
+        "hint": "A telefon hangonként a skálára igazítja az éneket (a hangszín marad), és kérésre a hangnemet követő harmóniát külön sávra teszi. Az eredeti megmarad.",
+        "strength": "Erősség",
+        "harmony": {
+          "none": "Harmónia nélkül",
+          "thirdUp": "Terc fölötte",
+          "thirdDown": "Terc alatta",
+          "fifthUp": "Kvint fölötte"
+        },
+        "apply": "Hangolás alkalmazása",
+        "reset": "Eredeti",
+        "working": "Ének hangolása…",
+        "failed": "A hangolás nem sikerült (túl hosszú vagy olvashatatlan felvétel).",
+        "harmonyLane": "Harmónia"
+      },
       "chords": {
         "title": "Akkordmenet",
         "open": "Akkordmenet",

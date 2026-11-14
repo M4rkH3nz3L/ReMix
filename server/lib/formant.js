@@ -6,14 +6,15 @@
  *
  * Egy egyszerű hangmagasság-tolás (a telefon natív nyújtója, a szerver asetrate+atempo) a hangszín
  * burkológörbéjét (a formánsokat) is eltolja → „mókus" / „óriás" hang. Itt a tolás UTÁN keretenként
- * (STFT, 2048 minta, 75 % átfedés, gyök-Hann) a tolt jel spektrumát a burkológörbék arányával
+ * (STFT, 2048 minta, 50 % átfedés, gyök-Hann; a két jel és a két burkoló egy-egy közös komplex FFT-ben) a tolt jel spektrumát a burkológörbék arányával
  * szorozzuk: az eredeti (időben illesztett, tolatlan) jel burkolója / a tolt jel burkolója. A burkoló
  * kepsztrális simítás (a kepsztrum az első ~1,2 ms-ig, az alaphang periódusa alatt) — így a
  * harmonikusok (az új hangmagasság) maradnak, a formánsok visszakerülnek a helyükre.
  */
 
 const FORMANT_N = 2048;
-const HOP = FORMANT_N / 4;
+// 2026-11-14: 50 % átfedés (gyök-Hann × gyök-Hann = sin², félkeretenként összegezve 1) — a 75 %-os felét adja
+const HOP = FORMANT_N / 2;
 /** a burkoló simítása: a kepsztrum ennyi mp-ig marad (az 800 Hz alatti alaphangok periódusa alatt) */
 const LIFTER_SEC = 0.0012;
 /** a korrekció ±18 dB-re szorítva (zajos / néma kereteken ne robbanjon) */
@@ -83,65 +84,64 @@ function fft(re, im, inverse) {
 
 const WIN = new Float64Array(FORMANT_N);
 for (let i = 0; i < FORMANT_N; i++) WIN[i] = Math.sin((Math.PI * (i + 0.5)) / FORMANT_N);
-/** gyök-Hann elemzés × szintézis 75 %-on: Σ sin² = 2 → a kimenet fele */
-const OLA_NORM = 0.5;
-
-/** a keret log-amplitúdó burkolója (kepsztrális simítás) a `re/im` spektrumból → `env` (lineáris) */
-function envelope(re, im, lifter, env, cr, ci) {
-  const n = re.length;
-  for (let k = 0; k < n; k++) {
-    cr[k] = Math.log(Math.sqrt(re[k] * re[k] + im[k] * im[k]) + 1e-9);
-    ci[k] = 0;
-  }
-  fft(cr, ci, true); // valós, páros log-spektrum → valós kepsztrum (n-szeres)
-  for (let q = 0; q < n; q++) {
-    const keep = q <= lifter || q >= n - lifter;
-    cr[q] = keep ? cr[q] / n : 0;
-    ci[q] = 0;
-  }
-  fft(cr, ci, false);
-  for (let k = 0; k < n; k++) env[k] = Math.exp(cr[k]);
-}
+/** gyök-Hann elemzés × szintézis 50 %-on: Σ sin² = 1 */
+const OLA_NORM = 1;
 
 /**
  * A tolt jel (`shifted`) formánsai az időben illesztett eredeti (`ref`) burkolójára. A kimenet hossza
  * a `shifted`-é; a `ref` ugyanazon az idővonalon (ugyanolyan sebességgel nyújtva, de tolatlanul).
+ *
+ * Keretenként 4 FFT: (1) a ref és a tolt jel EGY komplex FFT-ben (valós + képzetes rész), szétválasztva a
+ * hermitikus szimmetriával; (2) a két log-amplitúdó egy inverz FFT-ben → a két kepsztrum; (3) a simított
+ * kepsztrumok egy FFT-ben → a két burkoló; (4) a módosított spektrum inverze.
  */
 function formantCorrect(ref, shifted, sampleRate) {
   const n = FORMANT_N;
   const len = shifted.length;
   const out = new Float64Array(len + n);
   const lifter = Math.max(4, Math.round(LIFTER_SEC * sampleRate));
-  const ar = new Float64Array(n);
-  const ai = new Float64Array(n);
+  const xr = new Float64Array(n);
+  const xi = new Float64Array(n);
   const br = new Float64Array(n);
   const bi = new Float64Array(n);
-  const envA = new Float64Array(n);
-  const envB = new Float64Array(n);
   const cr = new Float64Array(n);
   const ci = new Float64Array(n);
-  // a keretek a jel előtt is indulnak (−n + HOP), hogy az eleje is teljes átfedést kapjon
   for (let start = -n + HOP; start < len; start += HOP) {
     let powA = 0;
     let powB = 0;
     for (let i = 0; i < n; i++) {
       const at = start + i;
-      const a = at >= 0 && at < ref.length ? ref[at] : 0;
-      const b = at >= 0 && at < len ? shifted[at] : 0;
-      ar[i] = a * WIN[i];
-      ai[i] = 0;
-      br[i] = b * WIN[i];
-      bi[i] = 0;
-      powA += ar[i] * ar[i];
-      powB += br[i] * br[i];
+      const a = at >= 0 && at < ref.length ? ref[at] * WIN[i] : 0;
+      const b = at >= 0 && at < len ? shifted[at] * WIN[i] : 0;
+      xr[i] = a;
+      xi[i] = b;
+      powA += a * a;
+      powB += b * b;
     }
-    fft(br, bi, false);
-    if (powA / n > SILENT_POWER && powB / n > SILENT_POWER) {
-      fft(ar, ai, false);
-      envelope(ar, ai, lifter, envA, cr, ci);
-      envelope(br, bi, lifter, envB, cr, ci);
+    if (powB / n <= SILENT_POWER) continue; // a néma keret 0 marad
+    fft(xr, xi, false);
+    // szétválasztás: A = (X[k] + conj X[n−k]) / 2 (a ref), B = (X[k] − conj X[n−k]) / 2i (a tolt jel)
+    for (let k = 0; k < n; k++) {
+      const m = (n - k) % n;
+      br[k] = (xi[k] + xi[m]) / 2;
+      bi[k] = (xr[m] - xr[k]) / 2;
+      if (powA / n > SILENT_POWER) {
+        const ar = (xr[k] + xr[m]) / 2;
+        const ai = (xi[k] - xi[m]) / 2;
+        cr[k] = Math.log(Math.sqrt(ar * ar + ai * ai) + 1e-9);
+        ci[k] = Math.log(Math.sqrt(br[k] * br[k] + bi[k] * bi[k]) + 1e-9);
+      }
+    }
+    if (powA / n > SILENT_POWER) {
+      fft(cr, ci, true); // a két (valós, páros) log-spektrum → két valós kepsztrum (n-szeres)
+      for (let q = 0; q < n; q++) {
+        const keep = q <= lifter || q >= n - lifter;
+        cr[q] = keep ? cr[q] / n : 0;
+        ci[q] = keep ? ci[q] / n : 0;
+      }
+      fft(cr, ci, false); // → a két simított log-burkoló (valós rész: ref, képzetes: tolt)
       for (let k = 0; k < n; k++) {
-        const g = Math.min(MAX_GAIN, Math.max(MIN_GAIN, envA[k] / envB[k]));
+        const g = Math.min(MAX_GAIN, Math.max(MIN_GAIN, Math.exp(cr[k] - ci[k])));
         br[k] *= g;
         bi[k] *= g;
       }

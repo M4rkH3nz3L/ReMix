@@ -17,6 +17,8 @@ import { RegionBar, Slider, ToggleRow, useWaveform } from '@/components/studio/a
 import { palette } from '@/constants/editor';
 import type { EditorCommand } from '@/lib/commands';
 import { AUDIO_EDIT_RATE, snapToFrame } from '@/lib/frames';
+import { NOTE_ROOTS } from '@/lib/chords';
+import { Chip } from '@/components/ui/controls';
 import { makeId } from '@/lib/id';
 import { stemClipsFrom } from '@/lib/stemClips';
 import { separateStems, STEM_SEPARATION_ENABLED } from '@/lib/stems';
@@ -58,10 +60,15 @@ export function ClipEditSheet({
   fps,
   onClose,
   onEditInstrument,
+  onTune,
+  onResetTune,
 }: {
   clip: AudioClip;
   fps: number;
   onClose: () => void;
+  /** 🎤 V3.2: ének-hangolás (a stúdió végzi; a lap előbb bezárul és ment) */
+  onTune?: (clipId: string, s: { root: number; minor: boolean; strength: number; harmonySteps?: number }) => void;
+  onResetTune?: (clipId: string) => void;
   /** 🎹🥁 a sütött hangszer-klip mintájának újraszerkesztése (a dobgép / piano roll nyílik) */
   onEditInstrument?: (docId: string) => void;
 }) {
@@ -76,6 +83,11 @@ export function ClipEditSheet({
   const formatText = asset ? audioFormatLabel(asset, { mono: t('studio.audio.format.mono'), stereo: t('studio.audio.format.stereo'), channels: (n) => t('studio.audio.format.channels', { count: n }) }) : '';
   const [separating, setSeparating] = useState(false);
   const [autoChannel, setAutoChannel] = useState<FxAutoKey>('fxLowpass');
+  // 🎤 V3.2: ének-hangolás beállításai (a klip mentett beállításaiból)
+  const [tuneRoot, setTuneRoot] = useState(() => clip.tune?.root ?? 0);
+  const [tuneMinor, setTuneMinor] = useState(() => clip.tune?.minor ?? false);
+  const [tuneStrength, setTuneStrength] = useState(() => clip.tune?.strength ?? 1);
+  const [tuneHarmony, setTuneHarmony] = useState<number>(() => clip.tune?.harmonySteps ?? 0);
 
   // 🎚️ AI stem-szeparáció (Pro): a klip hangját vocals/drums/bass/other klipekre
   // bontja (voiceover/sfx sávra), és az eredetit elnémítja — EGY undo.
@@ -476,6 +488,45 @@ export function ClipEditSheet({
         </ScrollView>
         {/* ⭐ saját presetek: a mostani effektek mentése, egy koppintással vissza */}
         <UserPresetRow kind="clipFx" getValue={() => fx} onApply={(v) => proFx(() => setFx(JSON.parse(JSON.stringify(v))))} />
+        {/* 🎤 V3.2: ének-hangolás hangonként (a skálára) + dallamkövető harmónia — a telefon új fájlt készít */}
+        {onTune ? (
+          <View style={styles.tuneBox}>
+            <Text style={styles.autoLabel}>{t('studio.audio.tune.title')}</Text>
+            <Text style={styles.hint}>{t('studio.audio.tune.hint')}</Text>
+            <View style={styles.autoChips}>
+              {NOTE_ROOTS.map((n, i) => (
+                <Chip key={n} label={n} active={tuneRoot === i} onPress={() => setTuneRoot(i)} />
+              ))}
+            </View>
+            <View style={styles.autoChips}>
+              <Chip label={t('studio.audio.chords.major')} active={!tuneMinor} onPress={() => setTuneMinor(false)} />
+              <Chip label={t('studio.audio.chords.minor')} active={tuneMinor} onPress={() => setTuneMinor(true)} />
+            </View>
+            <Slider label={t('studio.audio.tune.strength')} value={tuneStrength} min={0} max={1} onChange={(v) => setTuneStrength(Math.round(v * 20) / 20)} format={(v) => `${Math.round(v * 100)}%`} />
+            <View style={styles.autoChips}>
+              {[0, 2, -2, 4].map((st) => (
+                <Chip key={st} label={t(`studio.audio.tune.harmony.${st === 0 ? 'none' : st === 2 ? 'thirdUp' : st === -2 ? 'thirdDown' : 'fifthUp'}`)} active={tuneHarmony === st} onPress={() => setTuneHarmony(st)} />
+              ))}
+            </View>
+            <View style={styles.tuneRow}>
+              <Pressable
+                onPress={() => onTune(clip.id, { root: tuneRoot, minor: tuneMinor, strength: tuneStrength, ...(tuneHarmony ? { harmonySteps: tuneHarmony } : {}) })}
+                style={styles.tuneBtn}
+                accessibilityRole="button"
+                testID="tune-apply"
+              >
+                <Ionicons name="mic-outline" size={16} color="#fff" />
+                <Text style={styles.tuneBtnText}>{t('studio.audio.tune.apply')}</Text>
+              </Pressable>
+              {clip.tune && onResetTune ? (
+                <Pressable onPress={() => onResetTune(clip.id)} style={styles.tuneReset} accessibilityRole="button" testID="tune-reset">
+                  <Ionicons name="refresh-outline" size={15} color={palette.textDim} />
+                  <Text style={styles.tuneResetText}>{t('studio.audio.tune.reset')}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
         {/* 🎚️ hangmagasság-eltolás (transzponálás, hossz-tartó) — −12…+12 félhang */}
         <Slider
           label={t('studio.audio.fxPitch', { defaultValue: 'Hangmagasság (félhang)' })}
@@ -704,6 +755,12 @@ export function selectedAudioClip(project: Project | null, selectedClipId: strin
 }
 
 const styles = StyleSheet.create({
+  tuneBox: { marginBottom: 12, gap: 6 },
+  tuneRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  tuneBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: palette.accent, borderRadius: 10, paddingVertical: 11 },
+  tuneBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  tuneReset: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: palette.border },
+  tuneResetText: { color: palette.textDim, fontSize: 13, fontWeight: '700' },
   sheet: {
     backgroundColor: '#0b0d14',
     borderTopLeftRadius: 20,

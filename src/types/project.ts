@@ -1255,6 +1255,11 @@ export interface AudioClip extends ClipBase {
   /** az aktív take azonosítója (a `takes`-ből) */
   activeTake?: string;
   /**
+   * 🎤 V3.2 ének-hangolás: a klip a telefonon hangolt fájlra mutat; itt az eredeti forrás és a beállítások
+   * (újraszerkesztés az eredetiből, „Eredeti visszaállítása”). Hiányzó = nincs hangolva.
+   */
+  tune?: { sourceUri: string; sourceAssetId?: string; root: number; minor: boolean; strength: number; harmonySteps?: number };
+  /**
    * 🎹🥁 a hangszer-minta (`project.instrumentDocs`), amiből a klip hangja sütve lett — a minta
    * újraszerkeszthető, az újrasütés minden rá hivatkozó klipet frissít. Hiányzó = sima hangfájl.
    */

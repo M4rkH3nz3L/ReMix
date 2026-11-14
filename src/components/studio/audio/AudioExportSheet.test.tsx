@@ -77,7 +77,7 @@ describe('AudioExportSheet', () => {
 });
 
 describe('AudioExportSheet — telefonos export (A26)', () => {
-  it('Free módban a WAV az alap, a többi formátum a Pro-ajánlatot nyitja, minőség-választó nincs', () => {
+  it('Free módban a WAV az alap, a többi formátum a Pro-ajánlatot nyitja; a WAV bitmélysége, mintavétele és csatornája a telefonon is választható', () => {
     const onDownload = jest.fn();
     const onProRequired = jest.fn();
     let r!: ReactTestRenderer;
@@ -86,10 +86,12 @@ describe('AudioExportSheet — telefonos export (A26)', () => {
     });
     act(() => chip(r, 'MP3 · PRO').props.onPress());
     expect(onProRequired).toHaveBeenCalledTimes(1);
-    expect(chip(r, '24 bit')).toBeUndefined();
-    expect(chip(r, '48 kHz')).toBeUndefined();
+    expect(chip(r, '128 kbps')).toBeUndefined();
+    press(r, '24 bit');
+    press(r, '48 kHz');
+    press(r, 'studio.audio.exportSheet.mono');
     save(r);
-    expect(onDownload).toHaveBeenCalledWith('wav', expect.anything());
+    expect(onDownload).toHaveBeenCalledWith('wav', expect.objectContaining({ bitDepth: 24, sampleRate: 48000, channels: 1 }));
   });
 
   it('✂️🎚️ stemek: a formátum-választó eltűnik, a mentés a tartománnyal és a bitmélységgel hív', () => {

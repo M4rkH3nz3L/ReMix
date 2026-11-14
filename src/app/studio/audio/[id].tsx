@@ -263,7 +263,11 @@ export default function AudioStudioScreen() {
       withCancellableProgress(t('studio.audio.exportRendering', { format: 'WAV' }), async (report, signal) => {
         if (note) Alert.alert(t('studio.export'), note);
         const target = new File(projectExportDir(), audioExportFileName(project.name, 'wav'));
-        const { uri, unsupported } = await exportOfflineWav(mix, target, report, signal);
+        const { uri, unsupported } = await exportOfflineWav(mix, target, report, signal, 'pcm16', {
+          bits: quality.bitDepth === 24 ? 24 : 16,
+          channels: quality.channels,
+          sampleRate: quality.sampleRate,
+        });
         logCswcr({ type: 'export', projectId: project.id, kind: studioKindOf(project.kind) });
         if (unsupported.length > 0) {
           await new Promise<void>((resolve) =>

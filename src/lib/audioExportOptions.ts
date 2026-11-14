@@ -103,11 +103,11 @@ export function profileExport(target: AudioMasterTarget | undefined): ProfileExp
 }
 
 /**
- * a telefonos (Free) export ma egyetlen formát ír: WAV 44,1 kHz, sztereó, 16 bit (`exportOfflineWav`) — a
- * javaslat ezt mutatja, nem ígér mást (a profil mintavétele/csatornája a Pro felhő-exportnál érvényes)
+ * a telefonos (Free) export WAV-ot ír (`exportOfflineWav`), de a profil mintavételével és csatornájával
+ * (44,1/48 kHz, mono/sztereó) és bitmélységével — a veszteséges profil (podcast MP3) 16 bites WAV-ként
  */
-export function profileExportOnDevice(_p: ProfileExport): ProfileExport {
-  return { format: 'wav', quality: { bitrateKbps: 0, bitDepth: 16, sampleRate: 44100, channels: 2 } };
+export function profileExportOnDevice(p: ProfileExport): ProfileExport {
+  return { format: 'wav', quality: { bitrateKbps: 0, bitDepth: p.format === 'wav' || p.format === 'flac' ? p.quality.bitDepth : 16, sampleRate: p.quality.sampleRate, channels: p.quality.channels } };
 }
 
 /** a mért integrált hangosság a cél tartományában (±1 LU) — a felület visszajelzése */

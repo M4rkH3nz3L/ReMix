@@ -209,7 +209,7 @@ export function AudioExportSheet({
                   : t('studio.audio.exportSheet.losslessHint')}
             </Text>
 
-            {onDevice ? null : info.lossy ? (
+            {info.lossy ? (
               <>
                 <Text style={styles.section}>{t('studio.audio.exportSheet.bitrate')}</Text>
                 <View style={styles.row}>
@@ -229,7 +229,7 @@ export function AudioExportSheet({
               </>
             )}
 
-            {onDevice ? null : (
+            {(
               <>
             <Text style={styles.section}>{t('studio.audio.exportSheet.sampleRate')}</Text>
             <View style={styles.row}>

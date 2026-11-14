@@ -6936,8 +6936,8 @@ async function smokeExportProfile(log: Log) {
     type S = { format: string; quality: { sampleRate: number; channels: number; bitDepth: number; bitrateKbps: number }; rec: { format: string; quality: { sampleRate: number; channels: number; bitDepth: number; bitrateKbps: number } } | null; verdict: string | null };
     const s0 = runDevAction('exportSheet.state') as S;
     const pro = s0.rec?.format === 'mp3';
-    const recOk = pro ? s0.rec!.quality.channels === 1 && s0.rec!.quality.bitrateKbps === 128 : s0.rec?.format === 'wav' && s0.rec.quality.sampleRate === 44100;
-    log(!!s0.rec && recOk && s0.verdict === 'ok', `podcast-profil: javaslat ${pro ? 'MP3 128 kbps mono (Pro)' : 'a telefonos WAV (Free)'}; a mért −16,3 LUFS a −16-os célon`, JSON.stringify({ rec: s0.rec, verdict: s0.verdict }));
+    const recOk = pro ? s0.rec!.quality.channels === 1 && s0.rec!.quality.bitrateKbps === 128 : s0.rec?.format === 'wav' && s0.rec.quality.sampleRate === 44100 && s0.rec.quality.channels === 1;
+    log(!!s0.rec && recOk && s0.verdict === 'ok', `podcast-profil: javaslat ${pro ? 'MP3 128 kbps mono (Pro)' : 'telefonos WAV 44,1 kHz mono (Free)'}; a mért −16,3 LUFS a −16-os célon`, JSON.stringify({ rec: s0.rec, verdict: s0.verdict }));
     useReference.getState().setMixLufs(-19);
     await sleep(300);
     const s1 = runDevAction('exportSheet.state') as S;
@@ -6953,6 +6953,70 @@ async function smokeExportProfile(log: Log) {
     router.back();
     await sleep(500);
     await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:exprof-del', caught));
+  }
+}
+
+/** 🎧 AUDIO-PROD (telefonos WAV-opciók): mono és 48 kHz a telefonos exportban — pontos fejléc és hossz, a tartalom
+ *  a 44,1 kHz-es sztereó keverés mono-átlaga a pure átmintavételezőn át (a 16 bites kvantálás pontosságával). */
+async function smokeWavOptions(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const { readFileFormat } = await import('@/lib/media');
+  const { StreamResampler } = await import('@/lib/streamResampler');
+  const base = createEmptyProject('smoke wav-opciók', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'c', label: 'hang', uri: toneWav('smoke_wavopt.wav', 3), start: 0, duration: 3, trimIn: 0, sourceDuration: 3, volume: 0.6, fadeIn: 0.2, fadeOut: 0.2, source: 'imported' };
+  const project = { ...base, id: 'prj_smoke_wavopt', tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) };
+  const readAll = (uri: string) => {
+    const h = new File(uri).open();
+    try {
+      return h.readBytes(h.size ?? 0);
+    } finally {
+      h.close();
+    }
+  };
+  const uris: string[] = [];
+  try {
+    const ref = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_wavopt_ref.wav'), undefined, undefined, 'float32');
+    uris.push(ref.uri);
+    const rb = readAll(ref.uri);
+    const rv = new DataView(rb.buffer, rb.byteOffset);
+    const n = (rb.length - 44) / 8;
+    const mono = new Float32Array(n);
+    for (let i = 0; i < n; i++) mono[i] = (rv.getFloat32(44 + i * 8, true) + rv.getFloat32(48 + i * 8, true)) * 0.5;
+    const rs = new StreamResampler(44100, 48000, 1);
+    const a = rs.process([mono])[0];
+    const b = rs.flush()[0];
+    const expect = new Float32Array(a.length + b.length);
+    expect.set(a);
+    expect.set(b, a.length);
+    const t0 = Date.now();
+    const out = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_wavopt_m48.wav'), undefined, undefined, 'pcm16', { bits: 16, channels: 1, sampleRate: 48000 });
+    const ms = Date.now() - t0;
+    uris.push(out.uri);
+    const fmt = readFileFormat(out.uri);
+    const ob = readAll(out.uri);
+    const frames = StreamResampler.outFrames(n, 44100, 48000);
+    log(fmt.container === 'wav' && fmt.sampleRate === 48000 && fmt.channels === 1 && fmt.bitDepth === 16 && ob.length === 44 + frames * 2, 'mono 48 kHz 16 bit: a fejléc és a fájlméret pontos', `${JSON.stringify(fmt)} · ${ob.length} bájt (várt ${44 + frames * 2}) · ${ms} ms`);
+    const ov = new DataView(ob.buffer, ob.byteOffset);
+    let d = 0;
+    for (let i = 0; i < frames; i++) d = Math.max(d, Math.abs(ov.getInt16(44 + i * 2, true) / 32767 - expect[i]));
+    log(d <= 1.55 / 32767, 'a tartalom = a sztereó keverés mono-átlaga 48 kHz-en (a pure átmintavételező; 16 bit TPDF-ditherrel ≤ 1,5 LSB)', `max eltérés ${(d * 32767).toFixed(2)} LSB`);
+    const st24 = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_wavopt_s48.wav'), undefined, undefined, 'pcm16', { bits: 24, channels: 2, sampleRate: 48000 });
+    uris.push(st24.uri);
+    const f2 = readFileFormat(st24.uri);
+    const sz = new File(st24.uri).size ?? 0;
+    log(f2.sampleRate === 48000 && f2.channels === 2 && f2.bitDepth === 24 && sz === 44 + frames * 6, 'sztereó 48 kHz 24 bit: fejléc és méret', `${JSON.stringify(f2)} · ${sz} bájt`);
+    const m44 = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_wavopt_m44.wav'), undefined, undefined, 'pcm16', { channels: 1 });
+    uris.push(m44.uri);
+    const mb = readAll(m44.uri);
+    const mv = new DataView(mb.buffer, mb.byteOffset);
+    let dm = 0;
+    for (let i = 0; i < n; i++) dm = Math.max(dm, Math.abs(mv.getInt16(44 + i * 2, true) / 32767 - mono[i]));
+    log(readFileFormat(m44.uri).channels === 1 && mb.length === 44 + n * 2 && dm <= 1.55 / 32767, 'mono 44,1 kHz (podcast): átmintavételezés nélkül, a mono-átlag mintára (dither ≤ 1,5 LSB)', `${mb.length} bájt · max eltérés ${(dm * 32767).toFixed(2)} LSB`);
+  } finally {
+    for (const u of uris) {
+      const f = new File(u);
+      if (f.exists) f.delete();
+    }
   }
 }
 
@@ -9123,6 +9187,10 @@ export async function runImageSmoke(
   }
   if (phase === 'routechange') {
     await step(phase, () => smokeRouteChange(log));
+    return;
+  }
+  if (phase === 'wavopts') {
+    await step(phase, () => smokeWavOptions(log));
     return;
   }
   if (phase === 'midi') {

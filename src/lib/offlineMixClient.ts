@@ -10,6 +10,7 @@ import { freeDiskBytes } from '@/lib/diskSpaceClient';
 import { logCaught } from '@/lib/logCaught';
 import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, pcm24, sliceSource, stretchJobs, wavHeader16, wavHeader24, wavHeaderF32, pcmF32, withNormalizeGains, measureMasterGain, needsWholeWindow, sourceRanges, type DecodedSource, type OfflineMixPlan, type OfflineUnsupported, type StretchJob } from '@/lib/offlineMix';
 import { ZipStoreWriter } from '@/lib/zipStore';
+import { StreamResampler } from '@/lib/streamResampler';
 import type { ProgressUpdate } from '@/lib/progress';
 import { RenderCancelledError } from '@/lib/render';
 import type { Project } from '@/types/project';
@@ -31,6 +32,10 @@ export interface OfflineExportOptions {
   /** ✂️ csak ez a tartomány (mp) — a keverés az elejétől fut, így a tartomány mintára az, ami a teljes exportban ott szól */
   range?: { from: number; to: number };
   bits?: WavBits;
+  /** 🎧 csatornák: 1 = mono (a két csatorna átlaga), alap 2 */
+  channels?: 1 | 2;
+  /** 🎚️ kimeneti mintavétel: 48000 = folyamatos sinc-átmintavételezés a 44,1 kHz-es keverésből, alap 44100 */
+  sampleRate?: 44100 | 48000;
 }
 
 interface Prepared {
@@ -42,8 +47,8 @@ interface Prepared {
 }
 
 const bytesPerSample = (bits: WavBits) => bits / 8;
-const wavHeader = (bits: WavBits, frames: number) =>
-  bits === 32 ? wavHeaderF32(frames, 2, OFFLINE_SAMPLE_RATE) : bits === 24 ? wavHeader24(frames, 2, OFFLINE_SAMPLE_RATE) : wavHeader16(frames, 2, OFFLINE_SAMPLE_RATE);
+const wavHeader = (bits: WavBits, frames: number, channels = 2, sampleRate = OFFLINE_SAMPLE_RATE) =>
+  bits === 32 ? wavHeaderF32(frames, channels, sampleRate) : bits === 24 ? wavHeader24(frames, channels, sampleRate) : wavHeader16(frames, channels, sampleRate);
 const wavData = (bits: WavBits, out: Float32Array[]) => (bits === 32 ? pcmF32(out) : bits === 24 ? pcm24(out) : pcm16(out));
 
 /** a tartomány mintákban (a projekt hosszára szorítva) */
@@ -170,10 +175,31 @@ async function writeWav(
   bits: WavBits,
   write: (bytes: Uint8Array) => void,
   onRatio: (r: number) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  out: { channels?: 1 | 2; sampleRate?: 44100 | 48000 } = {}
 ): Promise<void> {
-  write(wavHeader(bits, range[1] - range[0]));
-  await mixLoop(prep, plan, range, (l, r) => write(wavData(bits, [l, r])), onRatio, signal);
+  const ch = out.channels ?? 2;
+  const sr = out.sampleRate ?? OFFLINE_SAMPLE_RATE;
+  const frames = sr === OFFLINE_SAMPLE_RATE ? range[1] - range[0] : StreamResampler.outFrames(range[1] - range[0], OFFLINE_SAMPLE_RATE, sr);
+  write(wavHeader(bits, frames, ch, sr));
+  const rs = sr === OFFLINE_SAMPLE_RATE ? null : new StreamResampler(OFFLINE_SAMPLE_RATE, sr, ch);
+  const toChannels = (l: Float32Array, r: Float32Array): Float32Array[] => {
+    if (ch === 2) return [l, r];
+    const m = new Float32Array(l.length);
+    for (let i = 0; i < m.length; i++) m[i] = (l[i] + r[i]) * 0.5;
+    return [m];
+  };
+  let written = 0;
+  const emit = (chans: Float32Array[]) => {
+    const n = Math.min(chans[0].length, frames - written);
+    if (n <= 0) return;
+    write(wavData(bits, n === chans[0].length ? chans : chans.map((c) => c.subarray(0, n))));
+    written += n;
+  };
+  await mixLoop(prep, plan, range, (l, r) => emit(rs ? rs.process(toChannels(l, r)) : toChannels(l, r)), onRatio, signal);
+  if (rs) emit(rs.flush());
+  // a fejlécben megadott hossz pontos: a hiány csenddel (nem fordulhat elő, de a fájl ne legyen hibás)
+  if (written < frames) emit(Array.from({ length: ch }, () => new Float32Array(frames - written)));
 }
 
 /**
@@ -243,7 +269,9 @@ export async function exportOfflineWav(
   const bits: WavBits = format === 'float32' ? 32 : (opts.bits ?? 16);
   const draft = offlineMixPlan(mix);
   const [a, b] = frameRange(draft, opts.range);
-  const needed = 44 + (b - a) * 2 * bytesPerSample(bits);
+  const outCh = opts.channels ?? 2;
+  const outSr = opts.sampleRate ?? OFFLINE_SAMPLE_RATE;
+  const needed = 44 + StreamResampler.outFrames(b - a, OFFLINE_SAMPLE_RATE, outSr) * outCh * bytesPerSample(bits);
   ensureRoom(needed);
   const prep = await prepareOffline(mix, onProgress, signal);
   // 📏 a master mérése (kétmenetes) — a teljes projekten, a tartomány is ugyanazt a szintet kapja
@@ -254,7 +282,7 @@ export async function exportOfflineWav(
     throw new RenderCancelledError();
   }
   await withTargetFile(target, needed, (write) =>
-    writeWav(prep, finalPlan, [a, b], bits, write, (r) => onProgress?.({ phase: tr('studio.audio.offline.mixing'), ratio: 0.4 + 0.6 * r }), signal)
+    writeWav(prep, finalPlan, [a, b], bits, write, (r) => onProgress?.({ phase: tr('studio.audio.offline.mixing'), ratio: 0.4 + 0.6 * r }), signal, { channels: outCh, sampleRate: outSr })
   );
   return { uri: target.uri, unsupported: prep.unsupported };
 }

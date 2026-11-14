@@ -44,13 +44,15 @@ describe('audioExportOptions (A31)', () => {
 });
 
 describe('🎯 V12: creator-profil az exportnál', () => {
-  it('a profil formátumot és minőséget javasol; custom → nincs; Free: a telefonos WAV (44,1 kHz, sztereó, 16 bit)', () => {
+  it('a profil formátumot és minőséget javasol; custom → nincs; Free: telefonos WAV a profil mintavételével és csatornájával', () => {
     const m = OPT;
     expect(m.profileExport('podcast')).toEqual({ format: 'mp3', quality: { bitrateKbps: 128, bitDepth: 16, sampleRate: 44100, channels: 1 } });
     expect(m.profileExport('appleMusic')?.quality).toMatchObject({ bitDepth: 24, sampleRate: 48000 });
     expect(m.profileExport('youtube')?.format).toBe('aac');
     expect(m.profileExport('custom')).toBeNull();
-    expect(m.profileExportOnDevice(m.profileExport('podcast')!)).toEqual({ format: 'wav', quality: { bitrateKbps: 0, bitDepth: 16, sampleRate: 44100, channels: 2 } });
+    expect(m.profileExportOnDevice(m.profileExport('podcast')!)).toEqual({ format: 'wav', quality: { bitrateKbps: 0, bitDepth: 16, sampleRate: 44100, channels: 1 } });
+    expect(m.profileExportOnDevice(m.profileExport('appleMusic')!)).toEqual({ format: 'wav', quality: { bitrateKbps: 0, bitDepth: 24, sampleRate: 48000, channels: 2 } });
+    expect(m.profileExportOnDevice(m.profileExport('youtube')!).quality).toMatchObject({ bitDepth: 16, sampleRate: 48000, channels: 2 });
     expect(m.audioExportSettings('mp3', m.profileExport('podcast')!.quality)).toEqual({ audioFormat: 'mp3', sampleRate: 44100, channels: 1, audioBitrateKbps: 128 });
   });
 

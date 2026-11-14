@@ -6744,6 +6744,47 @@ async function smokeAudioFormat(log: Log) {
   }
 }
 
+/** 🔍 C6: „Hol használom?" — a hang-projektre hivatkozó videók listája (új és meglévő videóba küldve), a frissíthetők jelölve. */
+async function smokeUsages(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const audioId = 'prj_smoke_usage_audio';
+  const created: string[] = [];
+  await deleteProject(audioId).catch((caught) => logCaught('lib/imageSmoke.tsx:usages', caught));
+  const base = createEmptyProject('smoke használat dal', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'c', label: 'hang', uri: toneWav('smoke_usage.wav', 2), start: 0, duration: 2, trimIn: 0, sourceDuration: 2, volume: 0.5, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  const audio: Project = { ...base, id: audioId, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) };
+  await saveProject(audio);
+  const st = useEditorStore.getState;
+  try {
+    // 1) egy meglévő videó-projektbe és egy újba küldve (hivatkozással)
+    const existing = { ...createEmptyProject('smoke használat A', '9:16', undefined, 'video'), id: 'prj_smoke_usage_va' };
+    await saveProject(existing);
+    created.push(existing.id);
+    const v1 = await sendMixdownToVideo(audio, existing, { newName: '-' });
+    const v2 = await sendMixdownToVideo(audio, null, { newName: 'smoke használat B' });
+    if (v2) created.push(v2.id);
+    log(null, 'diag0', `v1 ${v1?.id}, v2 ${v2?.id}`);
+    router.push(`/studio/audio/${audioId}` as Href);
+    const t0 = Date.now();
+    for (let i = 0; i < 150 && st().project?.id !== audioId; i++) await sleep(200);
+    log(null, 'diag1', `${Date.now() - t0} ms, projekt ${st().project?.id}`);
+    log(true, 'FOTÓZHATÓ', 'nav');
+    await sleep(4000);
+    await sleep(1000);
+    log(null, 'diag', `stúdió ${String(runDevAction('audio.workspace'))}, projekt ${st().project?.id}, akció ${typeof runDevAction('audio.usages')}`);
+    const u1 = (await runDevAction('audio.usages')) as string[] | null;
+    log(!!v1 && !!v2 && JSON.stringify(u1) === JSON.stringify(['smoke használat A', 'smoke használat B']), '„Hol használom?": a két hivatkozó videó (a meglévő és az új), név szerint', String(JSON.stringify(u1)));
+    // 2) a zene változik → mindkettő frissíthető
+    st().dispatch({ type: 'UPDATE_CLIP', clipId: 'c', patch: { volume: 1 } }, 'user');
+    const u2 = (await runDevAction('audio.usages')) as string[] | null;
+    log(JSON.stringify(u2) === JSON.stringify(['smoke használat A*', 'smoke használat B*']), 'a zene módosítása után mindkét videó „frissíthető"', JSON.stringify(u2));
+  } finally {
+    router.back();
+    await sleep(500);
+    for (const id of [audioId, ...created]) await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:usages-del', caught));
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -8899,6 +8940,10 @@ export async function runImageSmoke(
   }
   if (phase === 'audiofmt') {
     await step(phase, () => smokeAudioFormat(log));
+    return;
+  }
+  if (phase === 'usages') {
+    await step(phase, () => smokeUsages(log));
     return;
   }
   if (phase === 'modeldl') {

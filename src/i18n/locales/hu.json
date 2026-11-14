@@ -4030,6 +4030,10 @@
         "channels_other": "{{count}} csatorna"
       },
       "toVideo": {
+        "usages_one": "Hol használom? ({{count}} videó)",
+        "usages_other": "Hol használom? ({{count}} videó)",
+        "usagesTitle": "Erre a hangra hivatkozó videók",
+        "updateAvailable": "frissíthető",
         "title": "Videóba",
         "newLinked": "Új videó — hivatkozással (a zene módosítása egy koppintással frissül)",
         "existing": "Meglévő videó-projektbe…",

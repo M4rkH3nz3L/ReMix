@@ -4035,6 +4035,10 @@
         "channels_other": "{{count}} Kanäle"
       },
       "toVideo": {
+        "usages_one": "Wo verwendet? ({{count}} Video)",
+        "usages_other": "Wo verwendet? ({{count}} Videos)",
+        "usagesTitle": "Videos, die auf diesen Ton verweisen",
+        "updateAvailable": "aktualisierbar",
         "title": "Ins Video",
         "newLinked": "Neues Video – verknüpft (Änderungen an der Musik mit einem Tipp aktualisiert)",
         "existing": "In ein bestehendes Videoprojekt…",

@@ -1,5 +1,5 @@
 import { createEmptyProject } from '@/lib/projectUtils';
-import { linkedAssets, mixdownClipCommands, mixdownInsertAt, mixdownVersion, relinkPlan, staleLinks } from '@/lib/linkedAsset';
+import { linkedAssets, mixdownClipCommands, mixdownInsertAt, mixdownVersion, relinkPlan, staleLinks, usagesOf } from '@/lib/linkedAsset';
 import { useEditorStore } from '@/store/editorStore';
 import type { AudioClip, Project } from '@/types/project';
 
@@ -104,5 +104,18 @@ describe('🔗 linked asset: a mixdown a videóban', () => {
     expect(out.commands[1]).toMatchObject({ patch: { trimIn: 4.99, duration: 0.01, loopLength: 0.01, sourceDuration: 5 } });
     // ismeretlen / nem linkelt asset → üres terv
     expect(relinkPlan(p, 'nincs', { uri: 'x', durationSec: 1, version: 'v' })).toEqual({ commands: [], shortened: [] });
+  });
+});
+
+describe('🔍 C6: „Hol használom?"', () => {
+  it('a forrásra hivatkozó projektek név szerint, a frissíthetők jelölve; a forrás maga és a nem hivatkozók kimaradnak', () => {
+    const src = { projectId: 'audio1', output: 'mixdown' as const };
+    const mk = (id: string, name: string, versions: string[]) => ({ id, name, assets: versions.map((v, i) => ({ id: `${id}-a${i}`, kind: 'audio' as const, uri: 'x', provider: 'local' as const, source: { ...src, version: v } })) });
+    const projects = [mk('v2', 'Zebra klip', ['v1']), mk('v1', 'Alma klip', ['v2', 'v2']), mk('audio1', 'dal', []), { id: 'v3', name: 'Más', assets: [{ id: 'z', kind: 'audio' as const, uri: 'y', provider: 'local' as const }] }];
+    expect(usagesOf(projects, 'audio1', 'v2')).toEqual([
+      { projectId: 'v1', name: 'Alma klip', links: 2, stale: false },
+      { projectId: 'v2', name: 'Zebra klip', links: 1, stale: true },
+    ]);
+    expect(usagesOf(projects, 'nincs')).toEqual([]);
   });
 });

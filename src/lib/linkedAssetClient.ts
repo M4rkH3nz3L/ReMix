@@ -4,13 +4,13 @@ import { mixForExport } from '@/lib/audioExportMix';
 import { applyCommand } from '@/lib/commands';
 import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { makeId } from '@/lib/id';
-import { mixdownClipCommands, mixdownInsertAt, mixdownVersion, type AssetSource, type MixdownFile } from '@/lib/linkedAsset';
+import { mixdownClipCommands, mixdownInsertAt, mixdownVersion, usagesOf, type AssetSource, type LinkUsage, type MixdownFile } from '@/lib/linkedAsset';
 import { logCaught } from '@/lib/logCaught';
 import { exportOfflineWav } from '@/lib/offlineMixClient';
 import type { ProgressUpdate } from '@/lib/progress';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { createEmptyProject } from '@/lib/projectUtils';
-import { loadProject, saveProject } from '@/lib/storage';
+import { listProjects, loadProject, saveProject } from '@/lib/storage';
 import type { Project } from '@/types/project';
 
 /**
@@ -98,4 +98,19 @@ export async function sendMixdownToVideo(
   // 📊 CSWCR: átadás hivatkozással (a link-arány számlálója)
   logCswcr({ type: 'handoff', via: 'link', projectId: audio.id, kind: studioKindOf(audio.kind), toProjectId: video.id });
   return video;
+}
+
+/** 🔍 C6: a helyi projektek közül, amelyek erre a hang-projektre hivatkoznak (felhő nélkül) */
+export async function findUsages(source: Project): Promise<LinkUsage[]> {
+  const metas = await listProjects();
+  const projects: Project[] = [];
+  for (const m of metas) {
+    if (m.id === source.id) continue;
+    const p = await loadProject(m.id).catch((caught) => {
+      logCaught('lib/linkedAssetClient.ts:findUsages', caught);
+      return null;
+    });
+    if (p) projects.push(p);
+  }
+  return usagesOf(projects, source.id, mixdownVersion(source));
 }

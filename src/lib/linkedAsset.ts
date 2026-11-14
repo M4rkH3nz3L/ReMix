@@ -194,3 +194,33 @@ export function relinkPlan(project: Project, assetId: string, next: MixdownFile 
   }
   return { commands, shortened };
 }
+
+// ── 🔍 C6 (SC3): „Hol használom?" — a forrás-projektre hivatkozó projektek ─────────────────────────
+
+export interface LinkUsage {
+  projectId: string;
+  name: string;
+  /** a hivatkozó asset(ek) száma ebben a projektben */
+  links: number;
+  /** a hivatkozás régebbi verzióra mutat, mint a forrás mostani verziója (frissíthető) */
+  stale: boolean;
+}
+
+/**
+ * A `sourceProjectId`-ra hivatkozó projektek (linked asset `source.projectId`), név szerint rendezve. A
+ * `currentVersion` a forrás mostani kimenet-verziója — ezzel jelöljük, hol érhető el frissítés.
+ */
+export function usagesOf(
+  projects: readonly Pick<Project, 'id' | 'name' | 'assets'>[],
+  sourceProjectId: string,
+  currentVersion?: string
+): LinkUsage[] {
+  const out: LinkUsage[] = [];
+  for (const p of projects) {
+    if (p.id === sourceProjectId) continue;
+    const refs = p.assets.filter((a) => a.source?.projectId === sourceProjectId);
+    if (refs.length === 0) continue;
+    out.push({ projectId: p.id, name: p.name, links: refs.length, stale: !!currentVersion && refs.some((a) => a.source!.version !== currentVersion) });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}

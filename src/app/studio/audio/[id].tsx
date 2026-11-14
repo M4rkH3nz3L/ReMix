@@ -22,7 +22,8 @@ import { flushProjectSave } from '@/hooks/useProjectAutosave';
 import { useStudioSession } from '@/hooks/useStudioSession';
 import { StudioStatusBanners } from '@/components/studio/StudioStatusBanners';
 import { audioProjectToVideo } from '@/lib/audioToVideo';
-import { sendMixdownToVideo } from '@/lib/linkedAssetClient';
+import { findUsages, sendMixdownToVideo } from '@/lib/linkedAssetClient';
+import type { LinkUsage } from '@/lib/linkedAsset';
 import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { useActionMenu } from '@/store/actionMenuStore';
 import { mixForExport } from '@/lib/audioExportMix';
@@ -72,6 +73,15 @@ export default function AudioStudioScreen() {
   // 🧪 a füstteszt az export-lapot is megnyithatja (csak __DEV__)
   useEffect(() => registerDevAction('audio.exportSheet', () => setExporting(true)), []);
   useEffect(() => registerDevAction('audio.runCheck', () => runCheckRef.current()), []);
+  // 🧪 füstteszt (C6): a „Hol használom?" lista
+  useEffect(
+    () =>
+      registerDevAction('audio.usages', async () => {
+        const p = useEditorStore.getState().project;
+        return p ? (await findUsages(p)).map((u) => `${u.name}${u.stale ? '*' : ''}`) : null;
+      }),
+    []
+  );
   useEffect(() => registerDevAction('audio.closeCheck', () => setCheckResult(null)), []);
   // 💾 A8: autosave, helyreállítás, hiányzó média, kilépés mentéssel (mint a kép- és videó-stúdióban)
   const { saveFailed, missing, relinking, relink, exit } = useStudioSession(id, loading);
@@ -211,8 +221,23 @@ export default function AudioStudioScreen() {
       })
       .catch((caught) => { logCaught('app/studio/audio/[id].tsx:sendToVideo', caught); });
   };
-  const sendToVideo = () => {
+  // 🔍 C6: „Hol használom?" — a hivatkozó videó-projektek (a frissíthetők jelölve), koppintásra megnyitva
+  const showUsages = (usages: LinkUsage[]) =>
+    useActionMenu.getState().open(
+      t('studio.audio.toVideo.usagesTitle'),
+      usages.map((u) => ({
+        label: u.stale ? `${u.name} · ${t('studio.audio.toVideo.updateAvailable')}` : u.name,
+        icon: 'film-outline',
+        onPress: () => router.push(`/editor/${u.projectId}`),
+      }))
+    );
+  const sendToVideo = async () => {
+    const usages = await findUsages(useEditorStore.getState().project ?? project).catch((caught) => {
+      logCaught('app/studio/audio/[id].tsx:usages', caught);
+      return [] as LinkUsage[];
+    });
     useActionMenu.getState().open(t('studio.audio.toVideo.title'), [
+      ...(usages.length > 0 ? [{ label: t('studio.audio.toVideo.usages', { count: usages.length }), icon: 'search-outline', onPress: () => showUsages(usages) }] : []),
       { label: t('studio.audio.toVideo.newLinked'), icon: 'link-outline', onPress: () => void sendLinked(null) },
       { label: t('studio.audio.toVideo.existing'), icon: 'film-outline', onPress: () => void pickVideoProject() },
       { label: t('studio.audio.toVideo.copyTracks'), icon: 'copy-outline', onPress: copyToVideo },
@@ -299,7 +324,7 @@ export default function AudioStudioScreen() {
           }}
           onUseInVideo={() => {
             setExporting(false);
-            sendToVideo();
+            void sendToVideo();
           }}
           onDownload={(format, quality) => void downloadAudio(format, quality)}
           onDevice={!isPro || !cloudAvailable()}

@@ -4030,6 +4030,10 @@
         "channels_other": "{{count}} channels"
       },
       "toVideo": {
+        "usages_one": "Where is it used? ({{count}} video)",
+        "usages_other": "Where is it used? ({{count}} videos)",
+        "usagesTitle": "Videos linking to this audio",
+        "updateAvailable": "update available",
         "title": "To video",
         "newLinked": "New video — linked (edits to the music update with one tap)",
         "existing": "Into an existing video project…",

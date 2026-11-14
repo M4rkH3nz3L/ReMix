@@ -5,17 +5,19 @@ import { loadProject, saveProject, saveProjectAndEvents } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 import type { Project } from '@/types/project';
 
-/** 📐 AP1: séma v7 + az újabb app-verzió projektje csak olvasható (nem íródik felül). */
+/** 📐 AP1: séma v7 → v8 (C2: linked asset, sampler-minta) + az újabb app-verzió projektje csak olvasható (nem íródik felül). */
 describe('📐 projekt-séma', () => {
-  it('az új projekt a jelenlegi sémán; a régi (v1–v6) v7-re lép, idempotensen', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(7);
-    expect(createEmptyProject('a', '9:16', undefined, 'audio').schemaVersion).toBe(7);
+  it('az új projekt a jelenlegi sémán; a régi (v1–v7) v8-ra lép, idempotensen', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(8);
+    expect(createEmptyProject('a', '9:16', undefined, 'audio').schemaVersion).toBe(8);
     const v6 = { ...createEmptyProject('b', '9:16'), schemaVersion: 6 } as Project;
     const m = migrateProject(v6);
-    expect(m.schemaVersion).toBe(7);
+    expect(m.schemaVersion).toBe(8);
     expect(migrateProject(m)).toEqual(m);
+    const v7 = { ...createEmptyProject('b2', '9:16'), schemaVersion: 7 } as Project;
+    expect(migrateProject(v7).schemaVersion).toBe(8);
     const v1 = { ...createEmptyProject('c', '9:16'), schemaVersion: 1, assets: undefined } as unknown as Project;
-    expect(migrateProject(v1).schemaVersion).toBe(7);
+    expect(migrateProject(v1).schemaVersion).toBe(8);
   });
 
   it('az újabb verzió megmarad, és csak olvasható', () => {

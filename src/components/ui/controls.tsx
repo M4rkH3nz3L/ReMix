@@ -28,6 +28,8 @@ export function Chip({
     <Pressable
       onPress={onPress}
       hitSlop={8}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
       style={[
         styles.chip,
         active && { backgroundColor: color ?? palette.accent, borderColor: color ?? palette.accent },
@@ -44,15 +46,21 @@ export function ColorDot({
   color,
   active,
   onPress,
+  label,
 }: {
   color: string;
   active: boolean;
   onPress: () => void;
+  /** ♿ a szín neve a képernyőolvasónak (alapból a színkód) */
+  label?: string;
 }) {
   return (
     <Pressable
       onPress={onPress}
       hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={label ?? color}
+      accessibilityState={{ selected: active }}
       style={[
         styles.colorDot,
         { backgroundColor: color },

@@ -1,5 +1,5 @@
 import { emptyPattern, toggleStep } from '@/lib/drums';
-import { bakeNewCommands, clipsOfDoc, drumsDoc, instrumentDocOf, rebakeCommands, rebakedDuration, synthDoc } from '@/lib/instrumentDoc';
+import { bakeNewCommands, clipsOfDoc, drumsDoc, instrumentDocOf, rebakeCommands, rebakedDuration, samplerDoc, synthDoc } from '@/lib/instrumentDoc';
 import { createEmptyProject } from '@/lib/projectUtils';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, Project } from '@/types/project';
@@ -60,6 +60,31 @@ describe('🎹🥁 hangszer-minta', () => {
     expect(rebakedDuration(clip({ trimIn: 0.5, duration: 1.5 }), 1.2)).toBeCloseTo(0.7, 6);
     expect(rebakedDuration(clip({ speed: 2, duration: 1, sourceDuration: 2 }), 4)).toBe(2);
     expect(rebakedDuration(clip({ loopLength: 0.5, duration: 6 }), 1)).toBe(6);
+  });
+
+  it('🎛️ sampler-minta (S1): a saját hangfájl + a rács a projektben; újrasütés ugyanarra a klipre; a minta nem osztja a tömböt', () => {
+    const pattern = [true, false, false, false, true, false, false, false];
+    const doc = samplerDoc('inst4', 100, 1, 'file:///Projektek/x/minta.wav', pattern, 'minta.wav');
+    pattern[0] = false; // a hívó tömbje nem érinti a mintát
+    expect(doc).toEqual({ id: 'inst4', kind: 'sampler', bpm: 100, bars: 1, sampler: { sampleUri: 'file:///Projektek/x/minta.wav', sampleName: 'minta.wav', pattern: [true, false, false, false, true, false, false, false] } });
+    const st = useEditorStore.getState();
+    expect(st.applyBatch(bakeNewCommands(doc, 'music', clip({ id: 'c1', label: 'Sampler' }), asset('a1', 'file:///a.wav', 2)), 'user')).toBe(2);
+    const cur = useEditorStore.getState().project!;
+    expect(instrumentDocOf(cur, 'inst4')?.sampler?.sampleUri).toBe('file:///Projektek/x/minta.wav');
+    // a projekt JSON-ja tartalmazza a minta uri-ját → a mappába vétel, a média-GC és az .rp látja
+    expect(JSON.stringify(cur)).toContain('file:///Projektek/x/minta.wav');
+    useEditorStore.getState().dispatch({ type: 'UPDATE_CLIP', clipId: 'c1', patch: { start: 3, volume: 0.5 } });
+    const doc2 = samplerDoc('inst4', 100, 2, 'file:///Projektek/x/minta.wav', [true, true], 'minta.wav');
+    const before = useEditorStore.getState().project!;
+    expect(useEditorStore.getState().applyBatch(rebakeCommands(before, doc2, { uri: 'file:///b.wav', durationSec: 4.8 }, asset('a2', 'file:///b.wav', 4.8)), 'user')).toBe(3);
+    const after = useEditorStore.getState().project!;
+    const [c1] = clipsOfDoc(after, 'inst4');
+    expect(c1).toMatchObject({ id: 'c1', uri: 'file:///b.wav', start: 3, volume: 0.5, duration: 4.8, sourceDuration: 4.8, instrumentDocId: 'inst4' });
+    expect(instrumentDocOf(after, 'inst4')?.bars).toBe(2);
+    useEditorStore.getState().undo();
+    const undone = useEditorStore.getState().project!;
+    expect(clipsOfDoc(undone, 'inst4')[0].uri).toBe('file:///a.wav');
+    expect(instrumentDocOf(undone, 'inst4')?.sampler?.pattern).toEqual([true, false, false, false, true, false, false, false]);
   });
 
   it('a minta-parancs nem módosít, ha a minta azonos (nincs üres history-lépés)', () => {

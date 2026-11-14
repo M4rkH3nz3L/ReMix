@@ -188,7 +188,7 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
             <Text style={styles.title}>
               <Ionicons name="albums" size={16} color={palette.accent} /> {t('studio.audio.album.title', { defaultValue: 'Album' })}
             </Text>
-            <Pressable onPress={onClose} hitSlop={10}>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
               <Ionicons name="close" size={24} color={palette.textDim} />
             </Pressable>
           </View>
@@ -278,13 +278,13 @@ export function AlbumSheet({ onClose, onShareAlbum }: { onClose: () => void; onS
                     >
                       <Ionicons name="pencil-outline" size={15} color={palette.textDim} />
                     </Pressable>
-                    <Pressable onPress={() => move(i, -1)} disabled={i === 0} hitSlop={6} style={styles.songBtn}>
+                    <Pressable onPress={() => move(i, -1)} disabled={i === 0} hitSlop={6} style={styles.songBtn} accessibilityRole="button" accessibilityLabel={t('studio.audio.a11y.songUp')} accessibilityState={{ disabled: i === 0 }}>
                       <Ionicons name="chevron-up" size={16} color={i === 0 ? palette.border : palette.textDim} />
                     </Pressable>
-                    <Pressable onPress={() => move(i, 1)} disabled={i === songs.length - 1} hitSlop={6} style={styles.songBtn}>
+                    <Pressable onPress={() => move(i, 1)} disabled={i === songs.length - 1} hitSlop={6} style={styles.songBtn} accessibilityRole="button" accessibilityLabel={t('studio.audio.a11y.songDown')} accessibilityState={{ disabled: i === songs.length - 1 }}>
                       <Ionicons name="chevron-down" size={16} color={i === songs.length - 1 ? palette.border : palette.textDim} />
                     </Pressable>
-                    <Pressable onPress={() => remove(s.id, s.name)} disabled={!canRemoveSong(album)} hitSlop={6} style={styles.songBtn}>
+                    <Pressable onPress={() => remove(s.id, s.name)} disabled={!canRemoveSong(album)} hitSlop={6} style={styles.songBtn} accessibilityRole="button" accessibilityLabel={t('studio.audio.a11y.songRemove')} accessibilityState={{ disabled: !canRemoveSong(album) }}>
                       <Ionicons name="trash-outline" size={15} color={canRemoveSong(album) ? palette.textDim : palette.border} />
                     </Pressable>
                   </View>

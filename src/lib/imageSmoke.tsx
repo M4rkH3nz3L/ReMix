@@ -101,6 +101,8 @@ import { auditionDrum, auditionNote, lastLoopPcm, lastStartMs, playPcm, previewL
 import { DRUM_ACCENT, DRUM_SOFT, emptyPattern, patternHits } from '@/lib/drums';
 import { renderDrumsPcm, renderSamplerPcm, renderSynthPcm } from '@/lib/instrumentRender';
 import { decodeSample } from '@/lib/instrumentClient';
+import { instrumentDocOf } from '@/lib/instrumentDoc';
+import { emptySampler } from '@/lib/sampler';
 import { USER_PRESETS_KEY, useUserPresets } from '@/store/userPresetStore';
 import { useAudioEditMode } from '@/store/audioEditModeStore';
 import type { CheckIssue } from '@/lib/audioCheck';
@@ -5088,6 +5090,58 @@ async function smokeConsole(log: Log) {
 }
 
 /** ✋✂️↔️ Érintéses módok (Android emulátoron valódi adb-koppintással/-húzással): vágás, kijelölés, mozgatás; nagy sávok. */
+/**
+ * ♿ S8 (AUDIO-PROD): minden hang-vezérlőnek van neve a képernyőolvasónak. A Hang Stúdió lapjai
+ * SORBAN nyitva maradnak; mindegyiknél `READY <név>` → a héj (`adb shell uiautomator dump`) a
+ * `content-desc`/`text` mezőket menti és a címkézetlen érinthető elemeket számolja. A statikus
+ * őrteszt (`a11yGuard.test.ts`) a forrást zárja, ez a VALÓDI natív a11y-fát.
+ */
+async function smokeA11y(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_a11y';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:a11y', caught));
+  const base = createEmptyProject('smoke a11y', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'c', label: 'hang', uri: toneWav('smoke_a11y.wav', 4), start: 1, duration: 4, trimIn: 0, sourceDuration: 4, volume: 0.8, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  runDevAction('audio.fit');
+  const HOLD = 8000;
+  const views: string[] = [];
+  const hold = async (name: string, open?: string, close?: string) => {
+    if (open) {
+      runDevAction(open);
+      await sleep(900);
+    }
+    log(null, 'READY', name);
+    views.push(name);
+    await sleep(HOLD);
+    if (close) {
+      runDevAction(close);
+      await sleep(500);
+    }
+  };
+  try {
+    await hold('studio');
+    await hold('drums', 'audio.openDrums', 'audio.closeDrums');
+    await hold('pianoroll', 'audio.openPianoRoll', 'audio.closePianoRoll');
+    await hold('sampler', 'audio.openSampler', 'audio.closeSampler');
+    await hold('master', 'audio.master', 'audio.closeMaster');
+    await hold('mixer', 'audio.mixer', 'audio.closeMixer');
+    await hold('addmedia', 'audio.openAddMedia', 'audio.closeAddMedia');
+    await hold('tts', 'audio.openTts', 'audio.closeTts');
+    st().selectClip('c');
+    await sleep(200);
+    await hold('clipedit', 'audio.editClip', 'clipEdit.done');
+    log(true, 'a lapok sorban nyitva voltak (a címkéket a héj a uiautomator-dumpból számolja)', views.join(', '));
+  } finally {
+    router.back();
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:a11y-del', caught));
+  }
+}
+
 async function smokeTouchModes(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const id = 'prj_smoke_touch';
@@ -5826,8 +5880,56 @@ async function smokeInstrumentEdit(log: Log) {
     const u = music()[0];
     const ud = st().project!.instrumentDocs?.[0];
     log(u.uri === oldUri && ud?.bars === 1 && ud?.drums?.swing === 0.2, 'egy visszavonás: a régi hang és a régi minta', `${ud?.bars} ütem`);
+    // 6) 🎛️ S1: sampler-minta — saját hangfájl + rács; mentés + újratöltés; „Minta szerkesztése” → a sampler
+    //    a mentett fájllal és ráccsal; újrasütés ugyanarra a klipre; egy undo
+    runDevAction('audio.closeDrums');
+    await sleep(400);
+    const sampleUri = toneWav('smoke_instedit_sample.wav', 0.25);
+    runDevAction('audio.openSampler');
+    await sleep(800);
+    const pat1 = emptySampler(1);
+    pat1[0] = true;
+    pat1[8] = true;
+    runDevAction('sampler.set', { sampleUri, sampleName: 'minta.wav', pattern: pat1, bars: 1 });
+    await sleep(300);
+    runDevAction('sampler.bake');
+    const sBaked = await waitFor(() => music().length === 2, 10000);
+    const s0 = music().find((c) => instrumentDocOf(st().project, c.instrumentDocId)?.kind === 'sampler');
+    const sDoc0 = instrumentDocOf(st().project, s0?.instrumentDocId);
+    log(sBaked && !!s0 && sDoc0?.sampler?.sampleUri === sampleUri && sDoc0.sampler.pattern[8] === true, 'sampler: sütés → a minta (fájl + rács) a projektben, a klip hivatkozik rá', `${sDoc0?.sampler?.sampleName}, ${sDoc0?.sampler?.pattern.filter(Boolean).length} lépés`);
+    if (!s0) throw new Error('nincs sampler-klip');
+    st().dispatch({ type: 'UPDATE_CLIP', clipId: s0.id, patch: { start: 6, volume: 0.5 } });
+    await saveProject(st().project!);
+    const reloaded2 = await loadProject(id);
+    st().loadProject(reloaded2!);
+    await sleep(500);
+    const sDoc1 = instrumentDocOf(st().project, s0.instrumentDocId);
+    log(!!sDoc1?.sampler && sDoc1.sampler.pattern[8] === true && new File(sDoc1.sampler.sampleUri).exists, 'sampler: mentés + újratöltés után a minta megvan, a hangfájl létezik', sDoc1?.sampler?.sampleUri.split('/').slice(-2).join('/') ?? '-');
+    st().selectClip(s0.id);
+    runDevAction('audio.editClip');
+    await sleep(800);
+    const sOpened = runDevAction('clipEdit.editInstrument') === true;
+    await sleep(900);
+    const sState = runDevAction('sampler.state') as string;
+    log(sOpened && sState === '1|minta.wav|0,8', 'sampler: „Minta szerkesztése” → a sampler a mentett fájllal és ráccsal nyílik', sState);
+    const pat2 = emptySampler(2);
+    for (const i of [0, 4, 8, 12, 16, 24]) pat2[i] = true;
+    runDevAction('sampler.set', { pattern: pat2, bars: 2 });
+    await sleep(300);
+    const sOld = music().find((c) => c.id === s0.id)!.uri;
+    runDevAction('sampler.bake');
+    const sRebaked = await waitFor(() => music().find((c) => c.id === s0.id)?.uri !== sOld, 10000);
+    const s1 = music().find((c) => c.id === s0.id)!;
+    const sample = await decodeSample(sDoc1!.sampler!.sampleUri);
+    const sd = sample ? maxDiff(await left(s1.uri), renderSamplerPcm(sample, [0, 4, 8, 12, 16, 24], 2, st().project!.bpm ?? 120)[0]) : 1;
+    log(sRebaked && music().length === 2 && sd < 1e-4 && s1.start === 6 && s1.volume === 0.5 && s1.instrumentDocId === s0.instrumentDocId, 'sampler: újrasütés ugyanarra a klipre, a hang = az új minta (2 ütem), hely és hangerő marad', `eltérés ${sd.toExponential(1)}, ${s1.duration.toFixed(3)} s`);
+    st().undo();
+    const su = music().find((c) => c.id === s0.id)!;
+    const sud = instrumentDocOf(st().project, s0.instrumentDocId);
+    log(su.uri === sOld && sud?.bars === 1 && sud?.sampler?.pattern.filter(Boolean).length === 2, 'sampler: egy visszavonás a régi hangot és a régi mintát adja', `${sud?.bars} ütem, ${sud?.sampler?.pattern.filter(Boolean).length} lépés`);
   } finally {
     runDevAction('audio.closeDrums');
+    runDevAction('audio.closeSampler');
     router.back();
     await sleep(500);
     await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:instedit-del', caught));
@@ -8213,6 +8315,10 @@ export async function runImageSmoke(
   }
   if (phase === 'touchmodes') {
     await step(phase, () => smokeTouchModes(log));
+    return;
+  }
+  if (phase === 'a11y') {
+    await step(phase, () => smokeA11y(log));
     return;
   }
   if (phase === 'modeldl') {

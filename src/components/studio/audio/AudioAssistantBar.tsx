@@ -131,6 +131,7 @@ export function AudioAssistantBar({ onActions, onClose }: { onActions: (a: Audio
           onChangeText={setText}
           placeholder={t('studio.audio.assistant.placeholder')}
           placeholderTextColor={palette.textDim}
+          accessibilityLabel={t('studio.audio.assistant.placeholder')}
           style={styles.input}
           returnKeyType="done"
           autoCorrect={false}

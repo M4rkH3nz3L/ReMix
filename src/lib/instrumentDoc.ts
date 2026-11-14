@@ -29,6 +29,17 @@ export function drumsDoc(id: string, bpm: number, bars: number, pattern: DrumPat
   };
 }
 
+/** 🎛️ sampler-minta (S1): a saját hangfájl + a step-rács — a klip ebből süthető újra */
+export function samplerDoc(id: string, bpm: number, bars: number, sampleUri: string, pattern: readonly boolean[], sampleName?: string): InstrumentDoc {
+  return {
+    id,
+    kind: 'sampler',
+    bpm,
+    bars,
+    sampler: { sampleUri, ...(sampleName ? { sampleName } : {}), pattern: [...pattern] },
+  };
+}
+
 export const instrumentDocOf = (project: Project | null | undefined, id: string | undefined): InstrumentDoc | null =>
   (id && project?.instrumentDocs?.find((d) => d.id === id)) || null;
 

@@ -5,7 +5,7 @@ import { imageDocsReference, withImageDocAssets } from '@/lib/imageDocMedia';
 import { canHostClip, findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
 import type { LiveDoc } from '@/types/live';
 import type { Model3DDoc } from '@/types/model3d';
-import type { AlbumDoc, AspectRatio, Asset, AudioBus, AudioMaster, Chapter, Clip, ImageDoc, InstrumentDoc, Marker, ParticlesConfig, Project, TimelineRegion, Track, TrackType } from '@/types/project';
+import type { AlbumDoc, AspectRatio, Asset, AssetSource, AudioBus, AudioMaster, Chapter, Clip, ImageDoc, InstrumentDoc, Marker, ParticlesConfig, Project, TimelineRegion, Track, TrackType } from '@/types/project';
 
 /**
  * Command-réteg (full-plan F0): minden szerkesztő-művelet nevesített command,
@@ -51,7 +51,14 @@ export type EditorCommand =
    * (`undoSyncCommands`). Az eszköz-szintű mezők (mappa, szinkron) helyiek maradnak.
    */
   | { type: 'RESTORE_SNAPSHOT'; project: Project; label?: string }
-  | { type: 'RELINK_ASSET'; assetId: string; newUri: string }
+  | {
+      type: 'RELINK_ASSET';
+      assetId: string;
+      newUri: string;
+      /** 🔗 linked asset frissítése: az új forrás-verzió és a fájl hossza (a klipek hossz-szabálya a `relinkPlan`-ban) */
+      source?: AssetSource;
+      duration?: number;
+    }
   /** ✨ projekt-szintű részecske-réteg be/ki (null = kikapcsol) */
   | { type: 'SET_PARTICLES'; particles: ParticlesConfig | null }
   /** 🔖 a marker-lista cseréje (hozzáadás/törlés/átnevezés egy lépésben) */
@@ -583,8 +590,18 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
     case 'RELINK_ASSET': {
       // asset-centrikus relink (ADR-012): egy asset uri-cseréje → minden rá
       // hivatkozó klip követi. Nincs változás (ismeretlen asset / azonos uri) → null.
-      const next = relinkAsset(project, cmd.assetId, cmd.newUri);
-      return next === project ? null : next;
+      const relinked = relinkAsset(project, cmd.assetId, cmd.newUri);
+      // 🔗 linked asset (C2): az új forrás-verzió és a fájl hossza is az assetre kerül
+      const extra = cmd.source || cmd.duration != null;
+      if (!extra) return relinked === project ? null : relinked;
+      if (!relinked.assets.some((a) => a.id === cmd.assetId)) return null;
+      const next = {
+        ...relinked,
+        assets: relinked.assets.map((a) =>
+          a.id === cmd.assetId ? { ...a, ...(cmd.source ? { source: cmd.source } : {}), ...(cmd.duration != null ? { duration: cmd.duration } : {}) } : a
+        ),
+      };
+      return JSON.stringify(next.assets) === JSON.stringify(project.assets) && relinked === project ? null : next;
     }
   }
 }
@@ -687,7 +704,7 @@ export function describeCommand(cmd: EditorCommand): string {
     case 'REMOVE_IMAGE_DOC':
       return tr('lib.commands.removeImageDoc');
     case 'UPSERT_INSTRUMENT_DOC':
-      return tr('lib.commands.upsertInstrumentDoc', { defaultValue: cmd.doc.kind === 'drums' ? 'Dobminta' : 'Dallam' });
+      return tr('lib.commands.upsertInstrumentDoc', { defaultValue: cmd.doc.kind === 'drums' ? 'Dobminta' : cmd.doc.kind === 'sampler' ? 'Sampler-minta' : 'Dallam' });
     case 'REORDER_IMAGE_DOCS':
       return tr('lib.commands.reorderImageDocs', {
         count: cmd.order.length,

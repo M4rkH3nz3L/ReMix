@@ -11,6 +11,7 @@ import { palette } from '@/constants/editor';
 import { gestures, haptics, motion } from '@/design';
 import { audioLaneTarget } from '@/lib/audioTimelineGestures';
 import { makeId } from '@/lib/id';
+import { formatTime } from '@/lib/time';
 import { trimAudioLeft, trimAudioRight } from '@/lib/audioTrim';
 import { useActionMenu } from '@/store/actionMenuStore';
 import { useEditorStore } from '@/store/editorStore';
@@ -247,6 +248,10 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
     <GestureDetector gesture={bodyGesture}>
       <Animated.View
         testID={`audio-clip-${clip.id}`}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={t('studio.audio.a11y.clip', { name: clip.label, start: formatTime(clip.start), duration: formatTime(clip.duration) })}
+        accessibilityState={{ selected: selected || multiSelected }}
         style={[styles.clip, { left, borderColor: selected || multiSelected ? '#fff' : `${laneColor}99`, opacity: locked ? 0.55 : 1 }, animStyle]}
       >
         <View style={[styles.clipFill, { backgroundColor: `${laneColor}26` }]}>

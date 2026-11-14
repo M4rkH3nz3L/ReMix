@@ -6,6 +6,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { palette } from '@/constants/editor';
 import { silenceCutCommands } from '@/lib/audioSilence';
 import { findClipSilences } from '@/lib/audioSilenceClient';
+import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import { withProgress } from '@/store/progressStore';
 import { useSilenceReview } from '@/store/silenceReviewStore';
@@ -51,6 +52,7 @@ export function applySilenceReview(): number {
 
 /** a talált csendek a sávon (a sáv saját koordinátáiban) */
 export function SilenceMarks({ trackType, pxPerSec, height }: { trackType: TrackType; pxPerSec: number; height: number }) {
+  const { t } = useTranslation();
   const review = useSilenceReview((s) => s.review);
   const toggle = useSilenceReview((s) => s.toggle);
   if (!review || review.trackType !== trackType) return null;
@@ -64,6 +66,7 @@ export function SilenceMarks({ trackType, pxPerSec, height }: { trackType: Track
           hitSlop={{ top: 0, bottom: 0, left: 4, right: 4 }}
           accessibilityRole="switch"
           accessibilityState={{ checked: r.on }}
+          accessibilityLabel={t('studio.audio.a11y.silenceRange', { start: formatTime(r.start), end: formatTime(r.end) })}
           style={[
             styles.mark,
             { left: r.start * pxPerSec, width: Math.max(6, (r.end - r.start) * pxPerSec), height },

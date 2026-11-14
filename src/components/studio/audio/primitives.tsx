@@ -48,6 +48,7 @@ export function Slider({
   max,
   onChange,
   format,
+  accessibilityLabel,
 }: {
   label: string;
   value: number;
@@ -55,6 +56,8 @@ export function Slider({
   max: number;
   onChange: (v: number) => void;
   format: (v: number) => string;
+  /** ♿ üres látható címkénél kötelező: ezt mondja a képernyőolvasó (S8) */
+  accessibilityLabel?: string;
 }) {
   const [w, setW] = useState(0);
   const wRef = useRef(w);
@@ -81,6 +84,11 @@ export function Slider({
       })
   ).current;
   const frac = max > min ? clamp((value - min) / (max - min), 0, 1) : 0;
+  // ♿ VoiceOver/TalkBack: „adjustable” — fel/le lépés a tartomány 1/20-ával (a húzás 0,01-es kerekítésével)
+  const a11yStep = (dir: 1 | -1) => {
+    const stepSize = Math.max(0.01, Math.round(((max - min) / 20) * 100) / 100);
+    onChange(Math.round(clamp(value + dir * stepSize, min, max) * 100) / 100);
+  };
   return (
     <View style={styles.sliderRow}>
       {/* üres címke = a hívó maga mutatja az értéket (pl. a Mixer sáv-fejléce) → nincs dupla érték */}
@@ -94,6 +102,12 @@ export function Slider({
         <View
           style={styles.track}
           onLayout={(e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width)}
+          accessible
+          accessibilityRole="adjustable"
+          accessibilityLabel={label || accessibilityLabel || ''}
+          accessibilityValue={{ text: format(value) }}
+          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+          onAccessibilityAction={(e) => a11yStep(e.nativeEvent.actionName === 'increment' ? 1 : -1)}
         >
           <View style={styles.trackLine} />
           <View style={[styles.trackFill, { width: frac * Math.max(0, w - 22) + 11 }]} />
@@ -124,6 +138,7 @@ export function ToggleRow({
         onValueChange={onValueChange}
         trackColor={{ true: palette.accent, false: palette.surfaceHigh }}
         thumbColor="#fff"
+        accessibilityLabel={label}
       />
     </View>
   );

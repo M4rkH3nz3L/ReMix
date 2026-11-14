@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -10,6 +10,7 @@ import { renderSamplerPcm } from '@/lib/instrumentRender';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
 import { palette } from '@/constants/editor';
 import { audioIntakeText } from '@/lib/audioIntake';
+import { registerDevAction } from '@/lib/devActions';
 import { pickAudio } from '@/lib/media';
 import {
   activeSteps,
@@ -20,6 +21,7 @@ import {
   toggleSamplerStep,
   type SamplerPattern,
 } from '@/lib/sampler';
+import type { InstrumentDoc } from '@/types/project';
 
 /** lépés-cella: 44 pt magas (Apple HIG érintési minimum) */
 const CELL_W = 30;
@@ -27,26 +29,50 @@ const CELL_H = 44;
 
 /**
  * 🎛️🔊 SAMPLER (AUDIOT §5): a felhasználó SAJÁT mintáját (one-shot) egy step-rácsra helyezi.
- * Minta kiválasztása → koppintás a lépésekre → „Sávra" (worker `/sampler` → klip). A lépés-logika
+ * Minta kiválasztása → koppintás a lépésekre → „Sávra" (a telefonon sütve → klip). A lépés-logika
  * a pure `sampler.ts`-ben; a hang a feltöltött fájl (nem generált).
+ * 🎛️ S1: `initial` = a klip mentett mintája („Minta szerkesztése”): a fájl és a rács abból jön,
+ * a „Sávra” ugyanazt a klipet süti újra.
  */
 export function SamplerSheet({
   bpm,
   busy,
+  initial = null,
   onClose,
   onBake,
 }: {
   bpm: number;
   busy: boolean;
+  initial?: InstrumentDoc | null;
   onClose: () => void;
-  onBake: (sampleUri: string, pattern: SamplerPattern, bars: number) => void;
+  onBake: (sampleUri: string, pattern: SamplerPattern, bars: number, sampleName?: string) => void;
 }) {
   const { t } = useTranslation();
-  const [bars, setBars] = useState(1);
-  const [pattern, setPattern] = useState<SamplerPattern>(() => emptySampler(1));
-  const [sampleUri, setSampleUri] = useState<string | null>(null);
-  const [sampleName, setSampleName] = useState<string>('');
+  const [bars, setBars] = useState(() => initial?.bars ?? 1);
+  const [pattern, setPattern] = useState<SamplerPattern>(() => initial?.sampler?.pattern.slice() ?? emptySampler(1));
+  const [sampleUri, setSampleUri] = useState<string | null>(() => initial?.sampler?.sampleUri ?? null);
+  const [sampleName, setSampleName] = useState<string>(() => initial?.sampler?.sampleName ?? '');
   const [picking, setPicking] = useState(false);
+
+  // 🧪 füstteszt (S1): minta + rács beállítása, sütés, állapot kiolvasása
+  const stateRef = useRef(() => `${bars}|${sampleName}|${activeSteps(pattern).join(',')}`);
+  stateRef.current = () => `${bars}|${sampleName}|${activeSteps(pattern).join(',')}`;
+  const bakeRef = useRef(() => sampleUri && onBake(sampleUri, pattern, bars, sampleName));
+  bakeRef.current = () => sampleUri && onBake(sampleUri, pattern, bars, sampleName);
+  useEffect(
+    () =>
+      registerDevAction('sampler.set', (arg) => {
+        const a = arg as { sampleUri?: string; sampleName?: string; pattern?: SamplerPattern; bars?: number };
+        if (a.bars) setBars(a.bars);
+        if (a.pattern) setPattern(a.pattern);
+        if (a.sampleUri) setSampleUri(a.sampleUri);
+        if (a.sampleName !== undefined) setSampleName(a.sampleName);
+        return true;
+      }),
+    []
+  );
+  useEffect(() => registerDevAction('sampler.bake', () => bakeRef.current()), []);
+  useEffect(() => registerDevAction('sampler.state', () => stateRef.current()), []);
 
   const cols = pattern.map((_, i) => i);
   const durSec = samplerDurationSec(bars, bpm);
@@ -85,13 +111,13 @@ export function SamplerSheet({
         <Text style={styles.title}>
           <Ionicons name="color-filter" size={16} color={palette.accent} /> {t('studio.sampler.title', { defaultValue: 'Sampler' })}
         </Text>
-        <Pressable onPress={onClose} hitSlop={10}>
+        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={24} color={palette.textDim} />
         </Pressable>
       </View>
 
       {/* minta-választó */}
-      <Pressable style={styles.pickRow} onPress={pick} disabled={picking}>
+      <Pressable style={styles.pickRow} onPress={pick} disabled={picking} accessibilityRole="button">
         {picking ? (
           <ActivityIndicator size="small" color={palette.accent} />
         ) : (
@@ -105,11 +131,11 @@ export function SamplerSheet({
 
       {/* vezérlők */}
       <View style={styles.controls}>
-        <Pressable onPress={() => setBarsAndResize(bars - 1)} hitSlop={6} style={styles.stepBtn}>
+        <Pressable onPress={() => setBarsAndResize(bars - 1)} hitSlop={6} style={styles.stepBtn} accessibilityRole="button" accessibilityLabel={t('studio.audio.a11y.fewerBars')}>
           <Ionicons name="remove" size={16} color={palette.text} />
         </Pressable>
         <Text style={styles.barsText}>{bars} {t('studio.pianoRoll.bars', { defaultValue: 'ütem' })}</Text>
-        <Pressable onPress={() => setBarsAndResize(bars + 1)} hitSlop={6} style={styles.stepBtn}>
+        <Pressable onPress={() => setBarsAndResize(bars + 1)} hitSlop={6} style={styles.stepBtn} accessibilityRole="button" accessibilityLabel={t('studio.audio.a11y.moreBars')}>
           <Ionicons name="add" size={16} color={palette.text} />
         </Pressable>
         <View style={{ flex: 1 }} />
@@ -130,6 +156,9 @@ export function SamplerSheet({
                   if (!on && sampleUri) void decodeSample(sampleUri).then((x) => x && playPcm(x));
                   setPattern((p) => toggleSamplerStep(p, step));
                 }}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: !!on }}
+                accessibilityLabel={t('studio.audio.a11y.step', { step: step + 1 })}
                 style={[
                   styles.cell,
                   beatStart && styles.cellBeat,
@@ -158,7 +187,7 @@ export function SamplerSheet({
           <Text style={styles.clearText}>{t('common.clear', { defaultValue: 'Törlés' })}</Text>
         </Pressable>
         <Pressable
-          onPress={() => sampleUri && onBake(sampleUri, pattern, bars)}
+          onPress={() => sampleUri && onBake(sampleUri, pattern, bars, sampleName)}
           disabled={busy || !canBake}
           style={[styles.bakeBtn, (busy || !canBake) && styles.disabled]}
         >

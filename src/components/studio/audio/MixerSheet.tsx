@@ -81,7 +81,7 @@ export function MixerSheet({ onClose, onOpenMaster }: { onClose: () => void; onO
         <Text style={styles.title}>
           <Ionicons name="options" size={16} color={palette.accent} /> {t('studio.mixer.title', { defaultValue: 'Mixer' })}
         </Text>
-        <Pressable onPress={onClose} hitSlop={10}>
+        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={24} color={palette.textDim} />
         </Pressable>
       </View>
@@ -174,6 +174,7 @@ export function MixerSheet({ onClose, onOpenMaster }: { onClose: () => void; onO
 
               <Slider
                 label=""
+                accessibilityLabel={t('studio.audio.a11y.trackGain', { track: laneLabel(lane, t) })}
                 value={gain}
                 min={0}
                 max={MAX_GAIN}
@@ -238,7 +239,7 @@ export function MixerSheet({ onClose, onOpenMaster }: { onClose: () => void; onO
               <Text style={styles.stripName} numberOfLines={1}>
                 {b.name}
               </Text>
-              <Pressable onPress={() => removeBus(b.id)} hitSlop={8} style={{ marginLeft: 'auto' }}>
+              <Pressable onPress={() => removeBus(b.id)} hitSlop={8} style={{ marginLeft: 'auto' }} accessibilityRole="button" accessibilityLabel={`${t('studio.audio.a11y.removeBus')}: ${b.name}`}>
                 <Ionicons name="trash-outline" size={16} color={palette.textDim} />
               </Pressable>
             </View>

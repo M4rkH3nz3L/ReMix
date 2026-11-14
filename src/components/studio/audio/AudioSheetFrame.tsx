@@ -48,6 +48,7 @@ export function AudioSheetFrame({
   tapToClose?: boolean;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const frame = useContext(AudioSheetFrameContext);
   const spec = AUDIO_SHEET_SPECS[id];
   const padH = StyleSheet.flatten(sheetStyle).paddingHorizontal ?? 16;
@@ -89,7 +90,7 @@ export function AudioSheetFrame({
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        {tapToClose ? <Pressable style={styles.fill} onPress={onClose} /> : null}
+        {tapToClose ? <Pressable style={styles.fill} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('studio.audio.a11y.closeSheet')} /> : null}
         <SafeAreaView edges={['bottom']} style={sheetStyle}>
           {children}
         </SafeAreaView>

@@ -111,7 +111,7 @@ export function PianoRollSheet({
         <Text style={styles.title}>
           <Ionicons name="musical-notes" size={16} color={palette.accent} /> {t('studio.pianoRoll.title', { defaultValue: 'Zeneszerzés' })}
         </Text>
-        <Pressable onPress={onClose} hitSlop={10}>
+        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={24} color={palette.textDim} />
         </Pressable>
       </View>
@@ -125,11 +125,11 @@ export function PianoRollSheet({
           </Pressable>
         ))}
         <View style={styles.spacer} />
-        <Pressable onPress={() => setBars((b) => Math.max(1, b - 1))} hitSlop={6} style={styles.stepBtn}>
+        <Pressable onPress={() => setBars((b) => Math.max(1, b - 1))} hitSlop={6} style={styles.stepBtn} accessibilityRole="button" accessibilityLabel={t('studio.audio.a11y.fewerBars')}>
           <Ionicons name="remove" size={16} color={palette.text} />
         </Pressable>
         <Text style={styles.barsText}>{bars} {t('studio.pianoRoll.bars', { defaultValue: 'ütem' })}</Text>
-        <Pressable onPress={() => setBars((b) => Math.min(8, b + 1))} hitSlop={6} style={styles.stepBtn}>
+        <Pressable onPress={() => setBars((b) => Math.min(8, b + 1))} hitSlop={6} style={styles.stepBtn} accessibilityRole="button" accessibilityLabel={t('studio.audio.a11y.moreBars')}>
           <Ionicons name="add" size={16} color={palette.text} />
         </Pressable>
       </View>

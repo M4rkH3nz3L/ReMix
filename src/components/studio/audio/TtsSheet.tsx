@@ -102,11 +102,11 @@ export function TtsSheet({ onClose }: { onClose: () => void }) {
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.wrap}>
-        <Pressable style={styles.tap} onPress={onClose} />
+        <Pressable style={styles.tap} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('studio.audio.a11y.closeSheet')} />
         <SafeAreaView edges={['bottom']} style={styles.sheet}>
           <View style={styles.head}>
             <Text style={styles.title}>{t('studio.audio.ttsTitle')}</Text>
-            <Pressable onPress={onClose} hitSlop={10}>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
               <Ionicons name="close" size={22} color={palette.textDim} />
             </Pressable>
           </View>
@@ -122,6 +122,7 @@ export function TtsSheet({ onClose }: { onClose: () => void }) {
                 placeholderTextColor={palette.textDim}
                 multiline
                 style={styles.input}
+                accessibilityLabel={t('studio.audio.a11y.ttsText')}
               />
               {engine.choices.length > 0 ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.voiceRow}>

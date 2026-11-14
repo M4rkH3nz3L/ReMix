@@ -90,7 +90,7 @@ import { registerDevAction } from '@/lib/devActions';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { Asset, AudioClip, InstrumentDoc, TrackType } from '@/types/project';
-import { bakeNewCommands, clipsOfDoc, drumsDoc, instrumentDocOf, rebakeCommands, synthDoc } from '@/lib/instrumentDoc';
+import { bakeNewCommands, clipsOfDoc, drumsDoc, instrumentDocOf, rebakeCommands, samplerDoc, synthDoc } from '@/lib/instrumentDoc';
 import type { DrumSource } from '@/components/studio/audio/DrumMachineSheet';
 import { downloadToCache, probeAudioDuration } from '@/lib/media';
 import { pauseVoiceRecording, prepareVoiceRecording, resumeVoiceRecording, startVoiceRecording, stopVoiceRecording, VOICE_RECORDING_OPTIONS, voiceoverClip } from '@/lib/voiceRecording';
@@ -228,6 +228,14 @@ export function AudioStudioBody({
       registerDevAction('audio.recordPause', () => recDevRef.current.pause()),
       registerDevAction('audio.recordState', () => recDevRef.current.state()),
       registerDevAction('audio.master', () => setMastering(true)),
+      // ♿ a11y-füstteszt (S8): a lapok nyitása/zárása sorban, hogy a héj a képernyőolvasó-címkéket kiolvashassa
+      registerDevAction('audio.closeMaster', () => setMastering(false)),
+      registerDevAction('audio.closeMixer', () => setMixerOpen(false)),
+      registerDevAction('audio.closeTts', () => setTts(false)),
+      registerDevAction('audio.openSampler', () => setSampler(true)),
+      registerDevAction('audio.closeSampler', () => setSampler(false)),
+      registerDevAction('audio.openAddMedia', () => setAdding(true)),
+      registerDevAction('audio.closeAddMedia', () => setAdding(false)),
       registerDevAction('audio.insertSilence1Track', () => gapDevRef.current.insert(1, 'track')),
       registerDevAction('audio.insertSilence1All', () => gapDevRef.current.insert(1, 'all')),
       registerDevAction('audio.join', () => gapDevRef.current.join()),
@@ -804,6 +812,7 @@ export function AudioStudioBody({
     setEditing(false);
     setEditDocId(doc.id);
     if (doc.kind === 'drums') setDrumMachine(true);
+    else if (doc.kind === 'sampler') setSampler(true);
     else setPianoRoll(true);
   };
 
@@ -827,8 +836,9 @@ export function AudioStudioBody({
     }
   };
 
-  // 🎛️🔊 a sampler step-mintája (saját minta a rácson) → worker /sampler-render → klip a playheadnél
-  const bakeSampler = async (sampleUri: string, pattern: SamplerPattern, bars: number) => {
+  // 🎛️🔊 a sampler step-mintája (saját minta a rácson) → a telefonon sütött klip a playheadnél;
+  // 🎛️ S1: a minta (a fájl + a rács) a projektben marad, a klip újraszerkeszthető és újrasüthető
+  const bakeSampler = async (sampleUri: string, pattern: SamplerPattern, bars: number, sampleName?: string) => {
     if (samplerBusy) {
       return;
     }
@@ -839,26 +849,9 @@ export function AudioStudioBody({
         Alert.alert(t('studio.sampler.title', { defaultValue: 'Sampler' }), t('studio.pianoRoll.failed', { defaultValue: 'A renderelés nem sikerült (fut a render-worker?).' }));
         return;
       }
-      const start = snapToFrame(playhead, fps);
-      useEditorStore.getState().addClip(
-        'music',
-        {
-          kind: 'audio',
-          id: makeId('clip'),
-          start,
-          duration: res.durationSec,
-          trimIn: 0,
-          sourceDuration: res.durationSec,
-          uri: res.uri,
-          label: t('studio.sampler.clipLabel', { defaultValue: 'Sampler' }),
-          volume: 1,
-          fadeIn: 0,
-          fadeOut: 0,
-          source: 'imported',
-        },
-        { id: makeId('ast'), kind: 'audio', uri: res.uri, provider: 'local', name: t('studio.sampler.clipLabel', { defaultValue: 'Sampler' }), duration: res.durationSec }
-      );
+      placeInstrument(samplerDoc(editDocId ?? makeId('inst'), bpm, bars, sampleUri, pattern, sampleName), res, t('studio.sampler.clipLabel', { defaultValue: 'Sampler' }));
       setSampler(false);
+      setEditDocId(null);
     } finally {
       setSamplerBusy(false);
     }
@@ -1029,14 +1022,17 @@ export function AudioStudioBody({
         setDrumMachine(v);
         if (!v) setEditDocId(null);
       }}
-      setSampler={setSampler}
+      setSampler={(v) => {
+        setSampler(v);
+        if (!v) setEditDocId(null);
+      }}
       setSource={setSource}
       setAlbumOpen={setAlbumOpen}
       onBakeSynth={(notes, wave, bars) => void bakeSynth(notes, wave, bars)}
       onBakeDrums={(hits, bars, src) => void bakeDrums(hits, bars, src)}
       editDoc={instrumentDocOf(project, editDocId ?? undefined)}
       onEditInstrument={editInstrument}
-      onBakeSampler={(uri, pattern, bars) => void bakeSampler(uri, pattern, bars)}
+      onBakeSampler={(uri, pattern, bars, name) => void bakeSampler(uri, pattern, bars, name)}
       onInsertSource={(asset) => {
         void insertSource(asset).catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:insertSource', caught); });
       }}
@@ -1052,7 +1048,7 @@ export function AudioStudioBody({
       {/* 🎬 a videóból nyitva: a lejátszófejhez tartozó videó-képkocka (A/V szinkron nem vakon) */}
       {mode === 'scoped' ? <VideoReference /> : null}
       <View style={styles.topBar} onLayout={(e) => setTopBarH(e.nativeEvent.layout.height)}>
-        <Pressable onPress={exitStudio} hitSlop={10} style={styles.topBtn}>
+        <Pressable onPress={exitStudio} hitSlop={10} style={styles.topBtn} accessibilityRole="button" accessibilityLabel={mode === 'scoped' ? t('common.close') : t('studio.audio.a11y.exitStudio')}>
           <Ionicons name={mode === 'scoped' ? 'close' : 'chevron-back'} size={26} color={palette.text} />
         </Pressable>
         <View style={styles.titleWrap}>
@@ -1130,10 +1126,10 @@ export function AudioStudioBody({
                     </Text>
                   </View>
                   <View style={styles.flagRow}>
-                    <Pressable onPress={() => toggleFlag(lane.type, 'mute')} hitSlop={6}>
+                    <Pressable onPress={() => toggleFlag(lane.type, 'mute')} hitSlop={6} accessibilityRole="switch" accessibilityState={{ checked: muted }} accessibilityLabel={t('studio.audio.a11y.muteTrack', { track: laneLabel(lane, t) })}>
                       <Ionicons name={muted ? 'volume-mute' : 'volume-medium'} size={13} color={muted ? palette.danger : palette.textDim} />
                     </Pressable>
-                    <Pressable onPress={() => toggleFlag(lane.type, 'solo')} hitSlop={6}>
+                    <Pressable onPress={() => toggleFlag(lane.type, 'solo')} hitSlop={6} accessibilityRole="switch" accessibilityState={{ checked: solo }} accessibilityLabel={t('studio.audio.a11y.soloTrack', { track: laneLabel(lane, t) })}>
                       <Text style={[styles.soloText, solo && { color: palette.accent }]}>S</Text>
                     </Pressable>
                     {/* 🔒 A47: a videó-szerkesztőben zárolt sáv itt is látszik, és itt is feloldható */}
@@ -1316,20 +1312,20 @@ export function AudioStudioBody({
         keyboardShouldPersistTaps="handled"
       >
         {/* undo / redo */}
-        <TBtn icon="arrow-undo" onPress={() => useEditorStore.getState().undo()} disabled={!canUndo} />
-        <TBtn icon="arrow-redo" onPress={() => useEditorStore.getState().redo()} disabled={!canRedo} />
+        <TBtn icon="arrow-undo" onPress={() => useEditorStore.getState().undo()} disabled={!canUndo} accessibilityLabel={t('editor.transportBar.undo')} />
+        <TBtn icon="arrow-redo" onPress={() => useEditorStore.getState().redo()} disabled={!canRedo} accessibilityLabel={t('editor.transportBar.redo')} />
         <View style={styles.tSep} />
         {/* ugrás elejére / lépés beatre vissza */}
-        <TBtn icon="play-skip-back" onPress={() => useEditorStore.getState().setPlayhead(0)} />
-        <TBtn icon="chevron-back" {...holdBack} onPress={() => useEditorStore.getState().setPlayhead(prevBeatSec(bpm, playhead))} />
-        <Pressable onPress={() => useEditorStore.getState().setPlaying(!isPlaying)} style={styles.playBtn}>
+        <TBtn icon="play-skip-back" onPress={() => useEditorStore.getState().setPlayhead(0)} accessibilityLabel={t('studio.audio.a11y.toStart')} />
+        <TBtn icon="chevron-back" {...holdBack} onPress={() => useEditorStore.getState().setPlayhead(prevBeatSec(bpm, playhead))} accessibilityLabel={t('studio.audio.a11y.prevBeat')} />
+        <Pressable onPress={() => useEditorStore.getState().setPlaying(!isPlaying)} style={styles.playBtn} accessibilityRole="button" accessibilityLabel={isPlaying ? t('studio.audio.transport.pause') : t('studio.audio.transport.play')}>
           <Ionicons name={isPlaying ? 'pause' : 'play'} size={24} color="#fff" />
         </Pressable>
-        <TBtn icon="chevron-forward" {...holdForward} onPress={() => useEditorStore.getState().setPlayhead(nextBeatSec(bpm, playhead))} />
-        <TBtn icon="play-skip-forward" onPress={() => useEditorStore.getState().setPlayhead(duration)} />
+        <TBtn icon="chevron-forward" {...holdForward} onPress={() => useEditorStore.getState().setPlayhead(nextBeatSec(bpm, playhead))} accessibilityLabel={t('studio.audio.a11y.nextBeat')} />
+        <TBtn icon="play-skip-forward" onPress={() => useEditorStore.getState().setPlayhead(duration)} accessibilityLabel={t('studio.audio.a11y.toEnd')} />
         <View style={styles.tSep} />
         {/* loop + In/Out + range törlés */}
-        <TBtn icon="repeat" active={loop} onPress={() => useEditorStore.getState().setLoop(!loop)} />
+        <TBtn icon="repeat" active={loop} onPress={() => useEditorStore.getState().setLoop(!loop)} accessibilityLabel={loop ? t('editor.transportBar.loopOff') : t('editor.transportBar.loopOn')} />
         {/* ⏱️ metronóm: lejátszás és felvétel közben (az exportba nem kerül) */}
         <TBtn
           icon="timer-outline"
@@ -1341,7 +1337,7 @@ export function AudioStudioBody({
         <TBtn label={t('studio.audio.transport.rangeIn')} onPress={() => useEditorStore.getState().setRangeIn()} />
         <TBtn label={t('studio.audio.transport.rangeOut')} onPress={() => useEditorStore.getState().setRangeOut()} />
         {rangeIn != null || rangeOut != null ? (
-          <TBtn icon="close" onPress={() => useEditorStore.getState().clearRange()} />
+          <TBtn icon="close" onPress={() => useEditorStore.getState().clearRange()} accessibilityLabel={t('studio.audio.a11y.clearRange')} />
         ) : null}
         <View style={styles.tSep} />
         {/* idő + ütem:beat */}
@@ -1355,12 +1351,12 @@ export function AudioStudioBody({
         </View>
         <View style={styles.tSep} />
         {/* BPM léptető + auto-felismerés (a kiválasztott/első hang-klipből) */}
-        <TBtn icon="remove" onPress={() => useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: bpm - 1 })} />
+        <TBtn icon="remove" onPress={() => useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: bpm - 1 })} accessibilityLabel={t('studio.audio.a11y.bpmDown')} />
         <View style={styles.bpmWrap}>
           <Text style={styles.bpmVal}>{bpm}</Text>
           <Text style={styles.bpmLabel}>BPM</Text>
         </View>
-        <TBtn icon="add" onPress={() => useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: bpm + 1 })} />
+        <TBtn icon="add" onPress={() => useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: bpm + 1 })} accessibilityLabel={t('studio.audio.a11y.bpmUp')} />
         {/* 🎼 ütemjelzés: koppintásra a következő (4/4 → 3/4 → 2/4 → 6/8 → 5/4 → 7/8 → 12/8) */}
         <TBtn label={meterLabel(meter)} onPress={() => useEditorStore.getState().dispatch({ type: 'SET_TIME_SIGNATURE', timeSignature: nextMeter(meter) })} />
         <TBtn
@@ -1371,8 +1367,8 @@ export function AudioStudioBody({
         />
         <View style={styles.tSep} />
         {/* zoom + snap */}
-        <TBtn icon="remove-circle-outline" onPress={() => zoomStep(-1)} />
-        <TBtn icon="add-circle-outline" onPress={() => zoomStep(1)} />
+        <TBtn icon="remove-circle-outline" onPress={() => zoomStep(-1)} accessibilityLabel={t('studio.audio.a11y.zoomOut')} />
+        <TBtn icon="add-circle-outline" onPress={() => zoomStep(1)} accessibilityLabel={t('studio.audio.a11y.zoomIn')} />
         <TBtn icon="bookmark-outline" label={t('studio.audio.markers.add')} onPress={markerAtPlayhead} />
         <TBtn icon="contract-outline" label={t('studio.audio.transport.fit')} active={fitPps !== null} onPress={fitToView} />
         {/* ✋✂️↔️ érintéses szerkesztési mód + nagy sávok (nagyobb hullámforma) */}

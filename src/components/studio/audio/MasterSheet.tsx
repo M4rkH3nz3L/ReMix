@@ -123,7 +123,7 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
     <AudioSheetFrame id="master" onClose={onClose} sheetStyle={styles.sheet} tapToClose>
       <View style={styles.head}>
         <Text style={styles.title}>{t('studio.master.title')}</Text>
-        <Pressable onPress={onClose} hitSlop={10}>
+        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={22} color={palette.textDim} />
         </Pressable>
       </View>
@@ -152,18 +152,25 @@ export function MasterSheet({ onClose }: { onClose: () => void }) {
                 <Pressable
                   onPress={() => useEditorStore.getState().toggleTrackFlag(lane.type, 'mute')}
                   style={[styles.mixBtn, muted && { borderColor: palette.danger }]}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: muted }}
+                  accessibilityLabel={t('studio.audio.a11y.muteTrack', { track: laneLabel(lane, t) })}
                 >
                   <Ionicons name={muted ? 'volume-mute' : 'volume-medium'} size={15} color={muted ? palette.danger : palette.textDim} />
                 </Pressable>
                 <Pressable
                   onPress={() => useEditorStore.getState().toggleTrackFlag(lane.type, 'solo')}
                   style={[styles.mixBtn, solo && { borderColor: palette.accent }]}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: solo }}
+                  accessibilityLabel={t('studio.audio.a11y.soloTrack', { track: laneLabel(lane, t) })}
                 >
                   <Text style={[styles.soloText, solo && { color: palette.accent }]}>S</Text>
                 </Pressable>
               </View>
               <Slider
                 label=""
+                accessibilityLabel={t('studio.audio.a11y.trackGain', { track: laneLabel(lane, t) })}
                 value={gain}
                 min={0}
                 max={1}

@@ -90,7 +90,7 @@ export function AudioStudioSheets({
   editDoc?: InstrumentDoc | null;
   /** a klipszerkesztő „Minta szerkesztése” gombja */
   onEditInstrument?: (docId: string) => void;
-  onBakeSampler: (uri: string, pattern: SamplerPattern, bars: number) => void;
+  onBakeSampler: (uri: string, pattern: SamplerPattern, bars: number, sampleName?: string) => void;
   onInsertSource: (asset: Asset) => void;
   onShareAlbum: () => void;
   /** 📐 inline/workspace keret (MOBILE-UI §6.7); null → minden lap a régi modális keretben */
@@ -139,7 +139,7 @@ export function AudioStudioSheets({
         <DrumMachineSheet key={editDoc?.id ?? 'new'} initial={editDoc?.kind === 'drums' ? editDoc : null} bpm={bpm} busy={drumBusy} onClose={() => setDrumMachine(false)} onBake={(hits, bars, src) => onBakeDrums(hits, bars, src)} />
       ) : null}
       {sampler ? (
-        <SamplerSheet bpm={bpm} busy={samplerBusy} onClose={() => setSampler(false)} onBake={(uri, pattern, bars) => onBakeSampler(uri, pattern, bars)} />
+        <SamplerSheet key={editDoc?.id ?? 'new'} initial={editDoc?.kind === 'sampler' ? editDoc : null} bpm={bpm} busy={samplerBusy} onClose={() => setSampler(false)} onBake={(uri, pattern, bars, name) => onBakeSampler(uri, pattern, bars, name)} />
       ) : null}
       {source ? <SourceSheet onInsert={onInsertSource} onClose={() => setSource(false)} /> : null}
       {albumOpen ? <AlbumSheet onClose={() => setAlbumOpen(false)} onShareAlbum={() => onShareAlbum()} /> : null}

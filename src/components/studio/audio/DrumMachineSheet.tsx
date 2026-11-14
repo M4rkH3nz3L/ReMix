@@ -132,17 +132,17 @@ export function DrumMachineSheet({
         <Text style={styles.title}>
           <Ionicons name="grid" size={16} color={palette.accent} /> {t('studio.drums.title', { defaultValue: 'Dob-gép' })}
         </Text>
-        <Pressable onPress={onClose} hitSlop={10}>
+        <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={24} color={palette.textDim} />
         </Pressable>
       </View>
 
       <View style={styles.controls}>
-        <Pressable onPress={() => setBarsAndResize(bars - 1)} hitSlop={6} style={styles.stepBtn}>
+        <Pressable onPress={() => setBarsAndResize(bars - 1)} hitSlop={6} style={styles.stepBtn} accessibilityRole="button" accessibilityLabel={t('studio.audio.a11y.fewerBars')}>
           <Ionicons name="remove" size={16} color={palette.text} />
         </Pressable>
         <Text style={styles.barsText}>{bars} {t('studio.pianoRoll.bars', { defaultValue: 'ütem' })}</Text>
-        <Pressable onPress={() => setBarsAndResize(bars + 1)} hitSlop={6} style={styles.stepBtn}>
+        <Pressable onPress={() => setBarsAndResize(bars + 1)} hitSlop={6} style={styles.stepBtn} accessibilityRole="button" accessibilityLabel={t('studio.audio.a11y.moreBars')}>
           <Ionicons name="add" size={16} color={palette.text} />
         </Pressable>
         <View style={{ flex: 1 }} />

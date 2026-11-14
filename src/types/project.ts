@@ -231,10 +231,28 @@ export interface Text3D {
  * nyers fájlt — hivatkozik rá; később provider-alapú (Drive/S3/…) elérés és
  * hash-alapú relink épül rá (full-plan F2).
  */
+/**
+ * 🔗 Linked asset forrása (ReMix.md 5.3 · SC2 · AUDIO-PROD C2): ez a fájl egy MÁSIK projekt
+ * kimenete (ma: a hang-projekt mixdownja), verzióval. A hivatkozó projekt megnyitáskor a forrás
+ * mostani verziójával veti össze → „Frissítés elérhető”; a csere a `RELINK_ASSET` parancs.
+ */
+export interface AssetSource {
+  projectId: string;
+  /** a forrás neve a felületnek (a projekt címe a hivatkozáskor) */
+  name?: string;
+  /** a projekten belüli dokumentum (SC1); hiányzó = a projekt egésze */
+  docId?: string;
+  output: 'mixdown';
+  /** a forrás kimenet-verziója, amiből ez a fájl készült (`mixdownVersion`) */
+  version: string;
+}
+
 export interface Asset {
   id: string;
   /** `model`: 3D-háló / textúra / pontfelhő (USDZ, OBJ, PLY, STL, GLB) — 3D-Studio.md §15.8 */
   kind: 'video' | 'image' | 'audio' | 'model';
+  /** 🔗 hivatkozás egy másik projekt kimenetére (hiányzó = saját/importált fájl) */
+  source?: AssetSource;
   /** aktuális elérés (helyi másolat vagy stream-URL) */
   uri: string;
   provider: 'local' | 'library' | 'remote';
@@ -1152,15 +1170,21 @@ export interface AudioTake {
   at?: string;
 }
 
-/** 🎹🥁 egy hangszer-minta (a sütött klip szerkeszthető forrása) */
+/** 🎹🥁🎛️ egy hangszer-minta (a sütött klip szerkeszthető forrása) */
 export interface InstrumentDoc {
   id: string;
-  kind: 'synth' | 'drums';
+  kind: 'synth' | 'drums' | 'sampler';
   /** a sütéskori tempó (a rács ehhez tartozik) */
   bpm: number;
   bars: number;
   synth?: { wave: SynthWave; notes: SynthNote[] };
   drums?: { pattern: DrumPattern; velocity?: DrumVelocity; swing?: number };
+  /**
+   * 🎛️ sampler (S1): a felhasználó saját one-shot mintája a step-rácson. A `sampleUri` a projekt
+   * mappájában élő hangfájl (a mentés a mappába veszi, a média-GC és az `.rp` a projekt-JSON
+   * szövegéből látja, mint minden más uri-t); a `pattern` lépésenként igaz/hamis.
+   */
+  sampler?: { sampleUri: string; sampleName?: string; pattern: boolean[] };
 }
 
 export interface AudioClip extends ClipBase {

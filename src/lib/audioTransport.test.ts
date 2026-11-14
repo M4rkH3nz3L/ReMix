@@ -133,3 +133,78 @@ describe('illeszd / scrub / követés (PRO-AUDIO 17/2)', () => {
   });
 });
 
+
+// ── 🎼 S13 (MU4): tempo-map — a rács, a snap, az ugrás, a kijelzés és az ütemre vágás a tempóváltásokat követi ──
+import { barsBeatsLabelT, beatGridForTiming, beatSplitTimesT, bpmAt, hasTempoChanges, nextBeatSecT, normalizeTempoMap, prevBeatSecT, projectTiming, snapSecT, tempoChangeAt, tempoMapStep, tempoMapWith, tempoMapWithout } from '@/lib/audioTransport';
+
+describe('audioTransport — S13: tempo-map', () => {
+  const p = { bpm: 120, timeSignature: { beatsPerBar: 4, beatUnit: 4 as const }, tempoMap: [{ atBeat: 8, bpm: 90 }] };
+
+  it('normalizálás: rendezve, csak atBeat > 0, érvényes BPM (20–300), egyedi beat', () => {
+    expect(normalizeTempoMap([{ atBeat: 16, bpm: 60 }, { atBeat: 0, bpm: 100 }, { atBeat: 8, bpm: 400 }, { atBeat: 8, bpm: 90 }, { atBeat: -1, bpm: 80 }])).toEqual([{ atBeat: 8, bpm: 90 }, { atBeat: 16, bpm: 60 }]);
+    expect(normalizeTempoMap(undefined)).toEqual([]);
+    expect(hasTempoChanges({ bpm: 120 })).toBe(false);
+    expect(hasTempoChanges(p)).toBe(true);
+  });
+
+  it('projectTiming: tempóváltás nélkül = állandó tempó; váltással a 8. beat (4 s) után 90 BPM (0,6667 s/beat)', () => {
+    expect(projectTiming({ bpm: 120 }).tempoMap).toEqual([{ atBeat: 0, bpm: 120 }]);
+    const t = projectTiming(p);
+    expect(t.tempoMap).toEqual([{ atBeat: 0, bpm: 120 }, { atBeat: 8, bpm: 90 }]);
+    expect(nextBeatSecT(t, 3.9)).toBeCloseTo(4, 9);
+    expect(nextBeatSecT(t, 4.1)).toBeCloseTo(4 + 60 / 90, 9);
+    expect(prevBeatSecT(t, 5.5)).toBeCloseTo(4 + 2 * (60 / 90), 9);
+    // 6 s = 4 s (8. beat) + 2 s @ 90 BPM = +3 beat → 11. beat = 3. ütem 4. beat
+    expect(barsBeatsLabelT(t, 6)).toBe('3.4');
+    expect(bpmAt(p, 3.99)).toBe(120);
+    expect(bpmAt(p, 4.0)).toBe(90);
+    expect(tempoChangeAt(p, 2)).toBeNull();
+    expect(tempoChangeAt(p, 5)).toEqual({ atBeat: 8, bpm: 90 });
+    // /8-nál a beat-egység a nyolcad: a BPM negyedre értendő → a map BPM-je is skálázva
+    expect(projectTiming({ ...p, timeSignature: { beatsPerBar: 6, beatUnit: 8 } }).tempoMap[1]).toEqual({ atBeat: 8, bpm: 180 });
+  });
+
+  it('snap és rács a tempo-mapen: 4 s előtt 0,5 s-onként, utána 0,667 s-onként; ütem-egy a downbeat', () => {
+    const t = projectTiming(p);
+    expect(snapSecT(4.3, 'beat', 30, t)).toBeCloseTo(4, 6); // 4,0 közelebb (0,3), mint 4,667 (0,367)
+    expect(snapSecT(4.4, 'beat', 30, t)).toBeCloseTo(4 + 60 / 90, 6);
+    expect(snapSecT(1.3, 'beat', 30, t)).toBeCloseTo(1.5, 6);
+    expect(snapSecT(1.234, 'frame', 30, t)).toBeCloseTo(1.2333, 3);
+    const grid = beatGridForTiming(t, 0, 8, 100);
+    const secs = grid.map((g) => g.sec);
+    expect(secs.slice(0, 9)).toEqual([0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]);
+    expect(secs[9]).toBeCloseTo(4 + 60 / 90, 6);
+    expect(grid.filter((g) => g.downbeat).map((g) => g.sec).slice(0, 3)).toEqual([0, 2, 4]);
+    // ritkítás sűrű nézetben: ütemenként
+    expect(beatGridForTiming(t, 0, 8, 8).every((g) => g.downbeat)).toBe(true);
+  });
+
+  it('ütemre/beatre vágás a tempo-mapen: egy 0–8 s klipen 7 beat-vonal 4 s előtt és 6 utána', () => {
+    const t = projectTiming(p);
+    const beats = beatSplitTimesT({ start: 0, duration: 8 }, t, 'beat');
+    expect(beats.filter((x) => x < 4).length).toBe(7); // 0,5 … 3,5
+    expect(beats.filter((x) => x >= 4 - 1e-9).length).toBe(6); // 4, 4,667 … 7,333
+    expect(beats[7]).toBeCloseTo(4, 6);
+    expect(beats[8]).toBeCloseTo(4 + 60 / 90, 6);
+    const bars = beatSplitTimesT({ start: 0, duration: 8 }, t, 'bar');
+    expect(bars.map((x) => Math.round(x * 1000) / 1000)).toEqual([2, 4, 6.667]);
+  });
+
+  it('tempóváltás írása/törlése a lejátszófejnél: a legközelebbi egész beatre; a 0. beat nem váltás', () => {
+    expect(tempoMapWith({ bpm: 120 }, 2.1, 100)).toEqual([{ atBeat: 4, bpm: 100 }]);
+    expect(tempoMapWith(p, 4.2, 80)).toEqual([{ atBeat: 8, bpm: 80 }]); // felülírja a 8. beatet
+    expect(tempoMapWith(p, 0.1, 80)).toEqual([{ atBeat: 8, bpm: 90 }]); // a 0. beat: változatlan lista
+    expect(tempoMapWithout(p, 6)).toEqual([]);
+    expect(tempoMapWithout(p, 1)).toEqual([{ atBeat: 8, bpm: 90 }]);
+  });
+});
+
+describe('audioTransport — S13: a ± a lejátszófej szakaszát lépteti', () => {
+  it('tempoMapStep: a szakasz BPM-je változik, új váltás nem jön létre; az induló szakaszon null', () => {
+    const p = { bpm: 120, tempoMap: [{ atBeat: 8, bpm: 90 }, { atBeat: 16, bpm: 70 }] };
+    expect(tempoMapStep(p, 5, 1)).toEqual([{ atBeat: 8, bpm: 91 }, { atBeat: 16, bpm: 70 }]);
+    expect(tempoMapStep(p, 20, -1)).toEqual([{ atBeat: 8, bpm: 90 }, { atBeat: 16, bpm: 69 }]);
+    expect(tempoMapStep(p, 1, 1)).toBeNull();
+    expect(tempoMapStep({ bpm: 120 }, 3, 1)).toBeNull();
+  });
+});

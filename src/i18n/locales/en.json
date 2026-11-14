@@ -4034,6 +4034,8 @@
         "silent": "There is no audible audio in the project."
       },
       "a11y": {
+        "tempoAdd": "Tempo change at the playhead (long-press: remove)",
+        "tempoRemove": "Remove tempo change",
         "toStart": "To start",
         "toEnd": "To end",
         "prevBeat": "Previous beat",
@@ -4216,6 +4218,7 @@
         }
       },
       "transport": {
+        "tempo": "Tempo",
         "metronome": "Metronome",
         "auto": "Auto",
         "fit": "Fit",

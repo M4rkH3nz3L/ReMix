@@ -4034,6 +4034,8 @@
         "silent": "A projektben nincs hallható hang."
       },
       "a11y": {
+        "tempoAdd": "Tempóváltás a lejátszófejnél (hosszan nyomva: törlés)",
+        "tempoRemove": "Tempóváltás törlése",
         "toStart": "Az elejére",
         "toEnd": "A végére",
         "prevBeat": "Előző ütés",
@@ -4216,6 +4218,7 @@
         }
       },
       "transport": {
+        "tempo": "Tempó",
         "metronome": "Metronóm",
         "auto": "Auto",
         "fit": "Illeszd",

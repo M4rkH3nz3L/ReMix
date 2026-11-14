@@ -44,23 +44,29 @@ import { AUDIO_SHEET_SPECS, type AudioSheetId } from '@/lib/panelSpecs';
 import { setActiveSong, setSongRender, songCount, songNeedsRender, songRenderKey } from '@/lib/albumDoc';
 import { buildAlbumVideoProject } from '@/lib/albumShare';
 import {
-  barsBeatsLabel,
-  beatGridForView,
-  beatSplitTimes,
+  barsBeatsLabelT,
+  beatGridForTiming,
+  beatSplitTimesT,
+  bpmAt,
   DEFAULT_BPM,
   DEFAULT_METER,
   meterLabel,
+  nextBeatSecT,
+  prevBeatSecT,
+  projectTiming,
+  snapSecT,
+  tempoChangeAt,
+  tempoMapStep,
+  tempoMapWith,
+  tempoMapWithout,
   nextMeter,
   DEFAULT_ZOOM_INDEX,
-  nextBeatSec,
-  prevBeatSec,
   fitPxPerSec,
   followScrollX,
   nearestZoomIndex,
   pxPerSecAt,
   scrubTime,
   rulerTicks,
-  snapSec,
   type Meter,
   type SnapMode,
   zoomIn,
@@ -143,6 +149,48 @@ export function AudioStudioBody({
   const { t } = useTranslation();
   // 🧪 füstteszt: melyik munkaterület él
   useEffect(() => registerDevAction('audio.workspace', () => workspace ?? 'audio'), [workspace]);
+  // 🧪 füstteszt (S13): tempóváltások a lejátszófejnél, a mérvadó BPM, a rács — a tárolóból, closure nélkül
+  useEffect(() => {
+    const offs = [
+      registerDevAction('audio.tempoAdd', (arg) => {
+        const st = useEditorStore.getState();
+        if (!st.project) return false;
+        return st.dispatch({ type: 'SET_TEMPO_MAP', tempoMap: tempoMapWith(st.project, st.playhead, Number(arg) || bpmAt(st.project, st.playhead)) }, 'user');
+      }),
+      registerDevAction('audio.tempoStep', (arg) => {
+        const st = useEditorStore.getState();
+        if (!st.project) return false;
+        const dir = Number(arg) || 1;
+        const stepped = tempoMapStep(st.project, st.playhead, dir);
+        return stepped ? st.dispatch({ type: 'SET_TEMPO_MAP', tempoMap: stepped }, 'user') : st.dispatch({ type: 'SET_BPM', bpm: (st.project.bpm ?? DEFAULT_BPM) + dir }, 'user');
+      }),
+      registerDevAction('audio.tempoRemove', () => {
+        const st = useEditorStore.getState();
+        return st.project ? st.dispatch({ type: 'SET_TEMPO_MAP', tempoMap: tempoMapWithout(st.project, st.playhead) }, 'user') : false;
+      }),
+      registerDevAction('audio.tempoMap', () => useEditorStore.getState().project?.tempoMap ?? []),
+      registerDevAction('audio.nextBeat', () => {
+        const st = useEditorStore.getState();
+        if (!st.project) return false;
+        st.setPlayhead(nextBeatSecT(projectTiming(st.project), st.playhead));
+        return true;
+      }),
+      registerDevAction('audio.bpmAt', (arg) => {
+        const st = useEditorStore.getState();
+        return st.project ? bpmAt(st.project, Number(arg)) : null;
+      }),
+      registerDevAction('audio.gridLines', (arg) => {
+        const st = useEditorStore.getState();
+        const a = (arg as { from?: number; to?: number } | undefined) ?? {};
+        return st.project ? beatGridForTiming(projectTiming(st.project), a.from ?? 0, a.to ?? 10, 100).map((g) => g.sec) : [];
+      }),
+      registerDevAction('audio.barsBeats', (arg) => {
+        const st = useEditorStore.getState();
+        return st.project ? barsBeatsLabelT(projectTiming(st.project), Number(arg)) : null;
+      }),
+    ];
+    return () => offs.forEach((off) => off());
+  }, []);
   const fxBypass = useEditorStore((s) => s.fxBypass);
   const canPaste = useEditorStore((s) => (s.clipClipboard ? s.canPasteTo(pasteTargetOf(s)) : false));
   const projectTracks = useEditorStore((s) => s.project?.tracks);
@@ -328,8 +376,20 @@ export function AudioStudioBody({
   }
   const fps = project.fps ?? 30;
   const bpm = project.bpm ?? DEFAULT_BPM;
+  // 🎼 S13: a projekt időzítése tempóváltásokkal — a rács, a snap, az ugrás, a kijelzés és az ütemre vágás ezen
+  const timing = projectTiming(project);
   // 🎼 ütemjelzés (hiányzó = 4/4) — a rács, a snap és az ütem.ütemrész kijelzés is ezt követi
   const meter = project.timeSignature ?? DEFAULT_METER;
+  // 🎼 a lejátszófejnél érvényes tempó és tempóváltás; a ± az itteni szakaszt lépteti (az induló tempót SET_BPM-mel)
+  const tempoHere = tempoChangeAt(project, playhead);
+  const bpmHere = bpmAt(project, playhead);
+  const stepTempo = (dir: 1 | -1) => {
+    const st = useEditorStore.getState();
+    if (!st.project) return;
+    const stepped = tempoMapStep(st.project, st.playhead, dir);
+    if (stepped) st.dispatch({ type: 'SET_TEMPO_MAP', tempoMap: stepped }, 'user');
+    else st.dispatch({ type: 'SET_BPM', bpm: (st.project.bpm ?? DEFAULT_BPM) + dir }, 'user');
+  };
   const pxPerSec = fitPps ?? pxPerSecAt(zoomIndex);
   const duration = projectDuration(project);
   const timelineW = Math.max(320, duration * pxPerSec + 40);
@@ -349,10 +409,11 @@ export function AudioStudioBody({
         fps
       )
     : [];
-  const beatTimes = beatGridForView(bpm, meter.beatsPerBar, viewFrom, Math.min(duration + 2, viewTo), pxPerSec, meter.beatUnit);
+  // 🎼 S13: a rács a projekt időzítésén (tempóváltásokkal)
+  const beatTimes = beatGridForTiming(timing, viewFrom, Math.min(duration + 2, viewTo), pxPerSec);
 
   // 🔖 a markerek is snap-pontok (10 képpontnyi közelségben)
-  const snapSecIn = (sec: number) => snapToMarkers(snapSec(sec, snapMode, fps, bpm, meter), project.markers ?? [], 10 / pxPerSec);
+  const snapSecIn = (sec: number) => snapToMarkers(snapSecT(sec, snapMode, fps, timing), project.markers ?? [], 10 / pxPerSec);
 
   /** 📋 a kijelölt klip sávja (beillesztés célja), ennek hiányában az első sáv */
   const pasteTarget = (): TrackType => {
@@ -387,7 +448,7 @@ export function AudioStudioBody({
     const st = useEditorStore.getState();
     const clip = st.allSelectedIds().length <= 1 ? selectedAudioClip(st.project, st.selectedClipId) : null;
     if (!clip || !st.project) return 0;
-    const times = beatSplitTimes(clip, st.project.bpm ?? DEFAULT_BPM, st.project.timeSignature ?? DEFAULT_METER, every);
+    const times = beatSplitTimesT(clip, projectTiming(st.project), every);
     const cmds: EditorCommand[] = times.reverse().map((time) => ({ type: 'SPLIT_CLIP', clipId: clip.id, time }));
     return cmds.length > 0 ? st.applyBatch(cmds, 'user') : 0;
   };
@@ -1331,11 +1392,11 @@ export function AudioStudioBody({
         <View style={styles.tSep} />
         {/* ugrás elejére / lépés beatre vissza */}
         <TBtn icon="play-skip-back" onPress={() => useEditorStore.getState().setPlayhead(0)} accessibilityLabel={t('studio.audio.a11y.toStart')} />
-        <TBtn icon="chevron-back" {...holdBack} onPress={() => useEditorStore.getState().setPlayhead(prevBeatSec(bpm, playhead))} accessibilityLabel={t('studio.audio.a11y.prevBeat')} />
+        <TBtn icon="chevron-back" {...holdBack} onPress={() => useEditorStore.getState().setPlayhead(prevBeatSecT(timing, playhead))} accessibilityLabel={t('studio.audio.a11y.prevBeat')} />
         <Pressable onPress={() => useEditorStore.getState().setPlaying(!isPlaying)} style={styles.playBtn} accessibilityRole="button" accessibilityLabel={isPlaying ? t('studio.audio.transport.pause') : t('studio.audio.transport.play')}>
           <Ionicons name={isPlaying ? 'pause' : 'play'} size={24} color="#fff" />
         </Pressable>
-        <TBtn icon="chevron-forward" {...holdForward} onPress={() => useEditorStore.getState().setPlayhead(nextBeatSec(bpm, playhead))} accessibilityLabel={t('studio.audio.a11y.nextBeat')} />
+        <TBtn icon="chevron-forward" {...holdForward} onPress={() => useEditorStore.getState().setPlayhead(nextBeatSecT(timing, playhead))} accessibilityLabel={t('studio.audio.a11y.nextBeat')} />
         <TBtn icon="play-skip-forward" onPress={() => useEditorStore.getState().setPlayhead(duration)} accessibilityLabel={t('studio.audio.a11y.toEnd')} />
         <View style={styles.tSep} />
         {/* loop + In/Out + range törlés */}
@@ -1359,18 +1420,28 @@ export function AudioStudioBody({
           <Text style={styles.time}>
             {formatTime(playhead)} / {formatTime(duration)}
           </Text>
-          <Text style={styles.bars}>♪ {barsBeatsLabel(bpm, playhead, meter)}</Text>
+          <Text style={styles.bars}>♪ {barsBeatsLabelT(timing, playhead)}</Text>
           <MasterMeter />
           <LoudnessReadout />
         </View>
         <View style={styles.tSep} />
         {/* BPM léptető + auto-felismerés (a kiválasztott/első hang-klipből) */}
-        <TBtn icon="remove" onPress={() => useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: bpm - 1 })} accessibilityLabel={t('studio.audio.a11y.bpmDown')} />
+        <TBtn icon="remove" onPress={() => stepTempo(-1)} accessibilityLabel={t('studio.audio.a11y.bpmDown')} />
         <View style={styles.bpmWrap}>
-          <Text style={styles.bpmVal}>{bpm}</Text>
+          <Text style={styles.bpmVal}>{bpmHere}</Text>
           <Text style={styles.bpmLabel}>BPM</Text>
         </View>
-        <TBtn icon="add" onPress={() => useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: bpm + 1 })} accessibilityLabel={t('studio.audio.a11y.bpmUp')} />
+        <TBtn icon="add" onPress={() => stepTempo(1)} accessibilityLabel={t('studio.audio.a11y.bpmUp')} />
+        {/* 🎼 S13: tempóváltás a lejátszófejnél (a legközelebbi egész beaten, az itt kijelzett BPM-mel); hosszan: törlés */}
+        <TBtn
+          icon="speedometer-outline"
+          label={t('studio.audio.transport.tempo')}
+          active={tempoHere !== null}
+          testID="audio-tempo"
+          onPress={() => useEditorStore.getState().dispatch({ type: 'SET_TEMPO_MAP', tempoMap: tempoMapWith(project, playhead, bpmHere) })}
+          onLongPress={() => useEditorStore.getState().dispatch({ type: 'SET_TEMPO_MAP', tempoMap: tempoMapWithout(project, playhead) })}
+          accessibilityLabel={t('studio.audio.a11y.tempoAdd')}
+        />
         {/* 🎼 ütemjelzés: koppintásra a következő (4/4 → 3/4 → 2/4 → 6/8 → 5/4 → 7/8 → 12/8) */}
         <TBtn label={meterLabel(meter)} onPress={() => useEditorStore.getState().dispatch({ type: 'SET_TIME_SIGNATURE', timeSignature: nextMeter(meter) })} />
         <TBtn

@@ -61,3 +61,19 @@ describe('⏱️🎙️ metronómos felvétel', () => {
     expect(openTakePlacement({ seconds: 0.35, startAt: 3.7 }, 4)).toBeNull();
   });
 });
+
+// ── 🎼 S13: a metronóm a tempo-mapen ──────────────────────────────────────────────────────────
+import { projectTiming } from '@/lib/audioTransport';
+
+describe('⏱️ metronóm — tempóváltással', () => {
+  it('120 → 90 BPM a 8. beaten: a klikkek 4 s-ig 0,5 s-onként, utána 0,667 s-onként; az ütem-egy hangsúlyos', () => {
+    const timing = projectTiming({ bpm: 120, tempoMap: [{ atBeat: 8, bpm: 90 }] });
+    const c = metronomeClicks(0, 6.8, 120, DEFAULT_METER, timing); // a 12. beat 6,667 s-nál
+    expect(c.slice(0, 9).map((x) => x.t)).toEqual([0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]);
+    expect(c[9].t).toBeCloseTo(4 + 60 / 90, 9);
+    expect(c[10].t).toBeCloseTo(4 + 2 * (60 / 90), 9);
+    expect(c.filter((x) => x.accent).map((x) => x.beat)).toEqual([0, 4, 8, 12]);
+    // tempóváltás nélkül az időzítés átadva is a régi (állandó) út: bitre azonos
+    expect(metronomeClicks(0, 2.01, 120, DEFAULT_METER, projectTiming({ bpm: 120 }))).toEqual(metronomeClicks(0, 2.01, 120, DEFAULT_METER));
+  });
+});

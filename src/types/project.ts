@@ -1170,6 +1170,12 @@ export interface AudioTake {
   at?: string;
 }
 
+/** 🎼 egy tempóváltás: ettől a beat-pozíciótól ez a BPM (a `musicTime` TempoSegment-je a projektben) */
+export interface TempoChange {
+  atBeat: number;
+  bpm: number;
+}
+
 /** 🎹🥁🎛️ egy hangszer-minta (a sütött klip szerkeszthető forrása) */
 export interface InstrumentDoc {
   id: string;
@@ -1793,6 +1799,12 @@ export interface Project {
   bpm?: number;
   /** 🎼 ütemjelzés (hiányzó = 4/4); a BPM negyedhangra értendő, /8-nál a rács nyolcadonként */
   timeSignature?: { beatsPerBar: number; beatUnit: 4 | 8 };
+  /**
+   * 🎼 Tempóváltások (MU4 · AUDIO-PROD S13): a `bpm` az induló tempó (0. beattől), ezek a későbbi
+   * szegmensek beat-pozíció szerint (csak `atBeat > 0`, növekvő). A rács, a snap, az ütemre vágás,
+   * a metronóm és az ütem:beat kijelzés a tempo-mapet követi (`projectTiming`). Hiányzó = állandó tempó.
+   */
+  tempoMap?: TempoChange[];
   /** 🔎 SEO / közzétételi meta (a létrehozáskor kötelező — lásd ProjectSeo) */
   seo?: ProjectSeo;
   /** 🎞️ a legutóbb renderelt kész MP4 (a projekthez tárolva; lásd RenderedVersion) */

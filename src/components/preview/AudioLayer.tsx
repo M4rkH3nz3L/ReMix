@@ -11,7 +11,7 @@ import { canSegment, isLongSource } from '@/lib/longSource';
 import { needsWholeWindow, offlineMixPlan, type OfflineMixPlan } from '@/lib/offlineMix';
 import { previewEngine } from '@/lib/previewEngine';
 import { useRecordPrefs } from '@/store/recordPrefsStore';
-import { DEFAULT_METER } from '@/lib/audioTransport';
+import { DEFAULT_METER, projectTiming } from '@/lib/audioTransport';
 import { ensureStretchProxy, getStretchProxySync, stretchProxyKey } from '@/lib/stretchProxy';
 import { detectSystemPause, INITIAL_STALL } from '@/lib/interruption';
 import { audioSpeedOf, needsStretchProxy } from '@/lib/audioTrim';
@@ -190,9 +190,15 @@ function MixEngineLayer({ plan }: { plan: OfflineMixPlan | null }) {
   const bpm = useEditorStore((s) => s.project?.bpm);
   const beatsPerBar = useEditorStore((s) => (s.project?.timeSignature ?? DEFAULT_METER).beatsPerBar);
   const beatUnit = useEditorStore((s) => (s.project?.timeSignature ?? DEFAULT_METER).beatUnit);
+  // 🎼 S13: tempóváltásokkal a klikk a tempo-mapen ül (a tárolt lista referenciája stabil, amíg nem változik)
+  const tempoMap = useEditorStore((s) => s.project?.tempoMap);
   useEffect(() => {
-    previewEngine.setMetronome(metronomeOn ? { bpm, meter: { beatsPerBar, beatUnit }, gain: metronomeGain } : null);
-  }, [metronomeOn, metronomeGain, bpm, beatsPerBar, beatUnit]);
+    previewEngine.setMetronome(
+      metronomeOn
+        ? { bpm, meter: { beatsPerBar, beatUnit }, gain: metronomeGain, timing: projectTiming({ bpm, timeSignature: { beatsPerBar, beatUnit }, tempoMap }) }
+        : null
+    );
+  }, [metronomeOn, metronomeGain, bpm, beatsPerBar, beatUnit, tempoMap]);
   useEffect(() => () => previewEngine.setMetronome(null), []);
 
   useEffect(() => {

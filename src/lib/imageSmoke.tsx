@@ -6513,6 +6513,87 @@ async function smokeDrumKit(log: Log) {
   }
 }
 
+/**
+ * 🎼 S13 (MU4): tempo-map — tempóváltás a lejátszófejnél; a rács, az ütem:beat kijelzés, az ugrás, az ütemre vágás
+ * és a metronóm a tempóváltást követi; a ± az itteni szakaszt lépteti; egy undo; a metronóm klikkjei az új rácson.
+ */
+async function smokeTempoMap(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_tempomap';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:tempomap', caught));
+  const base = createEmptyProject('smoke tempo', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'c', label: 'hang', uri: toneWav('smoke_tempo.wav', 8), start: 0, duration: 8, trimIn: 0, sourceDuration: 8, volume: 0.5, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, bpm: 120, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  const music = () => st().project!.tracks.find((t) => t.type === 'music')!.clips as AudioClip[];
+  const near = (a: number, b: number, eps = 1e-3) => Math.abs(a - b) < eps;
+  try {
+    // 1) tempóváltás 90 BPM-re a 4 s-nál (= 8. beat 120 BPM-en)
+    st().setPlayhead(4);
+    await sleep(200);
+    const added = runDevAction('audio.tempoAdd', 90) === true;
+    const map = runDevAction('audio.tempoMap') as { atBeat: number; bpm: number }[];
+    log(added && map.length === 1 && map[0].atBeat === 8 && map[0].bpm === 90, 'tempóváltás a lejátszófejnél: a 8. beaten 90 BPM (a projektben, egy parancs)', JSON.stringify(map));
+    // 2) a mérvadó BPM és az ütem:beat kijelzés a váltás után
+    const b1 = runDevAction('audio.bpmAt', 3.9);
+    const b2 = runDevAction('audio.bpmAt', 4.1);
+    const bb = runDevAction('audio.barsBeats', 6);
+    log(b1 === 120 && b2 === 90 && bb === '3.4', 'a BPM a szakasz szerint (120 → 90), a 6 s = 3. ütem 4. beat', `${b1} → ${b2}, ${bb}`);
+    // 3) a rács: 4 s-ig 0,5 s-onként, utána 0,667 s-onként
+    const lines = runDevAction('audio.gridLines', { from: 0, to: 8 }) as number[];
+    log(near(lines[8], 4) && near(lines[9], 4 + 60 / 90) && near(lines[10], 4 + 2 * (60 / 90)), 'a rács követi a tempóváltást (0,5 s → 0,667 s)', lines.slice(7, 11).map((x) => x.toFixed(3)).join(' '));
+    // 4) ugrás a következő beatre a váltás után
+    st().setPlayhead(4.1);
+    await sleep(150);
+    runDevAction('audio.nextBeat');
+    await sleep(150);
+    const ph = st().playhead;
+    log(near(ph, 4 + 60 / 90, 1e-3), 'ugrás a következő beatre a váltás után: 4,667 s', ph.toFixed(3));
+    // 5) ütemre vágás a tempo-mapen: 7 vonal 4 s előtt, 6 utána
+    st().selectClip('c');
+    await sleep(150);
+    const n = runDevAction('audio.beatSplitBeats') as number;
+    const starts = music().map((x) => x.start).sort((a, b) => a - b);
+    log(music().length === 14 && starts.filter((x) => x < 4 - 1e-6).length === 8 && near(starts[8], 4) && near(starts[9], 4 + 60 / 90), 'beatre vágás a tempo-mapen: 14 darab (8 a váltás előtt, 6 utána)', `${n} vágás, ${music().length} darab`);
+    st().undo();
+    await sleep(200);
+    // 6) a ± az itteni szakaszt lépteti: a lejátszófej a 90-es szakaszban → 91 (új váltás nem jön létre), az induló tempó marad 120;
+    //    az induló szakaszon a ± az induló tempót lépteti
+    st().setPlayhead(5);
+    await sleep(150);
+    runDevAction('audio.tempoStep', 1);
+    const map2 = runDevAction('audio.tempoMap') as { atBeat: number; bpm: number }[];
+    st().setPlayhead(1);
+    await sleep(100);
+    runDevAction('audio.tempoStep', -1);
+    const baseBpm = st().project!.bpm;
+    st().setPlayhead(5);
+    await sleep(100);
+    log(map2.length === 1 && map2[0].atBeat === 8 && map2[0].bpm === 91 && baseBpm === 119, 'a ± a lejátszófej szakaszát lépteti (90 → 91, új váltás nélkül), az induló szakaszon az induló tempót (120 → 119)', `${JSON.stringify(map2)}, induló ${baseBpm}`);
+    st().undo();
+    await sleep(100);
+    // 7) a metronóm a tempo-mapen (pure): a klikkek a váltás után 0,667 s-onként
+    const { metronomeClicks } = await import('@/lib/metronome');
+    const { projectTiming: pt } = await import('@/lib/audioTransport');
+    const clicks = metronomeClicks(3.9, 6.1, 120, { beatsPerBar: 4, beatUnit: 4 }, pt(st().project!)).map((x) => x.t);
+    log(clicks.length === 4 && near(clicks[0], 4) && near(clicks[1], 4 + 60 / 91), 'a metronóm klikkjei a tempóváltás után az új tempón', clicks.map((x) => x.toFixed(3)).join(' '));
+    // 8) törlés hosszan nyomva (dev: tempoRemove) + egy undo visszahozza
+    runDevAction('audio.tempoRemove');
+    const gone = (runDevAction('audio.tempoMap') as unknown[]).length === 0;
+    st().undo();
+    await sleep(150);
+    const back = runDevAction('audio.tempoMap') as { bpm: number }[];
+    log(gone && back.length === 1 && back[0].bpm === 91, 'a tempóváltás törölhető, egy visszavonás visszahozza', `${gone} / ${JSON.stringify(back)}`);
+  } finally {
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:tempomap-del', caught));
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -8652,6 +8733,10 @@ export async function runImageSmoke(
   }
   if (phase === 'drumkit') {
     await step(phase, () => smokeDrumKit(log));
+    return;
+  }
+  if (phase === 'tempomap') {
+    await step(phase, () => smokeTempoMap(log));
     return;
   }
   if (phase === 'modeldl') {

@@ -49,6 +49,149 @@ export function timingForBpm(bpm?: number, meter: Meter = DEFAULT_METER): MusicT
   return createTiming((q * meter.beatUnit) / 4, { beatsPerBar: meter.beatsPerBar, beatUnit: meter.beatUnit });
 }
 
+// ── 🎼 tempo-map (MU4 · AUDIO-PROD S13): a projekt időzítése tempóváltásokkal ───────────────────
+
+export interface TempoChangeLike {
+  atBeat: number;
+  bpm: number;
+}
+export interface ProjectTempo {
+  bpm?: number;
+  timeSignature?: Meter;
+  tempoMap?: readonly TempoChangeLike[];
+}
+
+/** a projekt tárolt tempóváltásai rendezve, érvényesen (csak atBeat > 0, pozitív BPM, egyedi beat) */
+export function normalizeTempoMap(map: readonly TempoChangeLike[] | undefined): TempoChangeLike[] {
+  const out = new Map<number, number>();
+  for (const s of map ?? []) {
+    if (Number.isFinite(s.atBeat) && s.atBeat > 0 && Number.isFinite(s.bpm) && s.bpm > 0) out.set(Math.round(s.atBeat * 1000) / 1000, Math.max(20, Math.min(300, Math.round(s.bpm))));
+  }
+  return [...out.entries()].sort((a, b) => a[0] - b[0]).map(([atBeat, bpm]) => ({ atBeat, bpm }));
+}
+
+/**
+ * A projekt időzítése: az induló BPM (0. beat) + a tempóváltások, az ütemjelzés szerint (a BPM negyedre
+ * értendő, /8-nál a beat-egység a nyolcad — mint a `timingForBpm`). Tempóváltás nélkül = `timingForBpm`.
+ */
+export function projectTiming(p: ProjectTempo): MusicTiming {
+  const meter = p.timeSignature ?? DEFAULT_METER;
+  const base = timingForBpm(p.bpm, meter);
+  const changes = normalizeTempoMap(p.tempoMap);
+  if (changes.length === 0) return base;
+  const scale = meter.beatUnit / 4;
+  return { ...base, tempoMap: [base.tempoMap[0], ...changes.map((c) => ({ atBeat: c.atBeat, bpm: c.bpm * scale }))] };
+}
+
+/** van-e tempóváltás a projektben */
+export const hasTempoChanges = (p: ProjectTempo): boolean => normalizeTempoMap(p.tempoMap).length > 0;
+
+/** a mérvadó (kijelzett) BPM egy időpontban: az ott érvényes szegmens tempója */
+export function bpmAt(p: ProjectTempo, sec: number): number {
+  const base = Number.isFinite(p.bpm) && (p.bpm as number) > 0 ? (p.bpm as number) : DEFAULT_BPM;
+  const changes = normalizeTempoMap(p.tempoMap);
+  if (changes.length === 0) return base;
+  const beat = beatAtTime(projectTiming(p), Math.max(0, sec));
+  let cur = base;
+  for (const c of changes) if (c.atBeat <= beat + 1e-6) cur = c.bpm;
+  return cur;
+}
+
+/** a tempóváltás, amely egy időpontban érvényes (null = az induló tempó szakasza) */
+export function tempoChangeAt(p: ProjectTempo, sec: number): TempoChangeLike | null {
+  const changes = normalizeTempoMap(p.tempoMap);
+  if (changes.length === 0) return null;
+  const beat = beatAtTime(projectTiming(p), Math.max(0, sec));
+  let cur: TempoChangeLike | null = null;
+  for (const c of changes) if (c.atBeat <= beat + 1e-6) cur = c;
+  return cur;
+}
+
+/** tempóváltás a legközelebbi egész beaten egy időpontnál (0 → az induló tempót írja: a hívó SET_BPM-et ad) */
+export function tempoMapWith(p: ProjectTempo, sec: number, bpm: number): TempoChangeLike[] {
+  const beat = Math.round(beatAtTime(projectTiming(p), Math.max(0, sec)));
+  return normalizeTempoMap([...(p.tempoMap ?? []).filter((c) => Math.round(c.atBeat) !== beat), { atBeat: beat, bpm }]);
+}
+
+/**
+ * a lejátszófej szakaszának tempója ±dir (a ± gomb): a szakasz tempóváltásának BPM-je változik, új váltás
+ * nem jön létre; az induló tempó szakaszán null (a hívó SET_BPM-et ad)
+ */
+export function tempoMapStep(p: ProjectTempo, sec: number, dir: number): TempoChangeLike[] | null {
+  const cur = tempoChangeAt(p, sec);
+  if (!cur) return null;
+  return normalizeTempoMap((p.tempoMap ?? []).map((c) => (c.atBeat === cur.atBeat ? { ...c, bpm: cur.bpm + dir } : c)));
+}
+
+/** a megadott időpontban érvényes tempóváltás eltávolítása (az induló tempó szakaszán: változatlan) */
+export function tempoMapWithout(p: ProjectTempo, sec: number): TempoChangeLike[] {
+  const cur = tempoChangeAt(p, sec);
+  return normalizeTempoMap((p.tempoMap ?? []).filter((c) => !cur || c.atBeat !== cur.atBeat));
+}
+
+/** „ütem.beat" címke a projekt időzítésével (tempo-mappel) */
+export function barsBeatsLabelT(timing: MusicTiming, sec: number): string {
+  const bb = beatToBarsBeats(timing, Math.max(0, beatAtTime(timing, Math.max(0, sec))));
+  return `${bb.bar}.${bb.beat}`;
+}
+
+/** a következő beat időpontja a projekt időzítésével */
+export function nextBeatSecT(timing: MusicTiming, sec: number): number {
+  const beat = beatAtTime(timing, Math.max(0, sec));
+  return timeAtBeat(timing, Math.floor(beat + 1e-6) + 1);
+}
+
+/** az előző beat időpontja a projekt időzítésével */
+export function prevBeatSecT(timing: MusicTiming, sec: number): number {
+  const beat = beatAtTime(timing, Math.max(0, sec));
+  const whole = Math.floor(beat - 1e-6);
+  const target = beat - whole < 1e-3 ? Math.max(0, whole - 1) : Math.max(0, whole);
+  return timeAtBeat(timing, target);
+}
+
+/** igazítás a snap-mód szerint, a projekt időzítésével (beat-snap a tempo-mapen) */
+export function snapSecT(sec: number, mode: SnapMode, fps: number, timing: MusicTiming): number {
+  const t = Math.max(0, sec);
+  if (mode === 'frame') {
+    const f = fps > 0 ? fps : 30;
+    return Math.round(t * f) / f;
+  }
+  if (mode === 'beat') return Math.max(0, quantizeTime(timing, t, { subdivision: 1 }));
+  return t;
+}
+
+/** a látható rács a projekt időzítésével: beat-vonalak (ütem-egy = downbeat), ritkítva, ha sűrű */
+export function beatGridForTiming(timing: MusicTiming, fromSec: number, toSec: number, pxPerSec: number): BeatGridLine[] {
+  const bpb = Math.max(1, timing.timeSignature.beatsPerBar);
+  const from = Math.max(0, fromSec);
+  const to = Math.max(from, toSec);
+  const b0 = Math.max(0, Math.ceil(beatAtTime(timing, from) - 1e-6));
+  const b1 = Math.floor(beatAtTime(timing, to) + 1e-6);
+  // ritkítás: ha a beatek 6 px-nél sűrűbbek, ütemenként; ha az ütemek is, 4 ütemenként
+  const beatPx = (timeAtBeat(timing, b0 + 1) - timeAtBeat(timing, b0)) * pxPerSec;
+  const stride = beatPx >= 6 ? 1 : beatPx * bpb >= 6 ? bpb : bpb * 4;
+  const out: BeatGridLine[] = [];
+  for (let b = Math.ceil(b0 / stride) * stride; b <= b1 && out.length < 2000; b += stride) {
+    out.push({ sec: Math.round(timeAtBeat(timing, b) * 1e6) / 1e6, downbeat: b % bpb === 0 });
+  }
+  return out;
+}
+
+/** ütemre/beatre vágás helyei a projekt időzítésével (a klip belsejében, a szélektől `minSeg`-re) */
+export function beatSplitTimesT(clip: { start: number; duration: number }, timing: MusicTiming, every: 'bar' | 'beat', minSeg = 0.05): number[] {
+  const bpb = Math.max(1, timing.timeSignature.beatsPerBar);
+  const stride = every === 'bar' ? bpb : 1;
+  const end = clip.start + clip.duration;
+  const b0 = Math.ceil(beatAtTime(timing, clip.start + minSeg) - 1e-9);
+  const out: number[] = [];
+  for (let b = Math.ceil(b0 / stride) * stride; out.length < 5000; b += stride) {
+    const t = timeAtBeat(timing, b);
+    if (t >= end - minSeg + 1e-9) break;
+    if (t > clip.start + minSeg - 1e-9) out.push(Math.round(t * 1e6) / 1e6);
+  }
+  return out;
+}
+
 /** „ütem.beat" címke (1-alapú), pl. 3.2 — a transport-kijelzőhöz (az ütemjelzés szerint). */
 export function barsBeatsLabel(bpm: number | undefined, sec: number, meter: Meter = DEFAULT_METER): string {
   const timing = timingForBpm(bpm, meter);

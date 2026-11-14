@@ -4039,6 +4039,8 @@
         "silent": "Im Projekt gibt es keinen hörbaren Ton."
       },
       "a11y": {
+        "tempoAdd": "Tempowechsel am Abspielkopf (lange drücken: entfernen)",
+        "tempoRemove": "Tempowechsel entfernen",
         "toStart": "Zum Anfang",
         "toEnd": "Zum Ende",
         "prevBeat": "Vorheriger Schlag",
@@ -4221,6 +4223,7 @@
         }
       },
       "transport": {
+        "tempo": "Tempo",
         "metronome": "Metronom",
         "auto": "Auto",
         "fit": "Einpassen",

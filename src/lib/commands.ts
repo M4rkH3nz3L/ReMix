@@ -5,7 +5,8 @@ import { imageDocsReference, withImageDocAssets } from '@/lib/imageDocMedia';
 import { canHostClip, findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
 import type { LiveDoc } from '@/types/live';
 import type { Model3DDoc } from '@/types/model3d';
-import type { AlbumDoc, AspectRatio, Asset, AssetSource, AudioBus, AudioMaster, Chapter, Clip, ImageDoc, InstrumentDoc, Marker, ParticlesConfig, Project, TimelineRegion, Track, TrackType } from '@/types/project';
+import type { AlbumDoc, AspectRatio, Asset, AssetSource, AudioBus, AudioMaster, Chapter, Clip, ImageDoc, InstrumentDoc, Marker, ParticlesConfig, Project, TempoChange, TimelineRegion, Track, TrackType } from '@/types/project';
+import { normalizeTempoMap } from '@/lib/audioTransport';
 
 /**
  * Command-réteg (full-plan F0): minden szerkesztő-művelet nevesített command,
@@ -96,6 +97,8 @@ export type EditorCommand =
   /** 🎵 Projekt-tempó (BPM) a Hang Stúdió ütem-rácsához/snap-jéhez. 20–300 közé szorítva. */
   | { type: 'SET_BPM'; bpm: number }
   | { type: 'SET_TIME_SIGNATURE'; timeSignature: { beatsPerBar: number; beatUnit: 4 | 8 } }
+  /** 🎼 Tempóváltások (S13): a teljes lista cseréje (rendezve, csak atBeat > 0); üres → nincs tempóváltás */
+  | { type: 'SET_TEMPO_MAP'; tempoMap: TempoChange[] }
   /**
    * 🎧💿 Album-dokumentum beírása (Hang Stúdió: több szám + borító). A manifeszt-CRUD pure
    * (`albumDoc.ts`), az eredményt EZ a parancs teszi a `project.album`-ba — ÉS az idővonalat
@@ -406,6 +409,17 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
         return null;
       }
       return { ...project, bpm };
+    }
+
+    case 'SET_TEMPO_MAP': {
+      const next = normalizeTempoMap(cmd.tempoMap);
+      const cur = normalizeTempoMap(project.tempoMap);
+      if (JSON.stringify(next) === JSON.stringify(cur)) return null;
+      if (next.length === 0) {
+        const { tempoMap: _drop, ...rest } = project;
+        return rest as Project;
+      }
+      return { ...project, tempoMap: next };
     }
 
     case 'APPLY_ALBUM': {
@@ -730,6 +744,8 @@ export function describeCommand(cmd: EditorCommand): string {
       return tr('lib.commands.setTimeSignature', { defaultValue: `Ütemjelzés: ${cmd.timeSignature.beatsPerBar}/${cmd.timeSignature.beatUnit}` });
     case 'SET_BPM':
       return tr('lib.commands.setBpm', { bpm: cmd.bpm, defaultValue: `BPM: ${cmd.bpm}` });
+    case 'SET_TEMPO_MAP':
+      return tr('lib.commands.setTempoMap', { count: cmd.tempoMap.length, defaultValue: cmd.tempoMap.length > 0 ? `Tempóváltás (${cmd.tempoMap.length})` : 'Tempóváltások törölve' });
     case 'APPLY_ALBUM':
       return (
         cmd.label ??

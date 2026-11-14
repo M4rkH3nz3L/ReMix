@@ -8021,6 +8021,41 @@ async function smokeBusParity(log: Log) {
   log(Math.abs(direct + 6.1) < 1 && Math.abs(echo + 22.0) < 1.5, 'a zengés-busz a telefonos exportban ugyanúgy szól, mint a szerveren (±1 dB)', `közvetlen ${direct.toFixed(1)} dB (szerver −6,1) · visszhang ${echo.toFixed(1)} dB (szerver −22,0)`);
 }
 
+/** 🎛️ V7.4: a sáv-frekvencia automációja a telefonos exportban — a közép-sáv 500 Hz-ről 4 kHz-re söpör: az 500 Hz-es
+ *  hang az elején emelt (+12 dB körül), a végén nem. */
+async function smokeEqSweep(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const x = Float32Array.from({ length: SR }, (_, i) => 0.1 * Math.sin((2 * Math.PI * 500 * i) / SR));
+  const f = new File(Paths.document, 'smoke_eqsweep.wav');
+  if (f.exists) f.delete();
+  f.create();
+  f.write(encodeWav16([x, x], SR, () => 0.5));
+  const base = createEmptyProject('smoke eq-söprés', '9:16', undefined, 'audio');
+  const kf = [{ id: 'a', time: 0, value: 500, easing: 'linear' as const }, { id: 'b', time: 0.3, value: 500, easing: 'linear' as const }, { id: 'c', time: 0.7, value: 4000, easing: 'linear' as const }, { id: 'd', time: 1, value: 4000, easing: 'linear' as const }];
+  const clip: AudioClip = { kind: 'audio', id: 'c', label: 'c', uri: f.uri, start: 0, duration: 1, trimIn: 0, sourceDuration: 1, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported', audioFx: { eq: { low: 0, mid: 12, high: 0, midQ: 4 } }, keyframes: { fxEqMidFreq: kf } };
+  const project = { ...base, id: 'prj_smoke_eqsweep', tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [clip] } : t)) };
+  const out = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_eqsweep_out.wav'), undefined, undefined, 'float32');
+  const h = new File(out.uri).open();
+  let l: Float32Array;
+  try {
+    const b = h.readBytes(h.size ?? 0);
+    const fl = new Float32Array(b.buffer.slice(b.byteOffset + 44, b.byteOffset + b.length));
+    l = Float32Array.from({ length: fl.length / 2 }, (_, i) => fl[i * 2]);
+  } finally {
+    h.close();
+    new File(out.uri).delete();
+  }
+  const lvl = (a: number, b: number) => {
+    let e = 0;
+    for (let i = Math.round(a * SR); i < Math.round(b * SR); i++) e += l[i] * l[i];
+    return 20 * Math.log10(Math.sqrt(e / ((b - a) * SR)) / (0.1 / Math.SQRT2));
+  };
+  const a0 = lvl(0.05, 0.25);
+  const a1 = lvl(0.75, 0.95);
+  log(a0 > 10 && a1 < 2 && out.unsupported.length === 0, 'a közép-sáv frekvencia-görbéje: 500 Hz-en +12 dB körül, 4 kHz-re söpörve az 500 Hz-es hang visszaesik', `eleje ${a0.toFixed(1)} dB · vége ${a1.toFixed(1)} dB`);
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -10257,6 +10292,10 @@ export async function runImageSmoke(
   }
   if (phase === 'busparity') {
     await step(phase, () => smokeBusParity(log));
+    return;
+  }
+  if (phase === 'eqsweep') {
+    await step(phase, () => smokeEqSweep(log));
     return;
   }
   if (phase === 'midi') {

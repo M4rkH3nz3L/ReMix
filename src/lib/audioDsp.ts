@@ -1,6 +1,6 @@
 import { sampleChannel } from '@/lib/keyframes';
 import { fxStageOrder, type FxStage } from '@/lib/fxOrder';
-import { delayTimeMs, eqBandParams } from '@/lib/fxParams';
+import { delayTimeMs, EQ_BAND_SPEC, eqBandParams } from '@/lib/fxParams';
 import type { AudioFx, Keyframe } from '@/types/project';
 import { compGainDb, KERNEL, runKernel } from '@/lib/dspKernels';
 
@@ -110,13 +110,18 @@ export class AutoBiquad implements Processor {
   private readonly bq: Biquad;
   private last = Number.NaN;
 
+  private last2 = Number.NaN;
+
   constructor(
-    private readonly design: (v: number) => Coeffs,
+    private readonly design: (v: number, w: number) => Coeffs,
     private readonly kfs: Keyframe[],
     private readonly fallback: number,
-    private readonly sr: number
+    private readonly sr: number,
+    /** 🎛️ V7.4: második automatizált paraméter (pl. a sáv frekvenciája az erősítés mellett) */
+    private readonly kfs2: Keyframe[] | undefined = undefined,
+    private readonly fallback2 = 0
   ) {
-    this.bq = new Biquad(design(fallback));
+    this.bq = new Biquad(design(fallback, fallback2));
   }
 
   processStereo(l: Float32Array, r: Float32Array, pos: number): void {
@@ -125,10 +130,13 @@ export class AutoBiquad implements Processor {
       const at = pos + i;
       const next = Math.min(l.length, i + (AUTO_BLOCK - (at % AUTO_BLOCK)));
       // az érték a RÁCSPONTBÓL (nem a darab kezdetéből) — így a darabolás nem hagy nyomot
-      const v = sampleChannel(this.kfs, (at - (at % AUTO_BLOCK)) / this.sr, this.fallback);
-      if (v !== this.last) {
-        this.bq.setCoeffs(this.design(v));
+      const grid = (at - (at % AUTO_BLOCK)) / this.sr;
+      const v = sampleChannel(this.kfs, grid, this.fallback);
+      const w = this.kfs2 ? sampleChannel(this.kfs2, grid, this.fallback2) : this.fallback2;
+      if (v !== this.last || w !== this.last2) {
+        this.bq.setCoeffs(this.design(v, w));
         this.last = v;
+        this.last2 = w;
       }
       this.bq.processStereo(l.subarray(i, next), r.subarray(i, next));
       i = next;
@@ -544,9 +552,12 @@ export interface FxAutomation {
   fxEqLow?: Keyframe[];
   fxEqMid?: Keyframe[];
   fxEqHigh?: Keyframe[];
+  fxEqLowFreq?: Keyframe[];
+  fxEqMidFreq?: Keyframe[];
+  fxEqHighFreq?: Keyframe[];
 }
 
-export const FX_AUTO_KEYS = ['fxLowpass', 'fxHighpass', 'fxReverb', 'fxDelay', 'fxEqLow', 'fxEqMid', 'fxEqHigh'] as const;
+export const FX_AUTO_KEYS = ['fxLowpass', 'fxHighpass', 'fxReverb', 'fxDelay', 'fxEqLow', 'fxEqMid', 'fxEqHigh', 'fxEqLowFreq', 'fxEqMidFreq', 'fxEqHighFreq'] as const;
 
 export function buildFxChain(fx: AudioFx | undefined, sr: number, normGain = 1, deReverb = false, auto?: FxAutomation): Processor[] {
   const has = (k: keyof FxAutomation) => (auto?.[k]?.length ?? 0) > 0;
@@ -569,8 +580,12 @@ export function buildFxChain(fx: AudioFx | undefined, sr: number, normGain = 1, 
   const eqBands = eqBandParams(f.eq);
   const band = (key: 'fxEqLow' | 'fxEqMid' | 'fxEqHigh', i: number) => {
     const { freq, q, gain } = eqBands[i];
-    if (has(key)) {
-      chain.push(new AutoBiquad((v) => peakingCoeffs(freq, g(v), sr, q), auto![key]!, gain, sr));
+    // 🎛️ V7.4: a frekvencia is automatizálható (söprés) — a tartomány a sávé
+    const fKey = `${key}Freq` as 'fxEqLowFreq' | 'fxEqMidFreq' | 'fxEqHighFreq';
+    const spec = EQ_BAND_SPEC[eqBands[i].key];
+    const fz = (v: number) => Math.max(spec.min, Math.min(spec.max, v));
+    if (has(key) || has(fKey)) {
+      chain.push(new AutoBiquad((v, w) => peakingCoeffs(fz(w), g(v), sr, q), has(key) ? auto![key]! : [], gain, sr, has(fKey) ? auto![fKey] : undefined, freq));
     } else if (gain) {
       chain.push(peaking(freq, gain, sr, q));
     }

@@ -22,6 +22,8 @@ export const KEYFRAME_CHANNELS = [
   'scale', 'x', 'y', 'rotation', 'opacity', 'volume', 'pan',
   // 🎛️ hang-effekt automáció (a vágás/split ezeket is követi)
   'fxLowpass', 'fxHighpass', 'fxReverb', 'fxDelay', 'fxEqLow', 'fxEqMid', 'fxEqHigh',
+  // 🎛️ V7.4: az EQ-sávok frekvenciája
+  'fxEqLowFreq', 'fxEqMidFreq', 'fxEqHighFreq',
 ] as const;
 export type KeyframeChannel = (typeof KEYFRAME_CHANNELS)[number];
 

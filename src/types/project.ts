@@ -822,6 +822,10 @@ export interface ClipKeyframes {
   fxEqLow?: Keyframe[];
   fxEqMid?: Keyframe[];
   fxEqHigh?: Keyframe[];
+  /** 🎛️ V7.4: az EQ-sávok frekvenciája (Hz) — söprés; a tartomány a `fxParams.ts` EQ_BAND_SPEC-je */
+  fxEqLowFreq?: Keyframe[];
+  fxEqMidFreq?: Keyframe[];
+  fxEqHighFreq?: Keyframe[];
 }
 
 export interface TextClip extends ClipBase {

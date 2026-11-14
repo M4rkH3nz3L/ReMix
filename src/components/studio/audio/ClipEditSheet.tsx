@@ -36,7 +36,8 @@ import { withProgress } from '@/store/progressStore';
 import type { AudioClip, AudioFx, Project } from '@/types/project';
 import { audioFormatLabel } from '@/lib/audioFormat';
 
-type FxAutoKey = 'fxLowpass' | 'fxHighpass' | 'fxReverb' | 'fxDelay' | 'fxEqLow' | 'fxEqMid' | 'fxEqHigh';
+type FxAutoKey = 'fxLowpass' | 'fxHighpass' | 'fxReverb' | 'fxDelay' | 'fxEqLow' | 'fxEqMid' | 'fxEqHigh' | 'fxEqLowFreq' | 'fxEqMidFreq' | 'fxEqHighFreq';
+const hz = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)} kHz` : `${Math.round(v)} Hz`);
 
 /** 🎛️ az automatizálható effekt-paraméterek: tartomány, alapérték (a statikus beállítás), kiírás */
 const FX_AUTO: { key: FxAutoKey; min: number; max: number; fallback: (fx?: AudioFx) => number; format: (v: number) => string }[] = [
@@ -47,6 +48,10 @@ const FX_AUTO: { key: FxAutoKey; min: number; max: number; fallback: (fx?: Audio
   { key: 'fxEqLow', min: -12, max: 12, fallback: (fx) => fx?.eq?.low ?? 0, format: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB` },
   { key: 'fxEqMid', min: -12, max: 12, fallback: (fx) => fx?.eq?.mid ?? 0, format: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB` },
   { key: 'fxEqHigh', min: -12, max: 12, fallback: (fx) => fx?.eq?.high ?? 0, format: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} dB` },
+  // 🎛️ V7.4: a sávok frekvenciája (söprés) — a sáv tartományán belül
+  { key: 'fxEqLowFreq', min: EQ_BAND_SPEC.low.min, max: EQ_BAND_SPEC.low.max, fallback: (fx) => eqBandParams(fx?.eq)[0].freq, format: hz },
+  { key: 'fxEqMidFreq', min: EQ_BAND_SPEC.mid.min, max: EQ_BAND_SPEC.mid.max, fallback: (fx) => eqBandParams(fx?.eq)[1].freq, format: hz },
+  { key: 'fxEqHighFreq', min: EQ_BAND_SPEC.high.min, max: EQ_BAND_SPEC.high.max, fallback: (fx) => eqBandParams(fx?.eq)[2].freq, format: hz },
 ];
 
 /**

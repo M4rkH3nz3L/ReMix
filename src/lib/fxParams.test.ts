@@ -87,3 +87,29 @@ describe('🎛️ V7 fxParams', () => {
     expect(fxUnsupported({ eq: { low: 1, mid: 0, high: 0, midFreq: 2000, midQ: 2 } })).toBe(false);
   });
 });
+
+describe('🎛️ V7.4 a sáv-frekvencia automációja', () => {
+  const SR2 = 44100;
+  const sweep = (hz: number) => {
+    const n = SR2;
+    const l = Float32Array.from({ length: n }, (_, i) => 0.1 * Math.sin((2 * Math.PI * hz * i) / SR2));
+    const r = Float32Array.from(l);
+    const kf = [{ id: 'a', time: 0, value: 500, easing: 'linear' as const }, { id: 'b', time: 0.3, value: 500, easing: 'linear' as const }, { id: 'c', time: 0.7, value: 4000, easing: 'linear' as const }, { id: 'd', time: 1, value: 4000, easing: 'linear' as const }];
+    const chain = buildFxChain({ eq: { low: 0, mid: 12, high: 0, midQ: 4 } }, SR2, 1, false, { fxEqMidFreq: kf });
+    runChain(chain, l, r, 0);
+    const lvl = (a: number, b: number) => {
+      let e = 0;
+      for (let i = Math.round(a * SR2); i < Math.round(b * SR2); i++) e += l[i] * l[i];
+      return 20 * Math.log10(Math.sqrt(e / ((b - a) * SR2)) / (0.1 / Math.SQRT2));
+    };
+    return [lvl(0.05, 0.25), lvl(0.75, 0.95)];
+  };
+  it('500 Hz az elején +12 dB körül, a végén ~0; 4 kHz fordítva — a frekvencia a görbét követi', () => {
+    const [a0, a1] = sweep(500);
+    const [b0, b1] = sweep(4000);
+    expect(a0).toBeGreaterThan(10);
+    expect(a1).toBeLessThan(2);
+    expect(b0).toBeLessThan(2);
+    expect(b1).toBeGreaterThan(10);
+  });
+});

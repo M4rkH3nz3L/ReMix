@@ -4363,7 +4363,7 @@
         "fxDelay": "Echo",
         "fxEqLow": "EQ Tiefen",
         "fxEqMid": "EQ Mitten",
-        "fxEqHigh": "EQ Höhen"
+        "fxEqHigh": "EQ Höhen", "fxEqLowFreq": "Tiefen-Freq.", "fxEqMidFreq": "Mitten-Freq.", "fxEqHighFreq": "Höhen-Freq."
       },
       "lanes": {
         "add": "Spur",

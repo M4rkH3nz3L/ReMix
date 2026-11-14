@@ -23,6 +23,16 @@ const FPS = 30;
 // HARD-ENFORCE-olja; a kliens tükre: src/lib/projectUtils.ts MAX_PROJECT_DURATION_SEC
 // (contract-teszt zárolja az egyezést). Tier-szinten szigoríthatóbb, feljebb nem.
 const MAX_RENDER_DURATION_SEC = 600;
+/**
+ * 🎧 AUDIO-PROD S18: a CSAK HANG export (podcast, album) nem rövid videó — a 10 perces videó-plafon
+ * alól kivéve, a telefonos export 3 órás határával egyezően (env: MAX_AUDIO_RENDER_SEC).
+ */
+const MAX_AUDIO_RENDER_DURATION_SEC = Math.max(MAX_RENDER_DURATION_SEC, parseInt(process.env.MAX_AUDIO_RENDER_SEC || '10800', 10) || 10800);
+
+/** a render hossz-plafonja a kért beállítás szerint: csak-hang (audioFormat) → a hang plafonja, különben a videóé */
+function maxRenderSecFor(settings) {
+  return settings && settings.audioFormat ? MAX_AUDIO_RENDER_DURATION_SEC : MAX_RENDER_DURATION_SEC;
+}
 
 const CANVAS = {
   '9:16': { w: 1080, h: 1920 },
@@ -3150,6 +3160,8 @@ module.exports = {
   gifArgs,
   AUDIO_FORMATS,
   MAX_RENDER_DURATION_SEC,
+  MAX_AUDIO_RENDER_DURATION_SEC,
+  maxRenderSecFor,
   XFADE_MODES,
   xfadeMode,
 };

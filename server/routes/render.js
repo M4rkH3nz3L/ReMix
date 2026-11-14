@@ -18,7 +18,7 @@ const { requireAuth, INSECURE_DEV } = require('../auth');
 const { paidOnly, renderJobAuth } = require('../lib/guards');
 const { rateLimit } = require('../security/rateLimit');
 const { upload } = require('../lib/upload');
-const { renderProject, MAX_RENDER_DURATION_SEC } = require('../render');
+const { renderProject, MAX_RENDER_DURATION_SEC, maxRenderSecFor } = require('../render');
 const { queueEnabled, enqueueRender, getRenderJob, cancelRenderJob, listRenderJobs, renderConcurrency } = require('../queue');
 const { listWorkers } = require('../workers-registry');
 const { s3Enabled, uploadFile, streamFile } = require('../s3store');
@@ -124,10 +124,15 @@ router.post('/render', ...paidOnly, upload.any(), (req, res) => {
 
   // 🎬 HARD-GATE: a videó MAX 10 perc (short-video scope, SCOPES.md). A kliens is
   // figyelmeztet, de a biztonsági határ ITT van (autoritatív, nem bízunk a kliensben).
-  if (totalDuration > MAX_RENDER_DURATION_SEC) {
+  // 🎧 S18: a csak-hang export (audioFormat) a hang plafonját kapja (podcast, album: órák)
+  const audioOnly = !!settingsRaw.audioFormat;
+  const maxSec = maxRenderSecFor(settingsRaw);
+  if (totalDuration > maxSec) {
     fs.rm(workDir, { recursive: true, force: true }, () => {});
     res.status(413).json({
-      error: `A videó túl hosszú (${Math.round(totalDuration)} mp). A maximum ${MAX_RENDER_DURATION_SEC} mp (10 perc).`,
+      error: audioOnly
+        ? `A hang túl hosszú (${Math.round(totalDuration)} mp). A maximum ${maxSec} mp (${Math.round(maxSec / 3600)} óra).`
+        : `A videó túl hosszú (${Math.round(totalDuration)} mp). A maximum ${maxSec} mp (10 perc).`,
     });
     return;
   }

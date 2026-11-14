@@ -11,10 +11,18 @@ import hu from './locales/hu.json';
 
 type Dict = Record<string, unknown>;
 const LOCALES: Record<string, Dict> = { en: en as Dict, hu: hu as Dict, de: de as Dict };
+// AUDIO-PROD S9: a hang-UI MINDEN névtere zárolva (a lapok: keverő, dobgép, sampler, piano roll, master; a videó-
+// szerkesztő hang-panelje; a hivatkozott hang sávja), nem csak a három fő
 const AUDIO_NAMESPACES = [
   ['studio', 'audio'],
   ['studio', 'audioTools'],
   ['panels', 'audio'],
+  ['studio', 'mixer'],
+  ['studio', 'drums'],
+  ['studio', 'sampler'],
+  ['studio', 'pianoRoll'],
+  ['studio', 'master'],
+  ['editor', 'linked'],
 ];
 
 function at(root: Dict, pathParts: string[]): Dict | undefined {

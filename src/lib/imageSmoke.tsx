@@ -7840,6 +7840,50 @@ async function smokeDenoiseNative(log: Log) {
   log(tn / 60 <= 0.1, 'sebesség: 10 perc hang ≤ 1 perc (≤ 0,1 s / hang-mp)', `natív ${(tn / 60).toFixed(3)} s/mp (60 s: ${tn.toFixed(1)} s, 10 perc ≈ ${(tn * 10).toFixed(0)} s) · JS ≈ ${(tj / 60).toFixed(3)} s/mp · ${(tj / tn).toFixed(0)}×`);
 }
 
+/** ⚡ a formáns-korrekció natív magja — bitre azonos a JS-sel, és a sebesség (az ének-hangolás szűk keresztmetszete) */
+async function smokeFormantNative(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const fm = await import('@/lib/formant');
+  const native = fm.getNativeFormant();
+  log(!!native, 'a natív formáns-mag be van kötve', `${!!native}`);
+  if (!native) return;
+  const SR = 44100;
+  let seed = 5;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;
+  const mk = (hz: number, sec: number) => {
+    let ph = 0;
+    return Float32Array.from({ length: Math.round(sec * SR) }, () => {
+      ph += (2 * Math.PI * hz) / SR;
+      return 0.3 * Math.sin(ph) + 0.15 * Math.sin(2 * ph) + 0.08 * Math.sin(3 * ph) + 0.01 * rnd();
+    });
+  };
+  const ref = mk(200, 3);
+  const sh = mk(267, 3);
+  const hash = (x: Float32Array) => {
+    let h = 2166136261;
+    const u = new Uint32Array(x.buffer, x.byteOffset, x.length);
+    for (let i = 0; i < u.length; i++) h = Math.imul(h ^ u[i], 16777619) >>> 0;
+    return h.toString(16);
+  };
+  let t0 = Date.now();
+  const a = fm.formantCorrect(ref, sh, SR);
+  const tn = (Date.now() - t0) / 1000;
+  fm.setNativeFormant(null);
+  let b: Float32Array = new Float32Array(0);
+  let tj = 0;
+  try {
+    t0 = Date.now();
+    b = fm.formantCorrect(ref, sh, SR);
+    tj = (Date.now() - t0) / 1000;
+  } finally {
+    fm.setNativeFormant(native);
+  }
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d = Math.max(d, Math.abs(a[i] - b[i]));
+  log(hash(a) === hash(b), 'natív = JS bitre', `natív ${hash(a)} · JS ${hash(b)} · max eltérés ${d.toExponential(1)}`);
+  log(tn < tj, 'sebesség: 3 s hang formáns-korrekciója', `natív ${(tn * 1000).toFixed(0)} ms · JS ${(tj * 1000).toFixed(0)} ms · ${(tj / Math.max(tn, 0.001)).toFixed(0)}×`);
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -10060,6 +10104,10 @@ export async function runImageSmoke(
   }
   if (phase === 'denoisenative') {
     await step(phase, () => smokeDenoiseNative(log));
+    return;
+  }
+  if (phase === 'formantnative') {
+    await step(phase, () => smokeFormantNative(log));
     return;
   }
   if (phase === 'midi') {

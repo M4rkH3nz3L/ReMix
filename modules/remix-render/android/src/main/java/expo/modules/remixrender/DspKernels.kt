@@ -14,6 +14,105 @@ import kotlin.math.tanh
  * double számolás → float32 írás, ugyanaz a sorrend). Állapot nélküli: az állapot a JS `Float64Array`-ben.
  */
 object DspKernels {
+  /** ⚡ formáns-korrekció (a JS `formantCorrect` pontos tükre: keretenként 4 FFT, 50 % átfedés) */
+  fun formantRun(ref: FloatArray, sh: FloatArray, outF: FloatArray, tabs: DoubleArray, params: DoubleArray) {
+    val n = params[0].toInt()
+    val hop = params[1].toInt()
+    val lifter = params[2].toInt()
+    val maxGain = params[3]
+    val minGain = params[4]
+    val silent = params[5]
+    val ola = params[6]
+    val half = n / 2
+    val dn = n.toDouble()
+    val len = sh.size
+    val xr = DoubleArray(n); val xi = DoubleArray(n)
+    val br = DoubleArray(n); val bi = DoubleArray(n)
+    val cr = DoubleArray(n); val ci = DoubleArray(n)
+    val out = DoubleArray(len + n)
+    fun fft(re: DoubleArray, im: DoubleArray, inverse: Boolean) {
+      for (i in 0 until n) {
+        val j = tabs[n + i].toInt()
+        if (i < j) {
+          var t = re[i]; re[i] = re[j]; re[j] = t
+          t = im[i]; im[i] = im[j]; im[j] = t
+        }
+      }
+      val sign = if (inverse) 1.0 else -1.0
+      var size = 2
+      while (size <= n) {
+        val hs = size shr 1
+        val st = n / size
+        var i = 0
+        while (i < n) {
+          for (k in 0 until hs) {
+            val wr = tabs[k * st]
+            val wi = sign * tabs[half + k * st]
+            val p = i + k
+            val q = p + hs
+            val ar = re[q] * wr - im[q] * wi
+            val ai = re[q] * wi + im[q] * wr
+            re[q] = re[p] - ar
+            im[q] = im[p] - ai
+            re[p] += ar
+            im[p] += ai
+          }
+          i += size
+        }
+        size = size shl 1
+      }
+    }
+    var start = -n + hop
+    while (start < len) {
+      var powA = 0.0
+      var powB = 0.0
+      for (i in 0 until n) {
+        val at = start + i
+        val a = if (at >= 0 && at < ref.size) ref[at].toDouble() * tabs[2 * n + i] else 0.0
+        val b = if (at >= 0 && at < len) sh[at].toDouble() * tabs[2 * n + i] else 0.0
+        xr[i] = a
+        xi[i] = b
+        powA += a * a
+        powB += b * b
+      }
+      if (powB / dn <= silent) { start += hop; continue }
+      fft(xr, xi, false)
+      val loud = powA / dn > silent
+      for (k in 0 until n) {
+        val m = (n - k) % n
+        br[k] = (xi[k] + xi[m]) / 2
+        bi[k] = (xr[m] - xr[k]) / 2
+        if (loud) {
+          val ar = (xr[k] + xr[m]) / 2
+          val ai = (xi[k] - xi[m]) / 2
+          cr[k] = Math.log(Math.sqrt(ar * ar + ai * ai) + 1e-9)
+          ci[k] = Math.log(Math.sqrt(br[k] * br[k] + bi[k] * bi[k]) + 1e-9)
+        }
+      }
+      if (loud) {
+        fft(cr, ci, true)
+        for (q in 0 until n) {
+          val keep = q <= lifter || q >= n - lifter
+          cr[q] = if (keep) cr[q] / dn else 0.0
+          ci[q] = if (keep) ci[q] / dn else 0.0
+        }
+        fft(cr, ci, false)
+        for (k in 0 until n) {
+          val g = Math.min(maxGain, Math.max(minGain, Math.exp(cr[k] - ci[k])))
+          br[k] *= g
+          bi[k] *= g
+        }
+      }
+      fft(br, bi, true)
+      for (i in 0 until n) {
+        val at = start + i
+        if (at >= 0) out[at] += (br[i] / dn) * tabs[2 * n + i] * ola
+      }
+      start += hop
+    }
+    for (i in 0 until len) outF[i] = out[i].toFloat()
+  }
+
   /**
    * ⚡ S20: a zajszűrés keretei (a JS `denoiseRunJs` pontos tükre). A bemenet a `[inFrom, …)` szelet, a kimenet a
    * `outOff`-tól kezdődő szelet (a modul csak az érintett tartományt másolja).

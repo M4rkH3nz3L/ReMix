@@ -86,6 +86,33 @@ for (let i = 0; i < FORMANT_N; i++) WIN[i] = Math.sin((Math.PI * (i + 0.5)) / FO
 const OLA_NORM = 1;
 
 /**
+ * ⚡ natív mag (S20 mintájára): `RemixRender.formantRun` (Swift / Kotlin) UGYANEZT számolja azonos sorrendben; a
+ * táblák és az ablak a JS-ből jönnek (`formantTabs`), így a telefonon bitre egyezik. A szerveren nincs bekötve.
+ * `params` = [N, HOP, lifter, MAX_GAIN, MIN_GAIN, SILENT_POWER, OLA_NORM].
+ */
+export type FormantRun = (ref: Float32Array, shifted: Float32Array, out: Float32Array, tabs: Float64Array, params: Float64Array) => void;
+let nativeFormant: FormantRun | null = null;
+export function setNativeFormant(fn: FormantRun | null): void {
+  nativeFormant = fn;
+}
+export const getNativeFormant = (): FormantRun | null => nativeFormant;
+let tabsCache: Float64Array | null = null;
+/** a táblák egy tömbben: cos (N/2) | sin (N/2) | rev (N) | ablak (N) */
+export function formantTabs(): Float64Array {
+  if (!tabsCache) {
+    const n = FORMANT_N;
+    const { rev, cos, sin } = tablesFor(n);
+    const t = new Float64Array(3 * n);
+    t.set(cos, 0);
+    t.set(sin, n / 2);
+    for (let i = 0; i < n; i++) t[n + i] = rev[i];
+    t.set(WIN, 2 * n);
+    tabsCache = t;
+  }
+  return tabsCache;
+}
+
+/**
  * A tolt jel (`shifted`) formánsai az időben illesztett eredeti (`ref`) burkolójára. A kimenet hossza
  * a `shifted`-é; a `ref` ugyanazon az idővonalon (ugyanolyan sebességgel nyújtva, de tolatlanul).
  *
@@ -96,8 +123,13 @@ const OLA_NORM = 1;
 export function formantCorrect(ref: Float32Array, shifted: Float32Array, sampleRate: number): Float32Array {
   const n = FORMANT_N;
   const len = shifted.length;
-  const out = new Float64Array(len + n);
   const lifter = Math.max(4, Math.round(LIFTER_SEC * sampleRate));
+  if (nativeFormant) {
+    const res = new Float32Array(len);
+    nativeFormant(ref, shifted, res, formantTabs(), Float64Array.of(n, HOP, lifter, MAX_GAIN, MIN_GAIN, SILENT_POWER, OLA_NORM));
+    return res;
+  }
+  const out = new Float64Array(len + n);
   const xr = new Float64Array(n);
   const xi = new Float64Array(n);
   const br = new Float64Array(n);

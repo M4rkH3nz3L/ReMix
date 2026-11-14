@@ -46,6 +46,19 @@ class RemixRenderModule : Module() {
     Constant("supportsDecodeWindow") { true }
     Constant("supportsDenoiseRun") { true }
 
+    // ⚡ formáns-korrekció natívan (a `src/lib/formant.ts` `formantCorrect` JS-ágának tükre; a táblák a JS-ből)
+    Function("formantRun") { ref: expo.modules.kotlin.typedarray.Float32Array, shifted: expo.modules.kotlin.typedarray.Float32Array, out: expo.modules.kotlin.typedarray.Float32Array, tabs: expo.modules.kotlin.typedarray.Float64Array, params: expo.modules.kotlin.typedarray.Float64Array ->
+      val o = java.nio.ByteOrder.nativeOrder()
+      val ra = FloatArray(ref.length).also { ref.toDirectBuffer().order(o).asFloatBuffer().get(it) }
+      val sa = FloatArray(shifted.length).also { shifted.toDirectBuffer().order(o).asFloatBuffer().get(it) }
+      val ta = DoubleArray(tabs.length).also { tabs.toDirectBuffer().order(o).asDoubleBuffer().get(it) }
+      val pa = DoubleArray(params.length).also { params.toDirectBuffer().order(o).asDoubleBuffer().get(it) }
+      val oa = FloatArray(out.length)
+      DspKernels.formantRun(ra, sa, oa, ta, pa)
+      val ob = out.toDirectBuffer().order(o).asFloatBuffer()
+      ob.rewind(); ob.put(oa)
+    }
+
     // ⚡ S20: a zajszűrés keretenkénti munkája natívan (a `src/lib/denoise.ts` `denoiseRunJs` tükre, azonos
     // aritmetikával és sorrendben; a táblák a JS-ből jönnek). Csak a darab által érintett tartomány másolódik.
     Function("denoiseRun") { l: expo.modules.kotlin.typedarray.Float32Array, r: expo.modules.kotlin.typedarray.Float32Array, tabs: expo.modules.kotlin.typedarray.Float64Array, state: expo.modules.kotlin.typedarray.Float64Array, outL: expo.modules.kotlin.typedarray.Float64Array, outR: expo.modules.kotlin.typedarray.Float64Array, params: expo.modules.kotlin.typedarray.Float64Array ->

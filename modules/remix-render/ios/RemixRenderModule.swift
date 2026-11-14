@@ -163,6 +163,16 @@ public class RemixRenderModule: Module {
     Constant("supportsDecodeWindow") { true }
     Constant("supportsDenoiseRun") { true }
 
+    // ⚡ formáns-korrekció natívan (a `src/lib/formant.ts` `formantCorrect` JS-ágának tükre; a táblák a JS-ből)
+    Function("formantRun") { (ref: Float32Array, shifted: Float32Array, out: Float32Array, tabs: Float64Array, params: Float64Array) in
+      let A = ref.rawPointer.bindMemory(to: Float32.self, capacity: max(1, ref.length))
+      let B = shifted.rawPointer.bindMemory(to: Float32.self, capacity: max(1, shifted.length))
+      let O = out.rawPointer.bindMemory(to: Float32.self, capacity: max(1, out.length))
+      let T = tabs.rawPointer.bindMemory(to: Double.self, capacity: max(1, tabs.length))
+      let P = params.rawPointer.bindMemory(to: Double.self, capacity: max(1, params.length))
+      DspKernels.formantRun(A, ref.length, B, shifted.length, O, T, P)
+    }
+
     // ⚡ S20: a zajszűrés keretenkénti munkája natívan (a `src/lib/denoise.ts` `denoiseRunJs` tükre, azonos
     // aritmetikával és sorrendben; a táblák a JS-ből jönnek) — helyben ír az `outL` / `outR` / `prev` tömbökbe
     Function("denoiseRun") { (l: Float32Array, r: Float32Array, tabs: Float64Array, state: Float64Array, outL: Float64Array, outR: Float64Array, params: Float64Array) in
@@ -831,6 +841,111 @@ final class SpeechFileJob: NSObject, AVSpeechSynthesizerDelegate {
 /// ⚡ A DSP-magok (a `dspKernels.ts` JS-változatának pontos tükre: float32 olvasás → double számolás → float32 írás).
 enum DspKernels {
   @inline(__always) static func dbToLin(_ db: Double) -> Double { pow(10.0, db / 20.0) }
+
+  /// ⚡ formáns-korrekció (a JS `formantCorrect` pontos tükre: keretenként 4 FFT, 50 % átfedés)
+  static func formantRun(_ ref: UnsafePointer<Float32>, _ refLen: Int, _ sh: UnsafePointer<Float32>, _ len: Int, _ outF: UnsafeMutablePointer<Float32>, _ tabs: UnsafePointer<Double>, _ params: UnsafePointer<Double>) {
+    let n = Int(params[0])
+    let hop = Int(params[1])
+    let lifter = Int(params[2])
+    let maxGain = params[3]
+    let minGain = params[4]
+    let silent = params[5]
+    let ola = params[6]
+    let half = n / 2
+    let dn = Double(n)
+    let xr = UnsafeMutablePointer<Double>.allocate(capacity: n)
+    let xi = UnsafeMutablePointer<Double>.allocate(capacity: n)
+    let br = UnsafeMutablePointer<Double>.allocate(capacity: n)
+    let bi = UnsafeMutablePointer<Double>.allocate(capacity: n)
+    let cr = UnsafeMutablePointer<Double>.allocate(capacity: n)
+    let ci = UnsafeMutablePointer<Double>.allocate(capacity: n)
+    let out = UnsafeMutablePointer<Double>.allocate(capacity: len + n)
+    out.initialize(repeating: 0, count: len + n)
+    cr.initialize(repeating: 0, count: n)
+    ci.initialize(repeating: 0, count: n)
+    defer { xr.deallocate(); xi.deallocate(); br.deallocate(); bi.deallocate(); cr.deallocate(); ci.deallocate(); out.deallocate() }
+    @inline(__always) func fft(_ re: UnsafeMutablePointer<Double>, _ im: UnsafeMutablePointer<Double>, _ inverse: Bool) {
+      for i in 0..<n {
+        let j = Int(tabs[n + i])
+        if i < j {
+          var t = re[i]; re[i] = re[j]; re[j] = t
+          t = im[i]; im[i] = im[j]; im[j] = t
+        }
+      }
+      let sign: Double = inverse ? 1 : -1
+      var size = 2
+      while size <= n {
+        let hs = size >> 1
+        let st = n / size
+        var i = 0
+        while i < n {
+          for k in 0..<hs {
+            let wr = tabs[k * st]
+            let wi = sign * tabs[half + k * st]
+            let p = i + k
+            let q = p + hs
+            let ar = re[q] * wr - im[q] * wi
+            let ai = re[q] * wi + im[q] * wr
+            re[q] = re[p] - ar
+            im[q] = im[p] - ai
+            re[p] += ar
+            im[p] += ai
+          }
+          i += size
+        }
+        size <<= 1
+      }
+    }
+    var start = -n + hop
+    while start < len {
+      var powA = 0.0
+      var powB = 0.0
+      for i in 0..<n {
+        let at = start + i
+        let a = at >= 0 && at < refLen ? Double(ref[at]) * tabs[2 * n + i] : 0
+        let b = at >= 0 && at < len ? Double(sh[at]) * tabs[2 * n + i] : 0
+        xr[i] = a
+        xi[i] = b
+        powA += a * a
+        powB += b * b
+      }
+      if powB / dn <= silent { start += hop; continue }
+      fft(xr, xi, false)
+      let loud = powA / dn > silent
+      for k in 0..<n {
+        let m = (n - k) % n
+        br[k] = (xi[k] + xi[m]) / 2
+        bi[k] = (xr[m] - xr[k]) / 2
+        if loud {
+          let ar = (xr[k] + xr[m]) / 2
+          let ai = (xi[k] - xi[m]) / 2
+          cr[k] = log((ar * ar + ai * ai).squareRoot() + 1e-9)
+          ci[k] = log((br[k] * br[k] + bi[k] * bi[k]).squareRoot() + 1e-9)
+        }
+      }
+      if loud {
+        fft(cr, ci, true)
+        for q in 0..<n {
+          let keep = q <= lifter || q >= n - lifter
+          cr[q] = keep ? cr[q] / dn : 0
+          ci[q] = keep ? ci[q] / dn : 0
+        }
+        fft(cr, ci, false)
+        for k in 0..<n {
+          let g = Swift.min(maxGain, Swift.max(minGain, exp(cr[k] - ci[k])))
+          br[k] *= g
+          bi[k] *= g
+        }
+      }
+      fft(br, bi, true)
+      for i in 0..<n {
+        let at = start + i
+        if at >= 0 { out[at] += (br[i] / dn) * tabs[2 * n + i] * ola }
+      }
+      start += hop
+    }
+    for i in 0..<len { outF[i] = Float32(out[i]) }
+  }
 
   /// ⚡ S20: a zajszűrés keretei (a JS `denoiseRunJs` pontos tükre — lásd ott a paramétereket)
   static func denoiseRun(_ l: UnsafePointer<Float32>, _ r: UnsafePointer<Float32>, _ tabs: UnsafePointer<Double>, _ state: UnsafeMutablePointer<Double>, _ outL: UnsafeMutablePointer<Double>, _ outR: UnsafeMutablePointer<Double>, _ outLen: Int, _ params: UnsafePointer<Double>) {

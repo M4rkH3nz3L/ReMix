@@ -1,6 +1,6 @@
 {
-  "NSCameraUsageDescription": "A Remix a kamerát használja, hogy közvetlenül a projektedbe vehess fel videót.",
-  "NSMicrophoneUsageDescription": "A Remix a mikrofont a narráció és a videóid hangjának felvételéhez használja.",
+  "NSCameraUsageDescription": "A Remix a kamerát használja, hogy közvetlenül a projektedbe vehess fel videót, élő adást indíthass, és tárgyakat 3D-modellbe szkennelhess.",
+  "NSMicrophoneUsageDescription": "A Remix a mikrofont a Hang Stúdióban zene, podcast és narráció felvételéhez, a videóid és élő adásaid hangjához, valamint az asszisztens kimondott parancsaihoz használja. A felvételeket és az átiratokat a telefonod dolgozza fel.",
   "NSPhotoLibraryUsageDescription": "A Remix a galériádból importál videókat és képeket, hogy szerkeszthesd őket.",
   "NSPhotoLibraryAddUsageDescription": "A Remix a kész videóidat a galériádba menti."
 }

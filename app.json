@@ -13,7 +13,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Remix uses the camera to record video into your projects, go live, and scan objects into 3D models.",
-        "NSMicrophoneUsageDescription": "Remix uses the microphone to record voiceover and audio for your videos and live streams.",
+        "NSMicrophoneUsageDescription": "Remix uses the microphone to record music, podcasts and voiceover in the Audio Studio, audio for your videos and live streams, and spoken commands for the assistant. Recordings and transcripts are processed on your phone.",
         "NSPhotoLibraryUsageDescription": "Remix imports videos and photos from your library so you can edit them.",
         "NSPhotoLibraryAddUsageDescription": "Remix saves your finished videos to your photo library.",
         "NSAppTransportSecurity": {
@@ -207,7 +207,7 @@
         "@config-plugins/react-native-webrtc",
         {
           "cameraPermission": "Remix uses the camera for live streaming.",
-          "microphonePermission": "Remix uses the microphone for live streaming."
+          "microphonePermission": "Remix uses the microphone to record music, podcasts and voiceover, audio for your videos and live streams, and spoken commands. Recordings and transcripts are processed on your phone."
         }
       ],
       "./plugins/withWeakLet",

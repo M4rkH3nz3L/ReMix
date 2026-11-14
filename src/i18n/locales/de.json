@@ -4028,6 +4028,12 @@
       "master": "Master"
     },
     "audio": {
+      "format": {
+        "mono": "Mono",
+        "stereo": "Stereo",
+        "channels_one": "{{count}} Kanal",
+        "channels_other": "{{count}} Kanäle"
+      },
       "toVideo": {
         "title": "Ins Video",
         "newLinked": "Neues Video – verknüpft (Änderungen an der Musik mit einem Tipp aktualisiert)",

@@ -12,6 +12,7 @@ import type { SrtCue } from '@/lib/srt';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { logCaught } from '@/lib/logCaught';
 import { readAudioTags, tagLabel, type AudioTags } from '@/lib/audioTags';
+import { readAudioFormat, type AudioFormatInfo } from '@/lib/audioFormat';
 
 export interface PickedVideo {
   uri: string;
@@ -28,6 +29,8 @@ export interface PickedAudio {
   duration: number;
   /** bevételi osztályozás (barátságos hiba/figyelmeztetés — a UI-nak) */
   intake: AudioIntakeResult;
+  /** 🎚️ S16: mintavétel / csatornák / bitmélység a fejlécből (üres = ismeretlen) */
+  format: AudioFormatInfo;
 }
 
 /**
@@ -258,7 +261,7 @@ export async function pickAudio(): Promise<PickedAudio | null> {
   // 🎵 §5 bevételi osztályozás: barátságos hiba/figyelmeztetés a néma kudarc helyett
   const intake = classifyAudioIntake({ uri, name: asset.name, durationSec: duration });
   // 🏷️ a klip neve a fájl címkéjéből („előadó – cím”), ha van — különben a fájlnév
-  return { uri, name: tagLabel(readFileTags(uri), asset.name), duration, intake };
+  return { uri, name: tagLabel(readFileTags(uri), asset.name), duration, intake, format: readFileFormat(uri) };
 }
 
 const TAG_WINDOW = 256 * 1024;
@@ -281,6 +284,31 @@ export function readFileTags(uri: string): AudioTags {
     logCaught('lib/media.ts:readFileTags', caught);
     return {};
   }
+}
+
+/** 🎚️ S16: a hang-fájl formátum-adatai a fejlécből (eleje + vége), teljes dekódolás nélkül */
+export function readFileFormat(uri: string): AudioFormatInfo {
+  try {
+    const file = new File(uri);
+    const size = file.size ?? 0;
+    const handle = file.open();
+    try {
+      const head = handle.readBytes(Math.min(size, TAG_WINDOW));
+      handle.offset = Math.max(0, size - TAG_WINDOW);
+      const tail = handle.readBytes(Math.min(size, TAG_WINDOW));
+      return readAudioFormat(head, tail);
+    } finally {
+      handle.close();
+    }
+  } catch (caught) {
+    logCaught('lib/media.ts:readFileFormat', caught);
+    return {};
+  }
+}
+
+/** az Asset-mezők a formátumból (csak az ismertek) */
+export function assetFormatFields(f: AudioFormatInfo): { sampleRate?: number; channels?: number; bitDepth?: number } {
+  return { ...(f.sampleRate ? { sampleRate: f.sampleRate } : {}), ...(f.channels ? { channels: f.channels } : {}), ...(f.bitDepth ? { bitDepth: f.bitDepth } : {}) };
 }
 
 export interface PickedLut {

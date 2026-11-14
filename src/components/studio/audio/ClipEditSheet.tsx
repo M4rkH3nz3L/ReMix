@@ -31,6 +31,7 @@ import { guardPro, usePaywall } from '@/store/paywallStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { withProgress } from '@/store/progressStore';
 import type { AudioClip, AudioFx, Project } from '@/types/project';
+import { audioFormatLabel } from '@/lib/audioFormat';
 
 type FxAutoKey = 'fxLowpass' | 'fxHighpass' | 'fxReverb' | 'fxDelay' | 'fxEqLow' | 'fxEqMid' | 'fxEqHigh';
 
@@ -67,6 +68,9 @@ export function ClipEditSheet({
   const updateClip = useEditorStore((s) => s.updateClip);
   const applyBatch = useEditorStore((s) => s.applyBatch);
   const playhead = useEditorStore((s) => s.playhead);
+  // 🎚️ S16: a forrás formátuma (az asseten, importkor kiolvasva)
+  const asset = useEditorStore((s) => (clip.assetId ? s.project?.assets.find((a) => a.id === clip.assetId) : undefined));
+  const formatText = asset ? audioFormatLabel(asset, { mono: t('studio.audio.format.mono'), stereo: t('studio.audio.format.stereo'), channels: (n) => t('studio.audio.format.channels', { count: n }) }) : '';
   const [separating, setSeparating] = useState(false);
   const [autoChannel, setAutoChannel] = useState<FxAutoKey>('fxLowpass');
 
@@ -219,9 +223,16 @@ export function ClipEditSheet({
   return (
     <AudioSheetFrame id="clipEdit" onClose={onDone} sheetStyle={styles.sheet} tapToClose>
       <View style={styles.head}>
-        <Text style={styles.title} numberOfLines={1}>
-          {clip.label || t('studio.audio.title')}
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title} numberOfLines={1}>
+            {clip.label || t('studio.audio.title')}
+          </Text>
+          {formatText ? (
+            <Text style={styles.formatText} testID="clip-format">
+              {formatText}
+            </Text>
+          ) : null}
+        </View>
         <Pressable onPress={onDone} style={styles.doneBtn}>
           <Ionicons name="checkmark" size={18} color="#fff" />
           <Text style={styles.doneText}>{t('common.done')}</Text>
@@ -642,6 +653,7 @@ const styles = StyleSheet.create({
   },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
   title: { flex: 1, color: palette.text, fontSize: 16, fontWeight: '800' },
+  formatText: { color: palette.textDim, fontSize: 11, fontWeight: '600', marginTop: 2 },
   doneBtn: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -263,6 +263,11 @@ export interface Asset {
   height?: number;
   /** relinkhez (F2) */
   hash?: string;
+  /** 🎚️ hang-formátum a fájl fejlécéből (S16; importkor kiolvasva — hiányzó = ismeretlen) */
+  sampleRate?: number;
+  channels?: number;
+  /** csak veszteségmentesnél (PCM / FLAC) */
+  bitDepth?: number;
   size?: number;
   /** `lut`: kép-réteg .cube fájlja — menteni kell, de beszúrható képként nem listázzuk */
   role?: 'lut';

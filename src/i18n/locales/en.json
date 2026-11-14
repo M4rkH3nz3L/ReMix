@@ -4023,6 +4023,12 @@
       "master": "Master"
     },
     "audio": {
+      "format": {
+        "mono": "mono",
+        "stereo": "stereo",
+        "channels_one": "{{count}} channel",
+        "channels_other": "{{count}} channels"
+      },
       "toVideo": {
         "title": "To video",
         "newLinked": "New video — linked (edits to the music update with one tap)",

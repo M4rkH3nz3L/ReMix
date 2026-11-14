@@ -6690,6 +6690,60 @@ async function smokeDecodeWindowed(log: Log) {
   }
 }
 
+/** 🎚️ S16: a hang-formátum a fájl fejlécéből valódi fájlokon (WAV 48 kHz/sztereó/24 bit, videóból kinyert M4A), és a klipszerkesztő mutatja. */
+async function smokeAudioFormat(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const { readFileFormat, assetFormatFields } = await import('@/lib/media');
+  // 1) 48 kHz, sztereó, 24 bites WAV (1 s)
+  const sr = 48000, ch = 2, n = sr;
+  const b = new Uint8Array(44 + n * ch * 3);
+  const v = new DataView(b.buffer);
+  const txt = (at: number, x: string) => [...x].forEach((c, i) => v.setUint8(at + i, c.charCodeAt(0)));
+  txt(0, 'RIFF'); v.setUint32(4, 36 + n * ch * 3, true); txt(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, ch, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * ch * 3, true); v.setUint16(32, ch * 3, true); v.setUint16(34, 24, true); txt(36, 'data'); v.setUint32(40, n * ch * 3, true);
+  const f = new File(Paths.cache, 'smoke_fmt48.wav');
+  if (f.exists) f.delete();
+  f.create();
+  f.write(b);
+  const w = readFileFormat(f.uri);
+  log(w.container === 'wav' && w.sampleRate === 48000 && w.channels === 2 && w.bitDepth === 24, 'WAV a fejlécből: 48 kHz, sztereó, 24 bit', JSON.stringify(w));
+  // 2) a videóból kinyert M4A (natív kinyerés) — mintavétel és csatornák az mp4a leíróból
+  const vid = await downloadToCache(`${smokeFileHost()}/vid_audio.mp4`, 'smoke_fmt_vid.mp4');
+  const ex = vid ? await extractVideoAudio(vid, 'smoke_fmt.mp4') : null;
+  const m = ex && ex.ok ? readFileFormat(ex.uri) : {};
+  let headHex = '-';
+  if (ex && ex.ok) {
+    const h = new File(ex.uri).open();
+    try { headHex = Array.from(h.readBytes(16)).map((x) => x.toString(16).padStart(2, '0')).join(' '); } finally { h.close(); }
+  }
+  log(m.container === 'm4a' && !!m.sampleRate && m.sampleRate >= 8000 && !!m.channels, 'M4A (videóból kinyerve) a fejlécből: mintavétel és csatornák', `${JSON.stringify(m)} · kinyerés ${vid ? (ex && ex.ok ? 'ok' : JSON.stringify(ex)) : 'nincs videó'} · fej ${headHex}`);
+  // 3) a klipszerkesztő mutatja (az asset mezőiből)
+  const id = 'prj_smoke_fmt';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:fmt', caught));
+  const base = createEmptyProject('smoke formátum', '9:16', undefined, 'audio');
+  const clip: AudioClip = { kind: 'audio', id: 'c', label: 'hang', uri: f.uri, assetId: 'a1', start: 0, duration: 1, trimIn: 0, sourceDuration: 1, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, assets: [{ id: 'a1', kind: 'audio', uri: f.uri, provider: 'local', name: 'hang', duration: 1, ...assetFormatFields(w) }], tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [clip] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1000);
+  try {
+    const a = st().project?.assets.find((x) => x.id === 'a1');
+    log(a?.sampleRate === 48000 && a.channels === 2 && a.bitDepth === 24, 'a formátum az asseten megmarad (mentés + betöltés)', JSON.stringify({ sr: a?.sampleRate, ch: a?.channels, bit: a?.bitDepth }));
+    st().selectClip('c');
+    runDevAction('audio.editClip');
+    await sleep(900);
+    log(true, 'FOTÓZHATÓ', 'a klipszerkesztő fejlécében: 48 kHz · sztereó · 24 bit');
+    await sleep(1500);
+    runDevAction('clipEdit.done');
+  } finally {
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:fmt-del', caught));
+    if (f.exists) f.delete();
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -8841,6 +8895,10 @@ export async function runImageSmoke(
   }
   if (phase === 'decwin') {
     await step(phase, () => smokeDecodeWindowed(log));
+    return;
+  }
+  if (phase === 'audiofmt') {
+    await step(phase, () => smokeAudioFormat(log));
     return;
   }
   if (phase === 'modeldl') {

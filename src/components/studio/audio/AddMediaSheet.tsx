@@ -10,7 +10,7 @@ import { audioIntakeText } from '@/lib/audioIntake';
 import { renderServerUrl } from '@/lib/backend';
 import { snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
-import { pickAudio } from '@/lib/media';
+import { assetFormatFields, pickAudio } from '@/lib/media';
 import { formatTime } from '@/lib/time';
 import { loadStorageProviders, type StorageEntry, type StorageProvider } from '@/lib/storageProviders';
 import { useEditorStore } from '@/store/editorStore';
@@ -75,7 +75,7 @@ export function AddMediaSheet({
     };
   }, []);
 
-  const addAudio = (uri: string, name: string, duration: number, remoteUrl?: string) => {
+  const addAudio = (uri: string, name: string, duration: number, remoteUrl?: string, fmt: { sampleRate?: number; channels?: number; bitDepth?: number } = {}) => {
     const st = useEditorStore.getState();
     const project = st.project;
     if (!project) {
@@ -103,6 +103,7 @@ export function AddMediaSheet({
       name,
       duration,
       ...(remoteUrl ? { remoteUrl } : {}),
+      ...fmt,
     });
     onClose();
   };
@@ -124,7 +125,7 @@ export function AddMediaSheet({
         if (picked.intake.warning) {
           Alert.alert(t('studio.audio.intake.warningTitle'), audioIntakeText(picked.intake, t));
         }
-        addAudio(picked.uri, picked.name, picked.duration);
+        addAudio(picked.uri, picked.name, picked.duration, undefined, assetFormatFields(picked.format));
       }
     } finally {
       setBusy(false);

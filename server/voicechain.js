@@ -59,6 +59,35 @@ function fxStageOrder(order) {
   return out;
 }
 
+// 🎛️ V7 — a kliens `src/lib/fxParams.ts` tükre (szerződés-teszt: src/lib/fxParams.contract.test.ts)
+const EQ_BAND_SPEC = { low: { freq: 100, min: 20, max: 500 }, mid: { freq: 1000, min: 200, max: 8000 }, high: { freq: 8000, min: 2000, max: 20000 } };
+const EQ_Q_MIN = 0.3;
+const EQ_Q_MAX = 8;
+const DELAY_MS_MIN = 20;
+const DELAY_MS_MAX = 2000;
+const clampP = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const numP = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+
+function eqBandParams(eq) {
+  const e = eq || {};
+  return ['low', 'mid', 'high'].map((key) => {
+    const spec = EQ_BAND_SPEC[key];
+    return {
+      key,
+      freq: Math.round(clampP(numP(e[`${key}Freq`], spec.freq), spec.min, spec.max)),
+      q: Math.round(clampP(numP(e[`${key}Q`], 1), EQ_Q_MIN, EQ_Q_MAX) * 100) / 100,
+      gain: clampP(numP(e[key], 0), -12, 12),
+    };
+  });
+}
+
+/** a delay ideje ms-ben: tempóhoz kötve a kliens által kiszámolt `delayMs`, különben 120–500 ms a mértékből */
+function delayTimeMs(fx) {
+  if (fx && fx.delayBeats > 0 && fx.delayMs > 0) return Math.round(clampP(fx.delayMs, DELAY_MS_MIN, DELAY_MS_MAX));
+  const a = clampP(fx && typeof fx.delay === 'number' ? fx.delay : 0.5, 0, 1);
+  return Math.round(120 + a * 380);
+}
+
 function audioFxChain(fx) {
   if (!fx) {
     return '';
@@ -90,10 +119,10 @@ function audioFxChain(fx) {
     },
     eq: () => {
       if (!fx.eq) return;
-      const g = (v) => clampN(v || 0, -12, 12);
-      if (g(fx.eq.low)) parts.push(`equalizer=f=100:t=q:w=1:g=${g(fx.eq.low)}`);
-      if (g(fx.eq.mid)) parts.push(`equalizer=f=1000:t=q:w=1:g=${g(fx.eq.mid)}`);
-      if (g(fx.eq.high)) parts.push(`equalizer=f=8000:t=q:w=1:g=${g(fx.eq.high)}`);
+      // 🎛️ V7: sávonként frekvencia és Q (a kliens `src/lib/fxParams.ts` `eqBandParams` tükre — szerződés-teszt)
+      for (const b of eqBandParams(fx.eq)) {
+        if (b.gain) parts.push(`equalizer=f=${b.freq}:t=q:w=${b.q}:g=${b.gain}`);
+      }
     },
     // 🚪 zajkapu: a küszöb alatti halk részek (háttérzaj/szünetek) lehalkítása
     gate: () => fx.gate && parts.push('agate=threshold=0.05:ratio=9:attack=5:release=80:range=0.06'),
@@ -110,7 +139,7 @@ function audioFxChain(fx) {
     delay: () => {
       if (fx.delay > 0) {
         const a = clampN(fx.delay, 0, 1);
-        parts.push(`aecho=0.8:0.6:${Math.round(120 + a * 380)}:${(0.2 + a * 0.5).toFixed(2)}`);
+        parts.push(`aecho=0.8:0.6:${delayTimeMs(fx)}:${(0.2 + a * 0.5).toFixed(2)}`);
       }
     },
     // 🎧 Haas-szélesítés: mono/szűk → szélesebb sztereó-kép
@@ -235,6 +264,8 @@ module.exports = {
   dereverbChain,
   voiceChain,
   audioFxChain,
+  eqBandParams,
+  delayTimeMs,
   panFilter,
   masterGraph,
   masterDynamics,

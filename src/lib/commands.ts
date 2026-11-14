@@ -7,6 +7,7 @@ import type { LiveDoc } from '@/types/live';
 import type { Model3DDoc } from '@/types/model3d';
 import type { AlbumDoc, AspectRatio, Asset, AssetSource, AudioBus, AudioMaster, Chapter, Clip, ImageDoc, InstrumentDoc, Marker, ParticlesConfig, Project, TempoChange, TimelineRegion, Track, TrackType } from '@/types/project';
 import { normalizeTempoMap } from '@/lib/audioTransport';
+import { retimeTempoDelays } from '@/lib/fxParams';
 import type { WorkflowRun } from '@/lib/workflowTemplate';
 
 /**
@@ -140,6 +141,12 @@ export interface ProjectEvent {
  * nem változtat semmin (ilyenkor history/event sem íródik).
  */
 export function applyCommand(project: Project, cmd: EditorCommand): Project | null {
+  const next = applyCommandRaw(project, cmd);
+  // 🥁 V7: a tempóhoz kötött delay ms-e a tempó (vagy a klip helye) változásakor ugyanebben az undo-lépésben frissül
+  return next ? retimeTempoDelays(next) : next;
+}
+
+function applyCommandRaw(project: Project, cmd: EditorCommand): Project | null {
   switch (cmd.type) {
     case 'ADD_CLIP': {
       let base = project;

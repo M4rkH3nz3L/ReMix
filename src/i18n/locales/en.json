@@ -4066,6 +4066,15 @@
       "master": "Master"
     },
     "audio": {
+      "fxParam": {
+        "parametric": "Parametric EQ (frequency and Q)",
+        "freq": "{{band}} – frequency",
+        "q": "{{band}} – Q (width)",
+        "delaySync": "Delay time",
+        "free": "Free",
+        "delaySyncA11y": "Delay time: {{value}}",
+        "syncHint": "{{ms}} ms at the clip ({{bpm}} BPM) — follows tempo changes"
+      },
       "format": {
         "mono": "mono",
         "stereo": "stereo",

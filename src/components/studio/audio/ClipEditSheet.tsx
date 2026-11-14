@@ -23,6 +23,8 @@ import { separateStems, STEM_SEPARATION_ENABLED } from '@/lib/stems';
 import { selectTakeCommand } from '@/lib/punchRecord';
 import { tempoMatchPatch, tempoResetPatch } from '@/lib/tempoMatch';
 import { fxStageOrder, moveStage, type FxStage } from '@/lib/fxOrder';
+import { DELAY_BEAT_OPTIONS, delayMsForBeats, EQ_BAND_SPEC, EQ_Q_MAX, EQ_Q_MIN, eqBandParams, type EqBandKey } from '@/lib/fxParams';
+import { bpmAt } from '@/lib/audioTransport';
 import { CLIP_DB_MAX, CLIP_DB_MIN, CLIP_VOLUME_MAX, dbToVolume, formatDb, volumeToDb } from '@/lib/clipGain';
 import { TakePicker } from '@/components/studio/audio/TakePicker';
 import { clamp } from '@/lib/time';
@@ -144,6 +146,12 @@ export function ClipEditSheet({
   const patchFx = (p: Partial<AudioFx>) => proFx(() => setFx((prev) => ({ ...prev, ...p })));
   const eq = fx.eq ?? { low: 0, mid: 0, high: 0 };
   const setEq = (p: Partial<typeof eq>) => patchFx({ eq: { ...eq, ...p } });
+  // 🎛️ V7: parametrikus EQ (sávonként frekvencia + Q) — alapból rejtve, a régi 3 csúszka marad elöl
+  const [paramEq, setParamEq] = useState(() => eqBandParams(fx.eq).some((b, i) => b.freq !== [100, 1000, 8000][i] || b.q !== 1));
+  const bands = eqBandParams(fx.eq);
+  // 🥁 V7: a delay ütemre — a klip helyén érvényes tempóból (a reducer is ebből számol)
+  const bpmHere = useEditorStore((st) => (st.project ? bpmAt(st.project, clip.start) : 120));
+  const beatLabel = (b: number) => ({ 0.25: '1/16', 0.5: '1/8', 0.75: '1/8.', 1: '1/4', 2: '1/2' })[b] ?? `${b}`;
 
   const dirty =
     volume !== clip.volume ||
@@ -510,6 +518,33 @@ export function ClipEditSheet({
         <Slider label={t('panels.audio.fxEqLow')} value={eq.low} min={-12} max={12} onChange={(v) => setEq({ low: Math.round(v) })} format={(v) => `${v > 0 ? '+' : ''}${Math.round(v)} dB`} />
         <Slider label={t('panels.audio.fxEqMid')} value={eq.mid} min={-12} max={12} onChange={(v) => setEq({ mid: Math.round(v) })} format={(v) => `${v > 0 ? '+' : ''}${Math.round(v)} dB`} />
         <Slider label={t('panels.audio.fxEqHigh')} value={eq.high} min={-12} max={12} onChange={(v) => setEq({ high: Math.round(v) })} format={(v) => `${v > 0 ? '+' : ''}${Math.round(v)} dB`} />
+        <ToggleRow icon="pulse-outline" label={t('studio.audio.fxParam.parametric')} value={paramEq} onValueChange={setParamEq} />
+        {paramEq
+          ? bands.map((b) => {
+              const spec = EQ_BAND_SPEC[b.key as EqBandKey];
+              const name = t(`panels.audio.fxEq${b.key === 'low' ? 'Low' : b.key === 'mid' ? 'Mid' : 'High'}`);
+              return (
+                <View key={b.key}>
+                  <Slider
+                    label={t('studio.audio.fxParam.freq', { band: name })}
+                    value={Math.log10(b.freq)}
+                    min={Math.log10(spec.min)}
+                    max={Math.log10(spec.max)}
+                    onChange={(v) => setEq({ [`${b.key}Freq`]: Math.round(10 ** v) } as Partial<typeof eq>)}
+                    format={(v) => (10 ** v >= 1000 ? `${(10 ** v / 1000).toFixed(1)} kHz` : `${Math.round(10 ** v)} Hz`)}
+                  />
+                  <Slider
+                    label={t('studio.audio.fxParam.q', { band: name })}
+                    value={b.q}
+                    min={EQ_Q_MIN}
+                    max={EQ_Q_MAX}
+                    onChange={(v) => setEq({ [`${b.key}Q`]: Math.round(v * 10) / 10 } as Partial<typeof eq>)}
+                    format={(v) => v.toFixed(1)}
+                  />
+                </View>
+              );
+            })
+          : null}
 
         <ToggleRow icon="remove-circle-outline" label={t('panels.audio.fxDenoise')} value={!!fx.denoise} onValueChange={(v) => patchFx({ denoise: v })} />
         <ToggleRow icon="power-outline" label={t('studio.audio.fxGate', { defaultValue: 'Zajkapu' })} value={!!fx.gate} onValueChange={(v) => patchFx({ gate: v })} />
@@ -534,6 +569,28 @@ export function ClipEditSheet({
           onChange={(v) => patchFx({ delay: v })}
           format={(v) => `${Math.round(v * 100)}%`}
         />
+        {/* 🥁 V7: a delay ideje ütemre (a tempóból) vagy szabadon (a mértékből) */}
+        <Text style={styles.autoLabel}>{t('studio.audio.fxParam.delaySync')}</Text>
+        <View style={styles.autoChips}>
+          {[0, ...DELAY_BEAT_OPTIONS].map((b) => {
+            const active = (fx.delayBeats ?? 0) === b;
+            const label = b === 0 ? t('studio.audio.fxParam.free') : beatLabel(b);
+            return (
+              <Pressable
+                key={b}
+                testID={`fx-delay-beats-${b}`}
+                accessibilityRole="button"
+                accessibilityLabel={t('studio.audio.fxParam.delaySyncA11y', { value: label })}
+                accessibilityState={{ selected: active }}
+                onPress={() => patchFx(b === 0 ? { delayBeats: undefined, delayMs: undefined } : { delayBeats: b, delayMs: delayMsForBeats(b, bpmHere) })}
+                style={[styles.autoChip, active && styles.autoChipActive]}
+              >
+                <Text style={[styles.autoChipText, active && styles.autoChipTextActive]}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {fx.delayBeats ? <Text style={styles.hint}>{t('studio.audio.fxParam.syncHint', { ms: delayMsForBeats(fx.delayBeats, bpmHere), bpm: Math.round(bpmHere) })}</Text> : null}
         <Text style={styles.hint}>{t('panels.audio.mixHint')}</Text>
 
         {/* 🔀 effekt-sorrend: az aktív fokozatok a lánc sorrendjében, léptetéssel (előnézet = export) */}

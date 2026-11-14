@@ -1132,8 +1132,9 @@ export interface AudioFx {
   highpass?: number;
   /** felüláteresztő: e Hz fölötti sziszegés vágása (pl. 12000); 0/hiányzó = ki */
   lowpass?: number;
-  /** 3-sávos EQ erősítés dB-ben (-12…12); mind 0 = ki */
-  eq?: { low: number; mid: number; high: number };
+  /** 3-sávos EQ erősítés dB-ben (-12…12); mind 0 = ki. 🎛️ V7: sávonként állítható frekvencia és Q
+   *  (hiányzó = 100 Hz / 1 kHz / 8 kHz, Q 1 — `fxParams.ts`, a szerver tükre) */
+  eq?: { low: number; mid: number; high: number; lowFreq?: number; midFreq?: number; highFreq?: number; lowQ?: number; midQ?: number; highQ?: number };
   /** zajszűrés (afftdn) */
   denoise?: boolean;
   /** sziszegés-csökkentés (deesser) */
@@ -1152,6 +1153,10 @@ export interface AudioFx {
   reverb?: number;
   /** echo/delay mértéke 0–1 (aecho) */
   delay?: number;
+  /** 🥁 V7: tempóhoz kötött delay — ütemrész negyedhangban (0,25 = 1/16 … 1 = 1/4); hiányzó = mérték-alapú idő */
+  delayBeats?: number;
+  /** a `delayBeats` a projekt tempójából ms-ben (a reducer számolja — `retimeTempoDelays`; a szerver ezt olvassa) */
+  delayMs?: number;
   /** 🎚️ hangmagasság-eltolás félhangban (−12…+12; 0/hiányzó = nincs). A renderben
    *  asetrate+atempo-val, a HOSSZ változatlan (nem chipmunk-effekt). */
   pitchSemitones?: number;

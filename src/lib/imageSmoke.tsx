@@ -174,7 +174,7 @@ import Constants from 'expo-constants';
 import { deleteProject, listProjects, loadProject, loadVersions, readRecovery, recoveryIsFresher, saveProjectAndEvents, saveProject, writeRecovery, clearRecovery } from '@/lib/storage';
 import { findMissingMedia } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
-import type { AudioClip, ImageClip, VideoClip, ImageDoc, ImageLayer, PhotoLayer, Project, ShapeLayer } from '@/types/project';
+import type { AudioClip, AudioFx, ImageClip, VideoClip, ImageDoc, ImageLayer, PhotoLayer, Project, ShapeLayer } from '@/types/project';
 
 type Log = (ok: boolean | null, name: string, detail?: string) => void;
 
@@ -7097,6 +7097,107 @@ async function smokeSampleGrid(log: Log) {
   }
 }
 
+/** 🎛️ V7: parametrikus EQ és tempóhoz kötött delay a telefonos exportban — a visszhang a tempóból számolt helyen
+ *  (tempóváltás után is, egy undo-lépésben), a sáv a beállított frekvencián emel. */
+async function smokeFxParams(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const wav = (name: string, fill: (i: number) => number, seconds: number) => {
+    const n = Math.round(seconds * SR);
+    const b = new Uint8Array(44 + n * 2);
+    const v = new DataView(b.buffer);
+    const txt = (at: number, x: string) => [...x].forEach((c, i) => v.setUint8(at + i, c.charCodeAt(0)));
+    txt(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); txt(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, SR, true); v.setUint32(28, SR * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); txt(36, 'data'); v.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.round(fill(i) * 32767), true);
+    const f = new File(Paths.cache, name);
+    if (f.exists) f.delete();
+    f.create();
+    f.write(b);
+    return f.uri;
+  };
+  const clickAt = Math.round(0.5 * SR);
+  const clickUri = wav('smoke_fx_click.wav', (i) => (i === clickAt ? 0.9 : 0), 2);
+  const sineUri = wav('smoke_fx_sine.wav', (i) => 0.25 * Math.sin((2 * Math.PI * 3000 * i) / SR), 1);
+  const id = 'prj_smoke_fxparam';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:fxparam', caught));
+  const base = createEmptyProject('smoke fx-paraméterek', '9:16', undefined, 'audio');
+  const mk = (cid: string, uri: string, dur: number): AudioClip => ({ kind: 'audio', id: cid, label: cid, uri, start: 0, duration: dur, trimIn: 0, sourceDuration: dur, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' });
+  await saveProject({ ...base, id, bpm: 120, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [mk('click', clickUri, 2)] } : t.type === 'sfx' ? { ...t, clips: [mk('sine', sineUri, 1)] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1000);
+  const uris: string[] = [];
+  const readL = (uri: string) => {
+    const h = new File(uri).open();
+    try {
+      const bytes = h.readBytes(h.size ?? 0);
+      const f = new Float32Array(bytes.buffer.slice(bytes.byteOffset + 44, bytes.byteOffset + bytes.length));
+      return Float32Array.from({ length: f.length / 2 }, (_, i) => f[i * 2]);
+    } finally {
+      h.close();
+    }
+  };
+  const only = (keep: string) => {
+    const p = st().project!;
+    return { ...p, tracks: p.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => c.id === keep) })) };
+  };
+  const echoAt = async (name: string) => {
+    const out = await exportOfflineWav(only('click'), new File(projectExportDir(), name), undefined, undefined, 'float32');
+    uris.push(out.uri);
+    const l = readL(out.uri);
+    let peak = 0;
+    let at = -1;
+    for (let i = clickAt + 200; i < l.length; i++) if (Math.abs(l[i]) > peak) { peak = Math.abs(l[i]); at = i; }
+    return { ms: ((at - clickAt) / SR) * 1000, peak };
+  };
+  try {
+    // 1) delay 1/8 120 BPM-en → 250 ms
+    st().dispatch({ type: 'UPDATE_CLIP', clipId: 'click', patch: { audioFx: { delay: 0.8, delayBeats: 0.5 } } }, 'user');
+    const fx1 = (st().project!.tracks.find((t) => t.type === 'music')!.clips[0] as AudioClip).audioFx;
+    const e1 = await echoAt('smoke_fx_d1.wav');
+    log(fx1?.delayMs === 250 && Math.abs(e1.ms - 250) < 0.05, 'delay 1/8 120 BPM-en: a visszhang 250 ms-nál (a telefonos exportban)', `delayMs ${fx1?.delayMs} · visszhang ${e1.ms.toFixed(2)} ms (csúcs ${e1.peak.toFixed(2)})`);
+    // 2) tempóváltás 90 BPM → 1/8 = 333 ms, egy undo-lépés
+    const hist = st().past?.length ?? 0;
+    st().dispatch({ type: 'SET_BPM', bpm: 90 }, 'user');
+    const fx2 = (st().project!.tracks.find((t) => t.type === 'music')!.clips[0] as AudioClip).audioFx;
+    const e2 = await echoAt('smoke_fx_d2.wav');
+    log(fx2?.delayMs === 333 && Math.abs(e2.ms - 333) < 0.05 && (st().past?.length ?? 0) === hist + 1, 'tempóváltás 90 BPM-re: a delay követi (333 ms), egy undo-lépésben', `delayMs ${fx2?.delayMs} · visszhang ${e2.ms.toFixed(2)} ms · history +${(st().past?.length ?? 0) - hist}`);
+    st().undo();
+    const fx3 = (st().project!.tracks.find((t) => t.type === 'music')!.clips[0] as AudioClip).audioFx;
+    log(st().project!.bpm === 120 && fx3?.delayMs === 250, 'visszavonás: a tempó és a delay együtt áll vissza', `${st().project!.bpm} BPM · ${fx3?.delayMs} ms`);
+    // 3) parametrikus EQ: +9 dB 3 kHz-en, Q 4
+    const gain = async (fx: AudioFx | undefined, name: string) => {
+      st().dispatch({ type: 'UPDATE_CLIP', clipId: 'sine', patch: { audioFx: fx } }, 'user');
+      const out = await exportOfflineWav(only('sine'), new File(projectExportDir(), name), undefined, undefined, 'float32');
+      uris.push(out.uri);
+      const l = readL(out.uri);
+      let e = 0;
+      for (let i = SR / 4; i < (3 * SR) / 4; i++) e += l[i] * l[i];
+      return 10 * Math.log10(e / (SR / 2));
+    };
+    const g0 = await gain(undefined, 'smoke_fx_e0.wav');
+    const gParam = await gain({ eq: { low: 0, mid: 9, high: 0, midFreq: 3000, midQ: 4 } }, 'smoke_fx_e1.wav');
+    const gOld = await gain({ eq: { low: 0, mid: 9, high: 0 } }, 'smoke_fx_e2.wav');
+    log(Math.abs(gParam - g0 - 9) < 0.5 && gOld - g0 < 1.5, 'parametrikus EQ: a 3 kHz-re állított sáv +9 dB-t emel; a régi fix 1 kHz-es sáv ott alig', `paraméteres ${(gParam - g0).toFixed(2)} dB · régi ${(gOld - g0).toFixed(2)} dB`);
+    st().selectClip('sine');
+    runDevAction('audio.editClip');
+    await sleep(900);
+    log(true, 'FOTÓZHATÓ', 'a klipszerkesztő: parametrikus EQ és a delay ütemrész-választója');
+    await sleep(1500);
+    runDevAction('clipEdit.done');
+  } finally {
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:fxparam-del', caught));
+    for (const u of uris) {
+      const f = new File(u);
+      if (f.exists) f.delete();
+    }
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -9272,6 +9373,10 @@ export async function runImageSmoke(
   }
   if (phase === 'samplegrid') {
     await step(phase, () => smokeSampleGrid(log));
+    return;
+  }
+  if (phase === 'fxparam') {
+    await step(phase, () => smokeFxParams(log));
     return;
   }
   if (phase === 'midi') {

@@ -1,5 +1,6 @@
 import { sampleChannel } from '@/lib/keyframes';
 import { fxStageOrder, type FxStage } from '@/lib/fxOrder';
+import { delayTimeMs, eqBandParams } from '@/lib/fxParams';
 import type { AudioFx, Keyframe } from '@/types/project';
 import { compGainDb, KERNEL, runKernel } from '@/lib/dspKernels';
 
@@ -561,11 +562,14 @@ export function buildFxChain(fx: AudioFx | undefined, sr: number, normGain = 1, 
   const hpF = (v: number) => clampN(v, 20, 2000);
   const lpF = (v: number) => clampN(v, 1000, 20000);
   const g = (v: number | undefined) => clampN(v || 0, -12, 12);
-  const band = (key: 'fxEqLow' | 'fxEqMid' | 'fxEqHigh', freq: number, base: number | undefined) => {
+  // 🎛️ V7: sávonként a frekvencia és a Q is (a szerver `equalizer=f=…:w=…` tükre — `fxParams.ts`)
+  const eqBands = eqBandParams(f.eq);
+  const band = (key: 'fxEqLow' | 'fxEqMid' | 'fxEqHigh', i: number) => {
+    const { freq, q, gain } = eqBands[i];
     if (has(key)) {
-      chain.push(new AutoBiquad((v) => peakingCoeffs(freq, g(v), sr), auto![key]!, g(base), sr));
-    } else if (g(base)) {
-      chain.push(peaking(freq, g(base), sr));
+      chain.push(new AutoBiquad((v) => peakingCoeffs(freq, g(v), sr, q), auto![key]!, gain, sr));
+    } else if (gain) {
+      chain.push(peaking(freq, gain, sr, q));
     }
   };
   const reverbDecays = (amount: number) => {
@@ -591,9 +595,9 @@ export function buildFxChain(fx: AudioFx | undefined, sr: number, normGain = 1, 
       }
     },
     eq: () => {
-      band('fxEqLow', 100, f.eq?.low);
-      band('fxEqMid', 1000, f.eq?.mid);
-      band('fxEqHigh', 8000, f.eq?.high);
+      band('fxEqLow', 0);
+      band('fxEqMid', 1);
+      band('fxEqHigh', 2);
     },
     gate: () => {
       if (f.gate) chain.push(new Gate(0.05, 9, 5, 80, 0.06, sr));
@@ -613,10 +617,10 @@ export function buildFxChain(fx: AudioFx | undefined, sr: number, normGain = 1, 
     },
     delay: () => {
       if ((f.delay && f.delay > 0) || has('fxDelay')) {
-        // a delay ideje a statikus mértékből (a késleltetési vonal hossza nem automatizálható kattogás nélkül)
-        const a = clampN(f.delay ?? 0.5, 0, 1);
+        // a delay ideje a statikus mértékből vagy (V7) a tempóból — a késleltetési vonal hossza nem
+        // automatizálható kattogás nélkül
         const delayDecay = (amount: number) => [clampN(amount, 0, 1) > 0 ? Number((0.2 + clampN(amount, 0, 1) * 0.5).toFixed(2)) : 0];
-        const e = new Echo(0.8, 0.6, [Math.round(120 + a * 380)], delayDecay(f.delay ?? 0), sr);
+        const e = new Echo(0.8, 0.6, [delayTimeMs(f)], delayDecay(f.delay ?? 0), sr);
         if (has('fxDelay')) e.auto = { kfs: auto!.fxDelay!, fallback: f.delay ?? 0, decaysOf: delayDecay, sr };
         chain.push(e);
       }

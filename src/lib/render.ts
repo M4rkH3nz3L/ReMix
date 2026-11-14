@@ -909,9 +909,11 @@ export async function downloadTrack(track: LibraryTrack): Promise<string> {
   const safe = track.id.replace(/[^a-z0-9_-]+/gi, '-');
   const target = new File(dir, `lib_${safe}.m4a`);
   if (target.exists) {
-    return target.uri; // már letöltve
+    return target.uri; // már letöltve (a telefonon van — újra nem kér Pro-t)
   }
-  const file = await File.downloadFileAsync(`${cloudBaseUrl()}${track.url}`, target);
+  // 🔁 2026-11-14: a szerveres könyvtár letöltése Pro (a szerver is ellenőrzi — hitelesített kérés)
+  const base = ensureCloud('soundLibrary');
+  const file = await File.downloadFileAsync(`${base}${track.url}`, target, { headers: await workerAuthHeaders() });
   return file.uri;
 }
 

@@ -7468,6 +7468,49 @@ async function smokeLoops(log: Log) {
   }
 }
 
+/** 🔁 V2.2: a szerveres teljes könyvtár Pro — Free-ben a Pro-ajánlat nyílik és nem kerül be semmi; Pro-ban a zene
+ *  a lejátszófejnél, ismert forrás-tempónál a projekt tempójára nyújtva (120 → 100 BPM: sebesség 0,8333). */
+async function smokeCloudLibrary(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const { useEntitlement } = await import('@/store/entitlementStore');
+  const { usePaywall } = await import('@/store/paywallStore');
+  const { fetchSoundLibrary } = await import('@/lib/render');
+  const saved = useEntitlement.getState();
+  const prev = { tier: saved.tier, proUntil: saved.proUntil, devPro: saved.devPro };
+  const id = 'prj_smoke_cloudlib';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:cloudlib', caught));
+  const base = createEmptyProject('smoke felhő-könyvtár', '9:16', undefined, 'audio');
+  await saveProject({ ...base, id, bpm: 100 });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1000);
+  const clips = () => st().project!.tracks.flatMap((t) => t.clips);
+  try {
+    const lib = await fetchSoundLibrary().catch(() => []);
+    const pick = lib[0];
+    log(!!pick, 'a könyvtár listája elérhető (böngészhető)', `${lib.length} tétel`);
+    if (!pick) return;
+    const track = { ...pick, bpm: 120 };
+    useEntitlement.setState({ tier: 'free', proUntil: null, devPro: false });
+    usePaywall.setState({ visible: false });
+    const n0 = clips().length;
+    const r1 = await runDevAction('loops.placeCloud', track);
+    log(r1 == null && usePaywall.getState().visible && clips().length === n0, 'Free: a letöltés a Pro-ajánlatot nyitja, nem kerül be klip', `paywall ${usePaywall.getState().visible} · klipek ${n0} → ${clips().length}`);
+    usePaywall.setState({ visible: false });
+    useEntitlement.setState({ devPro: true });
+    const r2 = (await runDevAction('loops.placeCloud', track)) as string | null;
+    const c = clips().find((x) => x.id === r2) as AudioClip | undefined;
+    log(!!c && Math.abs((c.speed ?? 1) - 100 / 120) < 1e-6 && Math.abs(c.duration - pick.duration / (100 / 120)) < 1e-6 && new File(c.uri).exists, 'Pro: a zene a lejátszófejnél, a projekt tempójára nyújtva (120 → 100 BPM)', `sebesség ${(c?.speed ?? 0).toFixed(4)} · hossz ${c?.duration.toFixed(3)} s (forrás ${pick.duration} s) · ${c?.uri.split('/').pop()}`);
+  } finally {
+    useEntitlement.setState(prev);
+    usePaywall.setState({ visible: false });
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:cloudlib-del', caught));
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -9664,6 +9707,10 @@ export async function runImageSmoke(
   }
   if (phase === 'loops') {
     await step(phase, () => smokeLoops(log));
+    return;
+  }
+  if (phase === 'cloudlib') {
+    await step(phase, () => smokeCloudLibrary(log));
     return;
   }
   if (phase === 'midi') {

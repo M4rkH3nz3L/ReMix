@@ -57,7 +57,7 @@ export type CapabilityId =
   | 'psdImport' // 🖼️ Kép Stúdió: PSD → réteges ImageDoc (worker-parser, réteg-megőrzés)
   | 'psdExport' // 🖼️ Kép Stúdió: ImageDoc → réteges .psd (worker-builder, réteg-megőrzés)
   | 'pdfImport' // 📄 Kép Stúdió: PDF → oldalanként egy ImageDoc (worker pdfjs+canvas raszter)
-  | 'soundLibrary'; // worker hang-könyvtár (ingyenes felhő-funkció)
+  | 'soundLibrary'; // worker hang-könyvtár (Pro felhő-funkció; a beépített loopok ingyenesek)
 
 /**
  * A `where`/`minTier` kombináció TÍPUS-SZINTEN kódolja a szigorú üzleti szabályt:
@@ -117,8 +117,9 @@ export const CAPABILITIES: Record<CapabilityId, CapabilityMeta> = {
   psdImport: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.psdImport' },
   psdExport: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.psdExport' },
   pdfImport: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.pdfImport' },
-  // a hang-könyvtár felhőből jön, de minden felhasználónak jár
-  soundLibrary: { where: 'cloud', minTier: 'free', label: 'lib.capabilities.label.soundLibrary' },
+  // 🔁 2026-11-14 (tulajdonosi döntés): a szerveres hang-könyvtár Pro — ami a telefonon van, ingyenes (a beépített
+  // loopok a telefon motorján, `loopLibrary.ts`), a felhő fizetős; a lista böngészhető, a letöltés Pro
+  soundLibrary: { where: 'cloud', minTier: 'pro', label: 'lib.capabilities.label.soundLibrary' },
 };
 
 export function capabilityWhere(cap: CapabilityId): Where {

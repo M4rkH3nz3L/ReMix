@@ -51,7 +51,8 @@ describe('capabilities — minTier-alapú kapuzás (audit §2.1)', () => {
     // szándékosan ingyenes felhő-funkciók (adat-biztonság / mindenkinek jár)
     expect(capabilityMinTier('cloudSync')).toBe('free');
     expect(capabilityMinTier('collab')).toBe('free');
-    expect(capabilityMinTier('soundLibrary')).toBe('free');
+    // 🔁 2026-11-14: a szerveres hang-könyvtár Pro (a beépített loopok a telefonon ingyenesek)
+    expect(capabilityMinTier('soundLibrary')).toBe('pro');
     // fizetős felhő-AI
     expect(capabilityMinTier('autoEdit')).toBe('pro');
     expect(capabilityRequiresPro('autoEdit')).toBe(true);

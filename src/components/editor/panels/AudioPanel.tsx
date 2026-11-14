@@ -238,19 +238,24 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
       return;
     }
     setBusyTrack(track.id);
-    downloadTrack(track)
-      .then((uri) =>
-        addAudioClip(
-          uri,
-          track.name,
-          track.duration,
-          'library',
-          // az SFX-ek a saját sávjukra kerülnek, a zenék a zenesávra
-          track.kind === 'sfx' ? 'sfx' : 'music'
-        )
-      )
-      .catch((caught) => { logCaught('components/editor/panels/AudioPanel.tsx:addFromLibrary', caught); return Alert.alert(t('common.error'), t('panels.audio.downloadFailed')); })
-      .finally(() => setBusyTrack(null));
+    // 🔁 2026-11-14: a szerveres könyvtár letöltése Pro → Free-ben a Pro-ajánlat nyílik (guardPro)
+    void guardPro(
+      () =>
+        downloadTrack(track).then((uri) =>
+          addAudioClip(
+            uri,
+            track.name,
+            track.duration,
+            'library',
+            // az SFX-ek a saját sávjukra kerülnek, a zenék a zenesávra
+            track.kind === 'sfx' ? 'sfx' : 'music'
+          )
+        ),
+      (caught) => {
+        logCaught('components/editor/panels/AudioPanel.tsx:addFromLibrary', caught);
+        Alert.alert(t('common.error'), t('panels.audio.downloadFailed'));
+      }
+    ).finally(() => setBusyTrack(null));
   };
 
   const importOwn = async () => {

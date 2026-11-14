@@ -6,6 +6,7 @@ const { logCaught } = require('../lib/caught');
 const express = require('express');
 const { listMediaLibrary } = require('../library');
 const { listLibrary } = require('../sfx');
+const { proOnly } = require('../lib/guards');
 
 const router = express.Router();
 
@@ -64,7 +65,8 @@ router.get('/music', (_req, res) => {
     .catch((caught) => { logCaught('routes/library.js', caught); return res.status(500).json({ error: 'A könyvtár nem olvasható.' }); });
 });
 
-router.get('/music/:id/file', (req, res) => {
+// 🔁 2026-11-14: a könyvtár fájljainak letöltése Pro (a lista böngészhető); a beépített loopok a telefonon ingyenesek
+router.get('/music/:id/file', proOnly, (req, res) => {
   (libraryCache ? Promise.resolve(libraryCache) : listLibrary())
     .then((items) => {
       libraryCache = items;

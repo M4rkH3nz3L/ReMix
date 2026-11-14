@@ -11,6 +11,8 @@ import { planSoundDesign, usedSfxIds } from '@/lib/soundDesign';
 import type { SfxId, SfxPlacement } from '@/lib/soundDesign';
 import { useEditorStore } from '@/store/editorStore';
 import { logCaught } from '@/lib/logCaught';
+import { canUseCloud } from '@/lib/backend';
+import { usePaywall } from '@/store/paywallStore';
 
 /**
  * 🔊 Sound Design AI v1: a vágópontokra és a beat-rácsra oszt ki SFX-eket a
@@ -87,6 +89,11 @@ export function SoundDesignSection({
         return;
       }
 
+      // 🔁 2026-11-14: az effekt-hangok a szerveres könyvtárból jönnek → Pro (Free-ben a Pro-ajánlat)
+      if (!canUseCloud('soundLibrary')) {
+        usePaywall.getState().open('soundLibrary');
+        return;
+      }
       // a szükséges SFX-fájlok letöltése (mindegyik csak egyszer)
       setBusy(t('panels.assistant.downloadingSounds'));
       const library = await fetchSoundLibrary();

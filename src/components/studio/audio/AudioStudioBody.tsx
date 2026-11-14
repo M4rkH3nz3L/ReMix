@@ -90,6 +90,8 @@ import { renderDrumsToClip } from '@/lib/drumsClient';
 import { patternHits, type DrumHit } from '@/lib/drums';
 import { BUILTIN_LOOPS, LOOP_BARS, loopDrums, loopNotes, type BuiltinLoop } from '@/lib/loopLibrary';
 import { LoopLibrarySheet } from '@/components/studio/audio/LoopLibrarySheet';
+import { downloadTrack, type LibraryTrack } from '@/lib/render';
+import { tempoMatchPatch } from '@/lib/tempoMatch';
 import { renderSamplerToClip } from '@/lib/samplerClient';
 import type { SamplerPattern } from '@/lib/sampler';
 import { detectBeats } from '@/lib/beats';
@@ -247,6 +249,9 @@ export function AudioStudioBody({
   const [loopsOpen, setLoopsOpen] = useState(false);
   const [loopBusy, setLoopBusy] = useState<string | null>(null);
   const placeLoopRef = useRef<(id: string) => Promise<string | null>>(async () => null);
+  const placeCloudRef = useRef<(track: LibraryTrack) => Promise<string | null>>(async () => null);
+  // a foglaltság ref-ben is (az állapot csak a felületnek — két gyors hívás a render előtt is lássa)
+  const loopBusyRef = useRef(false);
   const [bpmBusy, setBpmBusy] = useState(false);
   const [detectedBeats, setDetectedBeats] = useState<{ uri: string; beats: number[] } | null>(null);
   const [source, setSource] = useState(false);
@@ -366,6 +371,7 @@ export function AudioStudioBody({
       registerDevAction('audio.openDrums', () => devRef.current.openDrums()),
       registerDevAction('audio.loops', () => setLoopsOpen(true)),
       registerDevAction('loops.place', (id) => placeLoopRef.current(String(id))),
+      registerDevAction('loops.placeCloud', (track) => placeCloudRef.current(track as LibraryTrack)),
       registerDevAction('audio.editClip', () => devRef.current.editClip()),
       registerDevAction('audio.closeDrums', () => devRef.current.closeDrums()),
       registerDevAction('audio.autoBpm', () => devRef.current.autoBpm()),
@@ -922,7 +928,8 @@ export function AudioStudioBody({
    * szintivel), a minta szerkeszthető hangszer-dokumentum lesz (egy undo). Visszaadja az új klip azonosítóját.
    */
   const placeLoop = async (loop: BuiltinLoop): Promise<string | null> => {
-    if (loopBusy) return null;
+    if (loopBusyRef.current) return null;
+    loopBusyRef.current = true;
     setLoopBusy(loop.id);
     try {
       const label = t(`studio.audio.loops.name.${loop.id}`);
@@ -941,9 +948,39 @@ export function AudioStudioBody({
       setLoopsOpen(false);
       return added?.id ?? null;
     } finally {
+      loopBusyRef.current = false;
       setLoopBusy(null);
     }
   };
+  /**
+   * 🔁 V2.2: a szerveres teljes könyvtár zenéje (Pro — Free-ben a Pro-ajánlat nyílik) a lejátszófejnél; ismert
+   * forrás-tempónál a projekt tempójára nyújtva (`tempoMatchPatch`, hangmagasság-tartással). Egy undo.
+   */
+  const placeCloudTrack = async (track: LibraryTrack): Promise<string | null> => {
+    if (loopBusyRef.current) return null;
+    loopBusyRef.current = true;
+    setLoopBusy(track.id);
+    try {
+      const id = await guardPro(
+        async () => {
+          const uri = await downloadTrack(track);
+          const st = useEditorStore.getState();
+          const base: AudioClip = { kind: 'audio', id: makeId('clip'), start: snapToFrame(st.playhead, grid), duration: track.duration, trimIn: 0, sourceDuration: track.duration, uri, label: track.name, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+          const clip: AudioClip = { ...base, ...(track.bpm ? (tempoMatchPatch(base, track.bpm, bpm) ?? {}) : {}) };
+          const asset: Asset = { id: makeId('ast'), kind: 'audio', uri, provider: 'library', name: track.name, duration: track.duration };
+          st.dispatch({ type: 'ADD_CLIP', trackType: 'music', clip, asset }, 'user');
+          setLoopsOpen(false);
+          return clip.id;
+        },
+        (err) => Alert.alert(t('studio.audio.loops.title'), err.message)
+      );
+      return id ?? null;
+    } finally {
+      loopBusyRef.current = false;
+      setLoopBusy(null);
+    }
+  };
+  placeCloudRef.current = placeCloudTrack;
   placeLoopRef.current = async (id: string) => {
     const loop = BUILTIN_LOOPS.find((l) => l.id === id);
     return loop ? placeLoop(loop) : null;
@@ -1585,7 +1622,7 @@ export function AudioStudioBody({
       )}
 
       {sheetsInDock ? null : sheets}
-      {loopsOpen ? <LoopLibrarySheet bpm={bpm} busyId={loopBusy} onPick={(l) => void placeLoop(l)} onClose={() => setLoopsOpen(false)} /> : null}
+      {loopsOpen ? <LoopLibrarySheet bpm={bpm} busyId={loopBusy} onPick={(l) => void placeLoop(l)} onPickCloud={(tr) => void placeCloudTrack(tr)} onClose={() => setLoopsOpen(false)} /> : null}
     </View>
     </UndoGestureArea>
   );

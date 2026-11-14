@@ -29,8 +29,7 @@ import { CLIP_DB_MAX, CLIP_DB_MIN, CLIP_VOLUME_MAX, dbToVolume, formatDb, volume
 import { TakePicker } from '@/components/studio/audio/TakePicker';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
-import { guardPro, usePaywall } from '@/store/paywallStore';
-import { useEntitlement } from '@/store/entitlementStore';
+import { guardPro } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
 import type { AudioClip, AudioFx, Project } from '@/types/project';
 import { audioFormatLabel } from '@/lib/audioFormat';
@@ -50,7 +49,7 @@ const FX_AUTO: { key: FxAutoKey; min: number; max: number; fallback: (fx?: Audio
 
 /**
  * 🎚️ Klip-szerkesztő lap — a kijelölt hangklip nem-destruktív szerkesztése
- * (trim / fade / hangerő / pan / enhance / Pro FX). Minden a `HangStudio`-ból
+ * (trim / fade / hangerő / pan / enhance / effektek). Minden a `HangStudio`-ból
  * ismert mintát követi: a lap LOKÁLIS állapotban dolgozik, és a „Kész" EGY
  * `updateClip`-pel commitál → EGY undo-lépés. A vágás/keyframe a projekt rácsára ül (hang-projektben a mintára — V6).
  */
@@ -133,16 +132,10 @@ export function ClipEditSheet({
   const maxFade = Math.min(5, duration / 2);
   const clipPlayhead = playhead - clip.start;
 
-  // A48: a PRO effekt-lánc a renderben hat (felhő, Pro) — Free-nél a paywall nyílik, nem egy
-  // olyan beállítás, ami se nem hallható, se nem exportálható
-  const isPro = useEntitlement((s) => s.isPro());
-  const proFx = (apply: () => void) => {
-    if (!isPro) {
-      usePaywall.getState().open('cloudRender');
-      return;
-    }
-    apply();
-  };
+  // 🆓 2026-11-14 (tulajdonosi döntés): ami a telefonon fut, az ingyenes, a felhő fizetős. A klip-effektek a
+  // telefonos exportban és előnézetben a közös DSP-n (`audioDsp.ts`) szólnak → Free-ben is állíthatók; Pro csak a
+  // felhős render (az export útja dönti el, nem ez a lap)
+  const proFx = (apply: () => void) => apply();
   const patchFx = (p: Partial<AudioFx>) => proFx(() => setFx((prev) => ({ ...prev, ...p })));
   const eq = fx.eq ?? { low: 0, mid: 0, high: 0 };
   const setEq = (p: Partial<typeof eq>) => patchFx({ eq: { ...eq, ...p } });
@@ -214,6 +207,13 @@ export function ClipEditSheet({
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
   useEffect(() => registerDevAction('clipEdit.done', () => onDoneRef.current()), []);
+  // 🧪 füstteszt: egy effekt-preset a lap valódi útján (a Free/Pro döntés is itt fut)
+  const presetRef = useRef((key: string) => proFx(() => setFx(presetFx(key as (typeof AUDIO_FX_PRESETS)[number]['key']))));
+  presetRef.current = (key: string) => proFx(() => setFx(presetFx(key as (typeof AUDIO_FX_PRESETS)[number]['key'])));
+  useEffect(() => registerDevAction('clipEdit.applyFxPreset', (key) => {
+    presetRef.current(String(key));
+    return true;
+  }), []);
   // 🧪 füstteszt: a „Minta szerkesztése” gomb
   const editInstrumentNow = () => {
     if (!clip.instrumentDocId || !onEditInstrument) return false;
@@ -456,9 +456,6 @@ export function ClipEditSheet({
             )}
             <Text style={styles.specBtnText}>{t('studio.audio.spectrum', { defaultValue: 'Spektrum' })}</Text>
           </Pressable>
-          <View style={styles.proTag}>
-            <Text style={styles.proTagText}>PRO</Text>
-          </View>
         </View>
         {spectrumUri ? (
           <Image source={{ uri: spectrumUri }} style={styles.spectrumImg} contentFit="contain" transition={120} />

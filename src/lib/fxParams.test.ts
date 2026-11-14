@@ -1,4 +1,4 @@
-import { buildFxChain, runChain } from '@/lib/audioDsp';
+import { buildFxChain, fxUnsupported, runChain } from '@/lib/audioDsp';
 import { applyCommand } from '@/lib/commands';
 import { DELAY_BEAT_OPTIONS, delayMsForBeats, delayTimeMs, eqBandParams, retimeTempoDelays } from '@/lib/fxParams';
 import { createEmptyProject } from '@/lib/projectUtils';
@@ -80,5 +80,10 @@ describe('🎛️ V7 fxParams', () => {
     // az ütemrész választása (UPDATE_CLIP) is azonnal kiszámolja
     const p4 = applyCommand(p3, { type: 'UPDATE_CLIP', clipId: 'b', patch: { audioFx: { delay: 0.6, delayBeats: 1 } } })!;
     expect(music(p4).find((c) => c.id === 'b')!.audioFx?.delayMs).toBe(600);
+  });
+
+  it('az ütemre kötött delay a telefonos láncban támogatott (nincs „nem támogatott effekt” jelzés)', () => {
+    expect(fxUnsupported({ delay: 0.5, delayBeats: 0.5, delayMs: 250 })).toBe(false);
+    expect(fxUnsupported({ eq: { low: 1, mid: 0, high: 0, midFreq: 2000, midQ: 2 } })).toBe(false);
   });
 });

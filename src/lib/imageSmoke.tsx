@@ -7198,6 +7198,67 @@ async function smokeFxParams(log: Log) {
   }
 }
 
+/** 🆓 2026-11-14: ami a telefonon fut, ingyenes — Free-fiókkal a klip-effekt (preset) paywall nélkül a klipre kerül,
+ *  és a telefonos export „nem támogatott” jelzés nélkül, hallhatóan alkalmazza. */
+async function smokeFreeFx(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const { useEntitlement } = await import('@/store/entitlementStore');
+  const { usePaywall } = await import('@/store/paywallStore');
+  const saved = useEntitlement.getState();
+  const prev = { tier: saved.tier, proUntil: saved.proUntil, devPro: saved.devPro };
+  const id = 'prj_smoke_freefx';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:freefx', caught));
+  const base = createEmptyProject('smoke free fx', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'c', label: 'hang', uri: toneWav('smoke_freefx.wav', 2), start: 0, duration: 2, trimIn: 0, sourceDuration: 2, volume: 0.8, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1000);
+  const uris: string[] = [];
+  try {
+    useEntitlement.setState({ tier: 'free', proUntil: null, devPro: false });
+    usePaywall.setState({ visible: false });
+    log(!useEntitlement.getState().isPro(), 'Free-fiók beállítva a mérésre', useEntitlement.getState().tier);
+    st().selectClip('c');
+    runDevAction('audio.editClip');
+    await sleep(900);
+    runDevAction('clipEdit.applyFxPreset', 'radio');
+    await sleep(200);
+    runDevAction('clipEdit.done');
+    await sleep(500);
+    const fx = (st().project!.tracks.find((t) => t.type === 'music')!.clips[0] as AudioClip).audioFx;
+    log(!!fx && !usePaywall.getState().visible, 'a „Rádió” effekt Free-ben paywall nélkül a klipre kerül', JSON.stringify(fx));
+    const dryP = { ...st().project!, tracks: st().project!.tracks.map((t) => ({ ...t, clips: t.clips.map((x) => ({ ...x, audioFx: undefined }) as AudioClip) })) };
+    const dry = await exportOfflineWav(dryP, new File(projectExportDir(), 'smoke_freefx_dry.wav'), undefined, undefined, 'float32');
+    const wet = await exportOfflineWav(st().project!, new File(projectExportDir(), 'smoke_freefx_wet.wav'), undefined, undefined, 'float32');
+    uris.push(dry.uri, wet.uri);
+    const rms = (uri: string) => {
+      const h = new File(uri).open();
+      try {
+        const b = h.readBytes(h.size ?? 0);
+        const f = new Float32Array(b.buffer.slice(b.byteOffset + 44, b.byteOffset + b.length));
+        let e = 0;
+        for (let i = 0; i < f.length; i++) e += f[i] * f[i];
+        return Math.sqrt(e / f.length);
+      } finally {
+        h.close();
+      }
+    };
+    const d = 20 * Math.log10(rms(wet.uri) / rms(dry.uri));
+    log(wet.unsupported.length === 0 && Math.abs(d) > 0.5, 'a telefonos export az effekttel szól (nincs „nem támogatott” jelzés)', `eltérés a száraztól ${d.toFixed(2)} dB · nem támogatott: ${JSON.stringify(wet.unsupported)}`);
+  } finally {
+    useEntitlement.setState(prev);
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:freefx-del', caught));
+    for (const u of uris) {
+      const f = new File(u);
+      if (f.exists) f.delete();
+    }
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -9377,6 +9438,10 @@ export async function runImageSmoke(
   }
   if (phase === 'fxparam') {
     await step(phase, () => smokeFxParams(log));
+    return;
+  }
+  if (phase === 'freefx') {
+    await step(phase, () => smokeFreeFx(log));
     return;
   }
   if (phase === 'midi') {

@@ -91,14 +91,14 @@ describe('ClipEditSheet', () => {
     };
     const savedFx = () => (useEditorStore.getState().project?.tracks.find((t) => t.type === 'music')?.clips[0] as AudioClip).audioFx;
 
-    it('Free felhasználónál az effekt a paywallt nyitja, és nem kerül a klipre', async () => {
+    it('🆓 Free felhasználónál is a klipre kerül (a telefonon szól — ami az eszközön fut, ingyenes), paywall nélkül', async () => {
       useEntitlement.setState({ tier: 'free', devPro: false });
       usePaywall.setState({ visible: false });
       const view = await mount();
       await act(async () => presetChip(view).props.onPress());
       await act(async () => frameClose());
-      expect(usePaywall.getState().visible).toBe(true);
-      expect(savedFx()).toBeUndefined();
+      expect(usePaywall.getState().visible).toBe(false);
+      expect(savedFx()).toBeDefined();
     });
 
     it('Pro felhasználónál az effekt a klipre kerül', async () => {

@@ -4086,6 +4086,32 @@
       "master": "Master"
     },
     "audio": {
+      "chords": {
+        "title": "Akkordfolge",
+        "open": "Akkorde",
+        "key": "Tonart",
+        "major": "Dur",
+        "minor": "Moll",
+        "progression": "Folge",
+        "parts": "Teile (auf eigenen Spuren)",
+        "part": {
+          "chords": "Akkorde",
+          "bass": "Bass",
+          "arp": "Arpeggio",
+          "drums": "Drums"
+        },
+        "prog": {
+          "pop": "Pop",
+          "sad": "Traurig",
+          "classic": "Klassisch",
+          "fifties": "Fünfziger",
+          "jazz": "Jazz ii–V–I",
+          "epic": "Episch"
+        },
+        "hint": "{{bars}} Takte, dein Handy rendert sie im Projekttempo ({{bpm}} BPM); jeder Teil bleibt im Piano Roll oder Drumcomputer bearbeitbar.",
+        "place": "{{count}} Spuren anlegen",
+        "clip": "{{part}} ({{chords}})"
+      },
       "loops": {
         "title": "Loops",
         "open": "Loops",

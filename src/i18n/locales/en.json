@@ -4081,6 +4081,32 @@
       "master": "Master"
     },
     "audio": {
+      "chords": {
+        "title": "Chord progression",
+        "open": "Chords",
+        "key": "Key",
+        "major": "Major",
+        "minor": "Minor",
+        "progression": "Progression",
+        "parts": "Parts (on separate lanes)",
+        "part": {
+          "chords": "Chords",
+          "bass": "Bass",
+          "arp": "Arpeggio",
+          "drums": "Drums"
+        },
+        "prog": {
+          "pop": "Pop",
+          "sad": "Sad",
+          "classic": "Classic",
+          "fifties": "Fifties",
+          "jazz": "Jazz ii–V–I",
+          "epic": "Epic"
+        },
+        "hint": "{{bars}} bars, rendered by your phone at the project tempo ({{bpm}} BPM); every part stays editable in the piano roll or drum machine.",
+        "place": "Create {{count}} lanes",
+        "clip": "{{part}} ({{chords}})"
+      },
       "loops": {
         "title": "Loops",
         "open": "Loops",

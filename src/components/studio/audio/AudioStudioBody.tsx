@@ -90,6 +90,9 @@ import { renderDrumsToClip } from '@/lib/drumsClient';
 import { patternHits, type DrumHit } from '@/lib/drums';
 import { BUILTIN_LOOPS, LOOP_BARS, loopDrums, loopNotes, type BuiltinLoop } from '@/lib/loopLibrary';
 import { LoopLibrarySheet } from '@/components/studio/audio/LoopLibrarySheet';
+import { CHORD_PARTS, ChordSheet, type ChordPart } from '@/components/studio/audio/ChordSheet';
+import type { MusicKey } from '@/lib/pitch';
+import { chordParts, PROGRESSIONS, type ChordProgressionId } from '@/lib/chords';
 import { decodeSample, samplerNotesOnDevice, samplerPadsOnDevice } from '@/lib/instrumentClient';
 import { playPcm } from '@/lib/instrumentPreview';
 import { DEFAULT_ROOT_MIDI, renderSamplerNotesPcm } from '@/lib/samplerPlus';
@@ -251,6 +254,11 @@ export function AudioStudioBody({
   const [samplerBusy, setSamplerBusy] = useState(false);
   // 🔁 V2: beépített loopok (a lap, és a most sütött loop azonosítója)
   const [loopsOpen, setLoopsOpen] = useState(false);
+  // 🎼 V3.1: akkordmenet-lap
+  const [chordsOpen, setChordsOpen] = useState(false);
+  const [chordBusy, setChordBusy] = useState(false);
+  const chordBusyRef = useRef(false);
+  const placeChordsRef = useRef<(arg: { key: MusicKey; prog: ChordProgressionId; parts: ChordPart[] }) => Promise<string[]>>(async () => []);
   // 🎛️ V2.3: a sampler Dallam módja (a piano roll a minta hangjával)
   const [samplerMelody, setSamplerMelody] = useState<{ sampleUri: string; sampleName: string; rootMidi: number } | null>(null);
   const [loopBusy, setLoopBusy] = useState<string | null>(null);
@@ -377,6 +385,8 @@ export function AudioStudioBody({
       registerDevAction('audio.openDrums', () => devRef.current.openDrums()),
       registerDevAction('audio.loops', () => setLoopsOpen(true)),
       registerDevAction('loops.place', (id) => placeLoopRef.current(String(id))),
+      registerDevAction('audio.chords', () => setChordsOpen(true)),
+      registerDevAction('chords.place', (arg) => placeChordsRef.current(arg as { key: MusicKey; prog: ChordProgressionId; parts: ChordPart[] })),
       registerDevAction('loops.placeCloud', (track) => placeCloudRef.current(track as LibraryTrack)),
       registerDevAction('audio.editClip', () => devRef.current.editClip()),
       registerDevAction('audio.closeDrums', () => devRef.current.closeDrums()),
@@ -1025,6 +1035,62 @@ export function AudioStudioBody({
     }
   };
   placeCloudRef.current = placeCloudTrack;
+  /**
+   * 🎼 V3.1: akkordmenet → a kiválasztott részek (akkordok, basszus, arpeggio, dob) a telefonon sütve, a
+   * lejátszófejnél, külön sávokra (a hiányzó sávokat a köteg hozza létre) — mind szerkeszthető minta, EGY undo.
+   * Visszaadja az új klipek azonosítóit.
+   */
+  const placeChords = async (key: MusicKey, prog: ChordProgressionId, parts: ChordPart[]): Promise<string[]> => {
+    if (chordBusyRef.current || parts.length === 0) return [];
+    chordBusyRef.current = true;
+    setChordBusy(true);
+    try {
+      const cp = chordParts(key, PROGRESSIONS[prog]);
+      const names = cp.labels.map((l) => l.name).join('–');
+      const st0 = useEditorStore.getState();
+      const at = snapToFrame(st0.playhead, grid);
+      const existing = (st0.project?.tracks ?? []).map((tr) => tr.type);
+      const commands: EditorCommand[] = [];
+      const ids: string[] = [];
+      const lanes: TrackType[] = [...existing];
+      const laneFor = (part: ChordPart): TrackType | null => {
+        if (part === 'chords') return 'music';
+        const free = (['aux1', 'aux2', 'aux3', 'aux4', 'aux5'] as TrackType[]).find((ty) => lanes.includes(ty) && !(st0.project?.tracks.find((tr) => tr.type === ty)?.clips.length) && !commands.some((c) => c.type === 'ADD_CLIP' && c.trackType === ty));
+        if (free) return free;
+        const next = nextExtraTrack(lanes);
+        if (!next) return null;
+        lanes.push(next);
+        commands.push({ type: 'ADD_TRACK', track: { id: makeId('trk'), type: next, name: t(`studio.audio.chords.part.${part}`), clips: [] } });
+        return next;
+      };
+      for (const part of CHORD_PARTS.filter((p) => parts.includes(p))) {
+        const res =
+          part === 'drums'
+            ? await renderDrumsToClip(patternHits(cp.drums.pattern, cp.drums.velocity, cp.drums.swing), { bpm, bars: cp.bars })
+            : await renderSynthToClip(part === 'chords' ? cp.chords : part === 'bass' ? cp.bass : cp.arp, { bpm, wave: part === 'chords' ? 'triangle' : part === 'bass' ? 'sawtooth' : 'square' });
+        if (!res) continue;
+        const lane = laneFor(part);
+        if (!lane) continue;
+        const doc =
+          part === 'drums'
+            ? drumsDoc(makeId('inst'), bpm, cp.bars, cp.drums.pattern, cp.drums.velocity, cp.drums.swing)
+            : synthDoc(makeId('inst'), bpm, cp.bars, part === 'chords' ? 'triangle' : part === 'bass' ? 'sawtooth' : 'square', part === 'chords' ? cp.chords : part === 'bass' ? cp.bass : cp.arp);
+        const label = t('studio.audio.chords.clip', { part: t(`studio.audio.chords.part.${part}`), chords: names });
+        const asset: Asset = { id: makeId('ast'), kind: 'audio', uri: res.uri, provider: 'local', name: label, duration: res.durationSec };
+        const clip: AudioClip = { kind: 'audio', id: makeId('clip'), start: at, duration: res.durationSec, trimIn: 0, sourceDuration: res.durationSec, uri: res.uri, label, volume: part === 'drums' ? 0.9 : part === 'arp' ? 0.6 : 0.8, fadeIn: 0, fadeOut: 0, source: 'imported' };
+        commands.push(...bakeNewCommands(doc, lane, clip, asset));
+        ids.push(clip.id);
+      }
+      if (commands.length > 0) useEditorStore.getState().applyBatch(commands, 'user');
+      setChordsOpen(false);
+      return ids;
+    } finally {
+      chordBusyRef.current = false;
+      setChordBusy(false);
+    }
+  };
+  placeChordsRef.current = (arg) => placeChords(arg.key, arg.prog, arg.parts);
+
   placeLoopRef.current = async (id: string) => {
     const loop = BUILTIN_LOOPS.find((l) => l.id === id);
     return loop ? placeLoop(loop) : null;
@@ -1522,6 +1588,7 @@ export function AudioStudioBody({
             <TBtn icon="grid-outline" label={t('studio.drums.title')} active={drumMachine} onPress={() => setDrumMachine(true)} testID="music-drums" />
             <TBtn icon="color-filter-outline" label={t('studio.sampler.title')} active={sampler} onPress={() => setSampler(true)} testID="music-sampler" />
             <TBtn icon="repeat-outline" label={t('studio.audio.loops.title')} active={loopsOpen} onPress={() => setLoopsOpen(true)} testID="music-loops" />
+            <TBtn icon="layers-outline" label={t('studio.audio.chords.open')} active={chordsOpen} onPress={() => setChordsOpen(true)} testID="music-chords" />
             <View style={styles.tSep} />
           </>
         ) : null}
@@ -1697,6 +1764,7 @@ export function AudioStudioBody({
           onBake={(notes, _wave, bars) => void bakeSamplerMelody(notes, bars)}
         />
       ) : null}
+      {chordsOpen ? <ChordSheet bpm={bpm} busy={chordBusy} onPlace={(key, prog, parts) => void placeChords(key, prog, parts)} onClose={() => setChordsOpen(false)} /> : null}
       {loopsOpen ? <LoopLibrarySheet bpm={bpm} busyId={loopBusy} onPick={(l) => void placeLoop(l)} onPickCloud={(tr) => void placeCloudTrack(tr)} onClose={() => setLoopsOpen(false)} /> : null}
     </View>
     </UndoGestureArea>

@@ -1,7 +1,7 @@
 import type { EditorCommand } from '@/lib/commands';
 import type { DrumPattern, DrumVelocity } from '@/lib/drums';
 import type { SynthNote, SynthWave } from '@/lib/synth';
-import type { Asset, AudioClip, InstrumentDoc, Project } from '@/types/project';
+import type { Asset, AudioClip, InstrumentDoc, Project, TrackType } from '@/types/project';
 
 /**
  * 🎹🥁 Hangszer-minta (MU1) — pure mag. A dobgép és a piano roll eredménye nem csak egy sütött
@@ -81,7 +81,7 @@ export function rebakedDuration(clip: AudioClip, newSourceSec: number): number {
 }
 
 /** új minta sütése: a minta + a klip egy kötegben */
-export function bakeNewCommands(doc: InstrumentDoc, trackType: 'music', clip: AudioClip, asset: Asset): EditorCommand[] {
+export function bakeNewCommands(doc: InstrumentDoc, trackType: TrackType, clip: AudioClip, asset: Asset): EditorCommand[] {
   return [
     { type: 'UPSERT_INSTRUMENT_DOC', doc },
     { type: 'ADD_CLIP', trackType, clip: { ...clip, instrumentDocId: doc.id }, asset },

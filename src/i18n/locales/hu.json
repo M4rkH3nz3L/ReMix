@@ -4081,6 +4081,32 @@
       "master": "Master"
     },
     "audio": {
+      "chords": {
+        "title": "Akkordmenet",
+        "open": "Akkordmenet",
+        "key": "Hangnem",
+        "major": "Dúr",
+        "minor": "Moll",
+        "progression": "Menet",
+        "parts": "Részek (külön sávokra)",
+        "part": {
+          "chords": "Akkordok",
+          "bass": "Basszus",
+          "arp": "Arpeggio",
+          "drums": "Dob"
+        },
+        "prog": {
+          "pop": "Pop",
+          "sad": "Szomorú",
+          "classic": "Klasszikus",
+          "fifties": "Ötvenes évek",
+          "jazz": "Jazz ii–V–I",
+          "epic": "Epikus"
+        },
+        "hint": "{{bars}} ütem, a telefon a projekt tempóján ({{bpm}} BPM) süti; utána minden rész a piano rollban vagy a dob-gépben szerkeszthető.",
+        "place": "{{count}} sáv létrehozása",
+        "clip": "{{part}} ({{chords}})"
+      },
       "loops": {
         "title": "Loopok",
         "open": "Loopok",

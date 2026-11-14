@@ -7627,6 +7627,81 @@ async function smokeSampler2(log: Log) {
   }
 }
 
+/** 🎼 V3.1: akkordmenet — a pop-menet (I–V–vi–IV) C-dúrban 4 részre, 4 sávra, egy undo; a telefonos exportban
+ *  ütemenként a három legerősebb hangosztály pontosan az akkord hangjai (C · G · Am · F). */
+async function smokeChords(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const id = 'prj_smoke_chords';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:chords', caught));
+  const base = createEmptyProject('smoke akkordok', '9:16', undefined, 'audio');
+  await saveProject({ ...base, id, bpm: 100 });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1000);
+  try {
+    st().setPlayhead(0);
+    const tracks0 = st().project!.tracks.length;
+    runDevAction('audio.chords');
+    await sleep(600);
+    const t0 = Date.now();
+    const ids = (await runDevAction('chords.place', { key: { root: 0, scale: 'major' }, prog: 'pop', parts: ['chords', 'bass', 'arp', 'drums'] })) as string[];
+    const ms = Date.now() - t0;
+    const p = st().project!;
+    const clipsOf = ids.map((cid) => ({ clip: p.tracks.flatMap((t) => t.clips).find((c) => c.id === cid) as AudioClip, track: p.tracks.find((t) => t.clips.some((c) => c.id === cid))?.type }));
+    const kinds = clipsOf.map(({ clip }) => p.instrumentDocs?.find((d) => d.id === clip?.instrumentDocId)?.kind);
+    log(ids.length === 4 && new Set(clipsOf.map((x) => x.track)).size === 4 && p.tracks.length === tracks0 + 3 && kinds.filter((k) => k === 'synth').length === 3 && kinds.includes('drums'), '4 rész 4 sávon (a 3 új sáv a kötegben jött létre), mind szerkeszthető minta', `${clipsOf.map((x) => x.track).join(', ')} · ${kinds.join(', ')} · ${ms} ms`);
+    // az akkord-rész exportja: ütemenként a hangosztályok energiája (Goertzel, 3–5. oktáv)
+    const chordClip = clipsOf[0].clip;
+    const only = { ...p, tracks: p.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => c.id === chordClip.id) })) };
+    const out = await exportOfflineWav(only, new File(projectExportDir(), 'smoke_chords.wav'), undefined, undefined, 'float32');
+    const h = new File(out.uri).open();
+    let x: Float32Array;
+    try {
+      const b = h.readBytes(h.size ?? 0);
+      const f = new Float32Array(b.buffer.slice(b.byteOffset + 44, b.byteOffset + b.length));
+      x = Float32Array.from({ length: f.length / 2 }, (_, i) => f[i * 2]);
+    } finally {
+      h.close();
+      new File(out.uri).delete();
+    }
+    const goertzel = (a: number, n: number, hz: number) => {
+      const w = (2 * Math.PI * hz) / SR;
+      const c = 2 * Math.cos(w);
+      let s1 = 0;
+      let s2 = 0;
+      for (let i = a; i < a + n; i++) {
+        const s0 = x[i] + c * s1 - s2;
+        s2 = s1;
+        s1 = s0;
+      }
+      return s1 * s1 + s2 * s2 - c * s1 * s2;
+    };
+    const bar = (4 * 60) / 100;
+    const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const want = [['C', 'E', 'G'], ['D', 'G', 'B'], ['A', 'C', 'E'], ['A', 'C', 'F']];
+    const got = [0, 1, 2, 3].map((k) => {
+      const a = Math.round((k * bar + 0.3) * SR);
+      const n = Math.round(1.2 * SR);
+      const e = names.map((_, pc) => [48, 60, 72].reduce((sum, o) => sum + goertzel(a, n, 440 * Math.pow(2, (o + pc - 69) / 12)), 0));
+      return e.map((v, pc) => [v, pc] as const).sort((p1, p2) => p2[0] - p1[0]).slice(0, 3).map(([, pc]) => names[pc]).sort();
+    });
+    log(got.every((g, k) => JSON.stringify(g) === JSON.stringify([...want[k]].sort())), 'a telefonos exportban ütemenként az akkord hangjai: C · G · Am · F', got.map((g) => g.join('')).join(' | '));
+    st().undo();
+    const p2 = st().project!;
+    log(p2.tracks.length === tracks0 && !ids.some((cid) => p2.tracks.some((t) => t.clips.some((c) => c.id === cid))), 'egy visszavonás: a 4 klip és a 3 új sáv is eltűnik', `${p2.tracks.length} sáv`);
+    runDevAction('audio.chords');
+    await sleep(800);
+    log(true, 'FOTÓZHATÓ', 'az Akkordmenet lap');
+    await sleep(1500);
+  } finally {
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:chords-del', caught));
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -9831,6 +9906,10 @@ export async function runImageSmoke(
   }
   if (phase === 'sampler2') {
     await step(phase, () => smokeSampler2(log));
+    return;
+  }
+  if (phase === 'chords') {
+    await step(phase, () => smokeChords(log));
     return;
   }
   if (phase === 'midi') {

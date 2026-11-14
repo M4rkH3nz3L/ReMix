@@ -163,6 +163,28 @@ public class RemixRenderModule: Module {
     Constant("supportsDecodeWindow") { true }
     Constant("supportsDenoiseRun") { true }
 
+    // 🌡️ S19: hőállapot és akkumulátor (a hosszú export alkalmazkodásához és naplózásához)
+    // thermal: 0 névleges · 1 emelkedett · 2 súlyos · 3 kritikus; battery: 0–1 (−1 = ismeretlen)
+    AsyncFunction("powerState") { () -> [String: Any] in
+      let t: Int
+      switch ProcessInfo.processInfo.thermalState {
+      case .nominal: t = 0
+      case .fair: t = 1
+      case .serious: t = 2
+      case .critical: t = 3
+      @unknown default: t = 0
+      }
+      // a UIDevice csak a fő szálon olvasható → a függvény ott fut (runOnQueue)
+      UIDevice.current.isBatteryMonitoringEnabled = true
+      let st = UIDevice.current.batteryState
+      return [
+        "thermal": t,
+        "battery": Double(UIDevice.current.batteryLevel),
+        "charging": st == .charging || st == .full,
+        "lowPower": ProcessInfo.processInfo.isLowPowerModeEnabled,
+      ]
+    }.runOnQueue(.main)
+
     // ⚡ formáns-korrekció natívan (a `src/lib/formant.ts` `formantCorrect` JS-ágának tükre; a táblák a JS-ből)
     Function("formantRun") { (ref: Float32Array, shifted: Float32Array, out: Float32Array, tabs: Float64Array, params: Float64Array) in
       let A = ref.rawPointer.bindMemory(to: Float32.self, capacity: max(1, ref.length))

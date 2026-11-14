@@ -46,6 +46,24 @@ class RemixRenderModule : Module() {
     Constant("supportsDecodeWindow") { true }
     Constant("supportsDenoiseRun") { true }
 
+    // 🌡️ S19: hőállapot és akkumulátor (a hosszú export alkalmazkodásához és naplózásához)
+    // thermal: 0 névleges · 1 emelkedett · 2 súlyos · 3 kritikus (az Android 7 szintje erre vetítve)
+    AsyncFunction("powerState") {
+      val ctx = appContext.reactContext
+      val pm = ctx?.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
+      val status = if (android.os.Build.VERSION.SDK_INT >= 29 && pm != null) pm.currentThermalStatus else 0
+      val t = when {
+        status >= 4 -> 3
+        status == 3 -> 2
+        status >= 1 -> 1
+        else -> 0
+      }
+      val bm = ctx?.getSystemService(android.content.Context.BATTERY_SERVICE) as? android.os.BatteryManager
+      val pct = bm?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
+      val charging = if (android.os.Build.VERSION.SDK_INT >= 23) bm?.isCharging ?: false else false
+      mapOf("thermal" to t, "battery" to if (pct >= 0) pct / 100.0 else -1.0, "charging" to charging, "lowPower" to (pm?.isPowerSaveMode ?: false))
+    }
+
     // ⚡ formáns-korrekció natívan (a `src/lib/formant.ts` `formantCorrect` JS-ágának tükre; a táblák a JS-ből)
     Function("formantRun") { ref: expo.modules.kotlin.typedarray.Float32Array, shifted: expo.modules.kotlin.typedarray.Float32Array, out: expo.modules.kotlin.typedarray.Float32Array, tabs: expo.modules.kotlin.typedarray.Float64Array, params: expo.modules.kotlin.typedarray.Float64Array ->
       val o = java.nio.ByteOrder.nativeOrder()

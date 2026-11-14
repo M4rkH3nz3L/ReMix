@@ -63,7 +63,8 @@ import { mixRange, offlineMixPlan } from '@/lib/offlineMix';
 import type { WaveformData } from '@/lib/waveform';
 import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncProbe';
 import { editGridRate } from '@/lib/frames';
-import { exportOfflineWav, measureStretchLatency, probeStretchTiming } from '@/lib/offlineMixClient';
+import { exportOfflineWav, measureStretchLatency, probeStretchTiming, recentExportPower } from '@/lib/offlineMixClient';
+import { readPowerState } from '@/lib/powerStateClient';
 import { canRenderLocally, renderLocal } from '@/lib/nativeRender';
 import { previewEngine } from '@/lib/previewEngine';
 import { barsBeatsLabel, beatSplitTimes } from '@/lib/audioTransport';
@@ -3182,6 +3183,57 @@ async function smokeLongSource(log: Log) {
   const want1 = 200 + 7 * Math.floor((21 * 60 + 5) / 20);
   const want2 = 200 + 7 * Math.floor((21 * 60 + 65) / 20);
   log(Math.abs(buf.duration - 120) < 0.01 && Math.abs(freq(x, 5, 6) - want1) < 2 && Math.abs(freq(x, 65, 66) - want2) < 2, 'telefonos export a 21. perctől: hossz és hangmagasság pontos', `${buf.duration.toFixed(2)} s, ${freq(x, 5, 6).toFixed(1)}/${want1} Hz, ${freq(x, 65, 66).toFixed(1)}/${want2} Hz, ${((Date.now() - t2) / 1000).toFixed(1)} s`);
+  new File(out).delete();
+}
+
+/**
+ * 🌡️ S19: 30 perces, effektezett, két sávos telefonos export — a hőállapot és az akkumulátor
+ * naplózva, súlyos hőnél a keverés pihen (lásd `thermalPolicy`). Hosszú (~percek) mérés.
+ */
+async function smokeThermal(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const SEC = 30 * 60;
+  const p0 = await readPowerState();
+  log(p0 !== null, 'a build adja a hő- és akkumulátor-állapotot', JSON.stringify(p0));
+  const value = (i: number) => 0.3 * Math.sin((2 * Math.PI * (220 + 5 * Math.floor(i / (30 * SR))) * i) / SR);
+  const src = new File(Paths.document, 'smoke_long_30min.wav');
+  if (!src.exists) {
+    src.create();
+    const h = src.open();
+    h.writeBytes(wavHeader16(SEC * SR, 1, SR));
+    const CH = SR * 10;
+    for (let a = 0; a < SEC * SR; a += CH) {
+      const n = Math.min(CH, SEC * SR - a);
+      const buf = new Int16Array(n);
+      for (let i = 0; i < n; i++) buf[i] = Math.round(value(a + i) * 32767);
+      h.writeBytes(new Uint8Array(buf.buffer));
+    }
+    h.close();
+  }
+  const base = createEmptyProject('smoke hő', '9:16', undefined, 'audio');
+  const voice: AudioClip = { kind: 'audio', id: 'TV', uri: src.uri, label: 'hang', start: 0, duration: SEC, trimIn: 0, sourceDuration: SEC, volume: 0.6, fadeIn: 0, fadeOut: 0, audioFx: { highpass: 80, eq: { low: 2, mid: -2, high: 3 }, compressor: true, reverb: 0.3 }, source: 'imported' };
+  const music: AudioClip = { ...voice, id: 'TM', label: 'zene', volume: 0.3, pan: -0.3, audioFx: { lowpass: 9000, delay: 0.3, stereoWide: true } };
+  const project: Project = { ...base, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [voice] } : t.type === 'music' ? { ...t, clips: [music] } : t)) };
+  const t0 = Date.now();
+  const { uri: out } = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_thermal_out.wav'));
+  const ms = Date.now() - t0;
+  const p1 = await readPowerState();
+  const size = new File(out).size ?? 0;
+  const want = 44 + SEC * SR * 4;
+  log(Math.abs(size - want) <= 8, '30 perces export elkészült, a hossz pontos', `${(size / 1048576).toFixed(0)} MB, ${(ms / 1000).toFixed(1)} s = ${(SEC / (ms / 1000)).toFixed(1)}× valós idő`);
+  const rec = recentExportPower()[recentExportPower().length - 1];
+  log(rec !== undefined && rec.summary.samples >= Math.floor(ms / 4000), 'az export hőnaplót vett', rec ? `${rec.summary.samples} minta` : 'nincs');
+  if (rec) {
+    const s = rec.summary;
+    log(null, 'hő', `max ${s.maxThermal}, súlyos ${(s.hotMs / 1000).toFixed(0)} s, pihenő ${(s.restMs / 1000).toFixed(1)} s`);
+    log(null, 'akkumulátor', s.batteryDropPct === null ? `töltés közben / ismeretlen (${p0?.battery} → ${p1?.battery})` : `−${s.batteryDropPct} %-pont (${p0?.battery} → ${p1?.battery})`);
+    // percenkénti idővonal (hőszint), hogy látszódjon a felmelegedés
+    const line: string[] = [];
+    for (const x of rec.samples) if (line.length === 0 || x.atMs >= line.length * 60_000) line.push(`${Math.round(x.atMs / 1000)}s:${x.thermal}`);
+    log(null, 'hő-idővonal', line.join(' '));
+    log(s.maxThermal < 2 || s.restMs > 0, 'súlyos hőnél a keverés pihent (vagy nem melegedett túl)');
+  }
   new File(out).delete();
 }
 
@@ -10392,6 +10444,10 @@ export async function runImageSmoke(
   }
   if (phase === 'crossfade') {
     await step(phase, () => smokeCrossfade(log));
+    return;
+  }
+  if (phase === 'thermal') {
+    await step(phase, () => smokeThermal(log));
     return;
   }
   if (phase === 'longsource') {

@@ -30,13 +30,28 @@ export function drumsDoc(id: string, bpm: number, bars: number, pattern: DrumPat
 }
 
 /** 🎛️ sampler-minta (S1): a saját hangfájl + a step-rács — a klip ebből süthető újra */
-export function samplerDoc(id: string, bpm: number, bars: number, sampleUri: string, pattern: readonly boolean[], sampleName?: string): InstrumentDoc {
+export function samplerDoc(
+  id: string,
+  bpm: number,
+  bars: number,
+  sampleUri: string,
+  pattern: readonly boolean[],
+  sampleName?: string,
+  /** 🎛️ V2.3: Dallam mód (alaphang + hangjegyek) vagy Pad mód (szeletek + 4 sor) */
+  extra: { rootMidi?: number; notes?: SynthNote[]; slices?: number[]; pads?: boolean[][] } = {}
+): InstrumentDoc {
   return {
     id,
     kind: 'sampler',
     bpm,
     bars,
-    sampler: { sampleUri, ...(sampleName ? { sampleName } : {}), pattern: [...pattern] },
+    sampler: {
+      sampleUri,
+      ...(sampleName ? { sampleName } : {}),
+      pattern: [...pattern],
+      ...(extra.notes ? { rootMidi: extra.rootMidi ?? 60, notes: extra.notes.map((n) => ({ ...n })) } : {}),
+      ...(extra.pads ? { slices: [...(extra.slices ?? [])], pads: extra.pads.map((r) => [...r]) } : {}),
+    },
   };
 }
 

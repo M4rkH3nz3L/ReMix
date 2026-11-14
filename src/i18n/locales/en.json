@@ -3262,6 +3262,21 @@
   },
   "studio": {
     "sampler": {
+      "mode": {
+        "steps": "Steps",
+        "pads": "Pads",
+        "melody": "Melody"
+      },
+      "rootHint": "Set the note your sample plays — then play it chromatically in the piano roll (pitch changes length too, like a classic sampler).",
+      "root": "Root note: {{note}}",
+      "rootDown": "Root note down",
+      "rootUp": "Root note up",
+      "openMelody": "Melody in the piano roll",
+      "slice": "Slice on transients (4 pads)",
+      "slicesFound": "{{count}} slices — tap a pad number to listen",
+      "padPlay": "Play pad {{n}}",
+      "padStep": "Pad {{n}}, step {{step}}",
+      "melodyLabel": "Sample: {{name}}",
       "title": "Sampler",
       "entry": "Sampler (your own sample on the grid)",
       "clipLabel": "Sampler",

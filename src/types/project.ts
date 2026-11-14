@@ -1203,7 +1203,17 @@ export interface InstrumentDoc {
    * mappájában élő hangfájl (a mentés a mappába veszi, a média-GC és az `.rp` a projekt-JSON
    * szövegéből látja, mint minden más uri-t); a `pattern` lépésenként igaz/hamis.
    */
-  sampler?: { sampleUri: string; sampleName?: string; pattern: boolean[] };
+  sampler?: {
+    sampleUri: string;
+    sampleName?: string;
+    pattern: boolean[];
+    /** 🎛️ V2.3 Dallam mód: a minta alaphangja és a hangjegyek (kromatikus játék — `samplerPlus.ts`) */
+    rootMidi?: number;
+    notes?: SynthNote[];
+    /** 🎛️ V2.3 Pad mód: a szelet-kezdetek (minta, 44,1 kHz) és a 4 pad lépés-sora */
+    slices?: number[];
+    pads?: boolean[][];
+  };
 }
 
 export interface AudioClip extends ClipBase {

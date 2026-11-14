@@ -3262,6 +3262,21 @@
   },
   "studio": {
     "sampler": {
+      "mode": {
+        "steps": "Schritte",
+        "pads": "Pads",
+        "melody": "Melodie"
+      },
+      "rootHint": "Gib den Grundton des Samples an — dann spielst du es chromatisch im Piano Roll (die Tonhöhe ändert auch die Länge, wie bei einem klassischen Sampler).",
+      "root": "Grundton: {{note}}",
+      "rootDown": "Grundton tiefer",
+      "rootUp": "Grundton höher",
+      "openMelody": "Melodie im Piano Roll",
+      "slice": "An Transienten schneiden (4 Pads)",
+      "slicesFound": "{{count}} Slices — tippe auf eine Pad-Nummer zum Anhören",
+      "padPlay": "Pad {{n}} anhören",
+      "padStep": "Pad {{n}}, Schritt {{step}}",
+      "melodyLabel": "Sample: {{name}}",
       "title": "Sampler",
       "entry": "Sampler (eigenes Sample im Raster)",
       "clipLabel": "Sampler",

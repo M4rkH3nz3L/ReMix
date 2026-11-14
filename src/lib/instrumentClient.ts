@@ -5,6 +5,7 @@ import { loadAudioApi } from '@/lib/audioApiGuard';
 import { activeSteps } from '@/lib/sampler';
 import type { DrumHit } from '@/lib/drums';
 import { INSTRUMENT_SR, renderDrumsPcm, renderSamplerPcm, renderSynthPcm } from '@/lib/instrumentRender';
+import { renderPadsPcm, renderSamplerNotesPcm } from '@/lib/samplerPlus';
 import { logCaught } from '@/lib/logCaught';
 import { encodeWav16 } from '@/lib/offlineMix';
 import { projectMediaDir } from '@/lib/projectFolderClient';
@@ -75,6 +76,32 @@ export async function samplerOnDevice(sampleUri: string, pattern: SamplerPattern
     return writeWav(renderSamplerPcm(sample, steps, opts.bars, opts.bpm), 'sampler');
   } catch (caught) {
     logCaught('lib/instrumentClient.ts:sampler', caught);
+    return null;
+  }
+}
+
+/** 🎛️ V2.3 Dallam mód: a minta kromatikusan (alaphang + hangjegyek) a telefonon */
+export async function samplerNotesOnDevice(sampleUri: string, notes: SynthNote[], rootMidi: number, bpm: number): Promise<Clip | null> {
+  if (Platform.OS === 'web' || notes.length === 0) return null;
+  const sample = await decodeSample(sampleUri);
+  if (!sample) return null;
+  try {
+    return writeWav(renderSamplerNotesPcm(sample, notes, rootMidi, bpm), 'sampler');
+  } catch (caught) {
+    logCaught('lib/instrumentClient.ts:samplerNotes', caught);
+    return null;
+  }
+}
+
+/** 🎛️ V2.3 Pad mód: a szeletek a 4 pad lépésein a telefonon */
+export async function samplerPadsOnDevice(sampleUri: string, slices: number[], pads: boolean[][], bars: number, bpm: number): Promise<Clip | null> {
+  if (Platform.OS === 'web' || !pads.some((r) => r.some(Boolean))) return null;
+  const sample = await decodeSample(sampleUri);
+  if (!sample) return null;
+  try {
+    return writeWav(renderPadsPcm(sample, slices, pads, bars, bpm), 'sampler');
+  } catch (caught) {
+    logCaught('lib/instrumentClient.ts:samplerPads', caught);
     return null;
   }
 }

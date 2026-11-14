@@ -65,6 +65,7 @@ export function PianoRollSheet({
   onClose,
   onBake,
   initial = null,
+  voice,
 }: {
   bpm: number;
   busy: boolean;
@@ -72,9 +73,15 @@ export function PianoRollSheet({
   onBake: (notes: SynthNote[], wave: SynthWave, bars: number) => void;
   /** 🎹 a szerkesztett hangszer-minta (újraszerkesztés); null = új dallam */
   initial?: InstrumentDoc | null;
+  /**
+   * 🎛️ V2.3: a sampler Dallam módja — a hang a minta (nincs hullámforma-választó); a koppintásra szóló hang és
+   * az előhallgatás a mintából
+   */
+  voice?: { label: string; audition: (midi: number, velocity: number) => void; render: (notes: SynthNote[], bpm: number) => Promise<Float32Array[] | null> };
 }) {
   const { t } = useTranslation();
-  const [notes, setNotes] = useState<SynthNote[]>(() => initial?.synth?.notes.map((n) => ({ ...n })) ?? []);
+  const [notes, setNotes] = useState<SynthNote[]>(() => (initial?.synth?.notes ?? initial?.sampler?.notes)?.map((n) => ({ ...n })) ?? []);
+  const audition = (m: number, vel: number) => (voice ? voice.audition(m, vel) : void auditionNote(m, wave, bpm, vel));
   const [wave, setWave] = useState<SynthWave>(() => initial?.synth?.wave ?? 'sine');
   const [bars, setBars] = useState(() => initial?.bars ?? 4);
   /** az új hangok velocity-je */
@@ -93,7 +100,7 @@ export function PianoRollSheet({
   const tap = (midi: number, beat: number) => {
     const m = targetMidi(midi);
     // 🎧 az új vagy hosszabbodó hang azonnal megszólal (offline, a telefonon)
-    if (!noteAt(notes, m, beat)) void auditionNote(m, wave, bpm, noteVel);
+    if (!noteAt(notes, m, beat)) audition(m, noteVel);
     setNotes((prev) => tapCell(prev, m, beat, stepsPerBeat, () => makeId('note'), noteVel));
   };
   const longPress = (midi: number, beat: number) => {
@@ -101,7 +108,7 @@ export function PianoRollSheet({
     if (!n) return;
     const next = cycleNoteVelocity(notes, n.id);
     setNotes(next);
-    void auditionNote(midi, wave, bpm, next.find((x) => x.id === n.id)?.velocity ?? 100);
+    audition(midi, next.find((x) => x.id === n.id)?.velocity ?? 100);
   };
 
   // 🧪 füstteszt (R7 + S11): a hangjegyek, a rács, a skála, az oktáv beállítása + a jelenlegiek
@@ -183,12 +190,19 @@ export function PianoRollSheet({
 
       {/* vezérlők */}
       <View style={styles.controls}>
-        {WAVES.map((w) => (
-          <Pressable key={w} onPress={() => setWave(w)} style={[styles.waveBtn, wave === w && styles.waveBtnActive]}>
-            <Ionicons name={WAVE_ICON[w]} size={14} color={wave === w ? '#fff' : palette.textDim} />
-            <Text style={[styles.waveText, wave === w && { color: '#fff' }]}>{t(`studio.pianoRoll.wave.${w}`, { defaultValue: w })}</Text>
-          </Pressable>
-        ))}
+        {voice ? (
+          <View style={[styles.waveBtn, styles.waveBtnActive]}>
+            <Ionicons name="color-filter-outline" size={14} color="#fff" />
+            <Text style={[styles.waveText, { color: '#fff' }]} numberOfLines={1}>{voice.label}</Text>
+          </View>
+        ) : (
+          WAVES.map((w) => (
+            <Pressable key={w} onPress={() => setWave(w)} style={[styles.waveBtn, wave === w && styles.waveBtnActive]}>
+              <Ionicons name={WAVE_ICON[w]} size={14} color={wave === w ? '#fff' : palette.textDim} />
+              <Text style={[styles.waveText, wave === w && { color: '#fff' }]}>{t(`studio.pianoRoll.wave.${w}`, { defaultValue: w })}</Text>
+            </Pressable>
+          ))
+        )}
         <View style={styles.spacer} />
         <Pressable onPress={() => setBars((b) => Math.max(1, b - 1))} hitSlop={6} style={styles.stepBtn} accessibilityRole="button" accessibilityLabel={t('studio.audio.a11y.fewerBars')}>
           <Ionicons name="remove" size={16} color={palette.text} />
@@ -334,7 +348,13 @@ export function PianoRollSheet({
           testID="pianoroll-play"
           disabled={notes.length === 0}
           version={`${wave}|${bpm}|${bars}|${notes.map((n) => `${n.midi}@${n.startBeat}v${n.velocity ?? 100}`).join(',')}`}
-          build={() => (notes.length > 0 ? padTo(renderSynthPcm(notes, wave, bpm), Math.max(bars * 4, Math.ceil(synthDurationSec(notes, bpm) * (bpm / 60))) * (60 / bpm)) : null)}
+          build={() =>
+            notes.length === 0
+              ? null
+              : voice
+                ? voice.render(notes, bpm)
+                : padTo(renderSynthPcm(notes, wave, bpm), Math.max(bars * 4, Math.ceil(synthDurationSec(notes, bpm) * (bpm / 60))) * (60 / bpm))
+          }
         />
         <Pressable onPress={() => setNotes([])} style={styles.clearBtn} disabled={notes.length === 0}>
           <Ionicons name="trash-outline" size={15} color={notes.length === 0 ? palette.border : palette.textDim} />

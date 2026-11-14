@@ -90,6 +90,10 @@ import { renderDrumsToClip } from '@/lib/drumsClient';
 import { patternHits, type DrumHit } from '@/lib/drums';
 import { BUILTIN_LOOPS, LOOP_BARS, loopDrums, loopNotes, type BuiltinLoop } from '@/lib/loopLibrary';
 import { LoopLibrarySheet } from '@/components/studio/audio/LoopLibrarySheet';
+import { decodeSample, samplerNotesOnDevice, samplerPadsOnDevice } from '@/lib/instrumentClient';
+import { playPcm } from '@/lib/instrumentPreview';
+import { DEFAULT_ROOT_MIDI, renderSamplerNotesPcm } from '@/lib/samplerPlus';
+import { PianoRollSheet } from '@/components/studio/audio/PianoRollSheet';
 import { downloadTrack, type LibraryTrack } from '@/lib/render';
 import { tempoMatchPatch } from '@/lib/tempoMatch';
 import { renderSamplerToClip } from '@/lib/samplerClient';
@@ -247,6 +251,8 @@ export function AudioStudioBody({
   const [samplerBusy, setSamplerBusy] = useState(false);
   // 🔁 V2: beépített loopok (a lap, és a most sütött loop azonosítója)
   const [loopsOpen, setLoopsOpen] = useState(false);
+  // 🎛️ V2.3: a sampler Dallam módja (a piano roll a minta hangjával)
+  const [samplerMelody, setSamplerMelody] = useState<{ sampleUri: string; sampleName: string; rootMidi: number } | null>(null);
   const [loopBusy, setLoopBusy] = useState<string | null>(null);
   const placeLoopRef = useRef<(id: string) => Promise<string | null>>(async () => null);
   const placeCloudRef = useRef<(track: LibraryTrack) => Promise<string | null>>(async () => null);
@@ -899,6 +905,7 @@ export function AudioStudioBody({
     setEditing(false);
     setEditDocId(doc.id);
     if (doc.kind === 'drums') setDrumMachine(true);
+    else if (doc.kind === 'sampler' && doc.sampler?.notes) setSamplerMelody({ sampleUri: doc.sampler.sampleUri, sampleName: doc.sampler.sampleName ?? '', rootMidi: doc.sampler.rootMidi ?? DEFAULT_ROOT_MIDI });
     else if (doc.kind === 'sampler') setSampler(true);
     else setPianoRoll(true);
   };
@@ -920,6 +927,43 @@ export function AudioStudioBody({
       setEditDocId(null);
     } finally {
       setDrumBusy(false);
+    }
+  };
+
+  /** 🎛️ V2.3 Pad mód: a szeletek a 4 pad lépésein → klip + szerkeszthető minta (egy undo) */
+  const bakeSamplerPads = async (sampleUri: string, slices: number[], pads: boolean[][], bars: number, sampleName?: string) => {
+    if (samplerBusy) return;
+    setSamplerBusy(true);
+    try {
+      const res = await samplerPadsOnDevice(sampleUri, slices, pads, bars, bpm);
+      if (!res) {
+        Alert.alert(t('studio.sampler.title', { defaultValue: 'Sampler' }), t('studio.pianoRoll.failed', { defaultValue: 'A renderelés nem sikerült.' }));
+        return;
+      }
+      placeInstrument(samplerDoc(editDocId ?? makeId('inst'), bpm, bars, sampleUri, [], sampleName, { slices, pads }), res, t('studio.sampler.clipLabel', { defaultValue: 'Sampler' }));
+      setSampler(false);
+      setEditDocId(null);
+    } finally {
+      setSamplerBusy(false);
+    }
+  };
+
+  /** 🎛️ V2.3 Dallam mód: a piano roll hangjegyei a minta hangjával (kromatikusan) → klip + minta (egy undo) */
+  const bakeSamplerMelody = async (notes: SynthNote[], bars: number) => {
+    const ctx = samplerMelody;
+    if (!ctx || samplerBusy) return;
+    setSamplerBusy(true);
+    try {
+      const res = await samplerNotesOnDevice(ctx.sampleUri, notes, ctx.rootMidi, bpm);
+      if (!res) {
+        Alert.alert(t('studio.sampler.title', { defaultValue: 'Sampler' }), t('studio.pianoRoll.failed', { defaultValue: 'A renderelés nem sikerült.' }));
+        return;
+      }
+      placeInstrument(samplerDoc(editDocId ?? makeId('inst'), bpm, bars, ctx.sampleUri, [], ctx.sampleName, { rootMidi: ctx.rootMidi, notes }), res, t('studio.sampler.clipLabel', { defaultValue: 'Sampler' }));
+      setSamplerMelody(null);
+      setEditDocId(null);
+    } finally {
+      setSamplerBusy(false);
     }
   };
 
@@ -1186,6 +1230,11 @@ export function AudioStudioBody({
       editDoc={instrumentDocOf(project, editDocId ?? undefined)}
       onEditInstrument={editInstrument}
       onOpenLoops={() => setLoopsOpen(true)}
+      onBakeSamplerPads={(uri, slices, pads, bars, name) => void bakeSamplerPads(uri, slices, pads, bars, name)}
+      onSamplerMelody={(uri, name, rootMidi) => {
+        setSampler(false);
+        setSamplerMelody({ sampleUri: uri, sampleName: name, rootMidi });
+      }}
       onBakeSampler={(uri, pattern, bars, name) => void bakeSampler(uri, pattern, bars, name)}
       onInsertSource={(asset) => {
         void insertSource(asset).catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:insertSource', caught); });
@@ -1622,6 +1671,32 @@ export function AudioStudioBody({
       )}
 
       {sheetsInDock ? null : sheets}
+      {samplerMelody ? (
+        <PianoRollSheet
+          key={`sampler-melody-${editDocId ?? 'new'}`}
+          bpm={bpm}
+          busy={samplerBusy}
+          initial={(() => {
+            const d = instrumentDocOf(project, editDocId ?? undefined);
+            return d?.kind === 'sampler' && d.sampler?.notes ? d : null;
+          })()}
+          voice={{
+            label: t('studio.sampler.melodyLabel', { name: samplerMelody.sampleName || t('studio.sampler.title', { defaultValue: 'Sampler' }) }),
+            audition: (m, vel) => {
+              void decodeSample(samplerMelody.sampleUri).then((x) => x && playPcm(renderSamplerNotesPcm(x, [{ id: 'a', midi: m, startBeat: 0, lengthBeats: 1, velocity: vel }], samplerMelody.rootMidi, bpm)));
+            },
+            render: async (notes, b) => {
+              const x = await decodeSample(samplerMelody.sampleUri);
+              return x ? renderSamplerNotesPcm(x, notes, samplerMelody.rootMidi, b) : null;
+            },
+          }}
+          onClose={() => {
+            setSamplerMelody(null);
+            setEditDocId(null);
+          }}
+          onBake={(notes, _wave, bars) => void bakeSamplerMelody(notes, bars)}
+        />
+      ) : null}
       {loopsOpen ? <LoopLibrarySheet bpm={bpm} busyId={loopBusy} onPick={(l) => void placeLoop(l)} onPickCloud={(tr) => void placeCloudTrack(tr)} onClose={() => setLoopsOpen(false)} /> : null}
     </View>
     </UndoGestureArea>

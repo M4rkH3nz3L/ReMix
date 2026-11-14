@@ -3262,6 +3262,21 @@
   },
   "studio": {
     "sampler": {
+      "mode": {
+        "steps": "Lépések",
+        "pads": "Padek",
+        "melody": "Dallam"
+      },
+      "rootHint": "Add meg, milyen hangon szól a minta — a piano rollban kromatikusan játszhatod (a hangmagassággal a hossz is változik, mint egy klasszikus samplernél).",
+      "root": "Alaphang: {{note}}",
+      "rootDown": "Alaphang lejjebb",
+      "rootUp": "Alaphang feljebb",
+      "openMelody": "Dallam a piano rollban",
+      "slice": "Szeletelés tranziensre (4 pad)",
+      "slicesFound": "{{count}} szelet — koppints a pad számára a meghallgatáshoz",
+      "padPlay": "{{n}}. pad meghallgatása",
+      "padStep": "{{n}}. pad, {{step}}. lépés",
+      "melodyLabel": "Minta: {{name}}",
       "title": "Sampler",
       "entry": "Sampler (saját minta a rácsra)",
       "clipLabel": "Sampler",

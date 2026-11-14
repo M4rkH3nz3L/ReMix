@@ -57,6 +57,8 @@ export function AudioStudioSheets({
   editDoc = null,
   onEditInstrument,
   onOpenLoops,
+  onBakeSamplerPads,
+  onSamplerMelody,
   frame = null,
 }: {
   selClip: AudioClip | null;
@@ -93,6 +95,9 @@ export function AudioStudioSheets({
   onEditInstrument?: (docId: string) => void;
   /** 🔁 V2: a beépített loopok lapja */
   onOpenLoops?: () => void;
+  /** 🎛️ V2.3: a sampler Pad és Dallam módja */
+  onBakeSamplerPads?: (uri: string, slices: number[], pads: boolean[][], bars: number, name?: string) => void;
+  onSamplerMelody?: (uri: string, name: string, rootMidi: number) => void;
   onBakeSampler: (uri: string, pattern: SamplerPattern, bars: number, sampleName?: string) => void;
   onInsertSource: (asset: Asset) => void;
   onShareAlbum: () => void;
@@ -150,7 +155,7 @@ export function AudioStudioSheets({
         <DrumMachineSheet key={editDoc?.id ?? 'new'} initial={editDoc?.kind === 'drums' ? editDoc : null} bpm={bpm} busy={drumBusy} onClose={() => setDrumMachine(false)} onBake={(hits, bars, src) => onBakeDrums(hits, bars, src)} />
       ) : null}
       {sampler ? (
-        <SamplerSheet key={editDoc?.id ?? 'new'} initial={editDoc?.kind === 'sampler' ? editDoc : null} bpm={bpm} busy={samplerBusy} onClose={() => setSampler(false)} onBake={(uri, pattern, bars, name) => onBakeSampler(uri, pattern, bars, name)} />
+        <SamplerSheet key={editDoc?.id ?? 'new'} initial={editDoc?.kind === 'sampler' ? editDoc : null} bpm={bpm} busy={samplerBusy} onClose={() => setSampler(false)} onBake={(uri, pattern, bars, name) => onBakeSampler(uri, pattern, bars, name)} onBakePads={onBakeSamplerPads} onMelody={onSamplerMelody} />
       ) : null}
       {source ? <SourceSheet onInsert={onInsertSource} onClose={() => setSource(false)} /> : null}
       {albumOpen ? <AlbumSheet onClose={() => setAlbumOpen(false)} onShareAlbum={() => onShareAlbum()} /> : null}

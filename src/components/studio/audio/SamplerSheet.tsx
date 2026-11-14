@@ -22,6 +22,10 @@ import {
   type SamplerPattern,
 } from '@/lib/sampler';
 import type { InstrumentDoc } from '@/types/project';
+import { Chip } from '@/components/ui/controls';
+import { DEFAULT_ROOT_MIDI, detectSlices, emptyPads, midiName, PAD_COUNT, renderPadsPcm, resizePads } from '@/lib/samplerPlus';
+
+type SamplerMode = 'steps' | 'pads' | 'melody';
 
 /** lépés-cella: 44 pt magas (Apple HIG érintési minimum) */
 const CELL_W = 30;
@@ -40,14 +44,26 @@ export function SamplerSheet({
   initial = null,
   onClose,
   onBake,
+  onBakePads,
+  onMelody,
 }: {
   bpm: number;
   busy: boolean;
   initial?: InstrumentDoc | null;
   onClose: () => void;
   onBake: (sampleUri: string, pattern: SamplerPattern, bars: number, sampleName?: string) => void;
+  /** 🎛️ V2.3 Pad mód: a szeletek a 4 pad lépés-során */
+  onBakePads?: (sampleUri: string, slices: number[], pads: boolean[][], bars: number, sampleName?: string) => void;
+  /** 🎛️ V2.3 Dallam mód: a piano roll nyílik a mintával (alaphang) */
+  onMelody?: (sampleUri: string, sampleName: string, rootMidi: number) => void;
 }) {
   const { t } = useTranslation();
+  // 🎛️ V2.3: három mód — lépések (one-shot), padek (szeletek), dallam (kromatikus)
+  const [mode, setMode] = useState<SamplerMode>(() => (initial?.sampler?.notes ? 'melody' : initial?.sampler?.pads ? 'pads' : 'steps'));
+  const [slices, setSlices] = useState<number[]>(() => initial?.sampler?.slices?.slice() ?? []);
+  const [pads, setPads] = useState<boolean[][]>(() => initial?.sampler?.pads?.map((r) => [...r]) ?? emptyPads(initial?.bars ?? 1));
+  const [rootMidi, setRootMidi] = useState<number>(() => initial?.sampler?.rootMidi ?? DEFAULT_ROOT_MIDI);
+  const [slicing, setSlicing] = useState(false);
   const [bars, setBars] = useState(() => initial?.bars ?? 1);
   const [pattern, setPattern] = useState<SamplerPattern>(() => initial?.sampler?.pattern.slice() ?? emptySampler(1));
   const [sampleUri, setSampleUri] = useState<string | null>(() => initial?.sampler?.sampleUri ?? null);
@@ -74,6 +90,57 @@ export function SamplerSheet({
   useEffect(() => registerDevAction('sampler.bake', () => bakeRef.current()), []);
   useEffect(() => registerDevAction('sampler.state', () => stateRef.current()), []);
 
+  const slice = async () => {
+    if (!sampleUri || slicing) return [];
+    setSlicing(true);
+    try {
+      const sample = await decodeSample(sampleUri);
+      const found = sample ? detectSlices(sample, PAD_COUNT) : [];
+      setSlices(found);
+      return found;
+    } finally {
+      setSlicing(false);
+    }
+  };
+  const playSlice = async (k: number) => {
+    const sample = sampleUri ? await decodeSample(sampleUri) : null;
+    const from = slices[k];
+    if (!sample || from === undefined) return;
+    const to = slices[k + 1] ?? sample[0].length;
+    playPcm(sample.map((ch) => ch.subarray(from, to)));
+  };
+  // 🧪 füstteszt (V2.3): mód, szeletelés, padek, alaphang, sütés
+  const sliceRef = useRef(slice);
+  sliceRef.current = slice;
+  const padBakeRef = useRef<() => void>(() => {});
+  padBakeRef.current = () => {
+    if (sampleUri) onBakePads?.(sampleUri, slices, pads, bars, sampleName);
+  };
+  const melodyRef = useRef<() => void>(() => {});
+  melodyRef.current = () => {
+    if (sampleUri) onMelody?.(sampleUri, sampleName, rootMidi);
+  };
+  useEffect(() => {
+    const offs = [
+      registerDevAction('sampler.mode', (m) => {
+        setMode(m as SamplerMode);
+        return true;
+      }),
+      registerDevAction('sampler.slice', () => sliceRef.current()),
+      registerDevAction('sampler.setPads', (p) => {
+        setPads(p as boolean[][]);
+        return true;
+      }),
+      registerDevAction('sampler.root', (m) => {
+        setRootMidi(Number(m));
+        return true;
+      }),
+      registerDevAction('sampler.bakePads', () => padBakeRef.current()),
+      registerDevAction('sampler.melody', () => melodyRef.current()),
+    ];
+    return () => offs.forEach((off) => off());
+  }, []);
+
   const cols = pattern.map((_, i) => i);
   const durSec = samplerDurationSec(bars, bpm);
 
@@ -81,6 +148,7 @@ export function SamplerSheet({
     const b = Math.max(1, Math.min(4, next));
     setBars(b);
     setPattern((p) => resizeSampler(p, b));
+    setPads((p) => resizePads(p, b));
   };
 
   const pick = async () => {
@@ -97,13 +165,15 @@ export function SamplerSheet({
         }
         setSampleUri(picked.uri);
         setSampleName(picked.name);
+        setSlices([]);
       }
     } finally {
       setPicking(false);
     }
   };
 
-  const canBake = !!sampleUri && samplerHasHits(pattern);
+  const padsHit = pads.some((r) => r.some(Boolean));
+  const canBake = !!sampleUri && (mode === 'pads' ? padsHit && slices.length > 0 : samplerHasHits(pattern));
 
   return (
     <AudioSheetFrame id="sampler" onClose={onClose} sheetStyle={styles.sheet}>
@@ -129,6 +199,42 @@ export function SamplerSheet({
         {sampleUri ? <Ionicons name="checkmark-circle" size={16} color="#39d98a" /> : null}
       </Pressable>
 
+      {/* 🎛️ V2.3: mód */}
+      <View style={styles.modes}>
+        {(['steps', 'pads', 'melody'] as const).map((m) => (
+          <Chip key={m} label={t(`studio.sampler.mode.${m}`)} active={mode === m} onPress={() => setMode(m)} />
+        ))}
+      </View>
+
+      {mode === 'melody' ? (
+        <View style={styles.melody}>
+          <Text style={styles.info}>{t('studio.sampler.rootHint')}</Text>
+          <View style={styles.controls}>
+            <Pressable onPress={() => setRootMidi((m) => Math.max(24, m - 1))} hitSlop={6} style={styles.stepBtn} accessibilityRole="button" accessibilityLabel={t('studio.sampler.rootDown')}>
+              <Ionicons name="remove" size={16} color={palette.text} />
+            </Pressable>
+            <Text style={styles.barsText}>{t('studio.sampler.root', { note: midiName(rootMidi) })}</Text>
+            <Pressable onPress={() => setRootMidi((m) => Math.min(96, m + 1))} hitSlop={6} style={styles.stepBtn} accessibilityRole="button" accessibilityLabel={t('studio.sampler.rootUp')}>
+              <Ionicons name="add" size={16} color={palette.text} />
+            </Pressable>
+          </View>
+          <Pressable
+            onPress={() => {
+              if (sampleUri) onMelody?.(sampleUri, sampleName, rootMidi);
+            }}
+            disabled={!sampleUri || !onMelody}
+            style={[styles.bakeBtn, (!sampleUri || !onMelody) && styles.disabled]}
+            testID="sampler-melody"
+            accessibilityRole="button"
+          >
+            <Ionicons name="musical-notes-outline" size={16} color="#fff" />
+            <Text style={styles.bakeText}>{t('studio.sampler.openMelody')}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {mode === 'melody' ? null : (
+      <>
       {/* vezérlők */}
       <View style={styles.controls}>
         <Pressable onPress={() => setBarsAndResize(bars - 1)} hitSlop={6} style={styles.stepBtn} accessibilityRole="button" accessibilityLabel={t('studio.audio.a11y.fewerBars')}>
@@ -142,6 +248,49 @@ export function SamplerSheet({
         <Text style={styles.info}>{bpm} BPM · {durSec.toFixed(1)}s</Text>
       </View>
 
+      {mode === 'pads' ? (
+        <>
+          <Pressable onPress={() => void slice()} disabled={!sampleUri || slicing} style={[styles.pickRow, !sampleUri && styles.disabled]} accessibilityRole="button" testID="sampler-slice">
+            {slicing ? <ActivityIndicator size="small" color={palette.accent} /> : <Ionicons name="cut-outline" size={18} color={palette.accent} />}
+            <Text style={styles.pickText}>{slices.length > 0 ? t('studio.sampler.slicesFound', { count: slices.length }) : t('studio.sampler.slice')}</Text>
+          </Pressable>
+          <ScrollView horizontal showsHorizontalScrollIndicator>
+            <View>
+              {pads.map((row, k) => (
+                <View key={k} style={styles.row}>
+                  <Pressable
+                    onPress={() => void playSlice(k)}
+                    disabled={slices[k] === undefined}
+                    style={[styles.padLabel, slices[k] === undefined && styles.disabled]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('studio.sampler.padPlay', { n: k + 1 })}
+                  >
+                    <Text style={styles.padLabelText}>{k + 1}</Text>
+                  </Pressable>
+                  {row.map((on, step) => {
+                    const beatStart = step % 4 === 0;
+                    return (
+                      <Pressable
+                        key={step}
+                        disabled={slices[k] === undefined}
+                        onPress={() => {
+                          if (!on) void playSlice(k);
+                          setPads((p) => p.map((r, i) => (i === k ? r.map((x, j) => (j === step ? !x : x)) : r)));
+                        }}
+                        accessibilityRole="switch"
+                        accessibilityState={{ checked: !!on }}
+                        accessibilityLabel={t('studio.sampler.padStep', { n: k + 1, step: step + 1 })}
+                        style={[styles.cell, beatStart && styles.cellBeat, beatStart && step > 0 && styles.cellGroupGap, on && styles.cellOn, slices[k] === undefined && styles.disabled]}
+                      />
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        </>
+      ) : (
+      <>
       {/* egysoros step-rács */}
       <ScrollView horizontal showsHorizontalScrollIndicator>
         <View style={styles.row}>
@@ -171,23 +320,35 @@ export function SamplerSheet({
           })}
         </View>
       </ScrollView>
+      </>
+      )}
 
       <View style={styles.footer}>
         <PreviewPlayButton
           testID="sampler-play"
           disabled={!canBake}
-          version={`${bpm}|${bars}|${sampleUri}|${activeSteps(pattern).join(',')}`}
+          version={`${mode}|${bpm}|${bars}|${sampleUri}|${activeSteps(pattern).join(',')}|${slices.join(',')}|${pads.map((r) => activeSteps(r).join('.')).join('/')}`}
           build={async () => {
             const sample = sampleUri ? await decodeSample(sampleUri) : null;
-            return sample && samplerHasHits(pattern) ? renderSamplerPcm(sample, activeSteps(pattern), bars, bpm) : null;
+            if (!sample) return null;
+            if (mode === 'pads') return padsHit && slices.length > 0 ? renderPadsPcm(sample, slices, pads, bars, bpm) : null;
+            return samplerHasHits(pattern) ? renderSamplerPcm(sample, activeSteps(pattern), bars, bpm) : null;
           }}
         />
-        <Pressable onPress={() => setPattern(emptySampler(bars))} style={styles.clearBtn} disabled={!samplerHasHits(pattern)}>
-          <Ionicons name="trash-outline" size={15} color={samplerHasHits(pattern) ? palette.textDim : palette.border} />
+        <Pressable
+          onPress={() => (mode === 'pads' ? setPads(emptyPads(bars)) : setPattern(emptySampler(bars)))}
+          style={styles.clearBtn}
+          disabled={mode === 'pads' ? !padsHit : !samplerHasHits(pattern)}
+        >
+          <Ionicons name="trash-outline" size={15} color={(mode === 'pads' ? padsHit : samplerHasHits(pattern)) ? palette.textDim : palette.border} />
           <Text style={styles.clearText}>{t('common.clear', { defaultValue: 'Törlés' })}</Text>
         </Pressable>
         <Pressable
-          onPress={() => sampleUri && onBake(sampleUri, pattern, bars, sampleName)}
+          onPress={() => {
+            if (!sampleUri) return;
+            if (mode === 'pads') onBakePads?.(sampleUri, slices, pads, bars, sampleName);
+            else onBake(sampleUri, pattern, bars, sampleName);
+          }}
           disabled={busy || !canBake}
           style={[styles.bakeBtn, (busy || !canBake) && styles.disabled]}
         >
@@ -195,6 +356,8 @@ export function SamplerSheet({
           <Text style={styles.bakeText}>{t('studio.pianoRoll.bake', { defaultValue: 'Sávra' })}</Text>
         </Pressable>
       </View>
+      </>
+      )}
     </AudioSheetFrame>
   );
 }
@@ -220,4 +383,8 @@ const styles = StyleSheet.create({
   bakeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: palette.accent, borderRadius: 10, paddingVertical: 11 },
   bakeText: { color: '#fff', fontSize: 14, fontWeight: '800' },
   disabled: { opacity: 0.5 },
+  modes: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  melody: { gap: 10, marginBottom: 12 },
+  padLabel: { width: 30, height: CELL_H, marginRight: 6, borderRadius: 8, backgroundColor: palette.accent2, alignItems: 'center', justifyContent: 'center' },
+  padLabelText: { color: '#fff', fontWeight: '800', fontSize: 14 },
 });

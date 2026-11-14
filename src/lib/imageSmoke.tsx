@@ -1,3 +1,4 @@
+import * as Device from 'expo-device';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { AlphaType, ColorType, drawAsImage, Group, ImageFormat, Skia, type SkImage } from '@shopify/react-native-skia';
@@ -65,6 +66,9 @@ import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncPr
 import { editGridRate } from '@/lib/frames';
 import { exportOfflineWav, measureStretchLatency, probeStretchTiming, recentExportPower } from '@/lib/offlineMixClient';
 import { readPowerState } from '@/lib/powerStateClient';
+import { matrixRow } from '@/lib/perfMatrix';
+import { denoiseStereo } from '@/lib/denoise';
+import { formantCorrect } from '@/lib/formant';
 import { canRenderLocally, renderLocal } from '@/lib/nativeRender';
 import { previewEngine } from '@/lib/previewEngine';
 import { barsBeatsLabel, beatSplitTimes } from '@/lib/audioTransport';
@@ -3186,16 +3190,10 @@ async function smokeLongSource(log: Log) {
   new File(out).delete();
 }
 
-/**
- * 🌡️ S19: 30 perces, effektezett, két sávos telefonos export — a hőállapot és az akkumulátor
- * naplózva, súlyos hőnél a keverés pihen (lásd `thermalPolicy`). Hosszú (~percek) mérés.
- */
-async function smokeThermal(log: Log) {
-  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+/** 30 perces mono 16 bites hangfájl (30 mp-enként lépő hangmagasság), egyszer generálva */
+function longToneFile(): File {
   const SR = 44100;
   const SEC = 30 * 60;
-  const p0 = await readPowerState();
-  log(p0 !== null, 'a build adja a hő- és akkumulátor-állapotot', JSON.stringify(p0));
   const value = (i: number) => 0.3 * Math.sin((2 * Math.PI * (220 + 5 * Math.floor(i / (30 * SR))) * i) / SR);
   const src = new File(Paths.document, 'smoke_long_30min.wav');
   if (!src.exists) {
@@ -3211,6 +3209,126 @@ async function smokeThermal(log: Log) {
     }
     h.close();
   }
+  return src;
+}
+
+/**
+ * 📊 V13: eszközmátrix — szabványos mérőkör (motor lejátszás közben, 8 sávos export, hosszú forrás
+ * hideg ablaka, zajszűrés, formáns); a végén a tervdokumentum táblázatának kész sora (`MATRIX`).
+ */
+async function smokePerfMatrix(log: Log) {
+  const SR = 44100;
+  const os = `${Device.osName ?? Platform.OS} ${Device.osVersion ?? ''}`.trim();
+  const device = Device.modelName ?? `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`;
+  log(null, 'eszköz', `${device}, ${os}`);
+  let maxThermal = (await readPowerState())?.thermal ?? -1;
+  const noteThermal = async () => {
+    const p = await readPowerState();
+    if (p) maxThermal = Math.max(maxThermal, p.thermal);
+  };
+  // 8 sáv × 60 s, különböző hangok és effektek
+  const SEC = 60;
+  const types = ['music', 'voiceover', 'sfx', 'aux1', 'aux2', 'aux3', 'aux4', 'aux5'] as const;
+  const fxs: AudioClip['audioFx'][] = [
+    { eq: { low: 3, mid: -2, high: 2 }, compressor: true },
+    { highpass: 80, compressor: true, reverb: 0.3 },
+    { delay: 0.3 },
+    { lowpass: 8000, stereoWide: true },
+    { eq: { low: -2, mid: 2, high: 1 }, reverb: 0.2 },
+    { highpass: 120, delay: 0.2 },
+    { compressor: true, limiter: true },
+    { eq: { low: 1, mid: 1, high: -3 } },
+  ];
+  const clips = types.map((type, k) => {
+    const f = new File(Paths.document, `smoke_perf_${k}.wav`);
+    if (!f.exists) {
+      f.create();
+      const x = Float32Array.from({ length: SEC * SR }, (_, i) => 0.15 * Math.sin((2 * Math.PI * (110 * (k + 1)) * i) / SR));
+      f.write(encodeWav16([x, x], SR, () => 0.5));
+    }
+    const c: AudioClip = { kind: 'audio', id: `pm${k}`, uri: f.uri, label: type, start: 0, duration: SEC, trimIn: 0, sourceDuration: SEC, volume: 0.4, fadeIn: 0, fadeOut: 0, pan: (k % 3) / 3 - 0.33, audioFx: fxs[k], source: 'imported' };
+    return { type, c };
+  });
+  // futásonként új azonosító: a meleg ismétlésnél a stúdió még az előző (azonos id-jű) projekten áll
+  const id = `prj_smoke_perf_${Date.now().toString(36)}`;
+  const base = createEmptyProject('smoke mátrix', '9:16', undefined, 'audio');
+  const tracks = [
+    ...base.tracks.map((t) => {
+      const hit = clips.find((x) => x.type === t.type);
+      return hit ? { ...t, clips: [hit.c] } : t;
+    }),
+    ...clips.filter((x) => !base.tracks.some((t) => t.type === x.type)).map((x) => ({ id: `trk_${x.type}`, type: x.type, name: x.type, clips: [x.c] })),
+  ];
+  const project: Project = { ...base, id, tracks };
+  await saveProject(project);
+  // motor lejátszás közben
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  // dev-módban a Metro a hidegindítás után lustán tölti a modulokat → a stúdió több mp is lehet
+  for (let i = 0; i < 150 && st().project?.id !== id; i++) await sleep(200);
+  log(st().project?.id === id, 'a mérőprojekt betöltött a stúdióban');
+  await sleep(2500);
+  st().setPlayhead(5);
+  previewEngine.takeStats();
+  st().setPlaying(true);
+  await sleep(8000);
+  const head = st().playhead;
+  st().setPlaying(false);
+  const es = previewEngine.takeStats();
+  log(null, 'motor-diag', `fej ${head.toFixed(2)} s (5 → +8 s várt), lejátszik: ${previewEngine.clock() !== null}`);
+  const engine = { chunks: es.chunks, late: es.late, avgMixMs: es.chunks > 0 ? es.mixMs / es.chunks : 0, maxMixMs: es.maxMixMs };
+  log(previewEngine.clock() !== null && es.late === 0 && es.chunks >= 60 && head > 12, 'motor: 8 sáv effektekkel, akadás nélkül, végig szólt', `${es.chunks} szelet, átlag ${engine.avgMixMs.toFixed(1)} ms, max ${es.maxMixMs} ms, ${es.late} késett (${es.lateAt.join(',')} ms-nál), min. előny ${Math.round(es.minLeadMs)} ms, indulás ${es.startMs} ms`);
+  router.back();
+  await sleep(500);
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:perf', caught));
+  await noteThermal();
+  // telefonos export
+  const t0 = Date.now();
+  const { uri: out } = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_perf_out.wav'));
+  const exportMs = Date.now() - t0;
+  new File(out).delete();
+  log(exportMs < SEC * 1000, 'export: 8 sáv × 60 s gyorsabb a valós időnél', `${exportMs} ms = ${(SEC / (exportMs / 1000)).toFixed(1)}×`);
+  await noteThermal();
+  // hosszú forrás: hideg ablak a 27. percnél
+  const long = new LongSource(longToneFile().uri);
+  const a = 27 * 60 * SR;
+  const t1 = Date.now();
+  await long.ensure(a, a + SR);
+  const longSourceMs = Date.now() - t1;
+  log(longSourceMs < 1000, 'hosszú forrás: hideg ablak 1 s alatt', `${longSourceMs} ms`);
+  // zajszűrés 60 s sztereó
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff) * 2 - 1;
+  const nl = Float32Array.from({ length: 60 * SR }, (_, i) => 0.2 * Math.sin((2 * Math.PI * 300 * i) / SR) + 0.05 * rnd());
+  const nr = Float32Array.from(nl);
+  const t2 = Date.now();
+  await denoiseStereo(nl, nr);
+  const denoise60Ms = Date.now() - t2;
+  log(denoise60Ms * 10 < 60_000, 'zajszűrés: 10 perc becsülten 60 s alatt', `60 s → ${denoise60Ms} ms`);
+  await noteThermal();
+  // formáns 10 s mono
+  const ref = nl.subarray(0, 10 * SR);
+  const shifted = Float32Array.from(ref, (v, i) => ref[Math.min(ref.length - 1, Math.round(i * 1.12))] ?? v);
+  const t3 = Date.now();
+  formantCorrect(ref, shifted, SR);
+  const formant10Ms = Date.now() - t3;
+  log(formant10Ms < 10_000, 'formáns: 10 s valós időnél gyorsabban', `${formant10Ms} ms`);
+  await noteThermal();
+  const row = matrixRow({ date: new Date().toISOString().slice(0, 10), device, os, engine, exportRun: { tracks: 8, sec: SEC, ms: exportMs }, longSourceMs, denoise60Ms, formant10Ms, maxThermal });
+  log(null, 'MATRIX', row);
+}
+
+/**
+ * 🌡️ S19: 30 perces, effektezett, két sávos telefonos export — a hőállapot és az akkumulátor
+ * naplózva, súlyos hőnél a keverés pihen (lásd `thermalPolicy`). Hosszú (~percek) mérés.
+ */
+async function smokeThermal(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const SEC = 30 * 60;
+  const p0 = await readPowerState();
+  log(p0 !== null, 'a build adja a hő- és akkumulátor-állapotot', JSON.stringify(p0));
+  const src = longToneFile();
   const base = createEmptyProject('smoke hő', '9:16', undefined, 'audio');
   const voice: AudioClip = { kind: 'audio', id: 'TV', uri: src.uri, label: 'hang', start: 0, duration: SEC, trimIn: 0, sourceDuration: SEC, volume: 0.6, fadeIn: 0, fadeOut: 0, audioFx: { highpass: 80, eq: { low: 2, mid: -2, high: 3 }, compressor: true, reverb: 0.3 }, source: 'imported' };
   const music: AudioClip = { ...voice, id: 'TM', label: 'zene', volume: 0.3, pan: -0.3, audioFx: { lowpass: 9000, delay: 0.3, stereoWide: true } };
@@ -10444,6 +10562,10 @@ export async function runImageSmoke(
   }
   if (phase === 'crossfade') {
     await step(phase, () => smokeCrossfade(log));
+    return;
+  }
+  if (phase === 'perfmatrix') {
+    await step(phase, () => smokePerfMatrix(log));
     return;
   }
   if (phase === 'thermal') {

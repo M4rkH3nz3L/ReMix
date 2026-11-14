@@ -2,6 +2,7 @@ import { File } from 'expo-file-system';
 
 import { loadAudioApi } from '@/lib/audioApiGuard';
 import type { FxState } from '@/lib/audioDsp';
+import { AHEAD_SEC, aheadSecFor, nextChunkCost } from '@/lib/engineAhead';
 import { logCaught } from '@/lib/logCaught';
 import { LongSource, longUris } from '@/lib/longSource';
 import { LiveLoudness, type LoudnessReading } from '@/lib/liveLoudness';
@@ -29,8 +30,6 @@ type SourceNode = ReturnType<Ctx['createBufferSource']>;
 const SR = OFFLINE_SAMPLE_RATE;
 /** egy szelet hossza (minta) — a szerkesztés legfeljebb ennyi + az indítási tartalék után hallható */
 export const CHUNK_SAMPLES = Math.round(0.125 * SR);
-/** ennyit keverünk előre a lejátszófej elé */
-const AHEAD_SEC = 0.75;
 /** az indításkori ütemezési tartalék (a natív szál ennyi idő alatt biztosan átveszi az első szeletet) */
 const START_LEAD_SEC = 0.08;
 /** szerkesztéskor csak az ennél később induló szeletek cserélődnek (a közelebbiek már a natív
@@ -88,6 +87,8 @@ class PreviewEngine {
   private playStartedAt = 0;
   private endSample = 0;
   /** 🧪 mérés: késve ütemezett szeletek (= hallható rés), a legkisebb előny, a cserék */
+  /** 🎧 a szeletkeverés becsült költsége (ms) — ebből az előpuffer hossza (`engineAhead`) */
+  private chunkCost = 0;
   private stats = { late: 0, minLeadMs: Infinity, replaced: 0, chunks: 0, lateAt: [] as number[], startMs: 0, mixMs: 0, maxMixMs: 0 };
 
   /** 🎛️ a master mért erősítései keverésenként, és a legutóbbi (amíg az új mérés tart) */
@@ -373,7 +374,8 @@ class PreviewEngine {
     this.stats.replaced += drop.length;
     this.scheduled = keep;
     this.nextSample = keep.length > 0 ? keep[keep.length - 1].from + CHUNK_SAMPLES : cut;
-    this.fill();
+    // a nehéz projekt hosszú előpufferét nem egyszerre keverjük újra (a felület ne álljon meg)
+    this.fill(6);
   }
 
   private stopNodes(when: number): void {
@@ -387,7 +389,8 @@ class PreviewEngine {
     this.scheduled = [];
   }
 
-  private fill(): void {
+  /** `maxChunks`: egy hívásban legfeljebb ennyi szelet (szerkesztéskor — a többit az időzítő pótolja) */
+  private fill(maxChunks = Number.POSITIVE_INFINITY): void {
     const ctx = this.ctx;
     if (!this.playing || !ctx) {
       return;
@@ -408,14 +411,27 @@ class PreviewEngine {
     // a lejátszott szeletek kiesnek a listából
     const now = ctx.currentTime;
     this.scheduled = this.scheduled.filter((s) => this.ctxTimeOf(s.from + CHUNK_SAMPLES) > now);
-    const until = Math.round((this.position() + AHEAD_SEC) * SR);
+    // az előpuffer a keverés költségéhez igazodik (nehéz projektnél hosszabb — `engineAhead`); az
+    // alap 0,75 s-on TÚLI részből hívásonként csak egy szelet (a hosszú szinkron blokk a lejátszófejet
+    // elcsúsztatta → újraindító ugrás; mérve iPaden 1,1 s-os indulás)
+    const pos = this.position();
+    const base = Math.round((pos + AHEAD_SEC) * SR);
+    const untilNow = () => Math.round((pos + aheadSecFor(this.chunkCost)) * SR);
+    const until = untilNow();
+    let extra = 0;
     // 🎧 a hosszú források a lejátszófej előtt 3 s-mal töltődnek (a háttérben)
     if (this.longUris.size > 0) {
       void this.prefetch(this.nextSample, until + 3 * SR).catch((caught) => { logCaught('lib/previewEngine.ts:prefetch', caught); });
     }
     // ⏱️ bekötött metronómnál a projekt vége után is szól (felvétel a végén túl)
     const end = this.metronome ? Number.POSITIVE_INFINITY : this.endSample;
-    while (this.nextSample < until && this.nextSample < end) {
+    let made = 0;
+    while (made < maxChunks && this.nextSample < untilNow() && this.nextSample < end) {
+      if (this.nextSample >= base) {
+        if (extra >= 1) break;
+        extra += 1;
+      }
+      made += 1;
       const from = this.nextSample;
       const to = Math.min(from + CHUNK_SAMPLES, end);
       const out: [Float32Array, Float32Array] = [new Float32Array(to - from), new Float32Array(to - from)];
@@ -426,6 +442,7 @@ class PreviewEngine {
       const mixMs = Date.now() - m0;
       this.stats.mixMs += mixMs;
       this.stats.maxMixMs = Math.max(this.stats.maxMixMs, mixMs);
+      this.chunkCost = nextChunkCost(this.chunkCost, mixMs);
       this.meter.push(from, out[0], out[1]);
       if (this.metronome) addMetronome(out, from, to, SR, this.metronome);
       this.tap?.push({ from, left: out[0].slice() });

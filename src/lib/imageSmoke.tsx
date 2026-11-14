@@ -7986,6 +7986,41 @@ async function smokeSidechain(log: Log) {
   }
 }
 
+/** 🎚️ V9.2: effekt-busz — a telefonos export ugyanúgy szól, mint a szerveres render (ott valódi ffmpeggel mérve:
+ *  közvetlen −6,1 dB, visszhang −22,0 dB egy 0,05 s-os ütés után, zengés-busz 0,6 küldéssel, 0,8 visszatéréssel). */
+async function smokeBusParity(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const n = 2 * SR;
+  const x = Float32Array.from({ length: n }, (_, i) => (i >= 0.5 * SR && i < 0.55 * SR ? 0.5 * Math.sin((2 * Math.PI * 1000 * i) / SR) : 0));
+  const f = new File(Paths.document, 'smoke_bus_burst.wav');
+  if (f.exists) f.delete();
+  f.create();
+  f.write(encodeWav16([x, x], SR, () => 0.5));
+  const base = createEmptyProject('smoke busz', '9:16', undefined, 'audio');
+  const clip: AudioClip = { kind: 'audio', id: 's', label: 's', uri: f.uri, start: 0, duration: 2, trimIn: 0, sourceDuration: 2, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  const project = { ...base, id: 'prj_smoke_bus', audioBuses: [{ id: 'rev', name: 'Z', fx: { reverb: 0.6 }, gain: 0.8 }], audioSends: { sfx: { rev: 0.6 } }, tracks: base.tracks.map((t) => (t.type === 'sfx' ? { ...t, clips: [clip] } : t)) };
+  const out = await exportOfflineWav(project, new File(projectExportDir(), 'smoke_bus.wav'), undefined, undefined, 'float32');
+  const h = new File(out.uri).open();
+  let l: Float32Array;
+  try {
+    const b = h.readBytes(h.size ?? 0);
+    const fl = new Float32Array(b.buffer.slice(b.byteOffset + 44, b.byteOffset + b.length));
+    l = Float32Array.from({ length: fl.length / 2 }, (_, i) => fl[i * 2]);
+  } finally {
+    h.close();
+    new File(out.uri).delete();
+  }
+  const db = (a: number, b: number) => {
+    let e = 0;
+    for (let i = Math.round(a * SR); i < Math.round(b * SR); i++) e += l[i] ** 2;
+    return 10 * Math.log10(e / ((b - a) * SR) + 1e-20);
+  };
+  const direct = db(0.5, 0.55);
+  const echo = db(0.56, 0.66);
+  log(Math.abs(direct + 6.1) < 1 && Math.abs(echo + 22.0) < 1.5, 'a zengés-busz a telefonos exportban ugyanúgy szól, mint a szerveren (±1 dB)', `közvetlen ${direct.toFixed(1)} dB (szerver −6,1) · visszhang ${echo.toFixed(1)} dB (szerver −22,0)`);
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -10218,6 +10253,10 @@ export async function runImageSmoke(
   }
   if (phase === 'sidechain') {
     await step(phase, () => smokeSidechain(log));
+    return;
+  }
+  if (phase === 'busparity') {
+    await step(phase, () => smokeBusParity(log));
     return;
   }
   if (phase === 'midi') {

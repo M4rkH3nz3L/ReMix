@@ -3059,6 +3059,48 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       }
     }
 
+    // 🎚️ V9.2: küldések és effekt-buszok (a kliens `mixRange` tükre): a sáv jele a fader UTÁN, a halkítás ELŐTT
+    // ágazik a buszokra (küldés-mértékkel); a busz a saját effekt-láncán és a visszatérő szintjén át a master elé
+    {
+      const buses = (project.audioBuses || []).filter((b) => b && b.id);
+      if (buses.length > 0) {
+        const sends = project.audioSends || {};
+        const busIns = new Map(buses.map((b) => [b.id, []]));
+        const renamed = new Map();
+        for (const [lbl, tr] of [...labelTrack]) {
+          const sv = sends[tr] || {};
+          const active = buses.filter((b) => Number(sv[b.id]) > 0);
+          if (active.length === 0) continue;
+          const main = `${lbl}_s`;
+          const outs = [main, ...active.map((_, k) => `${lbl}_b${k}`)];
+          graph.push(`[${lbl}]asplit=${outs.length}${outs.map((o) => `[${o}]`).join('')}`);
+          active.forEach((b, k) => {
+            graph.push(`[${lbl}_b${k}]volume=${Number(sv[b.id]).toFixed(4)}[${lbl}_bv${k}]`);
+            busIns.get(b.id).push(`${lbl}_bv${k}`);
+          });
+          for (const arr of [audioLabels, speechLabels, duckLabels]) {
+            const i = arr.indexOf(lbl);
+            if (i >= 0) arr[i] = main;
+          }
+          renamed.set(lbl, main);
+        }
+        for (const [from, to] of renamed) {
+          const tr = labelTrack.get(from);
+          labelTrack.delete(from);
+          labelTrack.set(to, tr);
+        }
+        buses.forEach((b, bi) => {
+          const ins = busIns.get(b.id);
+          if (ins.length === 0) return;
+          const mixed = ins.length > 1 ? (graph.push(`${ins.map((l) => `[${l}]`).join('')}amix=inputs=${ins.length}:duration=longest:normalize=0[busm${bi}]`), `busm${bi}`) : ins[0];
+          const fx = audioFxChain(b.fx || {}).replace(/^,+|,+$/g, '');
+          const g = Math.max(0, Math.min(1, Number(b.gain) || 0));
+          graph.push(`[${mixed}]aformat=sample_fmts=fltp:channel_layouts=stereo${fx ? `,${fx}` : ''},volume=${g.toFixed(4)}[bus${bi}]`);
+          audioLabels.push(`bus${bi}`);
+        });
+      }
+    }
+
     // 🎚️ V9: sávonkénti sidechain (a kliens `offlineMixPlan.sidechains` + `mixRange` tükre): a célsáv klipjei egy
     // sínre, a forrás jele szétválik (a saját helyére + csoportonként egy kulcs-másolat), sidechaincompress
     // a régi halkítás paramétereivel (0,02 / 25 ms / 350 ms) és a sáv arányával; a célsáv a régi halkításból kimarad

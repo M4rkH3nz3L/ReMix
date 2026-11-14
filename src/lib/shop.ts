@@ -7,6 +7,8 @@ import { workerJsonHeaders } from '@/lib/workerAuth';
 import { useAuth } from '@/store/authStore';
 import type { Project } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
+import { packFromProject, parseSoundPack } from '@/lib/soundPack';
+import { useSoundPacks } from '@/store/soundPackStore';
 
 /**
  * 🛒 Shop / marketplace kliens-réteg — a userek eladásai (sablon/asset-csomagok)
@@ -19,8 +21,8 @@ import { logCaught } from '@/lib/logCaught';
  * eladó vagy aki megvette olvashatja.
  */
 
-export type ShopKind = 'template' | 'overlay' | 'lut' | 'sfx' | 'sticker' | 'font' | 'preset';
-export const SHOP_KINDS: ShopKind[] = ['template', 'overlay', 'lut', 'sfx', 'sticker', 'font', 'preset'];
+export type ShopKind = 'template' | 'overlay' | 'lut' | 'sfx' | 'sticker' | 'font' | 'preset' | 'soundpack';
+export const SHOP_KINDS: ShopKind[] = ['template', 'soundpack', 'overlay', 'lut', 'sfx', 'sticker', 'font', 'preset'];
 
 export interface ShopItem {
   id: string;
@@ -227,7 +229,9 @@ export async function getPayload(itemId: string): Promise<unknown | null> {
  */
 export async function publishProjectAsItem(
   project: Project,
-  meta: { title: string; description?: string; priceCents: number; kind?: ShopKind; category?: string; previewUrl?: string }
+  meta: { title: string; description?: string; priceCents: number; kind?: ShopKind; category?: string; previewUrl?: string },
+  /** 🛍️ V4: más tartalom a projekt-JSON helyett (pl. a projektből képzett hangcsomag) */
+  payloadOverride?: unknown
 ): Promise<ShopItem> {
   const sb = requireSupabase();
   const uid = currentUserId();
@@ -255,7 +259,7 @@ export async function publishProjectAsItem(
   }
   const item = toItem(data as ItemRow);
   // a payload a projekt JSON-je (id és saját eredet nélkül — importkor újat generálunk)
-  const payload = { type: 'project', project: { ...project, id: undefined, shopOrigin: undefined } };
+  const payload = payloadOverride ?? { type: 'project', project: { ...project, id: undefined, shopOrigin: undefined } };
   const { error: pErr } = await sb.from('shop_item_payloads').insert({ item_id: item.id, payload });
   if (pErr) {
     // a payload nélkül a tétel használhatatlan → visszavonjuk
@@ -320,4 +324,50 @@ export async function buyCreditsDev(amount: number): Promise<number> {
   }
   const data = (await res.json()) as { balance?: number };
   return data.balance ?? 0;
+}
+
+/**
+ * 🛍️ V4: hangcsomag eladása a SAJÁT projektből — a projekt dob- és szinti-mintái lesznek a loopok.
+ * `null`, ha a projektben nincs hangszer-minta (nincs mit eladni).
+ */
+export async function publishSoundPack(
+  project: Project,
+  meta: { title: string; description?: string; priceCents: number }
+): Promise<ShopItem | null> {
+  const pack = packFromProject(project, meta.title);
+  if (!pack) {
+    return null;
+  }
+  const item = await publishProjectAsItem(project, { ...meta, kind: 'soundpack', category: 'audio' }, pack);
+  // az eladó is használhatja a saját csomagját a loop-könyvtárban
+  useSoundPacks.getState().addPack(item.id, pack);
+  return item;
+}
+
+/** 🛍️ V4: egy megvett tétel payloadja hangcsomagként a telefonra (ellenőrizve); `false`, ha nem az */
+export function storeSoundPack(itemId: string, payload: unknown): boolean {
+  const pack = parseSoundPack(payload);
+  if (!pack) {
+    return false;
+  }
+  useSoundPacks.getState().addPack(itemId, pack);
+  return true;
+}
+
+/**
+ * 🛍️ V4: a fiókom megvett (és saját) hangcsomagjai a telefonra — új eszközön / újratelepítés után a
+ * loop-könyvtár így kapja vissza őket. Best-effort: kijelentkezve / offline nem csinál semmit.
+ */
+export async function syncOwnedSoundPacks(): Promise<number> {
+  if (!supabase || !currentUserId()) {
+    return 0;
+  }
+  const have = new Set(useSoundPacks.getState().packs.map((p) => p.itemId));
+  const [bought, mine] = await Promise.all([myPurchases(), myListings()]);
+  const items = [...bought.map((b) => b.item), ...mine].filter((i) => i.kind === 'soundpack' && !have.has(i.id));
+  let added = 0;
+  for (const it of items) {
+    if (storeSoundPack(it.id, await getPayload(it.id))) added++;
+  }
+  return added;
 }

@@ -67,6 +67,9 @@ import { editGridRate } from '@/lib/frames';
 import { exportOfflineWav, measureStretchLatency, probeStretchTiming, recentExportPower } from '@/lib/offlineMixClient';
 import { readPowerState } from '@/lib/powerStateClient';
 import { matrixRow } from '@/lib/perfMatrix';
+import { packFromProject } from '@/lib/soundPack';
+import { storeSoundPack } from '@/lib/shop';
+import { useSoundPacks } from '@/store/soundPackStore';
 import { denoiseStereo } from '@/lib/denoise';
 import { formantCorrect } from '@/lib/formant';
 import { canRenderLocally, renderLocal } from '@/lib/nativeRender';
@@ -3316,6 +3319,48 @@ async function smokePerfMatrix(log: Log) {
   await noteThermal();
   const row = matrixRow({ date: new Date().toISOString().slice(0, 10), device, os, engine, exportRun: { tracks: 8, sec: SEC, ms: exportMs }, longSourceMs, denoise60Ms, formant10Ms, maxThermal });
   log(null, 'MATRIX', row);
+}
+
+/**
+ * 🛍️ V4: hangcsomag — beépített loopokból hangszer-mintás projekt → csomag → (JSON, a vevői ellenőrzőn át) a
+ * telefonos tárba → a loop-könyvtárból visszahelyezve ugyanaz a minta, a csomag-loop nevével; offline,
+ * a Shop (prod adatbázis) nélkül.
+ */
+async function smokeSoundPack(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const st = useEditorStore.getState;
+  const id = `prj_smoke_pack_${Date.now().toString(36)}`;
+  const itemId = `smoke_${Date.now().toString(36)}`;
+  await saveProject({ ...createEmptyProject('smoke csomag', '9:16', undefined, 'audio'), id });
+  try {
+    router.push(`/studio/audio/${id}` as Href);
+    for (let i = 0; i < 150 && (st().project?.id !== id || runDevAction('audio.studioMode') === undefined); i++) await sleep(200);
+    await sleep(800);
+    const a = await runDevAction('loops.place', 'house');
+    st().setPlayhead(10);
+    const b = await runDevAction('loops.place', 'bassWalk');
+    const src = st().project!;
+    log(typeof a === 'string' && typeof b === 'string' && (src.instrumentDocs?.length ?? 0) >= 2, 'a forrás-projektben két hangszer-minta (dob + basszus)', `${a}, ${b}, ${src.instrumentDocs?.length} minta`);
+    const pack = packFromProject(src, 'Smoke csomag');
+    log(pack?.loops.length === 2 && pack.loops[0].category === 'drums' && pack.loops[1].category === 'bass', 'a projektből csomag: dob + basszus loop', pack?.loops.map((l) => `${l.name}/${l.category}`).join(', '));
+    // a vevő oldala: a payload JSON-ként jön, az ellenőrzőn át kerül a tárba
+    const stored = storeSoundPack(itemId, JSON.parse(JSON.stringify(pack)));
+    log(stored && useSoundPacks.getState().packs.some((p) => p.itemId === itemId), 'a megvett csomag a telefonos tárban');
+    const drumId = `pack_${itemId}_pk0`;
+    st().setPlayhead(20);
+    const c = await runDevAction('loops.place', drumId);
+    const p2 = st().project!;
+    const placed = p2.tracks.flatMap((tr) => tr.clips).find((x): x is AudioClip => x.id === c && x.kind === 'audio');
+    const doc = placed ? p2.instrumentDocs?.find((d) => d.id === placed.instrumentDocId) : undefined;
+    const orig = src.instrumentDocs?.find((d) => d.kind === 'drums');
+    const same = !!doc?.drums && !!orig?.drums && JSON.stringify(doc.drums.pattern) === JSON.stringify(orig.drums.pattern);
+    log(!!placed && placed.label === pack?.loops[0].name && same, 'a csomag-loop visszahelyezve: a minta azonos, a felirat a csomagé', `${placed?.label}, minta ${same ? 'azonos' : 'ELTÉR'}`);
+    router.back();
+    await sleep(500);
+  } finally {
+    useSoundPacks.getState().removePack(itemId);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:soundpack', caught));
+  }
 }
 
 /** 🎛️ V10 fotózható állapot: Zene mód, a „Több” nyitva, a módválasztó nyitva — 25 s-ig áll */
@@ -10642,6 +10687,10 @@ export async function runImageSmoke(
   }
   if (phase === 'crossfade') {
     await step(phase, () => smokeCrossfade(log));
+    return;
+  }
+  if (phase === 'soundpack') {
+    await step(phase, () => smokeSoundPack(log));
     return;
   }
   if (phase === 'modeshot') {

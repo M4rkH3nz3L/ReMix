@@ -88,7 +88,7 @@ import { renderSynthToClip } from '@/lib/synthClient';
 import type { SynthNote, SynthWave } from '@/lib/synth';
 import { renderDrumsToClip } from '@/lib/drumsClient';
 import { patternHits, type DrumHit } from '@/lib/drums';
-import { BUILTIN_LOOPS, LOOP_BARS, loopDrums, loopNotes, type BuiltinLoop } from '@/lib/loopLibrary';
+import { BUILTIN_LOOPS, LOOP_BARS, LOOP_CATEGORIES, loopDrums, loopNotes, type BuiltinLoop } from '@/lib/loopLibrary';
 import { LoopLibrarySheet } from '@/components/studio/audio/LoopLibrarySheet';
 import { CHORD_PARTS, ChordSheet, type ChordPart } from '@/components/studio/audio/ChordSheet';
 import type { MusicKey } from '@/lib/pitch';
@@ -108,6 +108,8 @@ import { registerDevAction } from '@/lib/devActions';
 import { formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import { useEditorPrefs } from '@/store/editorPrefsStore';
+import { useSoundPacks } from '@/store/soundPackStore';
+import { packLoopsIn } from '@/lib/soundPack';
 import { AUDIO_STUDIO_MODES, initialAudioMode, transportLayout, type AudioStudioMode, type TransportGroup } from '@/lib/audioStudioModes';
 import type { Asset, AudioClip, InstrumentDoc, TrackType } from '@/types/project';
 import { bakeNewCommands, clipsOfDoc, drumsDoc, instrumentDocOf, rebakeCommands, samplerDoc, synthDoc } from '@/lib/instrumentDoc';
@@ -1044,7 +1046,7 @@ export function AudioStudioBody({
     loopBusyRef.current = true;
     setLoopBusy(loop.id);
     try {
-      const label = t(`studio.audio.loops.name.${loop.id}`);
+      const label = loop.name ?? t(`studio.audio.loops.name.${loop.id}`);
       const before = new Set(useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips.map((c) => c.id)) ?? []);
       if (loop.def.kind === 'drums') {
         const src = loopDrums(loop.def);
@@ -1201,7 +1203,9 @@ export function AudioStudioBody({
   };
 
   placeLoopRef.current = async (id: string) => {
-    const loop = BUILTIN_LOOPS.find((l) => l.id === id);
+    // 🛍️ V4: a megvett hangcsomagok loopjai is (`pack_<tétel>_<loop>`)
+    const packLoops = useSoundPacks.getState().packs.flatMap(({ itemId, pack }) => LOOP_CATEGORIES.flatMap((c) => packLoopsIn(itemId, pack, c)));
+    const loop = BUILTIN_LOOPS.find((l) => l.id === id) ?? packLoops.find((l) => l.id === id);
     return loop ? placeLoop(loop) : null;
   };
 

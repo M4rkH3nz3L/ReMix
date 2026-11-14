@@ -4649,7 +4649,8 @@
       "sfx": "SFX",
       "sticker": "Sticker",
       "font": "Font",
-      "preset": "Preset"
+      "preset": "Preset",
+      "soundpack": "Sound pack"
     },
     "free": "Free",
     "creator": "Creator",
@@ -4657,6 +4658,9 @@
     "getFree": "Get free",
     "owned": "Owned",
     "useInProject": "Use in project",
+    "soundPackStored": "The sound pack is in your loop library: Audio Studio → Loops. Works offline too.",
+    "soundPackEmpty": "This project has no drum machine or piano roll patterns, so it can't become a sound pack.",
+    "soundPackHint": "The project's drum machine and piano roll patterns become the pack's loops (buyers can edit them at their own tempo).",
     "useUnsupported": "This item type can't be opened as a project yet.",
     "boughtTitle": "Purchased",
     "boughtBody": "{{title}} is yours. Use it now?",

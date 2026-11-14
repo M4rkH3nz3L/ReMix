@@ -29,7 +29,9 @@ import {
   myPurchases,
   importPayloadAsProject,
   publishProjectAsItem,
+  publishSoundPack,
   purchaseItem,
+  storeSoundPack,
   SHOP_KINDS,
   unpublishItem,
   type PurchasedItem,
@@ -50,6 +52,7 @@ const KIND_EMOJI: Record<ShopKind, string> = {
   sticker: '✨',
   font: '🔤',
   preset: '🎛️',
+  soundpack: '🥁',
 };
 
 
@@ -74,6 +77,8 @@ export default function ShopScreen() {
   const [pubProjectId, setPubProjectId] = useState<string | null>(null);
   const [pubTitle, setPubTitle] = useState('');
   const [pubPrice, setPubPrice] = useState('0,40');
+  // 🛍️ V4: sablon (a projekt) vagy hangcsomag (a projekt dob- és szinti-mintái)
+  const [pubKind, setPubKind] = useState<'template' | 'soundpack'>('template');
 
   const refreshBalance = useCallback(() => {
     creditBalance().then(setBalance).catch((caught) => { logCaught('app/shop.tsx:refreshBalance', caught); });
@@ -129,6 +134,11 @@ export default function ShopScreen() {
   const openInEditor = (payload: unknown, itemId?: string) => {
     // 🌐 weben nincs szerkesztő → a megvett tétel az appban használható
     if (!requireApp()) {
+      return;
+    }
+    // 🛍️ V4: a hangcsomag a telefon loop-könyvtárába kerül (Hang Stúdió → Loopok), nem új projekt
+    if (itemId && storeSoundPack(itemId, payload)) {
+      Alert.alert(t('shop.title'), t('shop.soundPackStored'));
       return;
     }
     importPayloadAsProject(payload, itemId)
@@ -213,13 +223,20 @@ export default function ShopScreen() {
         if (!p) {
           throw new Error(t('shop.publishNoProject'));
         }
+        if (pubKind === 'soundpack') {
+          return publishSoundPack(p, { title: pubTitle.trim(), priceCents });
+        }
         return publishProjectAsItem(p, {
           title: pubTitle.trim(),
           priceCents,
           kind: 'template',
         });
       })
-      .then(() => {
+      .then((item) => {
+        if (!item) {
+          Alert.alert(t('shop.title'), t('shop.soundPackEmpty'));
+          return;
+        }
         setPublishOpen(false);
         Alert.alert(t('shop.title'), t('shop.publishedOk'));
         load();
@@ -410,6 +427,11 @@ export default function ShopScreen() {
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>{t('shop.publishCta')}</Text>
             <Text style={styles.sheetHint}>{t('shop.publishHint')}</Text>
+            <View style={styles.kindRow}>
+              <Chip label={`${KIND_EMOJI.template} ${t('shop.kind.template')}`} active={pubKind === 'template'} onPress={() => setPubKind('template')} />
+              <Chip label={`${KIND_EMOJI.soundpack} ${t('shop.kind.soundpack')}`} active={pubKind === 'soundpack'} onPress={() => setPubKind('soundpack')} />
+            </View>
+            {pubKind === 'soundpack' ? <Text style={styles.sheetHint}>{t('shop.soundPackHint')}</Text> : null}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.kindRow}>
               {myProjects.map((p) => (
                 <Chip

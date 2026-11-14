@@ -14,18 +14,19 @@ export const LOOP_CATEGORIES: readonly LoopCategory[] = ['drums', 'bass', 'chord
 /** a sütött loop hossza ütemben (a minta ismétlődik) */
 export const LOOP_BARS = 4;
 
-type DrumDef = {
+export type DrumDef = {
   kind: 'drums';
   /** 1 vagy 2 ütemes minta: hangonként a 16-od lépések (a 2. ütem lépései 16-tól) */
   steps: Partial<Record<DrumVoice, number[]>>;
   accent?: Partial<Record<DrumVoice, number[]>>;
   soft?: Partial<Record<DrumVoice, number[]>>;
   swing?: number;
-  len: 1 | 2;
+  /** 🛍️ V4: a hangcsomag loopja 4 ütemes is lehet */
+  len: 1 | 2 | 4;
 };
 /** hangjegy: [midi, kezdet beatben, hossz beatben, velocity?] egy `len` ütemes mintán belül */
-type NoteDef = [number, number, number, number?];
-type SynthDef = { kind: 'synth'; wave: SynthWave; notes: NoteDef[]; len: 1 | 2 | 4 };
+export type NoteDef = [number, number, number, number?];
+export type SynthDef = { kind: 'synth'; wave: SynthWave; notes: NoteDef[]; len: 1 | 2 | 4 };
 
 export interface BuiltinLoop {
   id: string;
@@ -34,6 +35,8 @@ export interface BuiltinLoop {
   def: DrumDef | SynthDef;
   /** a hangnem (a dallamos loopoknál), tájékoztató */
   key?: string;
+  /** 🛍️ V4: a hangcsomag loopjának saját neve (a beépítettek az i18n-kulcsból) */
+  name?: string;
 }
 
 const eighths = [0, 2, 4, 6, 8, 10, 12, 14];

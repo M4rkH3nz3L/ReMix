@@ -9,6 +9,9 @@ import { palette } from '@/constants/editor';
 import { LOOP_CATEGORIES, loopsIn, type BuiltinLoop, type LoopCategory } from '@/lib/loopLibrary';
 import { logCaught } from '@/lib/logCaught';
 import { fetchSoundLibrary, type LibraryTrack } from '@/lib/render';
+import { packLoopsIn } from '@/lib/soundPack';
+import { syncOwnedSoundPacks } from '@/lib/shop';
+import { useSoundPacks } from '@/store/soundPackStore';
 import { useEntitlement } from '@/store/entitlementStore';
 
 /**
@@ -47,6 +50,11 @@ export function LoopLibrarySheet({
       alive = false;
     };
   }, [onPickCloud]);
+  // 🛍️ V4: a megvett hangcsomagok (a telefonon); megnyitáskor a fiókból pótoljuk a hiányzókat
+  const packs = useSoundPacks((s) => s.packs);
+  useEffect(() => {
+    syncOwnedSoundPacks().catch((caught) => logCaught('components/studio/audio/LoopLibrarySheet.tsx:packs', caught));
+  }, []);
   const icon = (c: LoopCategory) => (c === 'drums' ? 'grid-outline' : c === 'bass' ? 'pulse-outline' : c === 'chords' ? 'layers-outline' : 'musical-note-outline');
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -83,6 +91,33 @@ export function LoopLibrarySheet({
                   {l.key ? <Text style={styles.key}>{l.key}</Text> : null}
                   {busyId === l.id ? <ActivityIndicator size="small" color={palette.accent} /> : <Ionicons name="add-circle-outline" size={20} color={palette.textDim} />}
                 </Pressable>
+              );
+            })}
+            {packs.map(({ itemId, pack }) => {
+              const loops = packLoopsIn(itemId, pack, cat);
+              if (loops.length === 0) return null;
+              return (
+                <View key={itemId}>
+                  <View style={styles.cloudHead}>
+                    <Text style={styles.packEmoji}>🥁</Text>
+                    <Text style={styles.cloudTitle} numberOfLines={1}>{pack.name}</Text>
+                  </View>
+                  {loops.map((l) => (
+                    <Pressable
+                      key={l.id}
+                      testID={`loop-${l.id}`}
+                      onPress={() => onPick(l)}
+                      disabled={busyId !== null}
+                      style={[styles.row, busyId !== null && busyId !== l.id && { opacity: 0.5 }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('studio.audio.loops.a11y', { name: l.name })}
+                    >
+                      <Ionicons name={icon(l.category)} size={18} color={palette.accent2} />
+                      <Text style={styles.rowText} numberOfLines={1}>{l.name}</Text>
+                      {busyId === l.id ? <ActivityIndicator size="small" color={palette.accent} /> : <Ionicons name="add-circle-outline" size={20} color={palette.textDim} />}
+                    </Pressable>
+                  ))}
+                </View>
               );
             })}
             {onPickCloud && cloud && cloud.length > 0 ? (
@@ -130,5 +165,6 @@ const styles = StyleSheet.create({
   key: { color: palette.textDim, fontSize: 12, fontWeight: '700' },
   cloudHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, marginBottom: 8 },
   cloudTitle: { color: palette.textDim, fontSize: 12, fontWeight: '700', flex: 1 },
+  packEmoji: { fontSize: 12 },
   pro: { color: '#fff', backgroundColor: palette.accent, fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
 });

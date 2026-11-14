@@ -4654,7 +4654,8 @@
       "sfx": "SFX",
       "sticker": "Sticker",
       "font": "Schrift",
-      "preset": "Preset"
+      "preset": "Preset",
+      "soundpack": "Soundpaket"
     },
     "free": "Gratis",
     "creator": "Creator",
@@ -4662,6 +4663,9 @@
     "getFree": "Gratis holen",
     "owned": "Gekauft",
     "useInProject": "Im Projekt nutzen",
+    "soundPackStored": "Das Soundpaket ist in deiner Loop-Bibliothek: Audio-Studio → Loops. Funktioniert auch offline.",
+    "soundPackEmpty": "Dieses Projekt hat keine Drumcomputer- oder Piano-Roll-Muster, daraus wird kein Soundpaket.",
+    "soundPackHint": "Die Drumcomputer- und Piano-Roll-Muster des Projekts werden zu den Loops des Pakets (Käufer bearbeiten sie im eigenen Tempo).",
     "useUnsupported": "Dieser Typ kann noch nicht als Projekt geöffnet werden.",
     "boughtTitle": "Gekauft",
     "boughtBody": "{{title}} gehört dir. Jetzt nutzen?",

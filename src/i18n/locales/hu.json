@@ -4649,7 +4649,8 @@
       "sfx": "Hang",
       "sticker": "Matrica",
       "font": "Betű",
-      "preset": "Beállítás"
+      "preset": "Beállítás",
+      "soundpack": "Hangcsomag"
     },
     "free": "Ingyen",
     "creator": "Alkotó",
@@ -4657,6 +4658,9 @@
     "getFree": "Ingyen elveszem",
     "owned": "Megvéve",
     "useInProject": "Használd a projektben",
+    "soundPackStored": "A hangcsomag a loop-könyvtáradba került: Hang Stúdió → Loopok. Offline is használhatod.",
+    "soundPackEmpty": "Ebben a projektben nincs dobgép- vagy piano roll-minta, ebből nem lesz hangcsomag.",
+    "soundPackHint": "A projekt dobgép- és piano roll-mintái lesznek a csomag loopjai (a vevő a saját tempóján szerkesztheti).",
     "useUnsupported": "Ez a típus még nem nyitható projektként.",
     "boughtTitle": "Megvéve",
     "boughtBody": "A(z) {{title}} a tiéd. Használod most?",

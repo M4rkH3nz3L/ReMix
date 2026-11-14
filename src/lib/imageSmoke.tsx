@@ -103,6 +103,9 @@ import { renderDrumsPcm, renderSamplerPcm, renderSynthPcm } from '@/lib/instrume
 import { decodeSample } from '@/lib/instrumentClient';
 import { instrumentDocOf } from '@/lib/instrumentDoc';
 import { emptySampler } from '@/lib/sampler';
+import { applyCommand } from '@/lib/commands';
+import { linkedAssets, mixdownVersion, relinkPlan } from '@/lib/linkedAsset';
+import { sendMixdownToVideo, sourceVersionOf } from '@/lib/linkedAssetClient';
 import { USER_PRESETS_KEY, useUserPresets } from '@/store/userPresetStore';
 import { useAudioEditMode } from '@/store/audioEditModeStore';
 import type { CheckIssue } from '@/lib/audioCheck';
@@ -5142,6 +5145,87 @@ async function smokeA11y(log: Log) {
   }
 }
 
+/**
+ * 🔗 C2 (ReMix.md 5.3 mérce): a hang-projekt → videó HIVATKOZÁSSAL; a zene módosítása után a videóban
+ * „Frissítés elérhető”, egy koppintás = az új mixdown (egy köteg), egy visszavonás; a hossz-szabály.
+ * Újraimport és kézi szinkron nélkül, felhő nélkül.
+ */
+async function smokeLinkedMix(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const api = (await loadAudioApi())!;
+  const left = async (uri: string) => (await api.decodeAudioData(uri, SR)).getChannelData(0);
+  const rms = (a: Float32Array) => {
+    let s = 0;
+    for (let i = 0; i < a.length; i++) s += a[i] * a[i];
+    return Math.sqrt(s / Math.max(1, a.length));
+  };
+  const waitFor = async (cond: () => boolean, ms: number) => {
+    for (let i = 0; i < ms / 100 && !cond(); i++) await sleep(100);
+    return cond();
+  };
+  const audioId = 'prj_smoke_linked_audio';
+  let videoId: string | null = null;
+  await deleteProject(audioId).catch((caught) => logCaught('lib/imageSmoke.tsx:linkedmix', caught));
+  const base = createEmptyProject('smoke dal', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'c', label: 'hang', uri: toneWav('smoke_linked.wav', 3), start: 0, duration: 3, trimIn: 0, sourceDuration: 3, volume: 0.5, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  const audio: Project = { ...base, id: audioId, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) };
+  await saveProject(audio);
+  const st = useEditorStore.getState;
+  try {
+    // 1) küldés hivatkozással egy ÚJ videó-projektbe (a menü „Új videó — hivatkozással” útja)
+    const video = await sendMixdownToVideo(audio, null, { newName: 'smoke klip' });
+    videoId = video?.id ?? null;
+    const asset = video ? linkedAssets(video)[0] : undefined;
+    const v0 = mixdownVersion(audio);
+    log(!!video && !!asset && asset.source?.projectId === audioId && asset.source.version === v0 && asset.source.output === 'mixdown', 'a videó a hang-projekt mixdownjára hivatkozik (verzióval), nem a sávok másolatára', `verzió ${asset?.source?.version}, ${video?.tracks.find((t) => t.type === 'music')?.clips.length} klip`);
+    if (!video) throw new Error('nincs videó');
+    const vClip0 = video.tracks.find((t) => t.type === 'music')!.clips[0] as AudioClip;
+    const rms0 = rms(await left(vClip0.uri));
+    // 2) a zene módosul a Hang Stúdióban (hangerő 0,5 → 1) és mentődik — a videó még nem tud róla
+    const changed = applyCommand(audio, { type: 'UPDATE_CLIP', clipId: 'c', patch: { volume: 1 } })!;
+    await saveProject(changed);
+    log(mixdownVersion(changed) !== v0 && mixdownVersion({ ...changed, name: 'más' } as Project) === mixdownVersion(changed), 'a hang módosítása új kimenet-verziót ad (a név nem)', `${v0} → ${mixdownVersion(changed)}`);
+    // 3) a videó megnyitása → a „Frissítés elérhető” sáv (helyben, felhő nélkül)
+    router.push(`/editor/${video.id}` as Href);
+    for (let i = 0; i < 60 && st().project?.id !== video.id; i++) await sleep(200);
+    await sleep(1500);
+    const stale = await waitFor(() => ((runDevAction('linked.stale') as string[] | undefined)?.length ?? 0) === 1, 10000);
+    // a forrás TÁROLT (betöltött, mappába vett) verziója = a memóriabeli — a mentés nem adhat hamis frissítést
+    const storedVersion = await sourceVersionOf(audioId);
+    log(stale && storedVersion === mixdownVersion(changed), '„Frissítés elérhető”: a videó észleli a forrás új verzióját (a tárolt verzió = a tartalomé)', `${JSON.stringify(runDevAction('linked.stale'))}, tárolt ${storedVersion}`);
+    log(true, 'FOTÓZHATÓ', 'a „Frissítés elérhető” sáv a videó-szerkesztő tetején');
+    await sleep(1500);
+    // 4) egy koppintás: az új mixdown (2× hangosabb), a verzió a forrásé, egy köteg
+    const clips = () => st().project!.tracks.find((t) => t.type === 'music')!.clips as AudioClip[];
+    const loadedUri = clips()[0].uri; // a betöltött (mappába vett) fájl — ehhez képest mérjük a cserét és a visszavonást
+    await runDevAction('linked.update');
+    const updated = await waitFor(() => clips()[0]?.uri !== loadedUri, 30000);
+    const vClip1 = clips()[0];
+    const asset1 = st().project!.assets.find((a) => a.id === vClip1.assetId);
+    const rms1 = rms(await left(vClip1.uri));
+    log(updated && asset1?.source?.version === storedVersion && Math.abs(rms1 / rms0 - 2) < 0.05, 'egy koppintás: a klip az új mixdownt kapja (2× hangosabb), a verzió a forrásé', `RMS ${rms0.toFixed(4)} → ${rms1.toFixed(4)} (×${(rms1 / rms0).toFixed(3)}), ${asset1?.source?.version}`);
+    const cleared = await waitFor(() => ((runDevAction('linked.stale') as string[] | undefined)?.length ?? 0) === 0, 8000);
+    log(cleared, 'a sáv eltűnik a frissítés után');
+    // 5) egy visszavonás: a régi hang és a régi verzió
+    st().undo();
+    await sleep(300);
+    const vClip2 = clips()[0];
+    const asset2 = st().project!.assets.find((a) => a.id === vClip2.assetId);
+    log(vClip2.uri === loadedUri && asset2?.source?.version === v0, 'egy visszavonás: a régi mixdown és verzió', `${asset2?.source?.version}`);
+    st().redo();
+    await sleep(300);
+    // 6) hossz-szabály (pure, a mentett videón): rövidebb forrás → a klip vége a forrás végére, jelezve
+    const plan = relinkPlan(st().project!, vClip1.assetId!, { uri: vClip1.uri, durationSec: 1.5, version: 'rövid' });
+    log(plan.shortened.length === 1 && plan.commands.some((x) => x.type === 'UPDATE_CLIP' && (x.patch as AudioClip).duration === 1.5), 'rövidebb kimenet: a klip vége a forrás végére vágva és jelezve (hosszabb: változatlan)', `${plan.shortened.length} rövidült`);
+  } finally {
+    router.back();
+    await sleep(500);
+    await deleteProject(audioId).catch((caught) => logCaught('lib/imageSmoke.tsx:linkedmix-del', caught));
+    if (videoId) await deleteProject(videoId).catch((caught) => logCaught('lib/imageSmoke.tsx:linkedmix-del2', caught));
+  }
+}
+
 async function smokeTouchModes(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const id = 'prj_smoke_touch';
@@ -8319,6 +8403,10 @@ export async function runImageSmoke(
   }
   if (phase === 'a11y') {
     await step(phase, () => smokeA11y(log));
+    return;
+  }
+  if (phase === 'linkedmix') {
+    await step(phase, () => smokeLinkedMix(log));
     return;
   }
   if (phase === 'modeldl') {

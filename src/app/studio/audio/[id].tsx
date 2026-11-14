@@ -22,6 +22,8 @@ import { flushProjectSave } from '@/hooks/useProjectAutosave';
 import { useStudioSession } from '@/hooks/useStudioSession';
 import { StudioStatusBanners } from '@/components/studio/StudioStatusBanners';
 import { audioProjectToVideo } from '@/lib/audioToVideo';
+import { sendMixdownToVideo } from '@/lib/linkedAssetClient';
+import { useActionMenu } from '@/store/actionMenuStore';
 import { mixForExport } from '@/lib/audioExportMix';
 import { exportAudioToFile, isRenderCancelledError } from '@/lib/render';
 import {
@@ -32,7 +34,8 @@ import {
   type AudioExportQuality,
 } from '@/lib/audioExportOptions';
 import { projectExportDir } from '@/lib/model3dRenderClient';
-import { loadEvents, loadProject, saveProject } from '@/lib/storage';
+import { listProjects, loadEvents, loadProject, saveProject } from '@/lib/storage';
+import type { Project } from '@/types/project';
 import { guardPro, usePaywall } from '@/store/paywallStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { exportOfflineWav } from '@/lib/offlineMixClient';
@@ -154,14 +157,58 @@ export default function AudioStudioScreen() {
   };
   runCheckRef.current = runCheck;
 
-  const sendToVideo = () => {
-    // 🎧→🎬 a hang átvitele egy ÚJ videó-projektbe (a userhez képet ad)
+  // 🔗 C2 (ReMix.md 5.3): a hang HIVATKOZÁSKÉNT a videóba — a mixdown a telefonon, a videó a hang-projektre
+  // mutat verzióval; a zene későbbi módosítása a videóban „Frissítés elérhető" → egy koppintás. A sávok
+  // másolata (a régi mód) megmarad választható útként.
+  const sendLinked = async (target: Project | null) => {
+    try {
+      // A13: előbb a hang-projekt mentése, különben a kilépő mentéssel versenyezne
+      await flushProjectSave();
+      const source = useEditorStore.getState().project ?? project;
+      const vid = await withCancellableProgress(t('studio.audio.toVideo.rendering'), (report, signal) =>
+        sendMixdownToVideo(source, target, { newName: t('studio.audio.videoName', { name: source.name }), onProgress: report, signal })
+      );
+      if (!vid) {
+        Alert.alert(t('studio.audio.toVideo.title'), t('studio.audio.toVideo.silent'));
+        return;
+      }
+      router.replace(`/editor/${vid.id}`);
+    } catch (caught) {
+      logCaught('app/studio/audio/[id].tsx:sendLinked', caught);
+      if (!isRenderCancelledError(caught)) Alert.alert(t('studio.audio.toVideo.title'), (caught as Error).message);
+    }
+  };
+  const pickVideoProject = async () => {
+    const metas = (await listProjects()).filter((m) => (m.kind ?? 'video') === 'video' && m.id !== project.id).slice(0, 8);
+    if (metas.length === 0) {
+      Alert.alert(t('studio.audio.toVideo.title'), t('studio.audio.toVideo.noVideos'));
+      return;
+    }
+    useActionMenu.getState().open(
+      t('studio.audio.toVideo.pickTitle'),
+      metas.map((m) => ({
+        label: m.name,
+        icon: 'videocam-outline',
+        onPress: () => {
+          void loadProject(m.id).then((p) => (p ? sendLinked(p) : undefined));
+        },
+      }))
+    );
+  };
+  const copyToVideo = () => {
+    // 🎧→🎬 a régi mód: a hang átvitele egy ÚJ videó-projektbe a sávok másolatával
     const vid = audioProjectToVideo(project, t('studio.audio.videoName', { name: project.name }), new Date().toISOString());
-    // A13: előbb a hang-projekt, különben a kilépő mentéssel versenyezne
     flushProjectSave()
       .then(() => saveProject(vid))
       .then(() => router.replace(`/editor/${vid.id}`))
       .catch((caught) => { logCaught('app/studio/audio/[id].tsx:sendToVideo', caught); });
+  };
+  const sendToVideo = () => {
+    useActionMenu.getState().open(t('studio.audio.toVideo.title'), [
+      { label: t('studio.audio.toVideo.newLinked'), icon: 'link-outline', onPress: () => void sendLinked(null) },
+      { label: t('studio.audio.toVideo.existing'), icon: 'film-outline', onPress: () => void pickVideoProject() },
+      { label: t('studio.audio.toVideo.copyTracks'), icon: 'copy-outline', onPress: copyToVideo },
+    ]);
   };
 
   const downloadAudio = (format: AudioExportFormat, quality: AudioExportQuality) => {

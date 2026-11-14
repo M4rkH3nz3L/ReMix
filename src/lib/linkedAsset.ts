@@ -1,5 +1,6 @@
 import type { EditorCommand } from '@/lib/commands';
 import { snapToFrame } from '@/lib/frames';
+import { logCaught } from '@/lib/logCaught';
 import type { Asset, AssetSource, AudioClip, Clip, Project, TrackType } from '@/types/project';
 
 /**
@@ -31,22 +32,46 @@ function fnv(text: string): string {
 }
 
 /**
+ * A tartalom-kulcs szerializálója: ami a hangot NEM változtatja, de a mentés/betöltés átírhatja,
+ * kimarad — a fájl uri-ja a mappába-vételkor (`prepareProjectFolder`) új útvonalat kap (a neve
+ * marad), az `assetId`-t a betöltés pótolja (`ensureClipAssets`). Különben a videó HAMIS
+ * „Frissítés elérhető"-t jelezne, pedig a zene nem változott (eszközön mérve 2026-11-14).
+ */
+function contentReplacer(key: string, value: unknown): unknown {
+  if (key === 'assetId') return undefined;
+  if (key === 'uri' && typeof value === 'string') {
+    const name = value.slice(value.lastIndexOf('/') + 1);
+    try {
+      return decodeURIComponent(name);
+    } catch (caught) {
+      logCaught('lib/linkedAsset.ts:contentReplacer', caught);
+      return name; // hibás százalék-kódolás: a nyers név is stabil kulcs
+    }
+  }
+  return value;
+}
+
+/**
  * A hang-projekt KIMENET-VERZIÓJA: minden, ami a keverés hangját adja (sávok és klipek, master,
  * sávmix, buszok, küldések, tempó). Ami csak nézet (jelölők, zoom, kijelölés) vagy meta (név,
- * mappa, frissítés ideje), az nem számít → a mentés önmagában nem jelez frissítést.
+ * mappa, frissítés ideje, a fájl útvonala, asset-azonosító), az nem számít → a mentés önmagában
+ * nem jelez frissítést.
  */
 export function mixdownVersion(
   p: Pick<Project, 'tracks' | 'audioMaster' | 'trackMix' | 'audioBuses' | 'audioSends' | 'bpm'>
 ): string {
   return fnv(
-    JSON.stringify({
-      tracks: p.tracks,
-      audioMaster: p.audioMaster ?? null,
-      trackMix: p.trackMix ?? null,
-      audioBuses: p.audioBuses ?? null,
-      audioSends: p.audioSends ?? null,
-      bpm: p.bpm ?? null,
-    })
+    JSON.stringify(
+      {
+        tracks: p.tracks,
+        audioMaster: p.audioMaster ?? null,
+        trackMix: p.trackMix ?? null,
+        audioBuses: p.audioBuses ?? null,
+        audioSends: p.audioSends ?? null,
+        bpm: p.bpm ?? null,
+      },
+      contentReplacer
+    )
   );
 }
 

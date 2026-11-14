@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NewerSchemaBanner } from '@/components/NewerSchemaBanner';
+import { LinkedUpdateBanner } from '@/components/editor/LinkedUpdateBanner';
 import { CollabPresence } from '@/components/editor/CollabPresence';
 import { UndoGestureArea } from '@/components/UndoGestureArea';
 import { SourceBin } from '@/components/SourceBin';
@@ -1025,6 +1026,8 @@ export default function EditorScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <NewerSchemaBanner />
+        {/* 🔗 C2: a hivatkozott hang-projekt újabb verziója → egy koppintásos frissítés */}
+        <LinkedUpdateBanner />
         {body}
         <BottomSheet
           visible={projectMenuOpen}

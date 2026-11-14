@@ -776,6 +776,15 @@
     }
   },
   "editor": {
+    "linked": {
+      "title": "Linked audio",
+      "available": "Update available: \"{{name}}\" changed in Audio Studio",
+      "availableMany": "Update available: \"{{name}}\" and {{count}} more links",
+      "update": "Update",
+      "rendering": "Mixing \"{{name}}\"…",
+      "shortened_one": "{{count}} clip was shortened: the new audio is shorter, so the clip now ends at the end of the source.",
+      "shortened_other": "{{count}} clips were shortened: the new audio is shorter, so the clips now end at the end of the source."
+    },
     "mode": {
       "label": "Editing mode",
       "quick": "Quick",
@@ -1603,6 +1612,10 @@
       }
     },
     "audio": {
+      "source": {
+        "linked": "Linked: \"{{name}}\" audio project",
+        "edit": "Edit in Audio Studio"
+      },
       "muteShort": "Mute",
       "aiVoiceLabel": "AI voice",
       "voiceoverLabel": "Voiceover",
@@ -3986,6 +3999,16 @@
       "master": "Master"
     },
     "audio": {
+      "toVideo": {
+        "title": "To video",
+        "newLinked": "New video — linked (edits to the music update with one tap)",
+        "existing": "Into an existing video project…",
+        "copyTracks": "Copy tracks into a new video (legacy)",
+        "pickTitle": "Which video project?",
+        "noVideos": "No video project yet — create one first.",
+        "rendering": "Mixing the audio for the video…",
+        "silent": "There is no audible audio in the project."
+      },
       "a11y": {
         "toStart": "To start",
         "toEnd": "To end",

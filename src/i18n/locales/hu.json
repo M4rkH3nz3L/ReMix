@@ -776,6 +776,15 @@
     }
   },
   "editor": {
+    "linked": {
+      "title": "Hivatkozott hang",
+      "available": "Frissítés elérhető: „{{name}}” a Hang Stúdióban megváltozott",
+      "availableMany": "Frissítés elérhető: „{{name}}” és még {{count}} hivatkozás",
+      "update": "Frissítés",
+      "rendering": "„{{name}}” keverése…",
+      "shortened_one": "{{count}} klip rövidült: az új hang rövidebb, a klip vége a forrás végére került.",
+      "shortened_other": "{{count}} klip rövidült: az új hang rövidebb, a klipek vége a forrás végére került."
+    },
     "mode": {
       "label": "Szerkesztési mód",
       "quick": "Gyors",
@@ -1603,6 +1612,10 @@
       }
     },
     "audio": {
+      "source": {
+        "linked": "Hivatkozás: „{{name}}” hang-projekt",
+        "edit": "Szerkesztés a Hang Stúdióban"
+      },
       "muteShort": "Néma",
       "aiVoiceLabel": "AI-hang",
       "voiceoverLabel": "Voiceover",
@@ -3986,6 +3999,16 @@
       "master": "Master"
     },
     "audio": {
+      "toVideo": {
+        "title": "Videóba",
+        "newLinked": "Új videó — hivatkozással (a zene módosítása egy koppintással frissül)",
+        "existing": "Meglévő videó-projektbe…",
+        "copyTracks": "Sávok másolata új videóba (a régi mód)",
+        "pickTitle": "Melyik videó-projektbe?",
+        "noVideos": "Még nincs videó-projekt — előbb készíts egyet.",
+        "rendering": "A hang keverése a videóhoz…",
+        "silent": "A projektben nincs hallható hang."
+      },
       "a11y": {
         "toStart": "Az elejére",
         "toEnd": "A végére",

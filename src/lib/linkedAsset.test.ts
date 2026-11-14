@@ -24,6 +24,17 @@ describe('🔗 linked asset: mixdown-verzió', () => {
     expect(mixdownVersion({ ...p, audioMaster: { target: 'music', lufs: -14, truePeak: -1, dynamics: 'balanced' } as never })).not.toBe(v0);
     expect(mixdownVersion({ ...p, bpm: 90 })).not.toBe(v0);
   });
+
+  it('a mentés/betöltés átírásai nem adnak új verziót: a fájl új útvonala (azonos névvel) és a pótolt assetId; más fájlnév igen', () => {
+    const p = audioProject();
+    const v0 = mixdownVersion(p);
+    const moved = { ...p, tracks: p.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [audioClip({ uri: 'file:///Projektek/dal/x.wav', assetId: 'ast_backfilled' })] } : t)) };
+    expect(mixdownVersion(moved)).toBe(v0);
+    const encoded = { ...p, tracks: p.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [audioClip({ uri: 'file:///m%C3%A1sik/x.wav' })] } : t)) };
+    expect(mixdownVersion(encoded)).toBe(v0);
+    const other = { ...p, tracks: p.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [audioClip({ uri: 'file:///y.wav' })] } : t)) };
+    expect(mixdownVersion(other)).not.toBe(v0);
+  });
 });
 
 describe('🔗 linked asset: a mixdown a videóban', () => {

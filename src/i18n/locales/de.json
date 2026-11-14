@@ -776,6 +776,15 @@
     }
   },
   "editor": {
+    "linked": {
+      "title": "Verknüpfter Ton",
+      "available": "Update verfügbar: „{{name}}“ wurde im Audio-Studio geändert",
+      "availableMany": "Update verfügbar: „{{name}}“ und {{count}} weitere Verknüpfungen",
+      "update": "Aktualisieren",
+      "rendering": "„{{name}}“ wird gemischt…",
+      "shortened_one": "{{count}} Clip wurde gekürzt: der neue Ton ist kürzer, der Clip endet jetzt am Ende der Quelle.",
+      "shortened_other": "{{count}} Clips wurden gekürzt: der neue Ton ist kürzer, die Clips enden jetzt am Ende der Quelle."
+    },
     "mode": {
       "label": "Bearbeitungsmodus",
       "quick": "Schnell",
@@ -1603,6 +1612,10 @@
       }
     },
     "audio": {
+      "source": {
+        "linked": "Verknüpft: Audioprojekt „{{name}}“",
+        "edit": "Im Audio-Studio bearbeiten"
+      },
       "muteShort": "Stumm",
       "aiVoiceLabel": "KI-Stimme",
       "voiceoverLabel": "Voiceover",
@@ -3991,6 +4004,16 @@
       "master": "Master"
     },
     "audio": {
+      "toVideo": {
+        "title": "Ins Video",
+        "newLinked": "Neues Video – verknüpft (Änderungen an der Musik mit einem Tipp aktualisiert)",
+        "existing": "In ein bestehendes Videoprojekt…",
+        "copyTracks": "Spuren in ein neues Video kopieren (alter Modus)",
+        "pickTitle": "In welches Videoprojekt?",
+        "noVideos": "Noch kein Videoprojekt – erstelle zuerst eines.",
+        "rendering": "Ton für das Video wird gemischt…",
+        "silent": "Im Projekt gibt es keinen hörbaren Ton."
+      },
       "a11y": {
         "toStart": "Zum Anfang",
         "toEnd": "Zum Ende",

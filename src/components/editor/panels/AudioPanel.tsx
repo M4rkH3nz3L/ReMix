@@ -23,6 +23,7 @@ import { useTtsEngine } from '@/hooks/useTtsEngine';
 import { formatDb, maxClipFade, stepClipVolume } from '@/lib/clipGain';
 import { clamp, formatTime } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
+import { router } from 'expo-router';
 import { guardPro } from '@/store/paywallStore';
 import type { AudioClip, AudioFx, TextClip } from '@/types/project';
 import { audioIntakeText } from '@/lib/audioIntake';
@@ -36,6 +37,8 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
   const { t, i18n } = useTranslation();
   const updateClip = useEditorStore((s) => s.updateClip);
   const addClip = useEditorStore((s) => s.addClip);
+  // 🔗 a klip assetjének forrása (linked asset); az asset-objektum referenciája stabil, amíg a projekt nem változik
+  const linkedSource = useEditorStore((s) => (clip?.assetId ? s.project?.assets.find((a) => a.id === clip.assetId)?.source : undefined));
   // 🥁 beat → marker / vágás
   const suggestedCuts = useEditorStore((s) => s.suggestedCuts);
   const hasAudio = useEditorStore((s) =>
@@ -475,6 +478,16 @@ export function AudioPanel({ clip }: { clip: AudioClip | null }) {
 
       {clip ? (
         <>
+        {/* 🔗 C2: a klip egy másik (hang-)projekt mixdownjára hivatkozik → a forrás szerkesztése a Hang Stúdióban */}
+        {linkedSource ? (
+          <PanelSection title={t('panels.audio.source.linked', { name: linkedSource.name ?? '' })}>
+            <PrimaryButton
+              icon="link-outline"
+              label={t('panels.audio.source.edit')}
+              onPress={() => router.push(`/studio/audio/${linkedSource.projectId}`)}
+            />
+          </PanelSection>
+        ) : null}
         <PanelSection title={t('panels.audio.mixTitle', { label: clip.label })}>
           <PrimaryButton
             icon="options-outline"

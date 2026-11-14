@@ -3220,6 +3220,46 @@
     "inUse": "használatban",
     "filterAll": "Mind"
   },
+  "workflowTpl": {
+    "name": {
+      "podcast-episode": "Podcast-epizód",
+      "youtube-creator": "YouTube-videó"
+    },
+    "step": {
+      "record": "Felvétel",
+      "sync": "Szinkron",
+      "clean": "Tisztítás",
+      "transcript": "Átirat",
+      "chapters": "Fejezetek",
+      "clips": "Rövid videók",
+      "audiogram": "Audiogram",
+      "publish": "Publikálás",
+      "import": "Import",
+      "aiSelect": "AI-válogatás",
+      "filler": "Töltelékszavak",
+      "hook": "Nyitás",
+      "captions": "Feliratok",
+      "broll": "B-roll",
+      "color": "Színek",
+      "thumbnail": "Bélyegkép",
+      "export": "Export"
+    },
+    "hint": {
+      "record": "Vedd fel a beszélgetést: Felvétel gomb a transzporton (előszámlálással, take-ekkel).",
+      "sync": "Több felvételnél: a klip menüjében „Szinkron” — a sávok egymáshoz igazodnak.",
+      "clean": "Klipszerkesztő → „Csendek keresése” és a zajszűrés; jóváhagyás után vág.",
+      "transcript": "„Beszédvágás szöveggel”: az átirat a telefonon készül (Whisper).",
+      "chapters": "Tegyél jelölőt a témák elejére (Marker gomb).",
+      "clips": "Küldd a hangot videóba: rövid kivágások hullámformával, felirattal.",
+      "audiogram": "A videóba küldött hangból audiogram-klip készül.",
+      "publish": "Export: podcast-hangosság, MP3/AAC, fájlba vagy megosztásra."
+    },
+    "start": "Indítás",
+    "skip": "Kihagyás",
+    "markDone": "Lépés kész",
+    "close": "Munkafolyamat bezárása",
+    "done": "Kész a munkafolyamat — minden lépés lezárva."
+  },
   "studio": {
     "sampler": {
       "title": "Sampler",

@@ -6785,6 +6785,58 @@ async function smokeUsages(log: Log) {
   }
 }
 
+/** ▶️ C4: a Podcast-sablon a valódi létrehozási úton elindítja a Podcast-epizód munkafolyamatot; lépések, kihagyás, egy undo, a vége. */
+async function smokeWorkflow(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const { currentStep, finishCurrent, isRunComplete, runProgress } = await import('@/lib/workflowTemplate');
+  const st = useEditorStore.getState;
+  const name = 'smoke munkafolyamat';
+  let createdId: string | null = null;
+  try {
+    router.replace('/studio' as Href);
+    await sleep(1500);
+    runDevAction('studio.fillCreate', { name, kind: 'audio', audioTemplate: 'podcast' });
+    await sleep(400);
+    await runDevAction('studio.create');
+    for (let i = 0; i < 60 && st().project?.name !== name; i++) await sleep(200);
+    await sleep(1200);
+    const p = st().project;
+    createdId = p?.name === name ? p.id : null;
+    const r0 = p?.workflowRun;
+    log(!!r0 && r0.templateId === 'podcast-episode' && currentStep(r0)?.id === 'record' && r0.steps.length === 8, 'a Podcast-sablon elindítja a Podcast-epizód munkafolyamatot (8 lépés, a felvétel fut)', r0 ? `${r0.templateId}, ${currentStep(r0)?.id}` : 'nincs futás');
+    log(true, 'FOTÓZHATÓ', 'a munkafolyamat-sáv a Hang Stúdió tetején');
+    await sleep(2000);
+    // kész → szinkron; kihagyás → tisztítás; egy undo → vissza a szinkronra
+    const now = () => new Date().toISOString();
+    st().dispatch({ type: 'SET_WORKFLOW_RUN', run: finishCurrent(st().project!.workflowRun!, 'done', now()) }, 'user');
+    st().dispatch({ type: 'SET_WORKFLOW_RUN', run: finishCurrent(st().project!.workflowRun!, 'skipped', now()) }, 'user');
+    const r1 = st().project!.workflowRun!;
+    st().undo();
+    const r2 = st().project!.workflowRun!;
+    log(currentStep(r1)?.id === 'clean' && currentStep(r2)?.id === 'sync' && runProgress(r1).skipped === 1, 'kész / kihagyás a következő lépésre lép (egy parancs); egy visszavonás visszalép', `${currentStep(r1)?.id} → undo → ${currentStep(r2)?.id}`);
+    // a végéig; mentés + újratöltés után is megvan
+    let r = st().project!.workflowRun!;
+    while (currentStep(r)) {
+      st().dispatch({ type: 'SET_WORKFLOW_RUN', run: finishCurrent(r, 'done', now()) }, 'user');
+      r = st().project!.workflowRun!;
+    }
+    await saveProject(st().project!);
+    const reloaded = await loadProject(st().project!.id);
+    log(isRunComplete(r) && !!reloaded?.workflowRun && isRunComplete(reloaded.workflowRun), 'a munkafolyamat végigmegy, és mentés + újratöltés után is megvan', `${runProgress(r).done}/${runProgress(r).total}`);
+    st().dispatch({ type: 'SET_WORKFLOW_RUN', run: null }, 'user');
+    log(!st().project!.workflowRun, 'a sáv bezárása a futást lezárja', '');
+  } finally {
+    router.replace('/studio' as Href);
+    await sleep(500);
+    const { deleteCloudProject, listCloudProjectMetas } = await import('@/lib/cloudSync');
+    const leftovers = (await listCloudProjectMetas().catch(() => [])).filter((m) => m.name === name).map((m) => m.id);
+    for (const id of new Set([...(createdId ? [createdId] : []), ...leftovers])) {
+      await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:wf-del', caught));
+      await deleteCloudProject(id);
+    }
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -8944,6 +8996,10 @@ export async function runImageSmoke(
   }
   if (phase === 'usages') {
     await step(phase, () => smokeUsages(log));
+    return;
+  }
+  if (phase === 'workflow') {
+    await step(phase, () => smokeWorkflow(log));
     return;
   }
   if (phase === 'modeldl') {

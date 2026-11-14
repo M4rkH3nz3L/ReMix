@@ -172,3 +172,20 @@ export function runProgress(run: WorkflowRun): RunProgress {
 export function isRunComplete(run: WorkflowRun): boolean {
   return run.steps.every((s) => s.status === 'done' || s.status === 'skipped');
 }
+
+// ── ▶️ futtatás a felületen (AUDIO-PROD C4): az aktuális lépés lezárása és továbblépés ─────────
+
+/** az épp futó lépés (a sávon ez látszik), vagy null */
+export function currentStep(run: WorkflowRun): RunStep | null {
+  return run.steps.find((s) => s.status === 'running') ?? null;
+}
+
+/** az aktuális lépés `done` vagy `skipped`, majd a következő pending indul (egy lépésben — egy undo) */
+export function finishCurrent(run: WorkflowRun, outcome: 'done' | 'skipped', now: string): WorkflowRun {
+  const cur = currentStep(run) ?? nextPendingStep(run);
+  if (!cur) return run;
+  return advanceRun(markStep(run, cur.id, outcome, now), now);
+}
+
+/** indítás a sablonból, az első lépés már fut */
+export const startRunning = (template: WorkflowTemplate, makeId: () => string, now: string): WorkflowRun => advanceRun(startRun(template, makeId, now), now);

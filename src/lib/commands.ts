@@ -7,6 +7,7 @@ import type { LiveDoc } from '@/types/live';
 import type { Model3DDoc } from '@/types/model3d';
 import type { AlbumDoc, AspectRatio, Asset, AssetSource, AudioBus, AudioMaster, Chapter, Clip, ImageDoc, InstrumentDoc, Marker, ParticlesConfig, Project, TempoChange, TimelineRegion, Track, TrackType } from '@/types/project';
 import { normalizeTempoMap } from '@/lib/audioTransport';
+import type { WorkflowRun } from '@/lib/workflowTemplate';
 
 /**
  * Command-réteg (full-plan F0): minden szerkesztő-művelet nevesített command,
@@ -99,6 +100,8 @@ export type EditorCommand =
   | { type: 'SET_TIME_SIGNATURE'; timeSignature: { beatsPerBar: number; beatUnit: 4 | 8 } }
   /** 🎼 Tempóváltások (S13): a teljes lista cseréje (rendezve, csak atBeat > 0); üres → nincs tempóváltás */
   | { type: 'SET_TEMPO_MAP'; tempoMap: TempoChange[] }
+  /** ▶️ Munkafolyamat-futás (C4): a teljes állapot cseréje; null → a futás vége */
+  | { type: 'SET_WORKFLOW_RUN'; run: WorkflowRun | null }
   /**
    * 🎧💿 Album-dokumentum beírása (Hang Stúdió: több szám + borító). A manifeszt-CRUD pure
    * (`albumDoc.ts`), az eredményt EZ a parancs teszi a `project.album`-ba — ÉS az idővonalat
@@ -409,6 +412,15 @@ export function applyCommand(project: Project, cmd: EditorCommand): Project | nu
         return null;
       }
       return { ...project, bpm };
+    }
+
+    case 'SET_WORKFLOW_RUN': {
+      if (JSON.stringify(project.workflowRun ?? null) === JSON.stringify(cmd.run)) return null;
+      if (!cmd.run) {
+        const { workflowRun: _drop, ...rest } = project;
+        return rest as Project;
+      }
+      return { ...project, workflowRun: cmd.run };
     }
 
     case 'SET_TEMPO_MAP': {
@@ -744,6 +756,8 @@ export function describeCommand(cmd: EditorCommand): string {
       return tr('lib.commands.setTimeSignature', { defaultValue: `Ütemjelzés: ${cmd.timeSignature.beatsPerBar}/${cmd.timeSignature.beatUnit}` });
     case 'SET_BPM':
       return tr('lib.commands.setBpm', { bpm: cmd.bpm, defaultValue: `BPM: ${cmd.bpm}` });
+    case 'SET_WORKFLOW_RUN':
+      return tr('lib.commands.setWorkflowRun', { defaultValue: cmd.run ? `Munkafolyamat: ${cmd.run.name}` : 'Munkafolyamat vége' });
     case 'SET_TEMPO_MAP':
       return tr('lib.commands.setTempoMap', { count: cmd.tempoMap.length, defaultValue: cmd.tempoMap.length > 0 ? `Tempóváltás (${cmd.tempoMap.length})` : 'Tempóváltások törölve' });
     case 'APPLY_ALBUM':

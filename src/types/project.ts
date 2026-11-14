@@ -1810,6 +1810,11 @@ export interface Project {
    * a metronóm és az ütem:beat kijelzés a tempo-mapet követi (`projectTiming`). Hiányzó = állandó tempó.
    */
   tempoMap?: TempoChange[];
+  /**
+   * ▶️ Futó munkafolyamat (AUDIO-PROD C4 · SC7): a lépések állapota (pl. Podcast-epizód: felvétel → … → publikálás).
+   * A projekt része (mentés, felhő, visszavonás); a Hang Stúdió sávja mutatja. Hiányzó = nincs futás.
+   */
+  workflowRun?: import('@/lib/workflowTemplate').WorkflowRun;
   /** 🔎 SEO / közzétételi meta (a létrehozáskor kötelező — lásd ProjectSeo) */
   seo?: ProjectSeo;
   /** 🎞️ a legutóbb renderelt kész MP4 (a projekthez tárolva; lásd RenderedVersion) */

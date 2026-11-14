@@ -16,6 +16,7 @@ import { AudioCheckSheet } from '@/components/studio/audio/AudioCheckSheet';
 import { runAudioCheck } from '@/lib/audioCheckClient';
 import type { CheckIssue, MixStats } from '@/lib/audioCheck';
 import { AudioStudioBody } from '@/components/studio/audio/AudioStudioBody';
+import { WorkflowRunBar } from '@/components/studio/audio/WorkflowRunBar';
 import { palette } from '@/constants/editor';
 import { usePlaybackClock } from '@/hooks/usePlaybackClock';
 import { flushProjectSave } from '@/hooks/useProjectAutosave';
@@ -314,6 +315,14 @@ export default function AudioStudioScreen() {
     <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
       <AudioLayer />
       <StudioStatusBanners saveFailed={saveFailed} missingCount={missing.length} relinking={relinking} onRelink={() => void relink()} />
+      {/* ▶️ C4: a futó munkafolyamat (pl. Podcast-epizód) — a képernyőről indítható lépések itt */}
+      <WorkflowRunBar
+        onStart={(kind) => {
+          if (kind === 'publish') setExporting(true);
+          else void sendToVideo();
+          return true;
+        }}
+      />
       <AudioStudioBody mode="project" workspace={ws === 'music' || project.kind === 'music' ? 'music' : undefined} title={project.name} onExit={exit} onExport={() => setExporting(true)} onRequestCheck={() => void runCheck()} />
       {exporting ? (
         <AudioExportSheet

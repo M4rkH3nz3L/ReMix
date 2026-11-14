@@ -1,3 +1,4 @@
+import { currentStep, finishCurrent, isRunComplete as isRunComplete2, PODCAST_EPISODE as PODCAST2, runProgress as runProgress2, startRunning } from '@/lib/workflowTemplate';
 import {
   BUILT_IN_TEMPLATES,
   PODCAST_EPISODE,
@@ -87,5 +88,22 @@ describe('workflowTemplate — futtatás', () => {
     run = markStep(run, 's', 'done', T1);
     expect(advanceRun(run, T1)).toBe(run);
     expect(nextPendingStep(run)).toBeNull();
+  });
+});
+
+describe('workflowTemplate — C4: futtatás a felületen', () => {
+  it('startRunning: az első lépés fut; finishCurrent: kész/kihagyva + a következő indul; a végén kész', () => {
+    let n = 0;
+    let run = startRunning(PODCAST2, () => `r${n++}`, 't0');
+    expect(currentStep(run)?.id).toBe('record');
+    run = finishCurrent(run, 'done', 't1');
+    expect(currentStep(run)?.id).toBe('sync');
+    run = finishCurrent(run, 'skipped', 't2');
+    expect(currentStep(run)?.id).toBe('clean');
+    for (let i = 0; i < 6; i++) run = finishCurrent(run, 'done', `t${3 + i}`);
+    expect(currentStep(run)).toBeNull();
+    expect(isRunComplete2(run)).toBe(true);
+    expect(runProgress2(run)).toMatchObject({ done: 7, skipped: 1, total: 8 });
+    expect(finishCurrent(run, 'done', 'x')).toBe(run);
   });
 });

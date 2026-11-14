@@ -3220,6 +3220,46 @@
     "inUse": "in Verwendung",
     "filterAll": "Alle"
   },
+  "workflowTpl": {
+    "name": {
+      "podcast-episode": "Podcast-Episode",
+      "youtube-creator": "YouTube-Video"
+    },
+    "step": {
+      "record": "Aufnahme",
+      "sync": "Synchronisieren",
+      "clean": "Bereinigen",
+      "transcript": "Transkript",
+      "chapters": "Kapitel",
+      "clips": "Kurzclips",
+      "audiogram": "Audiogramm",
+      "publish": "Veröffentlichen",
+      "import": "Import",
+      "aiSelect": "KI-Auswahl",
+      "filler": "Füllwörter",
+      "hook": "Einstieg",
+      "captions": "Untertitel",
+      "broll": "B-Roll",
+      "color": "Farbe",
+      "thumbnail": "Vorschaubild",
+      "export": "Export"
+    },
+    "hint": {
+      "record": "Nimm das Gespräch auf: Aufnahme-Taste im Transport (Einzähler, Takes).",
+      "sync": "Bei mehreren Aufnahmen: „Synchronisieren“ im Clip-Menü richtet die Spuren aus.",
+      "clean": "Clip-Editor → „Stille finden“ und Rauschminderung; schneidet nach Bestätigung.",
+      "transcript": "„Sprache per Text schneiden“: das Transkript entsteht auf dem Telefon (Whisper).",
+      "chapters": "Setze am Anfang jedes Themas eine Markierung.",
+      "clips": "Schicke den Ton in ein Video: Kurzclips mit Wellenform und Untertiteln.",
+      "audiogram": "Aus dem ins Video geschickten Ton entsteht ein Audiogramm-Clip.",
+      "publish": "Export: Podcast-Lautheit, MP3/AAC, in eine Datei oder teilen."
+    },
+    "start": "Starten",
+    "skip": "Überspringen",
+    "markDone": "Schritt erledigt",
+    "close": "Workflow schließen",
+    "done": "Workflow abgeschlossen – alle Schritte erledigt."
+  },
   "studio": {
     "sampler": {
       "title": "Sampler",

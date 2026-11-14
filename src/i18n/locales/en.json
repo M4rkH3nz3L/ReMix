@@ -3220,6 +3220,46 @@
     "inUse": "in use",
     "filterAll": "All"
   },
+  "workflowTpl": {
+    "name": {
+      "podcast-episode": "Podcast episode",
+      "youtube-creator": "YouTube video"
+    },
+    "step": {
+      "record": "Record",
+      "sync": "Sync",
+      "clean": "Clean up",
+      "transcript": "Transcript",
+      "chapters": "Chapters",
+      "clips": "Short clips",
+      "audiogram": "Audiogram",
+      "publish": "Publish",
+      "import": "Import",
+      "aiSelect": "AI selection",
+      "filler": "Filler words",
+      "hook": "Hook",
+      "captions": "Captions",
+      "broll": "B-roll",
+      "color": "Color",
+      "thumbnail": "Thumbnail",
+      "export": "Export"
+    },
+    "hint": {
+      "record": "Record the conversation: Record button on the transport (count-in, takes).",
+      "sync": "With several recordings: “Sync” in the clip menu aligns the tracks.",
+      "clean": "Clip editor → “Find silences” and noise reduction; cuts after approval.",
+      "transcript": "“Edit speech by text”: the transcript is made on the phone (Whisper).",
+      "chapters": "Put a marker at the start of each topic (Marker button).",
+      "clips": "Send the audio to a video: short clips with waveform and captions.",
+      "audiogram": "An audiogram clip is made from the audio sent to a video.",
+      "publish": "Export: podcast loudness, MP3/AAC, to a file or share."
+    },
+    "start": "Start",
+    "skip": "Skip",
+    "markDone": "Step done",
+    "close": "Close workflow",
+    "done": "Workflow complete — every step closed."
+  },
   "studio": {
     "sampler": {
       "title": "Sampler",

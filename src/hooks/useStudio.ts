@@ -14,6 +14,7 @@ import { listSharedWithMe, type SharedProject } from '@/lib/collab';
 import { backupProjectToCloud, deleteCloudProject, syncProjectsFromCloud } from '@/lib/cloudSync';
 import { deletePostsForProject, publishRenderedProject } from '@/lib/feed';
 import { makeId } from '@/lib/id';
+import { PODCAST_EPISODE, startRunning } from '@/lib/workflowTemplate';
 import { pickSourceAsset, type SourceKind } from '@/lib/projectSource';
 import { fileKindOf, studioForKind } from '@/lib/remixFiles';
 import { importFromStorage } from '@/lib/storageImport';
@@ -254,8 +255,10 @@ export function useStudio() {
             sections: [t('studio.audio.template.intro'), t('studio.audio.template.verse'), t('studio.audio.template.chorus'), t('studio.audio.template.outro')],
           })
         : created;
+    // ▶️ C4: a Podcast-sablon a Podcast-epizód munkafolyamatot is elindítja (a Hang Stúdió sávja vezet végig)
+    const withRun = (kind === 'audio' || kind === 'music') && audioTemplate === 'podcast' ? { ...base, workflowRun: startRunning(PODCAST_EPISODE, () => makeId('wf'), new Date().toISOString()) } : base;
     // 🗂️ a létrehozáskor hozzáadott források a projekt forrás-mappájába (assets)
-    const project = sources.length > 0 ? { ...base, assets: sources } : base;
+    const project = sources.length > 0 ? { ...withRun, assets: sources } : withRun;
     await saveProject(project);
     backupProjectToCloud(project); // 🗄️ azonnal a userhez a felhőbe is (best-effort)
     setCreating(false);

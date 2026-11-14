@@ -6837,6 +6837,44 @@ async function smokeWorkflow(log: Log) {
   }
 }
 
+/**
+ * 🎧 S15: kimenet-/munkamenet-váltás lejátszás közben (a hang-mód átállítása ugyanazt a natív útvonal-
+ * változást váltja ki, mint a fejhallgató ki/be) — a motor ne álljon meg, a lejátszófej haladjon tovább.
+ */
+async function smokeRouteChange(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const { setAudioModeAsync } = await import('expo-audio');
+  const id = 'prj_smoke_route';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:route', caught));
+  const base = createEmptyProject('smoke kimenet', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'c', label: 'hang', uri: toneWav('smoke_route.wav', 12), start: 0, duration: 12, trimIn: 0, sourceDuration: 12, volume: 0.5, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1500);
+  try {
+    st().setPlayhead(0);
+    st().setPlaying(true);
+    await sleep(3000);
+    const before = st().playhead;
+    // a munkamenet átállítása (felvétel-mód be, majd vissza) — útvonal-/kategória-változás a natív oldalon
+    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+    await sleep(400);
+    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+    await sleep(2500);
+    const after = st().playhead;
+    const playing = st().isPlaying;
+    st().setPlaying(false);
+    log(playing && after - before > 2.2, 'munkamenet-váltás lejátszás közben: a lejátszás folytatódik, a lejátszófej halad', `játszik ${playing}, ${before.toFixed(2)} → ${after.toFixed(2)} s`);
+  } finally {
+    st().setPlaying(false);
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:route-del', caught));
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -9000,6 +9038,10 @@ export async function runImageSmoke(
   }
   if (phase === 'workflow') {
     await step(phase, () => smokeWorkflow(log));
+    return;
+  }
+  if (phase === 'routechange') {
+    await step(phase, () => smokeRouteChange(log));
     return;
   }
   if (phase === 'modeldl') {

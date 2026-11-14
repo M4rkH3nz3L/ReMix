@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { UserPresetRow } from '@/components/studio/audio/UserPresetRow';
 import { PreviewPlayButton } from '@/components/studio/audio/PreviewPlayButton';
@@ -12,6 +12,8 @@ import { palette } from '@/constants/editor';
 import { registerDevAction } from '@/lib/devActions';
 import type { InstrumentDoc } from '@/types/project';
 import { makeId } from '@/lib/id';
+import { exportMidiFile, pickMidiFile, readMidiFile } from '@/lib/midiClient';
+import type { MidiSong } from '@/lib/midiFile';
 import { snapMidiToScale, type MusicKey, type ScaleName } from '@/lib/pitch';
 import {
   cycleNoteVelocity,
@@ -107,6 +109,25 @@ export function PianoRollSheet({
   notesRef.current = notes;
   const bakeRef = useRef(() => onBake(notes, wave, bars));
   bakeRef.current = () => onBake(notes, wave, bars);
+  // 🎼 V1: MIDI be / ki — a hangok a piano roll modelljébe (beat, erősség), a rács hossza a dallamhoz
+  const applyMidi = (song: MidiSong | null | undefined) => {
+    if (song === undefined) return false;
+    if (!song || song.notes.length === 0) {
+      Alert.alert(t('studio.pianoRoll.midiImport'), t('studio.pianoRoll.midiEmpty'));
+      return false;
+    }
+    const next = song.notes.slice(0, 400).map((n) => ({ id: makeId('note'), midi: n.midi, startBeat: n.startBeat, lengthBeats: n.lengthBeats, velocity: n.velocity }));
+    const endBeat = next.reduce((m, n) => Math.max(m, n.startBeat + n.lengthBeats), 0);
+    setNotes(next);
+    setBars(Math.max(1, Math.min(8, Math.ceil(endBeat / 4))));
+    const lo = Math.min(...next.map((n) => n.midi));
+    if (lo < range.lowMidi || lo > range.highMidi) setRange({ lowMidi: Math.max(24, Math.min(60, lo - (lo % 12))), highMidi: Math.max(24, Math.min(60, lo - (lo % 12))) + 36 });
+    return true;
+  };
+  const importMidi = async () => applyMidi(await pickMidiFile());
+  const exportMidi = (share = true) => exportMidiFile(t('studio.pianoRoll.title'), notes, { bpm, share });
+  const midiRef = useRef({ applyMidi, exportMidi });
+  midiRef.current = { applyMidi, exportMidi };
   const tapRef = useRef(tap);
   tapRef.current = tap;
   const stateRef = useRef({ stepsPerBeat, key, snap, range });
@@ -143,6 +164,8 @@ export function PianoRollSheet({
         return true;
       }),
       registerDevAction('synth.state', () => ({ ...stateRef.current })),
+      registerDevAction('synth.midiExport', () => midiRef.current.exportMidi(false)),
+      registerDevAction('synth.midiImport', (arg) => midiRef.current.applyMidi(readMidiFile(String(arg)))),
     ];
     return () => offs.forEach((off) => off());
   }, []);
@@ -231,7 +254,17 @@ export function PianoRollSheet({
           <Ionicons name="chevron-down" size={16} color={palette.text} />
         </Pressable>
       </View>
-      <Text style={styles.hint} numberOfLines={2}>{t('studio.pianoRoll.tapHint')}</Text>
+      <View style={styles.controls}>
+        <Text style={[styles.hint, { flex: 1 }]} numberOfLines={2}>{t('studio.pianoRoll.tapHint')}</Text>
+        <Pressable onPress={() => void importMidi()} style={styles.waveBtn} accessibilityRole="button" accessibilityLabel={t('studio.pianoRoll.midiImport')} testID="pianoroll-midi-in">
+          <Ionicons name="download-outline" size={14} color={palette.textDim} />
+          <Text style={styles.waveText}>{t('studio.pianoRoll.midiImport')}</Text>
+        </Pressable>
+        <Pressable onPress={() => void exportMidi()} disabled={notes.length === 0} style={[styles.waveBtn, notes.length === 0 && styles.disabled]} accessibilityRole="button" accessibilityLabel={t('studio.pianoRoll.midiExport')} testID="pianoroll-midi-out">
+          <Ionicons name="share-outline" size={14} color={palette.textDim} />
+          <Text style={styles.waveText}>{t('studio.pianoRoll.midiExport')}</Text>
+        </Pressable>
+      </View>
 
       {/* ⭐ saját dallamok (hangjegyek + hullámforma + ütemszám) */}
       <UserPresetRow

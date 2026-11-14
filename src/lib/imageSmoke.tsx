@@ -6875,6 +6875,46 @@ async function smokeRouteChange(log: Log) {
   }
 }
 
+/** 🎼 V1: MIDI ki → be a piano rollban (valódi fájl a projekt Export-mappájában): azonos hangok, tört hosszal és erősséggel; a sütés egy undo. */
+async function smokeMidi(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_midi';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:midi', caught));
+  await saveProject({ ...createEmptyProject('smoke midi', '9:16', undefined, 'audio'), id, bpm: 100 });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  try {
+    runDevAction('audio.openPianoRoll');
+    for (let i = 0; i < 50 && runDevAction('synth.notesFull') === undefined; i++) await sleep(100);
+    runDevAction('synth.set', { notes: [{ midi: 60, startBeat: 0, lengthBeats: 1.5, velocity: 127 }, { midi: 64, startBeat: 2, lengthBeats: 0.25, velocity: 50 }, { midi: 67, startBeat: 3, lengthBeats: 1, velocity: 100 }], bars: 1 });
+    await sleep(400);
+    const before = String(runDevAction('synth.notesFull'));
+    const uri = (await runDevAction('synth.midiExport')) as string;
+    const exists = !!uri && new File(uri).exists && (new File(uri).size ?? 0) > 30;
+    log(exists, 'MIDI ki: a dallam .mid fájlként a projekt Export-mappájában', `${uri?.split('/').slice(-2).join('/')} · ${new File(uri).size} B`);
+    runDevAction('synth.set', { notes: [], bars: 1 });
+    await sleep(300);
+    const ok = runDevAction('synth.midiImport', uri) === true;
+    await sleep(400);
+    const after = String(runDevAction('synth.notesFull'));
+    const vel = String(runDevAction('synth.notes'));
+    log(ok && after === before && vel === '60@0v127,64@2v50,67@3v100', 'MIDI be: ugyanazok a hangok (kezdet, hossz, erősség)', `${after} · ${vel}`);
+    runDevAction('synth.bake');
+    for (let i = 0; i < 100 && (st().project!.tracks.find((t) => t.type === 'music')!.clips.length === 0); i++) await sleep(100);
+    const n = st().project!.tracks.find((t) => t.type === 'music')!.clips.length;
+    st().undo();
+    await sleep(200);
+    log(n === 1 && st().project!.tracks.find((t) => t.type === 'music')!.clips.length === 0, 'a behúzott dallam sütése egy klip, egy visszavonás', `${n}`);
+  } finally {
+    runDevAction('audio.closePianoRoll');
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:midi-del', caught));
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -9042,6 +9082,10 @@ export async function runImageSmoke(
   }
   if (phase === 'routechange') {
     await step(phase, () => smokeRouteChange(log));
+    return;
+  }
+  if (phase === 'midi') {
+    await step(phase, () => smokeMidi(log));
     return;
   }
   if (phase === 'modeldl') {

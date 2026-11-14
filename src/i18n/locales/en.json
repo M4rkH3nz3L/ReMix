@@ -3298,6 +3298,9 @@
       "velHint": "Long press: normal, accented or soft hit"
     },
     "pianoRoll": {
+      "midiImport": "MIDI in",
+      "midiExport": "MIDI out",
+      "midiEmpty": "The file has no playable notes (or is not a MIDI file).",
       "grid": "Grid",
       "gridStep_1": "1/4",
       "gridStep_2": "1/8",

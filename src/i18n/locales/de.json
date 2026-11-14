@@ -3298,6 +3298,9 @@
       "velHint": "Lange drücken: normaler, betonter oder leiser Schlag"
     },
     "pianoRoll": {
+      "midiImport": "MIDI rein",
+      "midiExport": "MIDI raus",
+      "midiEmpty": "Die Datei enthält keine spielbaren Noten (oder ist keine MIDI-Datei).",
       "grid": "Raster",
       "gridStep_1": "1/4",
       "gridStep_2": "1/8",

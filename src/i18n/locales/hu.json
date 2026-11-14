@@ -3298,6 +3298,9 @@
       "velHint": "Hosszan nyomva: normál, hangsúlyos vagy halk ütés"
     },
     "pianoRoll": {
+      "midiImport": "MIDI be",
+      "midiExport": "MIDI ki",
+      "midiEmpty": "A fájlban nincs lejátszható hang (vagy nem MIDI-fájl).",
       "grid": "Rács",
       "gridStep_1": "1/4",
       "gridStep_2": "1/8",

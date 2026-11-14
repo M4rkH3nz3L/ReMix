@@ -23,6 +23,7 @@ import { useStudioSession } from '@/hooks/useStudioSession';
 import { StudioStatusBanners } from '@/components/studio/StudioStatusBanners';
 import { audioProjectToVideo } from '@/lib/audioToVideo';
 import { sendMixdownToVideo } from '@/lib/linkedAssetClient';
+import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { useActionMenu } from '@/store/actionMenuStore';
 import { mixForExport } from '@/lib/audioExportMix';
 import { exportAudioToFile, isRenderCancelledError } from '@/lib/render';
@@ -101,6 +102,8 @@ export default function AudioStudioScreen() {
           return;
         }
         useEditorStore.getState().loadProject(loaded, events);
+        // 📊 CSWCR: a Hang Stúdió szerkeszti a projektet (a lánc egyik stúdiója)
+        logCswcr({ type: 'edit', projectId: loaded.id, kind: studioKindOf(loaded.kind) });
         setLoading(false);
       })
       .catch((caught) => { logCaught('app/studio/audio/[id].tsx:AudioStudioScreen', caught); return alive && setLoading(false); });
@@ -200,7 +203,11 @@ export default function AudioStudioScreen() {
     const vid = audioProjectToVideo(project, t('studio.audio.videoName', { name: project.name }), new Date().toISOString());
     flushProjectSave()
       .then(() => saveProject(vid))
-      .then(() => router.replace(`/editor/${vid.id}`))
+      .then(() => {
+        // 📊 CSWCR: átadás másolattal (a link-arány nevezője)
+        logCswcr({ type: 'handoff', via: 'copy', projectId: project.id, kind: studioKindOf(project.kind), toProjectId: vid.id });
+        router.replace(`/editor/${vid.id}`);
+      })
       .catch((caught) => { logCaught('app/studio/audio/[id].tsx:sendToVideo', caught); });
   };
   const sendToVideo = () => {
@@ -227,6 +234,7 @@ export default function AudioStudioScreen() {
         if (note) Alert.alert(t('studio.export'), note);
         const target = new File(projectExportDir(), audioExportFileName(project.name, 'wav'));
         const { uri, unsupported } = await exportOfflineWav(mix, target, report, signal);
+        logCswcr({ type: 'export', projectId: project.id, kind: studioKindOf(project.kind) });
         if (unsupported.length > 0) {
           await new Promise<void>((resolve) =>
             Alert.alert(
@@ -257,6 +265,7 @@ export default function AudioStudioScreen() {
           // A28: a fájl a projekt Export-mappájába kerül, a token nem megy URL-ben a böngészőnek
           const target = new File(projectExportDir(), audioExportFileName(project.name, format));
           const uri = await exportAudioToFile(mix, audioExportSettings(format, quality), target, report, signal);
+          logCswcr({ type: 'export', projectId: project.id, kind: studioKindOf(project.kind) });
           if (await Sharing.isAvailableAsync()) {
             await Sharing.shareAsync(uri, { mimeType: info.mime, dialogTitle: t('studio.audio.exportSheet.shareTitle') });
           } else {

@@ -3,6 +3,7 @@ import * as Sharing from 'expo-sharing';
 import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
+import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { withFingerprints } from '@/lib/fingerprint';
 import { makeId } from '@/lib/id';
 import { extractMediaUriEntries, type MediaFileKey } from '@/lib/mediaGc';
@@ -158,6 +159,8 @@ export async function exportRpFile(
   } finally {
     handle.close();
   }
+  // 📊 CSWCR: a projekt-csomag a lánc egyik „befejezése" (export · poszt · csomag)
+  logCswcr({ type: 'package', projectId: project.id, kind: studioKindOf(project.kind) });
   return out;
 }
 

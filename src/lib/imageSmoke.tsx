@@ -106,6 +106,7 @@ import { emptySampler } from '@/lib/sampler';
 import { applyCommand } from '@/lib/commands';
 import { linkedAssets, mixdownVersion, relinkPlan } from '@/lib/linkedAsset';
 import { sendMixdownToVideo, sourceVersionOf } from '@/lib/linkedAssetClient';
+import { clearCswcrLog, logCswcr, type CswcrStats } from '@/lib/cswcrClient';
 import { USER_PRESETS_KEY, useUserPresets } from '@/store/userPresetStore';
 import { useAudioEditMode } from '@/store/audioEditModeStore';
 import type { CheckIssue } from '@/lib/audioCheck';
@@ -5173,6 +5174,13 @@ async function smokeLinkedMix(log: Log) {
   await saveProject(audio);
   const st = useEditorStore.getState;
   try {
+    // 📊 C5: tiszta napló; a Hang Stúdió megnyitása = a lánc 1. stúdiója (az útvonal naplózza)
+    await clearCswcrLog();
+    router.push(`/studio/audio/${audioId}` as Href);
+    for (let i = 0; i < 60 && st().project?.id !== audioId; i++) await sleep(200);
+    await sleep(800);
+    router.back();
+    await sleep(600);
     // 1) küldés hivatkozással egy ÚJ videó-projektbe (a menü „Új videó — hivatkozással” útja)
     const video = await sendMixdownToVideo(audio, null, { newName: 'smoke klip' });
     videoId = video?.id ?? null;
@@ -5218,6 +5226,12 @@ async function smokeLinkedMix(log: Log) {
     // 6) hossz-szabály (pure, a mentett videón): rövidebb forrás → a klip vége a forrás végére, jelezve
     const plan = relinkPlan(st().project!, vClip1.assetId!, { uri: vClip1.uri, durationSec: 1.5, version: 'rövid' });
     log(plan.shortened.length === 1 && plan.commands.some((x) => x.type === 'UPDATE_CLIP' && (x.patch as AudioClip).duration === 1.5), 'rövidebb kimenet: a klip vége a forrás végére vágva és jelezve (hosszabb: változatlan)', `${plan.shortened.length} rövidült`);
+    // 7) 📊 C5 / F1: a CSWCR a telefonon — a lánc (hang → videó hivatkozással) elkezdett (2 stúdió), a link-arány 1,
+    //    a „Frissítés" elfogadása számolva; egy export után befejezett
+    logCswcr({ type: 'export', projectId: video.id, kind: 'video' });
+    const stats = (await runDevAction('cswcr.stats')) as CswcrStats;
+    log(stats.link.link >= 1 && stats.link.copy === 0 && stats.link.ratio === 1, 'CSWCR: az átadás hivatkozás volt (link-arány 1)', `link ${stats.link.link}, másolat ${stats.link.copy}`);
+    log(stats.flow.multiStudio >= 1 && stats.flow.started >= 1 && stats.flow.completed >= 1 && stats.flow.relinks >= 1, 'CSWCR: a hang→videó lánc többstúdiós, elkezdett és (export után) befejezett; a frissítés elfogadva', `láncok ${stats.flow.chains}, többstúdiós ${stats.flow.multiStudio}, elkezdett ${stats.flow.started}, befejezett ${stats.flow.completed}, relink ${stats.flow.relinks}, CSWCR ${stats.flow.cswcr?.toFixed(2)}`);
   } finally {
     router.back();
     await sleep(500);

@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NewerSchemaBanner } from '@/components/NewerSchemaBanner';
 import { LinkedUpdateBanner } from '@/components/editor/LinkedUpdateBanner';
+import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { CollabPresence } from '@/components/editor/CollabPresence';
 import { UndoGestureArea } from '@/components/UndoGestureArea';
 import { SourceBin } from '@/components/SourceBin';
@@ -289,6 +290,8 @@ export default function EditorScreen() {
         };
         if (loaded) {
           useEditorStore.getState().loadProject(loaded, events);
+          // 📊 CSWCR: a videó-stúdió szerkeszti a projektet (a lánc 2. stúdiója lehet)
+          logCswcr({ type: 'edit', projectId: loaded.id, kind: studioKindOf(loaded.kind) });
           // 🛟 crash-recovery: ha van a mentettnél FRISSEBB pillanatkép (az előző
           // munkamenet nem fejezte be a mentést), felajánljuk a visszaállítást
           void readRecovery(id).then((rec) => {

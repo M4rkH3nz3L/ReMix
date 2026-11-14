@@ -2,6 +2,7 @@ import { File } from 'expo-file-system';
 
 import { mixForExport } from '@/lib/audioExportMix';
 import { applyCommand } from '@/lib/commands';
+import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { makeId } from '@/lib/id';
 import { mixdownClipCommands, mixdownInsertAt, mixdownVersion, type AssetSource, type MixdownFile } from '@/lib/linkedAsset';
 import { logCaught } from '@/lib/logCaught';
@@ -94,5 +95,7 @@ export async function sendMixdownToVideo(
   });
   for (const cmd of cmds) video = applyCommand(video, cmd) ?? video;
   await saveProject(video);
+  // 📊 CSWCR: átadás hivatkozással (a link-arány számlálója)
+  logCswcr({ type: 'handoff', via: 'link', projectId: audio.id, kind: studioKindOf(audio.kind), toProjectId: video.id });
   return video;
 }

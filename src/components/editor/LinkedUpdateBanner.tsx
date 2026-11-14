@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
+import { clearCswcrLog, cswcrStats, logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { registerDevAction } from '@/lib/devActions';
 import { linkedAssets, relinkPlan, staleLinks, type StaleLink } from '@/lib/linkedAsset';
 import { loadSourceProject, renderMixdown, sourceVersionOf } from '@/lib/linkedAssetClient';
@@ -62,6 +63,8 @@ export function LinkedUpdateBanner() {
       const plan = relinkPlan(st.project, link.asset.id, file);
       if (plan.commands.length === 0) return;
       st.applyBatch(plan.commands, 'user');
+      // 📊 CSWCR: a „Frissítés elérhető" elfogadása (7.4 frissítés-elfogadás)
+      logCswcr({ type: 'relink', projectId: st.project.id, kind: studioKindOf(st.project.kind) });
       if (plan.shortened.length > 0) {
         Alert.alert(t('editor.linked.title'), t('editor.linked.shortened', { count: plan.shortened.length }));
       }
@@ -92,6 +95,9 @@ export function LinkedUpdateBanner() {
         await updateRef.current(first);
         return true;
       }),
+      // 📊 a CSWCR-mérőszámok a telefonon (a mérésnek)
+      registerDevAction('cswcr.stats', () => cswcrStats()),
+      registerDevAction('cswcr.clear', () => clearCswcrLog().then(() => true)),
     ];
     return () => offs.forEach((off) => off());
   }, [check]);

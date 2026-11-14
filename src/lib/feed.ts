@@ -1,6 +1,7 @@
 import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
+import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { applyDiversity, rankBy, rankTrending, type PostSignals } from '@/lib/feedRanking';
 import { makeId } from '@/lib/id';
 import { audioRemixProject, imageRemixProject } from '@/lib/imageRemix';
@@ -573,6 +574,8 @@ export async function publishPost(
     }
     throw new Error(error.message);
   }
+  // 📊 CSWCR: a poszt a lánc egyik „befejezése" (export · poszt · csomag) — csak helyi napló
+  logCswcr({ type: 'post', projectId: project.id, kind: studioKindOf(project.kind) });
   return toPost(data as PostRow, new Set(), new Set());
 }
 

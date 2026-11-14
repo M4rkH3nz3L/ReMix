@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
+import { isAudioStudioMode, rememberMode, type AudioStudioMode } from '@/lib/audioStudioModes';
 import type { WorkspaceMode } from '@/lib/imageWorkspaceLayout';
 import type { EditMode } from '@/lib/toolbarSpec';
 import { logCaught } from '@/lib/logCaught';
@@ -22,6 +23,8 @@ interface EditorPrefs {
   imagePanels: ImagePanels;
   /** a Live Stúdió paneljeinek sorrendje */
   livePanels: string[];
+  /** 🎛️ V10: az Audio Stúdió módja projektenként (nézet — nem a projekt része) */
+  audioModes: Record<string, AudioStudioMode>;
 }
 
 interface EditorPrefsState extends EditorPrefs {
@@ -29,9 +32,10 @@ interface EditorPrefsState extends EditorPrefs {
   setTimelineExtras: (open: boolean) => void;
   setImagePanel: (mode: WorkspaceMode, patch: { rail?: boolean; layers?: boolean }) => void;
   setLivePanels: (order: string[]) => void;
+  setAudioMode: (projectId: string, mode: AudioStudioMode) => void;
 }
 
-const pick = ({ editMode, timelineExtras, imagePanels, livePanels }: EditorPrefs): EditorPrefs => ({ editMode, timelineExtras, imagePanels, livePanels });
+const pick = ({ editMode, timelineExtras, imagePanels, livePanels, audioModes }: EditorPrefs): EditorPrefs => ({ editMode, timelineExtras, imagePanels, livePanels, audioModes });
 
 function persist(p: EditorPrefs): void {
   AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(p)).catch((caught) => {
@@ -45,6 +49,7 @@ export const useEditorPrefs = create<EditorPrefsState>((set, get) => ({
   timelineExtras: true,
   imagePanels: {},
   livePanels: [],
+  audioModes: {},
   setEditMode: (editMode) => {
     set({ editMode });
     persist({ ...pick(get()), editMode });
@@ -62,6 +67,11 @@ export const useEditorPrefs = create<EditorPrefsState>((set, get) => ({
     set({ livePanels });
     persist({ ...pick(get()), livePanels });
   },
+  setAudioMode: (projectId, mode) => {
+    const audioModes = rememberMode(get().audioModes, projectId, mode);
+    set({ audioModes });
+    persist({ ...pick(get()), audioModes });
+  },
 }));
 
 // induláskor egyszer betöltjük (a hiányzó / sérült érték az alapra esik vissza)
@@ -74,6 +84,9 @@ AsyncStorage.getItem(STORAGE_KEY)
       ...(typeof p.timelineExtras === 'boolean' ? { timelineExtras: p.timelineExtras } : {}),
       ...(p.imagePanels && typeof p.imagePanels === 'object' ? { imagePanels: p.imagePanels } : {}),
       ...(Array.isArray(p.livePanels) ? { livePanels: p.livePanels.filter((v) => typeof v === 'string') } : {}),
+      ...(p.audioModes && typeof p.audioModes === 'object'
+        ? { audioModes: Object.fromEntries(Object.entries(p.audioModes).filter(([, v]) => isAudioStudioMode(v))) as Record<string, AudioStudioMode> }
+        : {}),
     });
   })
   .catch((caught) => { logCaught('store/editorPrefsStore.ts', caught); });

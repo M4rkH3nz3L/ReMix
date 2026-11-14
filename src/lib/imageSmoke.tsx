@@ -3318,6 +3318,86 @@ async function smokePerfMatrix(log: Log) {
   log(null, 'MATRIX', row);
 }
 
+/** 🎛️ V10 fotózható állapot: Zene mód, a „Több” nyitva, a módválasztó nyitva — 25 s-ig áll */
+async function smokeModeShot(log: Log) {
+  const st = useEditorStore.getState;
+  const id = `prj_smoke_modeshot_${Date.now().toString(36)}`;
+  const base = createEmptyProject('Mód-teszt', '9:16', undefined, 'audio');
+  await saveProject({ ...base, id });
+  try {
+    router.push(`/studio/audio/${id}` as Href);
+    for (let i = 0; i < 150 && (st().project?.id !== id || runDevAction('audio.studioMode') === undefined); i++) await sleep(200);
+    await sleep(800);
+    runDevAction('audio.setStudioMode', 'music');
+    await sleep(300);
+    runDevAction('audio.toggleMore');
+    runDevAction('audio.toggleModePicker');
+    log(true, 'FOTÓZHATÓ', 'Zene mód, „Több” és módválasztó nyitva');
+    await sleep(25_000);
+    router.back();
+    await sleep(500);
+  } finally {
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:modeshot', caught));
+  }
+}
+
+/**
+ * 🎛️ V10: az Audio Stúdió módjai — Gyors · Keverés · Zene · AI. Az új hang-projekt Gyors módban,
+ * a zene-munkaterület Zene módban nyílik; a választás projektenként megmarad; az AI mód kinyitja
+ * az asszisztenst; a „Több” a módon kívüli csoportokat mutatja.
+ */
+async function smokeStudioModes(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  type Info = { mode: string; front: string[]; more: string[]; showMore: boolean; assistantOpen: boolean };
+  const st = useEditorStore.getState;
+  const info = () => runDevAction('audio.studioMode') as Info | undefined;
+  const stamp = Date.now().toString(36);
+  const ids = [`prj_smoke_modes_a_${stamp}`, `prj_smoke_modes_b_${stamp}`, `prj_smoke_modes_m_${stamp}`];
+  const open = async (id: string, ws?: string) => {
+    router.push(`/studio/audio/${id}${ws ? `?ws=${ws}` : ''}` as Href);
+    for (let i = 0; i < 150 && (st().project?.id !== id || info() === undefined); i++) await sleep(200);
+    await sleep(800);
+  };
+  const close = async () => {
+    router.back();
+    await sleep(800);
+  };
+  try {
+    for (const id of ids) {
+      const base = createEmptyProject(`smoke mód ${id.slice(-8)}`, '9:16', undefined, 'audio');
+      await saveProject({ ...base, id });
+    }
+    await open(ids[0]);
+    let i = info();
+    log(i?.mode === 'quick' && i.front.join(',') === 'editModes,zoom,markers' && !i.showMore, 'új hang-projekt: Gyors mód, rövid transzport-sor', JSON.stringify(i));
+    runDevAction('audio.toggleMore');
+    await sleep(300);
+    i = info();
+    log(i?.showMore === true && i.more.includes('instruments') && i.more.includes('tempo'), 'a „Több” a módon kívüli csoportokat mutatja (hangszerek, tempó is)', i?.more.join(','));
+    runDevAction('audio.setStudioMode', 'mix');
+    await sleep(300);
+    i = info();
+    log(i?.mode === 'mix' && i.front[0] === 'ab' && !i.showMore, 'Keverés mód: A/B elöl, a „Több” becsukódik', JSON.stringify(i));
+    await close();
+    await open(ids[1]);
+    log(info()?.mode === 'quick', 'a mód projektenként: a másik projekt Gyors maradt', info()?.mode);
+    await close();
+    await open(ids[0]);
+    log(info()?.mode === 'mix', 'újranyitva az első projekt Keverés módban maradt', info()?.mode);
+    runDevAction('audio.setStudioMode', 'ai');
+    await sleep(500);
+    i = info();
+    log(i?.mode === 'ai' && i.front[0] === 'assistant' && i.assistantOpen, 'AI mód: az asszisztens elöl és nyitva', JSON.stringify(i));
+    await close();
+    await open(ids[2], 'music');
+    i = info();
+    log(i?.mode === 'music' && i.front[0] === 'instruments', 'zene-munkaterület: Zene mód, hangszerek elöl', JSON.stringify(i));
+    await close();
+  } finally {
+    for (const id of ids) await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:modes', caught));
+  }
+}
+
 /**
  * 🌡️ S19: 30 perces, effektezett, két sávos telefonos export — a hőállapot és az akkumulátor
  * naplózva, súlyos hőnél a keverés pihen (lásd `thermalPolicy`). Hosszú (~percek) mérés.
@@ -10562,6 +10642,14 @@ export async function runImageSmoke(
   }
   if (phase === 'crossfade') {
     await step(phase, () => smokeCrossfade(log));
+    return;
+  }
+  if (phase === 'modeshot') {
+    await step(phase, () => smokeModeShot(log));
+    return;
+  }
+  if (phase === 'studiomodes') {
+    await step(phase, () => smokeStudioModes(log));
     return;
   }
   if (phase === 'perfmatrix') {

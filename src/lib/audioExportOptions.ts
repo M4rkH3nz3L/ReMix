@@ -1,4 +1,5 @@
 import type { RenderSettings } from '@/lib/render';
+import type { AudioMasterTarget } from '@/types/project';
 
 /**
  * 🎧 Hangexport-beállítások (PRO-AUDIO A31): formátum, minőség, mintavétel, csatorna. Pure.
@@ -70,4 +71,49 @@ export function audioExportFileName(projectName: string, format: AudioExportForm
       .replace(/\s+/g, '_')
       .slice(0, 60) || 'ReMix';
   return `${base}.${audioFormatInfo(format).ext}`;
+}
+
+// ── 🎯 V12: creator-profil az exportnál — a hangosság-cél a formátumot is javasolja ──────────────
+
+
+export interface ProfileExport {
+  format: AudioExportFormat;
+  quality: AudioExportQuality;
+}
+
+/** a profil szerint javasolt formátum (a platformok bevett szállítási formátumai); `custom` → nincs javaslat */
+export function profileExport(target: AudioMasterTarget | undefined): ProfileExport | null {
+  switch (target) {
+    case 'podcast':
+      return { format: 'mp3', quality: { bitrateKbps: 128, bitDepth: 16, sampleRate: 44100, channels: 1 } };
+    case 'music':
+    case 'spotify':
+    case 'club':
+      return { format: 'wav', quality: { bitrateKbps: 0, bitDepth: 24, sampleRate: 44100, channels: 2 } };
+    case 'appleMusic':
+      return { format: 'wav', quality: { bitrateKbps: 0, bitDepth: 24, sampleRate: 48000, channels: 2 } };
+    case 'video':
+    case 'youtube':
+    case 'social':
+    case 'tiktok':
+      return { format: 'aac', quality: { bitrateKbps: 256, bitDepth: 16, sampleRate: 48000, channels: 2 } };
+    default:
+      return null;
+  }
+}
+
+/**
+ * a telefonos (Free) export ma egyetlen formát ír: WAV 44,1 kHz, sztereó, 16 bit (`exportOfflineWav`) — a
+ * javaslat ezt mutatja, nem ígér mást (a profil mintavétele/csatornája a Pro felhő-exportnál érvényes)
+ */
+export function profileExportOnDevice(_p: ProfileExport): ProfileExport {
+  return { format: 'wav', quality: { bitrateKbps: 0, bitDepth: 16, sampleRate: 44100, channels: 2 } };
+}
+
+/** a mért integrált hangosság a cél tartományában (±1 LU) — a felület visszajelzése */
+export function loudnessVerdict(measuredLufs: number | null | undefined, targetLufs: number): 'ok' | 'quiet' | 'loud' | null {
+  if (measuredLufs === null || measuredLufs === undefined || !Number.isFinite(measuredLufs)) return null;
+  if (measuredLufs < targetLufs - 1) return 'quiet';
+  if (measuredLufs > targetLufs + 1) return 'loud';
+  return 'ok';
 }

@@ -6915,6 +6915,47 @@ async function smokeMidi(log: Log) {
   }
 }
 
+/** 🎯 V12: az export-lapon a profil (podcast) javasolt formátuma, a cél és a mért hangosság ítélete; „Profil szerint” alkalmazza. */
+async function smokeExportProfile(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const { masterPreset } = await import('@/lib/audioMaster');
+  const { useReference } = await import('@/store/referenceStore');
+  const id = 'prj_smoke_exprof';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:exprof', caught));
+  const base = createEmptyProject('smoke export-profil', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'c', label: 'hang', uri: toneWav('smoke_exprof.wav', 2), start: 0, duration: 2, trimIn: 0, sourceDuration: 2, volume: 0.5, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, audioMaster: masterPreset('podcast'), tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1000);
+  try {
+    useReference.getState().setMixLufs(-16.3);
+    runDevAction('audio.exportSheet');
+    await sleep(800);
+    type S = { format: string; quality: { sampleRate: number; channels: number; bitDepth: number; bitrateKbps: number }; rec: { format: string; quality: { sampleRate: number; channels: number; bitDepth: number; bitrateKbps: number } } | null; verdict: string | null };
+    const s0 = runDevAction('exportSheet.state') as S;
+    const pro = s0.rec?.format === 'mp3';
+    const recOk = pro ? s0.rec!.quality.channels === 1 && s0.rec!.quality.bitrateKbps === 128 : s0.rec?.format === 'wav' && s0.rec.quality.sampleRate === 44100;
+    log(!!s0.rec && recOk && s0.verdict === 'ok', `podcast-profil: javaslat ${pro ? 'MP3 128 kbps mono (Pro)' : 'a telefonos WAV (Free)'}; a mért −16,3 LUFS a −16-os célon`, JSON.stringify({ rec: s0.rec, verdict: s0.verdict }));
+    useReference.getState().setMixLufs(-19);
+    await sleep(300);
+    const s1 = runDevAction('exportSheet.state') as S;
+    log(s1.verdict === 'quiet', 'a mért −19 LUFS: „halkabb a célnál”', `${s1.verdict}`);
+    runDevAction('exportSheet.applyProfile');
+    await sleep(300);
+    const s2 = runDevAction('exportSheet.state') as S;
+    log(s2.format === s0.rec!.format && JSON.stringify(s2.quality) === JSON.stringify(s0.rec!.quality), '„Profil szerint”: a lap a javasolt formátumra és minőségre áll', `${s2.format} ${JSON.stringify(s2.quality)}`);
+    log(true, 'FOTÓZHATÓ', 'az export-lap profil-sora');
+    await sleep(1500);
+  } finally {
+    useReference.getState().setMixLufs(null);
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:exprof-del', caught));
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -9086,6 +9127,10 @@ export async function runImageSmoke(
   }
   if (phase === 'midi') {
     await step(phase, () => smokeMidi(log));
+    return;
+  }
+  if (phase === 'exprofile') {
+    await step(phase, () => smokeExportProfile(log));
     return;
   }
   if (phase === 'modeldl') {

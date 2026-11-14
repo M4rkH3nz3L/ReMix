@@ -4203,6 +4203,12 @@
         "downloadFailed": "The rendered audio of “{{name}}” could not be downloaded."
       },
       "exportSheet": {
+        "profile": "Profile: {{name}}",
+        "profileTarget": "Target: {{lufs}} LUFS, ceiling {{tp}} dBTP",
+        "profileApply": "Per profile: {{fmt}}",
+        "verdict_ok": "measured {{lufs}} LUFS — on target",
+        "verdict_quiet": "measured {{lufs}} LUFS — quieter than the target (master)",
+        "verdict_loud": "measured {{lufs}} LUFS — louder than the target (master)",
         "phoneFallback": "The server can’t be reached right now — the WAV is made on your phone.",
         "scope": "Range",
         "whole": "Whole project",

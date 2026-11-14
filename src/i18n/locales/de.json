@@ -4208,6 +4208,12 @@
         "downloadFailed": "Das gerenderte Audio von „{{name}}“ konnte nicht geladen werden."
       },
       "exportSheet": {
+        "profile": "Profil: {{name}}",
+        "profileTarget": "Ziel: {{lufs}} LUFS, Obergrenze {{tp}} dBTP",
+        "profileApply": "Laut Profil: {{fmt}}",
+        "verdict_ok": "gemessen {{lufs}} LUFS — im Ziel",
+        "verdict_quiet": "gemessen {{lufs}} LUFS — leiser als das Ziel (Master)",
+        "verdict_loud": "gemessen {{lufs}} LUFS — lauter als das Ziel (Master)",
         "phoneFallback": "Der Server ist gerade nicht erreichbar — die WAV wird auf dem Telefon erstellt.",
         "scope": "Bereich",
         "whole": "Ganzes Projekt",

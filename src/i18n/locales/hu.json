@@ -4203,6 +4203,12 @@
         "downloadFailed": "A(z) „{{name}}” szám renderelt hangja nem töltődött le."
       },
       "exportSheet": {
+        "profile": "Profil: {{name}}",
+        "profileTarget": "Cél: {{lufs}} LUFS, plafon {{tp}} dBTP",
+        "profileApply": "Profil szerint: {{fmt}}",
+        "verdict_ok": "mérve {{lufs}} LUFS — a célon",
+        "verdict_quiet": "mérve {{lufs}} LUFS — halkabb a célnál (master)",
+        "verdict_loud": "mérve {{lufs}} LUFS — hangosabb a célnál (master)",
         "phoneFallback": "A szerver most nem érhető el — a WAV a telefonon készül.",
         "scope": "Tartomány",
         "whole": "Teljes projekt",

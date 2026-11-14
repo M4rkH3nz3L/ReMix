@@ -27,6 +27,7 @@ import { findUsages, sendMixdownToVideo } from '@/lib/linkedAssetClient';
 import type { LinkUsage } from '@/lib/linkedAsset';
 import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { useActionMenu } from '@/store/actionMenuStore';
+import { useReference } from '@/store/referenceStore';
 import { mixForExport } from '@/lib/audioExportMix';
 import { exportAudioToFile, isRenderCancelledError } from '@/lib/render';
 import {
@@ -61,6 +62,8 @@ export default function AudioStudioScreen() {
   const { id, ws } = useLocalSearchParams<{ id: string; ws?: string }>();
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
+  // 🎯 V12: a keverés legutóbb mért integrált hangossága (a master-lap mérése) — az export-lap ítéletéhez
+  const mixLufs = useReference((s) => s.mixLufs);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [checkResult, setCheckResult] = useState<{ issues: CheckIssue[]; stats: MixStats | null } | null>(null);
@@ -326,6 +329,8 @@ export default function AudioStudioScreen() {
       <AudioStudioBody mode="project" workspace={ws === 'music' || project.kind === 'music' ? 'music' : undefined} title={project.name} onExit={exit} onExport={() => setExporting(true)} onRequestCheck={() => void runCheck()} />
       {exporting ? (
         <AudioExportSheet
+          master={project.audioMaster ?? null}
+          measuredLufs={mixLufs}
           onClose={() => setExporting(false)}
           onPreview={() => {
             setExporting(false);

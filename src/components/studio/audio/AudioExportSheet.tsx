@@ -1,5 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { registerDevAction } from '@/lib/devActions';
+import type { AudioMaster } from '@/types/project';
 import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +12,9 @@ import {
   AUDIO_EXPORT_FORMATS,
   audioFormatInfo,
   defaultAudioQuality,
+  loudnessVerdict,
+  profileExport,
+  profileExportOnDevice,
   qualityForFormat,
   type AudioExportFormat,
   type AudioExportQuality,
@@ -30,6 +35,8 @@ export function AudioExportSheet({
   range = null,
   onExportParts,
   onCheck,
+  master = null,
+  measuredLufs = null,
 }: {
   onClose: () => void;
   /** hiányzik = nincs „Előnézet” / „Videóba” gomb (pl. a videó-szerkesztőből nyitva) */
@@ -45,6 +52,9 @@ export function AudioExportSheet({
   onExportParts?: (scope: { range: boolean; stems: boolean }, bitDepth: 16 | 24) => void;
   /** 🩺 hangellenőrzés a telefonon (export előtt) */
   onCheck?: () => void;
+  /** 🎯 V12: a projekt hangosság-célja (profil) és — ha mérve — a keverés integrált hangossága */
+  master?: AudioMaster | null;
+  measuredLufs?: number | null;
 }) {
   const { t } = useTranslation();
   const [format, setFormat] = useState<AudioExportFormat>(onDevice ? 'wav' : 'mp3');
@@ -65,6 +75,32 @@ export function AudioExportSheet({
     setQuality((q) => qualityForFormat(next, q));
   };
   const set = (patch: Partial<AudioExportQuality>) => setQuality((q) => ({ ...q, ...patch }));
+  // 🎯 V12: a profil javasolt formátuma (Free: WAV a profil mintavételével) és a cél / a mért érték
+  const prof = profileExport(master?.target);
+  const rec = prof ? (onDevice ? profileExportOnDevice(prof) : prof) : null;
+  const verdict = master ? loudnessVerdict(measuredLufs, master.lufs) : null;
+  const applyProfile = () => {
+    if (!rec) return;
+    setFormat(rec.format);
+    setQuality(rec.quality);
+  };
+  // 🧪 füstteszt (V12): a lap állapota és a profil alkalmazása
+  const devRef = useRef({ format, quality, rec, verdict, applyProfile });
+  devRef.current = { format, quality, rec, verdict, applyProfile };
+  useEffect(() => {
+    const offs = [
+      registerDevAction('exportSheet.state', () => {
+        const d = devRef.current;
+        return { format: d.format, quality: d.quality, rec: d.rec, verdict: d.verdict };
+      }),
+      registerDevAction('exportSheet.applyProfile', () => {
+        devRef.current.applyProfile();
+        return true;
+      }),
+    ];
+    return () => offs.forEach((off) => off());
+  }, []);
+  const recActive = !!rec && rec.format === format && JSON.stringify(rec.quality) === JSON.stringify({ ...quality, bitrateKbps: rec.format === 'wav' || rec.format === 'flac' ? 0 : quality.bitrateKbps });
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -95,6 +131,25 @@ export function AudioExportSheet({
                 <Ionicons name="pulse-outline" size={20} color={palette.accent} />
                 <Text style={styles.actionText}>{t('studio.audio.check.open')}</Text>
               </Pressable>
+            ) : null}
+
+            {master ? (
+              <View style={styles.profile} testID="audio-export-profile">
+                <Text style={styles.section}>{t('studio.audio.exportSheet.profile', { name: t(`studio.master.target.${master.target}`) })}</Text>
+                <Text style={styles.hint}>
+                  {t('studio.audio.exportSheet.profileTarget', { lufs: master.lufs, tp: master.truePeak })}
+                  {verdict ? ` · ${t(`studio.audio.exportSheet.verdict_${verdict}`, { lufs: measuredLufs?.toFixed(1) })}` : ''}
+                </Text>
+                {rec ? (
+                  <View style={styles.row}>
+                    <Chip
+                      label={t('studio.audio.exportSheet.profileApply', { fmt: `${audioFormatInfo(rec.format).label} · ${rec.quality.sampleRate / 1000} kHz · ${rec.quality.channels === 1 ? 'mono' : 'stereo'}${rec.format === 'wav' || rec.format === 'flac' ? ` · ${rec.quality.bitDepth} bit` : ` · ${rec.quality.bitrateKbps} kbps`}` })}
+                      active={recActive}
+                      onPress={applyProfile}
+                    />
+                  </View>
+                ) : null}
+              </View>
             ) : null}
 
             {onExportParts ? (
@@ -204,6 +259,7 @@ export function AudioExportSheet({
 }
 
 const styles = StyleSheet.create({
+  profile: { marginTop: 10 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   scrim: { flex: 1 },
   sheet: { backgroundColor: palette.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, maxHeight: '86%' },

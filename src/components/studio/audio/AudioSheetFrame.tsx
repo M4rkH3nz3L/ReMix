@@ -19,6 +19,11 @@ export interface AudioSheetFrameValue {
   onDetentChange: (detent: Detent) => void;
   /** iPad fekvő (expanded): az inline lap jobb oldali dokkolt oszlopként, detent nélkül */
   docked?: boolean;
+  /**
+   * 🎹 S14: iPad fekvőben a hangszer-szerkesztő (workspace) NEM takarja el a sávokat: a stúdió-gyökér
+   * tetejétől ennyi képpontra kezdődik, fölötte a fejléc és a sávok (a lejátszófejjel) látszanak.
+   */
+  workspaceTop?: number;
 }
 
 export const AudioSheetFrameContext = createContext<AudioSheetFrameValue | null>(null);
@@ -58,7 +63,7 @@ export function AudioSheetFrame({
   if (frame && spec.tier === 'workspace') {
     return (
       // a stúdió-gyökér már a safe area-n BELÜL van → itt nincs újabb inset (T1/A3)
-      <View style={[StyleSheet.absoluteFill, styles.workspace]}>
+      <View style={[StyleSheet.absoluteFill, styles.workspace, frame.workspaceTop ? [{ top: frame.workspaceTop }, styles.workspaceDocked] : null]} testID={frame.workspaceTop ? 'instrument-docked' : 'instrument-full'}>
         <View style={[styles.fill, { paddingHorizontal: padH }]}>{children}</View>
         <WorkspaceTransport onBack={onClose} />
       </View>
@@ -159,4 +164,5 @@ const styles = StyleSheet.create({
   inline: { backgroundColor: '#0b0d14' },
   docked: { backgroundColor: '#0b0d14', borderLeftWidth: 1, borderLeftColor: palette.border },
   workspace: { backgroundColor: palette.bg, zIndex: 10 },
+  workspaceDocked: { borderTopWidth: 1, borderTopColor: palette.border, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
 });

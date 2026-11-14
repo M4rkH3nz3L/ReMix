@@ -168,6 +168,7 @@ export function AudioStudioBody({
         const st = useEditorStore.getState();
         return st.project ? st.dispatch({ type: 'SET_TEMPO_MAP', tempoMap: tempoMapWithout(st.project, st.playhead) }, 'user') : false;
       }),
+      registerDevAction('audio.layout', () => ({ docked: layoutRef.current.docked, workspaceTop: layoutRef.current.workspaceTop, rootH: layoutRef.current.rootH })),
       registerDevAction('audio.tempoMap', () => useEditorStore.getState().project?.tempoMap ?? []),
       registerDevAction('audio.nextBeat', () => {
         const st = useEditorStore.getState();
@@ -253,6 +254,8 @@ export function AudioStudioBody({
   // 🖥️ iPad fekvő: a keverő/master/klip-szerk. a sávok MELLETT, dokkolt oszlopban (MOBILE-UI §7)
   const L = useLayout();
   const docked = L.isExpanded;
+  // 🧪 füstteszt (S14): a lap-elrendezés kiolvasása
+  const layoutRef = useRef<{ docked: boolean; workspaceTop: number | null; rootH: number }>({ docked: false, workspaceTop: null, rootH: 0 });
   const [albumSharing, setAlbumSharing] = useState(false);
   const [tlH, setTlH] = useState(0); // az idővonal-terület magassága (rács/playhead a teljes magasságot tölti)
   const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
@@ -1052,8 +1055,11 @@ export function AudioStudioBody({
           onDetentChange: (d: Detent) =>
             inlineSheet && setDetentById((m) => ({ ...m, [inlineSheet]: d })),
           docked,
+          // 🎹 S14: iPad fekvőben a hangszer-szerkesztő a felület alsó ~58 %-án, a sávok fölötte látszanak
+          ...(docked ? { workspaceTop: topBarH + Math.round((rootH - topBarH) * 0.42) } : {}),
         }
       : null;
+  layoutRef.current = { docked, workspaceTop: sheetFrame?.workspaceTop ?? null, rootH };
   // dokkolt módban a nyitott inline lap a sávok mellé kerül (a workspace/modális lapok maradnak)
   const sheetsInDock = docked && inlineSheet !== null;
 

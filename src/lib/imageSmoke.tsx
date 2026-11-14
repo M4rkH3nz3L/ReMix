@@ -6594,6 +6594,43 @@ async function smokeTempoMap(log: Log) {
   }
 }
 
+/**
+ * 🎹 S14: iPad fekvőben a hangszer-szerkesztő dokkolva — a sávok (és a lejátszófej) fölötte látszanak; telefonon teljes képernyő.
+ */
+async function smokeInstrumentDock(log: Log) {
+  const { width, height } = Dimensions.get('screen');
+  log(null, 'eszköz', `${Platform.OS} ${width}×${height}`);
+  const id = 'prj_smoke_instdock';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:instdock', caught));
+  const base = createEmptyProject('smoke dokk', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'c', label: 'hang', uri: toneWav('smoke_dock.wav', 4), start: 0, duration: 4, trimIn: 0, sourceDuration: 4, volume: 0.5, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  try {
+    for (const [name, open, close] of [['dobgép', 'audio.openDrums', 'audio.closeDrums'], ['piano roll', 'audio.openPianoRoll', 'audio.closePianoRoll'], ['sampler', 'audio.openSampler', 'audio.closeSampler']] as const) {
+      runDevAction(open);
+      await sleep(900);
+      const l = runDevAction('audio.layout') as { docked: boolean; workspaceTop: number | null; rootH: number };
+      const tablet = Math.min(width, height) >= 700 && width > height;
+      const ok = tablet ? l.docked && !!l.workspaceTop && l.workspaceTop > 0.3 * l.rootH && l.workspaceTop < 0.6 * l.rootH : !l.workspaceTop;
+      log(ok, tablet ? `${name}: iPad fekvő — dokkolva, a sávok fölötte látszanak` : `${name}: telefonon / állóban teljes képernyő`, `docked ${l.docked}, top ${l.workspaceTop ?? '-'} / ${l.rootH}`);
+      if (name === 'dobgép') {
+        log(true, 'FOTÓZHATÓ', 'a dokkolt dobgép a sávok alatt');
+        await sleep(2500);
+      }
+      runDevAction(close);
+      await sleep(400);
+    }
+  } finally {
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:instdock-del', caught));
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -8737,6 +8774,10 @@ export async function runImageSmoke(
   }
   if (phase === 'tempomap') {
     await step(phase, () => smokeTempoMap(log));
+    return;
+  }
+  if (phase === 'instdock') {
+    await step(phase, () => smokeInstrumentDock(log));
     return;
   }
   if (phase === 'modeldl') {

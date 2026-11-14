@@ -148,6 +148,7 @@ export function AudioStudioBody({
   onExit,
   onExport,
   onRequestCheck,
+  onSendToVideo,
 }: {
   mode: 'project' | 'scoped';
   /** 🎵 Zene munkaterület (S10): a hangszer-eszközök a transzport elején (a `music` fajta / `?ws=music`) */
@@ -157,6 +158,8 @@ export function AudioStudioBody({
   onExport?: () => void;
   /** 🩺 a hangellenőrzés (a képernyő futtatja; az asszisztens is kérheti) */
   onRequestCheck?: () => void;
+  /** 🔗 C7: az asszisztens „videóba” művelete — a képernyő a C2 hivatkozásos átadásával végzi */
+  onSendToVideo?: (target: 'new' | 'latest' | 'pick') => void;
 }) {
   const { t } = useTranslation();
   // 🧪 füstteszt: melyik munkaterület él
@@ -561,6 +564,7 @@ export function AudioStudioBody({
         if (c && tt) void startSilenceSearch(c, tt, grid, t);
       } else if (a.kind === 'beatSplitBars' || a.kind === 'beatSplitBeats') beatSplitSelection(a.kind === 'beatSplitBars' ? 'bar' : 'beat');
       else if (a.kind === 'check') onRequestCheck?.();
+      else if (a.kind === 'toVideo') onSendToVideo?.(a.target);
       else if (a.kind === 'mixSuggest') useMixAssist.getState().show('mix');
       else if (a.kind === 'masterAssist') useMixAssist.getState().show('master');
       else if (a.kind === 'sync') sel && startAudioSync(sel, grid, t);

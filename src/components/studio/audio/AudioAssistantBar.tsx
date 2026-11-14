@@ -164,7 +164,7 @@ export function AudioAssistantBar({ onActions, onClose }: { onActions: (a: Audio
           {result.actions.map((a, i) => (
             <View key={`a${i}`} style={styles.line}>
               <Ionicons name="play-circle-outline" size={14} color={palette.accent} />
-              <Text style={styles.lineText}>{t(`studio.audio.assistant.action.${a.kind}`, { track: 'track' in a ? a.track : '' })}</Text>
+              <Text style={styles.lineText}>{t(`studio.audio.assistant.action.${a.kind}`, { track: 'track' in a ? a.track : '', target: 'target' in a ? t(`studio.audio.assistant.toVideoTarget.${a.target}`) : '' })}</Text>
             </View>
           ))}
           {result.unknown.map((u, i) => (

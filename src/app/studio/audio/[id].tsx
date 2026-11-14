@@ -213,6 +213,14 @@ export default function AudioStudioScreen() {
       }))
     );
   };
+  // 🔗 C7: az asszisztens „videóba” parancsa — új videó, a legutóbbi videó-projekt, vagy a választó
+  const sendToVideoBy = async (target: 'new' | 'latest' | 'pick') => {
+    if (target === 'pick') return pickVideoProject();
+    if (target === 'new') return sendLinked(null);
+    const latest = (await listProjects()).filter((m) => (m.kind ?? 'video') === 'video' && m.id !== project.id)[0];
+    const p = latest ? await loadProject(latest.id) : null;
+    return sendLinked(p ?? null);
+  };
   const copyToVideo = () => {
     // 🎧→🎬 a régi mód: a hang átvitele egy ÚJ videó-projektbe a sávok másolatával
     const vid = audioProjectToVideo(project, t('studio.audio.videoName', { name: project.name }), new Date().toISOString());
@@ -330,7 +338,7 @@ export default function AudioStudioScreen() {
           return true;
         }}
       />
-      <AudioStudioBody mode="project" workspace={ws === 'music' || project.kind === 'music' ? 'music' : undefined} title={project.name} onExit={exit} onExport={() => setExporting(true)} onRequestCheck={() => void runCheck()} />
+      <AudioStudioBody mode="project" workspace={ws === 'music' || project.kind === 'music' ? 'music' : undefined} title={project.name} onExit={exit} onExport={() => setExporting(true)} onRequestCheck={() => void runCheck()} onSendToVideo={(target) => void sendToVideoBy(target)} />
       {exporting ? (
         <AudioExportSheet
           master={project.audioMaster ?? null}

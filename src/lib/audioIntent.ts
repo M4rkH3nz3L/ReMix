@@ -24,7 +24,9 @@ export interface AudioStep {
 /** a parancs-buszon kívüli műveletek (munkamenet-állapot vagy meglévő folyamat) */
 export type AudioAction =
   | { kind: 'mute' | 'unmute' | 'solo'; track: TrackType }
-  | { kind: 'silence' | 'beatSplitBars' | 'beatSplitBeats' | 'check' | 'sync' | 'transcript' | 'mixSuggest' | 'masterAssist' };
+  | { kind: 'silence' | 'beatSplitBars' | 'beatSplitBeats' | 'check' | 'sync' | 'transcript' | 'mixSuggest' | 'masterAssist' }
+  /** 🔗 C7: a hang-projekt mixdownja HIVATKOZÁSKÉNT a videóba (C2): új videó, a legutóbbi videó, vagy választás */
+  | { kind: 'toVideo'; target: 'new' | 'latest' | 'pick' };
 
 export interface AudioIntentResult {
   steps: AudioStep[];
@@ -277,6 +279,12 @@ function clause(raw: string, ctx: AudioIntentContext, out: AudioIntentResult): b
   const t = numberWordsToDigits(fixDictation(norm(raw)));
   const project = ctx.project;
   const tracks = tracksIn(t, ctx);
+
+  // 🔗 C7: stúdiók közti átadás — „tedd a zenét a videó alá”, „küldd a videóba”, „send it to a new video”
+  if (/\b(video\w*|klip\w*)\b/.test(t) && (/\b(ala|under|unter|ins?|to|into)\b/.test(t) || /\b(tedd|tegyed|rakd|kuld\w*|vidd|put|send|add|schick\w*|leg\w*)\b/.test(t))) {
+    const target = /\b(uj|new|neue?s?|neuen)\b/.test(t) ? 'new' : /\b(valaszt\w*|melyik\w*|choose|pick|auswahl|auswahlen|wahl\w*)\b/.test(t) ? 'pick' : 'latest';
+    return out.actions.push({ kind: 'toVideo', target }) > 0;
+  }
 
   // folyamatok (a meglévő eszközök)
   if (/\b(csend\w*|silence\w*|holt ?ido\w*|dead air)\b/.test(t)) return out.actions.push({ kind: 'silence' }) > 0;

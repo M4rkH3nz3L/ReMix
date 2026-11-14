@@ -7884,6 +7884,46 @@ async function smokeFormantNative(log: Log) {
   log(tn < tj, 'sebesség: 3 s hang formáns-korrekciója', `natív ${(tn * 1000).toFixed(0)} ms · JS ${(tj * 1000).toFixed(0)} ms · ${(tj / Math.max(tn, 0.001)).toFixed(0)}×`);
 }
 
+/** 🔗 C7: stúdiók közti hangparancs — „küldd egy új videóba” → a hang-projekt mixdownja HIVATKOZÁSKÉNT egy új
+ *  videó-projekt zene-sávjára (C2), a videó-szerkesztő nyílik. */
+async function smokeC7(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_c7';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:c7', caught));
+  const base = createEmptyProject('smoke C7 dal', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'm', label: 'zene', uri: toneWav('smoke_c7.wav', 3), start: 0, duration: 3, trimIn: 0, sourceDuration: 3, volume: 0.8, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  let vidId: string | null = null;
+  try {
+    runDevAction('audio.assistant');
+    for (let i = 0; i < 50 && runDevAction('assistant.text') === undefined; i++) await sleep(100);
+    const sentence = 'küldd egy új videóba';
+    for (let k = 0; k < 5 && runDevAction('assistant.text') !== sentence; k++) {
+      devTypeAssistant(sentence);
+      await sleep(300);
+    }
+    log(true, 'FOTÓZHATÓ', 'az asszisztens: „Videóba hivatkozással: új videó”');
+    await sleep(1500);
+    runDevAction('assistant.apply');
+    for (let i = 0; i < 150 && (st().project?.id === id || (st().project?.kind ?? 'video') !== 'video'); i++) await sleep(200);
+    await sleep(800);
+    const p = st().project;
+    vidId = p && p.id !== id ? p.id : null;
+    const clip = p?.tracks.find((t) => t.type === 'music')?.clips[0] as AudioClip | undefined;
+    const asset = p?.assets.find((a) => a.id === clip?.assetId);
+    log(!!vidId && (p?.kind ?? 'video') === 'video' && asset?.source?.projectId === id && Math.abs((clip?.duration ?? 0) - 3) < 0.05, 'a parancs: új videó-projekt, a zene-sávon a hang-projekt mixdownja hivatkozásként (a videó-szerkesztő nyílt)', `videó ${vidId} · forrás ${asset?.source?.projectId} · ${clip?.duration.toFixed(2)} s`);
+  } finally {
+    router.back();
+    await sleep(500);
+    if (vidId) await deleteProject(vidId).catch((caught) => logCaught('lib/imageSmoke.tsx:c7-vid', caught));
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:c7-del', caught));
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -10108,6 +10148,10 @@ export async function runImageSmoke(
   }
   if (phase === 'formantnative') {
     await step(phase, () => smokeFormantNative(log));
+    return;
+  }
+  if (phase === 'c7') {
+    await step(phase, () => smokeC7(log));
     return;
   }
   if (phase === 'midi') {

@@ -150,3 +150,21 @@ describe('🎙️ a felület példamondatai (hu, en, de) maradék nélkül érte
     }
   });
 });
+
+describe('🔗 C7: stúdiók közti átadás (videóba hivatkozással)', () => {
+  const act = (text: string) => parseAudioIntent(text, ctx()).actions;
+  it('magyar, angol és német mondatok → toVideo a megfelelő céllal', () => {
+    expect(act('Tedd a zenét a videó alá')).toEqual([{ kind: 'toVideo', target: 'latest' }]);
+    expect(act('küldd egy új videóba')).toEqual([{ kind: 'toVideo', target: 'new' }]);
+    expect(act('rakd a hangot egy választott videóba')).toEqual([{ kind: 'toVideo', target: 'pick' }]);
+    expect(act('put the music under the video')).toEqual([{ kind: 'toVideo', target: 'latest' }]);
+    expect(act('send it to a new video')).toEqual([{ kind: 'toVideo', target: 'new' }]);
+    expect(act('leg die Musik unter das Video')).toEqual([{ kind: 'toVideo', target: 'latest' }]);
+  });
+  it('más parancsokkal együtt is (egy mondatban, sorrendben)', () => {
+    const r = parseAudioIntent('masterelj YouTube-ra, és tedd a zenét a videó alá', ctx());
+    expect(r.steps.map((x) => x.key)).toEqual(['master']);
+    expect(r.actions).toEqual([{ kind: 'toVideo', target: 'latest' }]);
+    expect(r.unknown).toEqual([]);
+  });
+});

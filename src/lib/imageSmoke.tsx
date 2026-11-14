@@ -68,7 +68,7 @@ import { exportOfflineWav, measureStretchLatency, probeStretchTiming, recentExpo
 import { readPowerState } from '@/lib/powerStateClient';
 import { matrixRow } from '@/lib/perfMatrix';
 import { packFromProject } from '@/lib/soundPack';
-import { storeSoundPack } from '@/lib/shop';
+import { getPayload, listShopItems, purchaseItem, storeSoundPack, syncOwnedSoundPacks } from '@/lib/shop';
 import { useSoundPacks } from '@/store/soundPackStore';
 import { denoiseStereo } from '@/lib/denoise';
 import { formantCorrect } from '@/lib/formant';
@@ -3319,6 +3319,52 @@ async function smokePerfMatrix(log: Log) {
   await noteThermal();
   const row = matrixRow({ date: new Date().toISOString().slice(0, 10), device, os, engine, exportRun: { tracks: 8, sec: SEC, ms: exportMs }, longSourceMs, denoise60Ms, formant10Ms, maxThermal });
   log(null, 'MATRIX', row);
+}
+
+/**
+ * 🛍️ V4 e2e a VALÓDI Shopon (prod adatbázis — engedéllyel, 2026-11-15): a „SMOKE V4 hangcsomag” ingyenes
+ * tételt egy teszt-eladó teszi ki (a Mac-ről); a bejelentkezett felhasználó az app kódján át megveszi
+ * (RPC), a tartalom RLS-sel olvasható, a csomag a tárba kerül, „új eszközön” a fiókból visszajön, és a
+ * loopja a stúdióban szól. Ingyenes tétel → nincs Coin-mozgás.
+ */
+async function smokeShopPack(log: Log) {
+  const me = useAuth.getState().user;
+  log(!!me, 'bejelentkezett vevő', me ? `${me.email?.slice(0, 2)}…` : 'nincs bejelentkezve');
+  if (!me) return;
+  const item = (await listShopItems({ kind: 'soundpack' })).find((i) => i.title === 'SMOKE V4 hangcsomag');
+  log(!!item && item.sellerId !== me.id && item.priceCents === 0, 'a teszt-hangcsomag a piacon (más eladótól, ingyen)', item ? `${item.id.slice(0, 8)}, ${item.priceCents} cent` : 'nincs');
+  if (!item) return;
+  let payload: unknown = null;
+  try {
+    payload = await purchaseItem(item.id);
+  } catch (e) {
+    // a korábbi futás már megvette (egyedi vásárlás) → a tartalom a payload-táblából
+    log(null, 'vásárlás', e instanceof Error ? e.message : String(e));
+    payload = await getPayload(item.id);
+  }
+  log(storeSoundPack(item.id, payload), 'a megvett tartalom ellenőrizve, a csomag a telefonon', `${(payload as { loops?: unknown[] } | null)?.loops?.length ?? 0} loop`);
+  log((await getPayload(item.id)) !== null, 'a tartalom a vevőnek olvasható (RLS)');
+  // „új eszköz”: a helyi tárból törölve, a fiókból visszajön
+  useSoundPacks.getState().removePack(item.id);
+  const added = await syncOwnedSoundPacks();
+  log(added >= 1 && useSoundPacks.getState().packs.some((p) => p.itemId === item.id), 'új eszközön a fiókból visszaszinkronizálva', `${added} csomag`);
+  const st = useEditorStore.getState;
+  const id = `prj_smoke_shoppack_${Date.now().toString(36)}`;
+  await saveProject({ ...createEmptyProject('smoke shop-csomag', '9:16', undefined, 'audio'), id });
+  try {
+    router.push(`/studio/audio/${id}` as Href);
+    for (let i = 0; i < 150 && (st().project?.id !== id || runDevAction('audio.studioMode') === undefined); i++) await sleep(200);
+    await sleep(800);
+    const c = await runDevAction('loops.place', `pack_${item.id}_pk0`);
+    const placed = st().project?.tracks.flatMap((tr) => tr.clips).find((x): x is AudioClip => x.id === c && x.kind === 'audio');
+    const doc = placed ? st().project?.instrumentDocs?.find((d) => d.id === placed.instrumentDocId) : undefined;
+    log(placed?.label === 'Smoke dob' && doc?.kind === 'drums' && doc.drums?.pattern.kick.filter(Boolean).length === 12, 'a megvett loop a stúdióban: dob-minta 4 ütemre (3 lábdob × 4)', `${placed?.label}, ${doc?.drums?.pattern.kick.filter(Boolean).length} lábdob`);
+    router.back();
+    await sleep(500);
+  } finally {
+    useSoundPacks.getState().removePack(item.id);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:shoppack', caught));
+  }
 }
 
 /**
@@ -10687,6 +10733,10 @@ export async function runImageSmoke(
   }
   if (phase === 'crossfade') {
     await step(phase, () => smokeCrossfade(log));
+    return;
+  }
+  if (phase === 'shoppack') {
+    await step(phase, () => smokeShopPack(log));
     return;
   }
   if (phase === 'soundpack') {

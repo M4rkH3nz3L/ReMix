@@ -8,7 +8,7 @@ import { t as tr } from 'i18next';
 
 import { extractStyle, styleTransferPatch } from '@/lib/batchEdit';
 import { makeId } from '@/lib/id';
-import { projectFps, snapToFrame } from '@/lib/frames';
+import { snapToEditGrid } from '@/lib/frames';
 import { canHostClip, findClip } from '@/lib/projectUtils';
 import type { Clip, TrackType } from '@/types/project';
 
@@ -203,7 +203,7 @@ export const createSelectionSlice: EditorSlice<SelectionSlice> = (set, get) => (
       return 0;
     }
     const minStart = Math.min(...compatible.map((c) => c.start));
-    const base = Math.max(0, snapToFrame(time, projectFps(project)));
+    const base = Math.max(0, snapToEditGrid(time, project));
     // a horgony (legkorábbi klip) a frame-illesztett `base`-re ül; a többi a saját
     // relatív távolságát tartja (a `base` frame-pontossága nem rontható el kerekítéssel)
     const pasted = compatible.map(

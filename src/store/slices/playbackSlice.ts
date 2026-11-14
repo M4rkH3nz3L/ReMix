@@ -5,7 +5,7 @@
  * Mind SESSION-szintű (nem projekt-adat). A rAF-mesteróra
  * (`usePlaybackClock`) ezt az állapotot olvassa/írja.
  */
-import { projectFps, snapToFrame } from '@/lib/frames';
+import { snapToEditGrid } from '@/lib/frames';
 import { projectDuration } from '@/lib/projectUtils';
 import { clamp } from '@/lib/time';
 
@@ -76,7 +76,7 @@ export const createPlaybackSlice: EditorSlice<PlaybackSlice> = (set, get) => ({
     const clamped = clamp(t, 0, Math.max(max, 0));
     // 🎞️ scrub/koppintáskor a frame-rácsra ül (fél-kocka csúszás már látszik); a
     // lejátszó-óra snap NÉLKÜL hívja (folytonos lejátszás, nem ugrál kockánként)
-    set({ playhead: snap ? snapToFrame(clamped, projectFps(project)) : clamped });
+    set({ playhead: snap ? snapToEditGrid(clamped, project) : clamped });
   },
 
   setPlaying: (playing) => set({ isPlaying: playing }),

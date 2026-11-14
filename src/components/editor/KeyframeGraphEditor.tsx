@@ -30,6 +30,8 @@ interface Props {
   onChange: (kfs: Keyframe[]) => void;
   onSeek?: (clipLocalTime: number) => void;
   formatValue?: (v: number) => string;
+  /** 🎧 V6: az idő-rács (pont / mp) — alap 1000 (ezredmásodperc); a hang-projekt a mintát adja (44 100) */
+  timeRate?: number;
 }
 
 /**
@@ -50,7 +52,9 @@ export function KeyframeGraphEditor({
   onChange,
   onSeek,
   formatValue,
+  timeRate = 1000,
 }: Props) {
+  const toGrid = (sec: number) => Math.round(sec * timeRate) / timeRate;
   const [w, setW] = useState(0);
   const [sel, setSel] = useState<number | null>(keyframes.length ? 0 : null);
   const dragStart = useRef<{ time: number; value: number } | null>(null);
@@ -134,7 +138,7 @@ export function KeyframeGraphEditor({
     const nt = isEdge ? start.time : Math.min(hiT, Math.max(loT, start.time + (dx / innerW) * dur));
     const nv = Math.min(max, Math.max(min, start.value - (dy / innerH) * span));
     // csak a helyi vázlatba (a store-ba az `endGesture` commitol egyszer)
-    putDraft(kfs.map((k, j) => (j === i ? { ...k, time: Math.round(nt * 1000) / 1000, value: nv } : k)));
+    putDraft(kfs.map((k, j) => (j === i ? { ...k, time: toGrid(nt), value: nv } : k)));
   };
 
   // ── Bézier-fogó húzása (a kijelölt kf szegmensén) ────────────────────────────
@@ -184,7 +188,7 @@ export function KeyframeGraphEditor({
   };
 
   const addAt = (px: number, py: number) => {
-    const t = Math.round(pxToT(px) * 1000) / 1000;
+    const t = toGrid(pxToT(px));
     if (kfsRef.current.some((k) => Math.abs(k.time - t) <= KF_EPS)) {
       return;
     }
@@ -196,7 +200,7 @@ export function KeyframeGraphEditor({
   };
 
   const addAtPlayhead = () => {
-    const t = Math.round(Math.min(dur, Math.max(0, playhead)) * 1000) / 1000;
+    const t = toGrid(Math.min(dur, Math.max(0, playhead)));
     const val = sampleChannel(kfsRef.current, t, fallback);
     const filtered = kfsRef.current.filter((k) => Math.abs(k.time - t) > KF_EPS);
     const next = [...filtered, { time: t, value: val, easing: 'easeInOut' as KeyframeEasing }];

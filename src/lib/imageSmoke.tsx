@@ -62,6 +62,7 @@ import { CLIP_LEVEL, levelDb, trackLevelAt } from '@/lib/levelMeter';
 import { mixRange, offlineMixPlan } from '@/lib/offlineMix';
 import type { WaveformData } from '@/lib/waveform';
 import { startSyncProbe, stopSyncProbe, summarizeDrift } from '@/lib/audioSyncProbe';
+import { editGridRate } from '@/lib/frames';
 import { exportOfflineWav, measureStretchLatency, probeStretchTiming } from '@/lib/offlineMixClient';
 import { canRenderLocally, renderLocal } from '@/lib/nativeRender';
 import { previewEngine } from '@/lib/previewEngine';
@@ -5265,7 +5266,7 @@ async function smokeTouchModes(log: Log) {
   log(null, 'READY', 'cut');
   const cut = await waitFor(() => clips().length === 2, 25000);
   const at = cut ? clips()[1].start : NaN;
-  log(cut && Math.abs(at - 4) < 0.6 && Math.abs(at * 30 - Math.round(at * 30)) < 1e-6, 'vágás-mód: egy koppintás a klipen → ott vág, a frame-rácson', `${clips().length} darab, vágás ${at.toFixed(3)} s`);
+  log(cut && Math.abs(at - 4) < 0.6 && Math.abs(at * 44100 - Math.round(at * 44100)) < 1e-6, 'vágás-mód: egy koppintás a klipen → ott vág, a minta-rácson (V6)', `${clips().length} darab, vágás ${at.toFixed(3)} s`);
   st().undo();
   await sleep(300);
   // 2) kijelölés-mód: a gyors (hosszú nyomás nélküli) húzás NEM mozdítja a klipet
@@ -7020,6 +7021,82 @@ async function smokeWavOptions(log: Log) {
   }
 }
 
+/** 🎧 V6: mintapontos vágás — hang-projektben a vágás a mintára ül, és a kettévágott klip exportja a vágatlannal
+ *  mintára (bitre) egyezik; a videó-projekt marad a frame-rácson. Zajforrás (egy minta csúszása is látszana). */
+async function smokeSampleGrid(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const n = 3 * SR;
+  const b = new Uint8Array(44 + n * 4);
+  const v = new DataView(b.buffer);
+  const txt = (at: number, x: string) => [...x].forEach((c, i) => v.setUint8(at + i, c.charCodeAt(0)));
+  txt(0, 'RIFF'); v.setUint32(4, 36 + n * 4, true); txt(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 2, true);
+  v.setUint32(24, SR, true); v.setUint32(28, SR * 4, true); v.setUint16(32, 4, true); v.setUint16(34, 16, true); txt(36, 'data'); v.setUint32(40, n * 4, true);
+  let seed = 12345;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;
+  for (let i = 0; i < n * 2; i++) v.setInt16(44 + i * 2, Math.round(rnd() * 12000), true);
+  const src = new File(Paths.cache, 'smoke_grid_noise.wav');
+  if (src.exists) src.delete();
+  src.create();
+  src.write(b);
+  const id = 'prj_smoke_grid';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:grid', caught));
+  const base = createEmptyProject('smoke minta-rács', '9:16', undefined, 'audio');
+  const c: AudioClip = { kind: 'audio', id: 'c', label: 'zaj', uri: src.uri, start: 0, duration: 3, trimIn: 0, sourceDuration: 3, volume: 0.8, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, fps: 30, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [c] } : t)) });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1000);
+  const readF32 = (uri: string) => {
+    const h = new File(uri).open();
+    try {
+      const bytes = h.readBytes(h.size ?? 0);
+      return new Float32Array(bytes.buffer.slice(bytes.byteOffset + 44, bytes.byteOffset + bytes.length));
+    } finally {
+      h.close();
+    }
+  };
+  const uris: string[] = [];
+  try {
+    const ref = await exportOfflineWav(st().project!, new File(projectExportDir(), 'smoke_grid_ref.wav'), undefined, undefined, 'float32');
+    uris.push(ref.uri);
+    const at = 1.23456;
+    st().splitClipAt('c', at);
+    const clips = st().project!.tracks.find((t) => t.type === 'music')!.clips as AudioClip[];
+    const right = clips.find((x) => x.start > 0);
+    const k = right ? right.start * SR : NaN;
+    log(clips.length === 2 && Math.abs(k - Math.round(k)) < 1e-6 && Math.round(k) === Math.round(at * SR) && Math.abs(right!.start * 30 - Math.round(right!.start * 30)) > 0.01, 'a vágás a mintára ül (nem a 30 fps-es képkockára)', `${right?.start} s = ${k.toFixed(6)} minta (képkocka-rácson ${(Math.round(at * 30) / 30).toFixed(5)} s lett volna, ${Math.round(Math.abs(Math.round(at * 30) / 30 - at) * SR)} minta eltérés)`);
+    const cut = await exportOfflineWav(st().project!, new File(projectExportDir(), 'smoke_grid_cut.wav'), undefined, undefined, 'float32');
+    uris.push(cut.uri);
+    const ra = readF32(ref.uri);
+    const ca = readF32(cut.uri);
+    let d = 0;
+    let dAround = 0;
+    const cutS = Math.round(at * SR) * 2;
+    for (let i = 0; i < Math.min(ra.length, ca.length); i++) {
+      const e = Math.abs(ra[i] - ca[i]);
+      d = Math.max(d, e);
+      if (Math.abs(i - cutS) < 2000) dAround = Math.max(dAround, e);
+    }
+    log(ra.length === ca.length && d === 0, 'null-teszt: a kettévágott klip exportja a vágatlannal mintára egyezik (a vágáspont körül is)', `${ra.length / 2} minta, max eltérés ${d} (vágás ±1000 minta: ${dAround})`);
+    st().undo();
+    const back = st().project!.tracks.find((t) => t.type === 'music')!.clips.length;
+    log(back === 1, 'egy visszavonás: újra egy klip', `${back}`);
+    st().setPlayhead(2.000013, true);
+    log(Math.abs(st().playhead * SR - Math.round(st().playhead * SR)) < 1e-6 && Math.round(st().playhead * SR) === Math.round(2.000013 * SR), 'a lejátszófej (koppintás/scrub) is a mintára ül', `${st().playhead}`);
+  } finally {
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:grid-del', caught));
+    for (const u of uris) {
+      const f = new File(u);
+      if (f.exists) f.delete();
+    }
+    if (src.exists) src.delete();
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7338,7 +7415,7 @@ async function smokeExtSync(log: Log) {
   const placed = mic.start - (mic.trimIn ?? 0); // a forrás 0 pontja az idővonalon
   const errMs = r ? (r.target - truth) * 1000 : NaN;
   log(!!r && Math.abs(errMs) < 0.1 && r.confidence >= SYNC_MIN_CONFIDENCE, 'a talált eltolás a valóditól < 0,1 ms (más hangszín, halkabb, zajos)', `hiba ${errMs.toFixed(4)} ms, egyezés ${r?.confidence.toFixed(1)}, ${Date.now() - t0} ms alatt`);
-  log(Math.abs(placed - truth) < 1e-4 && Math.abs(mic.start * 30 - Math.round(mic.start * 30)) < 1e-4, 'a klip a frame-rácson, a maradék a trimIn-ben — a hang mintapontosan a helyén', `kezdet ${mic.start.toFixed(6)} (rács), trimIn ${mic.trimIn?.toFixed(6)}, forrás-0 @ ${placed.toFixed(6)} (valódi ${truth.toFixed(6)})`);
+  log(Math.abs(placed - truth) < 1e-4 && Math.abs(mic.start * 44100 - Math.round(mic.start * 44100)) < 1e-4, 'a klip a minta-rácson (V6), a maradék a trimIn-ben — a hang mintapontosan a helyén', `kezdet ${mic.start.toFixed(6)} (rács), trimIn ${mic.trimIn?.toFixed(6)}, forrás-0 @ ${placed.toFixed(6)} (valódi ${truth.toFixed(6)})`);
   log(true, 'FOTÓZHATÓ', 'a mikrofon-klip a kamera-hang alá igazítva');
   await sleep(2500);
   // a keverőn át: a két sáv külön exportja egymáshoz mérve
@@ -7641,10 +7718,10 @@ async function smokeSilence(log: Log) {
   const fr = r.map((q) => `${q.start.toFixed(3)}–${q.end.toFixed(3)}`).join(', ');
   log(found === 2, 'a keresés 2 csendet talál; a 0,4 s-os szünet marad', `${found} csend: ${fr} (${Date.now() - t0} ms)`);
   const near = (a: number, b: number) => Math.abs(a - b) <= 1 / 30 + 0.011;
-  log(r.length === 2 && near(r[0].start, 1.62) && near(r[0].end, 2.88) && near(r[1].start, 4.62) && near(r[1].end, 5.08), 'a határok: a beszéd felől 0,12 s levegő, frame-rácson', fr);
+  log(r.length === 2 && near(r[0].start, 1.62) && near(r[0].end, 2.88) && near(r[1].start, 4.62) && near(r[1].end, 5.08), 'a határok: a beszéd felől 0,12 s levegő, minta-rácson (V6)', fr);
   // 🎧 hosszú forrás útja (szakaszos natív dekóder, 44,1 kHz) ugyanazokat a csendeket adja
   setLongThresholdForTest(1);
-  const longR = await findClipSilences(track('voiceover')[0] as AudioClip, 30);
+  const longR = await findClipSilences(track('voiceover')[0] as AudioClip, editGridRate(st().project)); // V6: a stúdió rácsa
   setLongThresholdForTest(null);
   const lr = (longR ?? []).map((q) => `${q.start.toFixed(3)}–${q.end.toFixed(3)}`).join(', ');
   log(canSegment() && lr === fr, 'hosszú forrás (szakaszos dekódolás): ugyanazok a csendek', lr);
@@ -9191,6 +9268,10 @@ export async function runImageSmoke(
   }
   if (phase === 'wavopts') {
     await step(phase, () => smokeWavOptions(log));
+    return;
+  }
+  if (phase === 'samplegrid') {
+    await step(phase, () => smokeSampleGrid(log));
     return;
   }
   if (phase === 'midi') {

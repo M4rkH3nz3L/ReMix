@@ -96,10 +96,12 @@ export function syncedPlacement(
 ): { start: number; trimIn: number; duration: number } | null {
   const start = Math.max(0, Math.ceil(target * fps - 1e-6) / fps);
   const skip = start - target; // ≥ 0: ennyivel később indul → ennyivel később a forrásban is
-  const trimIn = Math.round(((ext.trimIn ?? 0) + skip) * 1e6) / 1e6;
-  const duration = Math.round((ext.duration - skip) * 1e6) / 1e6;
+  const trimIn = (ext.trimIn ?? 0) + skip;
+  const duration = ext.duration - skip;
   if (duration <= 0.05) return null;
-  return { start: Math.round(start * 1e6) / 1e6, trimIn, duration };
+  // a kezdet már a rácson (V6: hang-projektben a mintán); µs-kerekítés nincs — a rácsot és a
+  // „forrás − idővonal” állandót is lerontaná
+  return { start, trimIn, duration };
 }
 
 /**

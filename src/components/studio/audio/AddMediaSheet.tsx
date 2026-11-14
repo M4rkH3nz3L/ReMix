@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { palette } from '@/constants/editor';
 import { audioIntakeText } from '@/lib/audioIntake';
 import { renderServerUrl } from '@/lib/backend';
-import { snapToFrame } from '@/lib/frames';
+import { snapToEditGrid } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { assetFormatFields, pickAudio } from '@/lib/media';
 import { formatTime } from '@/lib/time';
@@ -84,7 +84,7 @@ export function AddMediaSheet({
     const clip: AudioClip = {
       id: makeId('clip'),
       kind: 'audio',
-      start: snapToFrame(st.playhead, project.fps ?? 30),
+      start: snapToEditGrid(st.playhead, project),
       duration,
       trimIn: 0,
       sourceDuration: duration,

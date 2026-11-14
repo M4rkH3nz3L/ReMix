@@ -111,5 +111,23 @@ describe('ClipEditSheet', () => {
       expect(savedFx()).toBeDefined();
     });
   });
+
+  it.each([
+    [44100, Math.round(0.5000123 * 44100) / 44100],
+    [30, 0.5],
+  ])('🎧 V6: a kulcskocka a lejátszófejnél a rácsra kerül (rács %i → hang-projektben minta, különben ezredmásodperc)', async (grid, expected) => {
+    const p = createEmptyProject('t', '9:16', undefined, 'audio');
+    useEditorStore.getState().loadProject({ ...p, tracks: p.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [clip] } : t)) }, []);
+    useEditorStore.getState().setPlayhead(0.5000123);
+    let view!: ReactTestRenderer;
+    await act(async () => {
+      view = create(<ClipEditSheet clip={clip} fps={grid} onClose={() => {}} />);
+    });
+    // az első (hangerő-) görbe „hozzáadás a lejátszófejnél” gombja
+    const add = view.root.findAll((n) => typeof n.props.onPress === 'function' && n.findAll((c) => c.props.name === 'add-circle-outline').length > 0 && n.props.style !== undefined)[0];
+    await act(async () => add.props.onPress());
+    const saved = useEditorStore.getState().project?.tracks.find((t) => t.type === 'music')?.clips[0] as AudioClip;
+    expect(saved.keyframes?.volume?.[0]?.time).toBe(expected);
+  });
 });
 

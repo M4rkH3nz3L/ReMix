@@ -77,7 +77,7 @@ import { zoomIndexForPinch } from '@/lib/audioTimelineGestures';
 import { publishRenderedProject } from '@/lib/feed';
 import type { ProgressUpdate } from '@/lib/progress';
 import type { PostVisibility } from '@/types/social';
-import { snapToFrame } from '@/lib/frames';
+import { editGridRate, snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { projectDuration } from '@/lib/projectUtils';
 import { exportAudioFile, isRenderCancelledError } from '@/lib/render';
@@ -378,6 +378,9 @@ export function AudioStudioBody({
     return null;
   }
   const fps = project.fps ?? 30;
+  // 🎧 V6: a szerkesztési rács (hang-projektben a minta, a videóból nyitva a képkocka) — a beillesztés, a vágás,
+  // a duplikálás, a felvétel és az elemzések (csend, szinkron) helye ezen; a „Képkocka” snap-mód marad fps
+  const grid = editGridRate(project);
   const bpm = project.bpm ?? DEFAULT_BPM;
   // 🎼 S13: a projekt időzítése tempóváltásokkal — a rács, a snap, az ugrás, a kijelzés és az ütemre vágás ezen
   const timing = projectTiming(project);
@@ -439,7 +442,7 @@ export function AudioStudioBody({
     for (const tr of st.project?.tracks ?? []) {
       const picked = tr.clips.filter((c) => ids.includes(c.id));
       if (picked.length > 0) {
-        cmds.push({ type: 'ADD_CLIPS', trackType: tr.type, clips: duplicateAfter(picked, fps, () => makeId('clip')) });
+        cmds.push({ type: 'ADD_CLIPS', trackType: tr.type, clips: duplicateAfter(picked, grid, () => makeId('clip')) });
       }
     }
     if (cmds.length > 0) st.applyBatch(cmds, 'user');
@@ -519,12 +522,12 @@ export function AudioStudioBody({
       else if (a.kind === 'silence') {
         const c = sel ?? voice;
         const tt = trackOf(c?.id);
-        if (c && tt) void startSilenceSearch(c, tt, fps, t);
+        if (c && tt) void startSilenceSearch(c, tt, grid, t);
       } else if (a.kind === 'beatSplitBars' || a.kind === 'beatSplitBeats') beatSplitSelection(a.kind === 'beatSplitBars' ? 'bar' : 'beat');
       else if (a.kind === 'check') onRequestCheck?.();
       else if (a.kind === 'mixSuggest') useMixAssist.getState().show('mix');
       else if (a.kind === 'masterAssist') useMixAssist.getState().show('master');
-      else if (a.kind === 'sync') sel && startAudioSync(sel, fps, t);
+      else if (a.kind === 'sync') sel && startAudioSync(sel, grid, t);
       else if (a.kind === 'transcript') {
         const tt = trackOf((sel ?? voice)?.id);
         if (tt) void startSpeechEdit(tt, t);
@@ -619,7 +622,7 @@ export function AudioStudioBody({
     const st = useEditorStore.getState();
     const c = selectedAudioClip(st.project, st.selectedClipId);
     const tr = st.project?.tracks.find((x) => x.clips.some((y) => y.id === c?.id));
-    return c && tr ? startSilenceSearch(c, tr.type, fps, t) : null;
+    return c && tr ? startSilenceSearch(c, tr.type, grid, t) : null;
   }, speechStart: async () => {
     const st = useEditorStore.getState();
     const tr = st.project?.tracks.find((x) => x.clips.some((y) => y.id === st.selectedClipId));
@@ -628,7 +631,7 @@ export function AudioStudioBody({
     const st = useEditorStore.getState();
     const c = selectedAudioClip(st.project, st.selectedClipId);
     const ref = c ? syncCandidates(c)[0] : undefined;
-    return c && ref ? runAudioSync(c, ref, fps, t, true) : null;
+    return c && ref ? runAudioSync(c, ref, grid, t, true) : null;
   }, openDrums: () => setDrumMachine(true), editClip: () => setEditing(true), closeDrums: () => setDrumMachine(false), assistant: () => setAssistantOpen(true), pianoRoll: (open) => setPianoRoll(open), autoBpm: () => autoBpmRef.current() };
 
   // 🎙️ felvétel a voiceover sávra — a playheadnél kezd, a hosszt a felvevő adja
@@ -657,7 +660,7 @@ export function AudioStudioBody({
       const startAt = await alignPunchTake(st.project, 'voiceover', uri, clockStart, { ...punch.win, out: end, stopAt: end }, st.isTrackAudible);
       const place = openTakePlacement({ seconds, startAt }, punch.win.in);
       if (!place) return;
-      const { clip, asset } = voiceoverClip(uri, seconds, place.start, fps, label, makeId);
+      const { clip, asset } = voiceoverClip(uri, seconds, place.start, grid, label, makeId);
       st.addClip('voiceover', { ...clip, start: place.start, trimIn: place.trimIn, duration: place.duration }, asset);
       return;
     }
@@ -671,7 +674,7 @@ export function AudioStudioBody({
       if (cmds.length > 0) st.applyBatch(cmds, 'user');
       return;
     }
-    const { clip, asset } = voiceoverClip(uri, seconds, recordStartPlayhead.current, fps, label, makeId);
+    const { clip, asset } = voiceoverClip(uri, seconds, recordStartPlayhead.current, grid, label, makeId);
     if (countIn) {
       // ⏱️ az előszámlálás kimarad: a take ott kezdődik, ahol a következő ütés lenne (a felvevő idejében)
       if (countIn.trim === null) return;
@@ -838,7 +841,7 @@ export function AudioStudioBody({
     const clip: AudioClip = {
       kind: 'audio',
       id: makeId('clip'),
-      start: snapToFrame(playhead, fps),
+      start: snapToFrame(playhead, grid),
       duration: res.durationSec,
       trimIn: 0,
       sourceDuration: res.durationSec,
@@ -939,7 +942,7 @@ export function AudioStudioBody({
     const clip: AudioClip = {
       kind: 'audio',
       id: makeId('clip'),
-      start: snapToFrame(playhead, fps),
+      start: snapToFrame(playhead, grid),
       duration: dur,
       trimIn: 0,
       sourceDuration: dur,
@@ -1066,7 +1069,7 @@ export function AudioStudioBody({
   const sheets = (
     <AudioStudioSheets
       selClip={selClip}
-      fps={fps}
+      fps={grid}
       bpm={bpm}
       editing={editing}
       mastering={mastering}

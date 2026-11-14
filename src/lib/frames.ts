@@ -36,6 +36,23 @@ export function frameToSec(frame: number, fps: number): number {
 }
 
 /**
+ * 🎧 V6: a hang- és zene-projektek szerkesztési rácsa a MINTA (az offline keverés 44,1 kHz-e — szerződés-teszt),
+ * nem a videó képkockája (30 fps ≈ 1470 minta): a vágás, a mozgatás, a beillesztés és a lejátszófej mintára ül.
+ * A videó-projekt (és a belőle nyitott Hang Stúdió) marad a frame-rácson.
+ */
+export const AUDIO_EDIT_RATE = 44100;
+
+/** a projekt szerkesztési rácsa (rács-pont / mp): hang/zene → mintavétel, egyébként a frame-ráta */
+export function editGridRate(project: Pick<Project, 'fps' | 'kind'> | null | undefined): number {
+  return project?.kind === 'audio' || project?.kind === 'music' ? AUDIO_EDIT_RATE : projectFps(project);
+}
+
+/** egy időpont a projekt szerkesztési rácsára (hang: minta, videó: képkocka) */
+export function snapToEditGrid(sec: number, project: Pick<Project, 'fps' | 'kind'> | null | undefined): number {
+  return snapToFrame(sec, editGridRate(project));
+}
+
+/**
  * Egy időpont a frame-rácsra kerekítve (a lebegő-hiba ellen a kockára
  * kvantálunk, majd vissza). A vágás/kulcskocka/léptetés ezt használja.
  */

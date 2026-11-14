@@ -4,7 +4,7 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector, PointerType } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
-import { snapToFrame } from '@/lib/frames';
+import { snapToEditGrid } from '@/lib/frames';
 import type { AudioEditMode } from '@/store/audioEditModeStore';
 import { ClipWaveform } from '@/components/editor/ClipWaveform';
 import { palette } from '@/constants/editor';
@@ -123,9 +123,10 @@ export const AudioTimelineClip = memo(function AudioTimelineClip({
 
   /**
    * ✏️ Apple Pencil / toll: a húzás és a vágás pontos — az ütem-/marker-illesztést kihagyja, de a
-   * frame-rácsra (a projekt szabálya) továbbra is kerekít
+   * projekt rácsára (videó: képkocka, hang-projekt: minta — V6) továbbra is kerekít; az ütemre/markerre illesztett
+   * pozíció is a rácsra kerül (a mintapontos vágás és a bitre egyező export feltétele)
    */
-  const place = (sec: number, precise: boolean) => (precise ? snapToFrame(sec, useEditorStore.getState().project?.fps ?? 30) : snap(sec));
+  const place = (sec: number, precise: boolean) => snapToEditGrid(precise ? sec : snap(sec), useEditorStore.getState().project);
 
   const commitMove = (dx: number, dy: number, precise = false) => {
     moveDX.value = 0;

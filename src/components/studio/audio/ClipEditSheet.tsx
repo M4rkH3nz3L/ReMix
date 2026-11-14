@@ -16,7 +16,7 @@ import { renderClipSpectrum } from '@/lib/audioSpectrum';
 import { RegionBar, Slider, ToggleRow, useWaveform } from '@/components/studio/audio/primitives';
 import { palette } from '@/constants/editor';
 import type { EditorCommand } from '@/lib/commands';
-import { snapToFrame } from '@/lib/frames';
+import { AUDIO_EDIT_RATE, snapToFrame } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { stemClipsFrom } from '@/lib/stemClips';
 import { separateStems, STEM_SEPARATION_ENABLED } from '@/lib/stems';
@@ -50,7 +50,7 @@ const FX_AUTO: { key: FxAutoKey; min: number; max: number; fallback: (fx?: Audio
  * 🎚️ Klip-szerkesztő lap — a kijelölt hangklip nem-destruktív szerkesztése
  * (trim / fade / hangerő / pan / enhance / Pro FX). Minden a `HangStudio`-ból
  * ismert mintát követi: a lap LOKÁLIS állapotban dolgozik, és a „Kész" EGY
- * `updateClip`-pel commitál → EGY undo-lépés. A vágás/keyframe frame-rácsra ül.
+ * `updateClip`-pel commitál → EGY undo-lépés. A vágás/keyframe a projekt rácsára ül (hang-projektben a mintára — V6).
  */
 export function ClipEditSheet({
   clip,
@@ -68,6 +68,8 @@ export function ClipEditSheet({
   const updateClip = useEditorStore((s) => s.updateClip);
   const applyBatch = useEditorStore((s) => s.applyBatch);
   const playhead = useEditorStore((s) => s.playhead);
+  // 🎧 V6: a kulcskockák ideje hang-projektben a mintára (a `fps` itt a szerkesztési rács), különben ezredmásodpercre
+  const kfRate = fps === AUDIO_EDIT_RATE ? AUDIO_EDIT_RATE : 1000;
   // 🎚️ S16: a forrás formátuma (az asseten, importkor kiolvasva)
   const asset = useEditorStore((s) => (clip.assetId ? s.project?.assets.find((a) => a.id === clip.assetId) : undefined));
   const formatText = asset ? audioFormatLabel(asset, { mono: t('studio.audio.format.mono'), stereo: t('studio.audio.format.stereo'), channels: (n) => t('studio.audio.format.channels', { count: n }) }) : '';
@@ -329,6 +331,7 @@ export function ClipEditSheet({
         {/* 🎚️ hangerő-automáció (value/time görbe) — élő, mint az AudioPanelben */}
         <Text style={styles.autoLabel}>{t('panels.audio.volumeAutomation')}</Text>
         <KeyframeGraphEditor
+          timeRate={kfRate}
           keyframes={clip.keyframes?.volume ?? []}
           duration={clip.duration}
           min={0}
@@ -347,6 +350,7 @@ export function ClipEditSheet({
         {/* 🎚️ pásztázás-automáció (−1…1 görbe) — a render per-frame aeval-lal égeti be */}
         <Text style={styles.autoLabel}>{t('studio.audio.panAutomation', { defaultValue: 'Pásztázás-automáció' })}</Text>
         <KeyframeGraphEditor
+          timeRate={kfRate}
           keyframes={clip.keyframes?.pan ?? []}
           duration={clip.duration}
           min={-1}
@@ -387,6 +391,7 @@ export function ClipEditSheet({
           const ch = FX_AUTO.find((c) => c.key === autoChannel)!;
           return (
             <KeyframeGraphEditor
+              timeRate={kfRate}
               keyframes={clip.keyframes?.[ch.key] ?? []}
               duration={clip.duration}
               min={ch.min}

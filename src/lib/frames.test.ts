@@ -1,13 +1,17 @@
 import {
+  AUDIO_EDIT_RATE,
   DEFAULT_FPS,
+  editGridRate,
   FPS_OPTIONS,
   formatTimecode,
   frameDuration,
   frameToSec,
   projectFps,
   secToFrame,
+  snapToEditGrid,
   snapToFrame,
 } from '@/lib/frames';
+import { OFFLINE_SAMPLE_RATE } from '@/lib/offlineMix';
 
 describe('frames — frame-kvantált idő-modell', () => {
   describe('projectFps', () => {
@@ -78,4 +82,17 @@ describe('frames — frame-kvantált idő-modell', () => {
   it('a választható frame-ráták a szabványos készlet', () => {
     expect([...FPS_OPTIONS]).toEqual([24, 25, 30, 50, 60]);
   });
+
+  it('🎧 V6: hang/zene-projektben a rács a minta (= az offline keverés mintavétele), videóban a képkocka', () => {
+    expect(AUDIO_EDIT_RATE).toBe(OFFLINE_SAMPLE_RATE);
+    expect(editGridRate({ kind: 'audio', fps: 30 })).toBe(44100);
+    expect(editGridRate({ kind: 'music', fps: 25 })).toBe(44100);
+    expect(editGridRate({ kind: 'video', fps: 25 })).toBe(25);
+    expect(editGridRate({ fps: undefined })).toBe(DEFAULT_FPS);
+    expect(snapToEditGrid(1.00001, { kind: 'audio' })).toBe(Math.round(1.00001 * 44100) / 44100);
+    expect(snapToEditGrid(1.03, { kind: 'video', fps: 25 })).toBeCloseTo(1.04, 12);
+    // a frame-határ (30 fps) a minta-rácson is pontos: 1470 minta
+    expect(snapToEditGrid(1 / 30, { kind: 'audio' }) * 44100).toBeCloseTo(1470, 9);
+  });
 });
+

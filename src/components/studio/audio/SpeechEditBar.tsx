@@ -6,6 +6,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 
 import { palette } from '@/constants/editor';
 import { silenceCutCommands } from '@/lib/audioSilence';
+import { editGridRate } from '@/lib/frames';
 import { catalogAvailability, catalogEntry } from '@/lib/modelCatalog';
 import { catalogRuntime, downloadModel } from '@/lib/modelRegistryClient';
 import { trackWords, wordCutRanges, type SrcWord, type TimelineWord } from '@/lib/speechEdit';
@@ -132,7 +133,7 @@ export function applySpeechCut(): number {
   const s = useSpeechEdit.getState();
   const st = useEditorStore.getState();
   if (!s.trackType || !st.project) return 0;
-  const ranges = wordCutRanges(currentSpeechWords(), s.selected, st.project.fps ?? 30);
+  const ranges = wordCutRanges(currentSpeechWords(), s.selected, editGridRate(st.project));
   const cmds = silenceCutCommands(st.project, s.trackType, ranges, s.mode, st.lockedTracks);
   if (cmds.length === 0) return 0;
   st.applyBatch(cmds, 'user');
@@ -148,7 +149,7 @@ export function SpeechCutMarks({ trackType, pxPerSec, height }: { trackType: Tra
   const project = useEditorStore((s) => s.project);
   const words = useMemo(() => (active === trackType ? trackWords(audioClipsOf(project, trackType), wordsByUri) : []), [active, trackType, project, wordsByUri]);
   if (active !== trackType || selected.size === 0) return null;
-  const ranges = wordCutRanges(words, selected, project?.fps ?? 30);
+  const ranges = wordCutRanges(words, selected, editGridRate(project));
   return (
     <>
       {ranges.map((r) => (

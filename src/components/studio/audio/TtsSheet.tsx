@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Chip, PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
-import { snapToFrame } from '@/lib/frames';
+import { snapToEditGrid } from '@/lib/frames';
 import { makeId } from '@/lib/id';
 import { useTtsEngine } from '@/hooks/useTtsEngine';
 import { registerDevAction } from '@/lib/devActions';
@@ -37,7 +37,7 @@ export function TtsSheet({ onClose }: { onClose: () => void }) {
     const clip: AudioClip = {
       id: makeId('clip'),
       kind: 'audio',
-      start: snapToFrame(st.playhead, project.fps ?? 30),
+      start: snapToEditGrid(st.playhead, project),
       duration: duration || 4,
       trimIn: 0,
       sourceDuration: duration || 4,

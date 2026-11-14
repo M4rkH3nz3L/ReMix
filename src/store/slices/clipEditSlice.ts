@@ -11,7 +11,7 @@ import { t as tr } from 'i18next';
 
 import { applyBatchPatch, batchablePatch } from '@/lib/batchEdit';
 import { makeId } from '@/lib/id';
-import { projectFps, snapToFrame } from '@/lib/frames';
+import { snapToEditGrid } from '@/lib/frames';
 import { buildPreComposePlan } from '@/lib/preCompose';
 import {
   compatibleTracksFor,
@@ -127,14 +127,14 @@ export const createClipEditSlice: EditorSlice<ClipEditSlice> = (set, get) => ({
   },
 
   splitClipAt: (clipId, time) => {
-    // 🎞️ a vágás a projekt frame-rácsára ül (fél kocka csúszás már látszik)
-    const snapped = snapToFrame(time, projectFps(get().project));
+    // 🎞️ a vágás a projekt rácsára ül: videóban a képkockára, hang-projektben a mintára (V6)
+    const snapped = snapToEditGrid(time, get().project);
     return get().dispatch({ type: 'SPLIT_CLIP', clipId, time: snapped });
   },
 
   moveClip: (clipId, toTrackType, start, alreadySnapped = false) => {
     // 🎞️ a cél-kezdet a frame-rácsra ül (mint a split), kivéve ha a hívó saját rácsra illesztett; 0 alá nem
-    const snapped = Math.max(0, alreadySnapped ? start : snapToFrame(start, projectFps(get().project)));
+    const snapped = Math.max(0, alreadySnapped ? start : snapToEditGrid(start, get().project));
     return get().dispatch({ type: 'MOVE_CLIP', clipId, toTrackType, start: snapped });
   },
 

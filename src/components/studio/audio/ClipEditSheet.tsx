@@ -485,6 +485,10 @@ export function ClipEditSheet({
           onChange={(v) => patchFx({ pitchSemitones: Math.round(v) })}
           format={(v) => (Math.round(v) === 0 ? t('common.off') : `${v > 0 ? '+' : ''}${Math.round(v)}`)}
         />
+        {/* 🗣️ V7.3: a hangszín (formánsok) megtartása a tolásnál — nincs „mókus/óriás" hatás */}
+        {(fx.pitchSemitones ?? 0) !== 0 || (fx.harmony ?? 0) !== 0 ? (
+          <ToggleRow icon="person-outline" label={t('studio.audio.fxParam.formant')} value={!!fx.formant} onValueChange={(v) => patchFx({ formant: v || undefined })} />
+        ) : null}
         {/* 🎵 harmónia-hang: eltolt másodhang a klip mellé (pl. +7 kvint, +4 terc) */}
         <Slider
           label={t('studio.audio.fxHarmony', { defaultValue: 'Harmónia-hang (félhang)' })}

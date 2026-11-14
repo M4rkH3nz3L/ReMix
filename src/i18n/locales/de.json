@@ -4078,7 +4078,8 @@
         "delaySync": "Delay-Zeit",
         "free": "Frei",
         "delaySyncA11y": "Delay-Zeit: {{value}}",
-        "syncHint": "{{ms}} ms am Clip ({{bpm}} BPM) — folgt Tempowechseln"
+        "syncHint": "{{ms}} ms am Clip ({{bpm}} BPM) — folgt Tempowechseln",
+        "formant": "Klangfarbe erhalten (Formanten)"
       },
       "format": {
         "mono": "Mono",

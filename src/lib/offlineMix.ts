@@ -113,6 +113,8 @@ export interface OfflineMixClip {
   reversed: boolean;
   /** 🎚️ hangmagasság-eltolás félhangban (a hossz marad); 0 = nincs */
   pitch: number;
+  /** 🗣️ V7.3: a hangmagasság-eltolás formáns-korrekcióval (a hangszín marad) */
+  formant?: boolean;
   /** 📏 a normalizálás előmenetben mért erősítése (`withNormalizeGains`) */
   normGain?: number;
   /** 🏚️ visszhang-csökkentés (a lánc elején) */
@@ -212,6 +214,7 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
         speed: audioSpeedOf(clip),
         reversed: !!clip.reversed,
         pitch: pitchOf(clip.audioFx?.pitchSemitones),
+        ...(clip.audioFx?.formant ? { formant: true } : {}),
       };
       clips.push(main);
       // 🎵 harmónia (a szerver tükre): a klip MELLÉ egy eltolt, 0,7-szeres másodhang, a felhasználói
@@ -702,6 +705,8 @@ export interface StretchJob {
   pitch: number;
   /** 🧹 spektrális zajszűrés a kész szakaszon (`denoise.ts`) */
   denoise: boolean;
+  /** 🗣️ V7.3: formáns-korrekció a hangmagasság-eltolás után */
+  formant?: boolean;
 }
 
 /**
@@ -715,11 +720,12 @@ export function stretchJobs(plan: OfflineMixPlan): { jobs: StretchJob[]; plan: O
     if (c.speed === 1 && !c.reversed && c.pitch === 0 && !denoise) {
       return c;
     }
-    const key = `${c.uri}#${c.trimIn.toFixed(6)}|${c.duration.toFixed(6)}|${c.speed}|${c.reversed ? 'r' : 'f'}|${c.pitch}|${denoise ? 'dn' : ''}`;
+    const formant = !!c.formant && c.pitch !== 0;
+    const key = `${c.uri}#${c.trimIn.toFixed(6)}|${c.duration.toFixed(6)}|${c.speed}|${c.reversed ? 'r' : 'f'}|${c.pitch}|${denoise ? 'dn' : ''}${formant ? '|fm' : ''}`;
     if (!jobs.has(key)) {
-      jobs.set(key, { key, uri: c.uri, from: c.trimIn, sourceSec: c.duration * c.speed, duration: c.duration, speed: c.speed, reversed: c.reversed, pitch: c.pitch, denoise });
+      jobs.set(key, { key, uri: c.uri, from: c.trimIn, sourceSec: c.duration * c.speed, duration: c.duration, speed: c.speed, reversed: c.reversed, pitch: c.pitch, denoise, ...(formant ? { formant: true } : {}) });
     }
-    return { ...c, uri: key, trimIn: 0, speed: 1, reversed: false, pitch: 0 };
+    return { ...c, uri: key, trimIn: 0, speed: 1, reversed: false, pitch: 0, formant: false };
   });
   return { jobs: [...jobs.values()], plan: { ...plan, clips } };
 }

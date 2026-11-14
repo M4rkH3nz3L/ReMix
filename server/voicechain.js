@@ -88,6 +88,14 @@ function delayTimeMs(fx) {
   return Math.round(120 + a * 380);
 }
 
+/** a hangmagasság-eltolás szűrői (±12 félhang, hossz-tartó); 0 → üres — a formáns-előkészítés is ezt használja */
+function pitchFilters(semitones) {
+  const semis = Math.max(-12, Math.min(12, semitones || 0));
+  if (semis === 0) return [];
+  const ratio = Math.pow(2, semis / 12);
+  return ['aresample=44100', `asetrate=${Math.round(44100 * ratio)}`, 'aresample=44100', `atempo=${(1 / ratio).toFixed(6)}`];
+}
+
 function audioFxChain(fx) {
   if (!fx) {
     return '';
@@ -98,18 +106,7 @@ function audioFxChain(fx) {
   // abszolút rátát kap, a forrás lehet 48k vagy a loudnorm utáni 192k) → asetrate (pitch+sebesség)
   // → aresample vissza 44.1k-ra → atempo a sebességet visszaállítja (a pitch marad eltolva).
   // ELSŐ a láncban, hogy a nyers jelre hasson. A ±12-nél az atempo 0.5–2.0 közt marad.
-  if (fx.pitchSemitones) {
-    const semis = clampN(fx.pitchSemitones, -12, 12);
-    if (semis !== 0) {
-      const ratio = Math.pow(2, semis / 12);
-      parts.push(
-        'aresample=44100',
-        `asetrate=${Math.round(44100 * ratio)}`,
-        'aresample=44100',
-        `atempo=${(1 / ratio).toFixed(6)}`
-      );
-    }
-  }
+  if (fx.pitchSemitones) parts.push(...pitchFilters(fx.pitchSemitones));
   // 🔀 a mozgatható fokozatok a klip sorrendjében (a kliens `src/lib/fxOrder.ts` tükre — szerződés-teszt);
   // a zajszűrés a szűrők/EQ után marad (a kliensen előmenet), a normalizálás és a limiter mindig a végén
   const stages = {
@@ -264,6 +261,7 @@ module.exports = {
   dereverbChain,
   voiceChain,
   audioFxChain,
+  pitchFilters,
   eqBandParams,
   delayTimeMs,
   panFilter,

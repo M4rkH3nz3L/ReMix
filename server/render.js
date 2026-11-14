@@ -14,6 +14,7 @@ const { bgRemoveDir } = require('./bgremove');
 const { depthLayerDir } = require('./depth');
 const { renderShapePngs, renderTextPngs } = require('./text-render');
 const { VOICE_ENHANCE, dereverbChain, audioFxChain, panFilter, masterGraph, masterLra } = require('./voicechain');
+const { needsFormantPrep, prepareFormantClip } = require('./formantPrep');
 // 🖼️ kép-paritás: a Kép Stúdió szín-magjai (már /imagedoc-on pixel-bizonyítva) a video-klip grade-jéhez
 const { levelsFilter, channelMixFilter, gradientMapFilter, perspectiveFilter, splitToneFilter } = require('./imageFilters');
 
@@ -2943,7 +2944,6 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       if (!(await hasAudioStream(clip.uri))) {
         continue;
       }
-      const idx = addInput(['-i', clip.uri], `a|${clip.uri}`);
       const delayMs = Math.round(clip.start * 1000);
       const label = `aa${audioIdx++}`;
       // 🎚️ a forráson belüli kezdet (trimIn) → atrim=start; a szegmens ennyitől
@@ -2951,8 +2951,28 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       const aTrimIn = clip.trimIn || 0;
       // sávonkénti mixer-gain (fader) — a klip sávjának gainje (hiányzó = 1)
       const trackGain = project.trackMix?.[clipTrackType[clip.id]]?.gain ?? 1;
-      const mono = (await audioChannelCount(clip.uri)) === 1;
-      let chain =
+      // 🗣️ V7.3: formáns-megőrző hangmagasság — a klip ablaka (vágás, irány, sebesség, hangmagasság + korrekció)
+      // előre kirenderelve; a lánc ebből a fájlból indul, a hangmagasság nélküli effektekkel
+      const windowFilter =
+        `atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration * audioSpeed(clip)).toFixed(3)},` +
+        (clip.reversed ? 'areverse,' : '') +
+        `asetpts=PTS-STARTPTS,` +
+        audioSpeedChain(clip);
+      const formantFile = needsFormantPrep(clip, clip.audioFx?.pitchSemitones)
+        ? await prepareFormantClip({ uri: clip.uri, windowFilter, semitones: Math.round(clip.audioFx.pitchSemitones), duration: clip.duration, workDir, key: clip.id })
+        : null;
+      const idx = formantFile ? addInput(['-i', formantFile], `f|${clip.id}`) : addInput(['-i', clip.uri], `a|${clip.uri}`);
+      const mono = !formantFile && (await audioChannelCount(clip.uri)) === 1;
+      let chain = formantFile
+        ? `[${idx}:a]asetpts=PTS-STARTPTS,` +
+          (clip.deReverb ? DEREVERB : '') +
+          (clip.voiceEnhance ? VOICE_ENHANCE : '') +
+          audioFxChain({ ...clip.audioFx, pitchSemitones: 0 }) +
+          panChain(clip, 0) +
+          ((clip.keyframes?.volume ?? []).length > 0 ? FINE_FRAMES : '') +
+          volumeExpr(clip, 0) +
+          (trackGain !== 1 ? `,volume=${trackGain.toFixed(3)}` : '')
+        :
         // 🔁 loop-klip: a hurok-szakasz ismétlődik (aloop), majd a klip hosszára vágva
       (clip.loopLength > 0
         ? `[${idx}:a]aresample=44100,atrim=start=${aTrimIn.toFixed(6)}:end=${(aTrimIn + clip.loopLength).toFixed(6)},asetpts=PTS-STARTPTS,aloop=loop=-1:size=${Math.round(clip.loopLength * 44100)},atrim=start=${(clip.loopOffset || 0).toFixed(6)}:end=${((clip.loopOffset || 0) + clip.duration).toFixed(6)},`
@@ -2995,11 +3015,24 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       // teljes eltolás (klip-pitch + harmónia) ±12-re szorítva, hogy az atempo biztonságos maradjon.
       const harm = clip.audioFx?.harmony;
       if (harm && Math.round(harm) !== 0) {
-        const idx2 = addInput(['-i', clip.uri], `harm|${clip.uri}`);
         const hlabel = `ah${audioIdx++}`;
         const total = Math.max(-12, Math.min(12, Math.round(clip.audioFx.pitchSemitones || 0) + Math.round(harm)));
         const hFx = { ...clip.audioFx, pitchSemitones: total, harmony: 0 };
-        let hchain =
+        // 🗣️ V7.3: a harmónia-hang is formáns-korrigálva, ha a klipen be van kapcsolva
+        const hFile = needsFormantPrep(clip, total)
+          ? await prepareFormantClip({ uri: clip.uri, windowFilter, semitones: total, duration: clip.duration, workDir, key: `${clip.id}_harm` })
+          : null;
+        const idx2 = hFile ? addInput(['-i', hFile], `fh|${clip.id}`) : addInput(['-i', clip.uri], `harm|${clip.uri}`);
+        let hchain = hFile
+          ? `[${idx2}:a]asetpts=PTS-STARTPTS,` +
+            (clip.deReverb ? DEREVERB : '') +
+            (clip.voiceEnhance ? VOICE_ENHANCE : '') +
+            audioFxChain({ ...hFx, pitchSemitones: 0 }) +
+            panChain(clip, 0) +
+            volumeExpr(clip, 0) +
+            `,volume=0.7` +
+            (trackGain !== 1 ? `,volume=${trackGain.toFixed(3)}` : '')
+          :
           `[${idx2}:a]atrim=start=${aTrimIn.toFixed(3)}:end=${(aTrimIn + clip.duration * audioSpeed(clip)).toFixed(3)},` +
           (clip.reversed ? 'areverse,' : '') + // ⏪ a hang-ablak megfordítása
           `asetpts=PTS-STARTPTS,` +

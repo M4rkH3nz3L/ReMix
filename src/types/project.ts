@@ -1163,6 +1163,9 @@ export interface AudioFx {
   /** 🎵 harmónia-hang: a klip MELLÉ kevert, e félhanggal eltolt halkabb másodhang
    *  (−12…+12; 0/hiányzó = nincs). Pl. +7 = kvint, +4 = nagy terc. A renderben. */
   harmony?: number;
+  /** 🗣️ V7.3: a hangmagasság-eltolás megtartja a hangszínt (formáns-korrekció — `formant.ts`, a szerver tükre);
+   *  a harmónia-hangra is vonatkozik; hiányzó = ki (a „mókus/óriás" hatás szándékos is lehet) */
+  formant?: boolean;
   /** 🔀 a mozgatható fokozatok sorrendje (`fxOrder.ts`); hiányzó = az alap sorrend */
   order?: string[];
 }

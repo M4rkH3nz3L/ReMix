@@ -4073,7 +4073,8 @@
         "delaySync": "Delay ideje",
         "free": "Szabad",
         "delaySyncA11y": "Delay ideje: {{value}}",
-        "syncHint": "{{ms}} ms a klip helyén ({{bpm}} BPM) — tempóváltáskor követi"
+        "syncHint": "{{ms}} ms a klip helyén ({{bpm}} BPM) — tempóváltáskor követi",
+        "formant": "Hangszín megtartása (formáns)"
       },
       "format": {
         "mono": "mono",

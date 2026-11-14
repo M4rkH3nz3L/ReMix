@@ -11,6 +11,7 @@ import { logCaught } from '@/lib/logCaught';
 import { mixRange, OFFLINE_SAMPLE_RATE, offlineMixPlan, pcm16, pcm24, sliceSource, stretchJobs, wavHeader16, wavHeader24, wavHeaderF32, pcmF32, withNormalizeGains, measureMasterGain, needsWholeWindow, sourceRanges, type DecodedSource, type OfflineMixPlan, type OfflineUnsupported, type StretchJob } from '@/lib/offlineMix';
 import { ZipStoreWriter } from '@/lib/zipStore';
 import { StreamResampler } from '@/lib/streamResampler';
+import { formantCorrect } from '@/lib/formant';
 import type { ProgressUpdate } from '@/lib/progress';
 import { RenderCancelledError } from '@/lib/render';
 import type { Project } from '@/types/project';
@@ -455,6 +456,16 @@ export async function stretchSegment(api: AudioApi, src: DecodedSource, job: Str
 
   if (job.speed === 1 && cents === 0) {
     return finish(sliceSource(src.channels, Math.round(job.from * sr), n, job.reversed));
+  }
+  // 🗣️ V7.3: formáns-korrekció — a tolt szakasz a tolatlan, ugyanígy nyújtott referencia burkolójára
+  // (1-es sebességnél a referencia maga a forrás-ablak; a `formant.ts` bitre a szerveré)
+  if (job.formant && cents !== 0) {
+    const shifted = await stretchSegment(api, src, { ...job, formant: false, denoise: false });
+    const ref =
+      job.speed === 1
+        ? sliceSource(src.channels, Math.round(job.from * sr), shifted.channels[0].length, job.reversed)
+        : (await stretchSegment(api, src, { ...job, pitch: 0, formant: false, denoise: false })).channels;
+    return finish(shifted.channels.map((ch, c) => formantCorrect(ref[c] ?? ref[0], ch, sr)));
   }
   const lat = await stretchLatency(api, job.speed, sr, cents);
   // a kimenet `lat` mintával késik: elejéről ennyi esik le, ezért a bemenet a VÉGÉN hosszabb

@@ -4073,7 +4073,8 @@
         "delaySync": "Delay time",
         "free": "Free",
         "delaySyncA11y": "Delay time: {{value}}",
-        "syncHint": "{{ms}} ms at the clip ({{bpm}} BPM) — follows tempo changes"
+        "syncHint": "{{ms}} ms at the clip ({{bpm}} BPM) — follows tempo changes",
+        "formant": "Keep voice character (formants)"
       },
       "format": {
         "mono": "mono",

@@ -7259,6 +7259,85 @@ async function smokeFreeFx(log: Log) {
   }
 }
 
+/** 🗣️ V7.3: formáns-megőrző hangmagasság a telefonos exportban — a +5 félhanggal tolt magánhangzó hangszíne
+ *  (spektrális súlypontja) formánssal az eredeti marad, nélküle felcsúszik; a harmónia-hang is. */
+async function smokeFormant(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const n = SR * 2;
+  const src = new Float64Array(n);
+  for (let t = 0; t < n; t += SR / 150) src[Math.round(t)] = 1;
+  let x = src;
+  for (const f of [700, 1200]) {
+    const r = Math.exp((-Math.PI * 80) / SR);
+    const a1 = 2 * r * Math.cos((2 * Math.PI * f) / SR);
+    const y = new Float64Array(n);
+    for (let i = 0; i < n; i++) y[i] = x[i] + a1 * (y[i - 1] ?? 0) - r * r * (y[i - 2] ?? 0);
+    x = y;
+  }
+  let peak = 0;
+  for (const v of x) peak = Math.max(peak, Math.abs(v));
+  const b = new Uint8Array(44 + n * 2);
+  const dv = new DataView(b.buffer);
+  const txt = (at: number, s0: string) => [...s0].forEach((c, i) => dv.setUint8(at + i, c.charCodeAt(0)));
+  txt(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); txt(8, 'WAVEfmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, SR, true); dv.setUint32(28, SR * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); txt(36, 'data'); dv.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) dv.setInt16(44 + i * 2, Math.round(((0.4 * x[i]) / peak) * 32767), true);
+  const f0 = new File(Paths.cache, 'smoke_formant_vowel.wav');
+  if (f0.exists) f0.delete();
+  f0.create();
+  f0.write(b);
+  const centroid = (a: Float32Array) => {
+    const N = 4096;
+    const off = (a.length >> 1) - N / 2;
+    let num = 0;
+    let den = 0;
+    for (let k = Math.round((250 * N) / SR); k <= Math.round((3000 * N) / SR); k++) {
+      let re = 0;
+      let im = 0;
+      for (let i = 0; i < N; i++) {
+        const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / N);
+        re += a[off + i] * w * Math.cos((2 * Math.PI * k * i) / N);
+        im -= a[off + i] * w * Math.sin((2 * Math.PI * k * i) / N);
+      }
+      num += (re * re + im * im) * ((k * SR) / N);
+      den += re * re + im * im;
+    }
+    return num / den;
+  };
+  const base = createEmptyProject('smoke formáns', '9:16', undefined, 'audio');
+  const proj = (fx: AudioFx) => ({ ...base, id: 'prj_smoke_formant', tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [{ kind: 'audio', id: 'c', label: 'v', uri: f0.uri, start: 0, duration: 2, trimIn: 0, sourceDuration: 2, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported', audioFx: fx } as AudioClip] } : t)) });
+  const uris: string[] = [];
+  const render = async (fx: AudioFx, name: string) => {
+    const t0 = Date.now();
+    const out = await exportOfflineWav(proj(fx), new File(projectExportDir(), name), undefined, undefined, 'float32');
+    uris.push(out.uri);
+    const h = new File(out.uri).open();
+    try {
+      const bytes = h.readBytes(h.size ?? 0);
+      const f = new Float32Array(bytes.buffer.slice(bytes.byteOffset + 44, bytes.byteOffset + bytes.length));
+      return { c: centroid(Float32Array.from({ length: f.length / 2 }, (_, i) => f[i * 2])), ms: Date.now() - t0, unsupported: out.unsupported };
+    } finally {
+      h.close();
+    }
+  };
+  try {
+    const dry = await render({}, 'smoke_formant_dry.wav');
+    const off = await render({ pitchSemitones: 5 }, 'smoke_formant_off.wav');
+    const on = await render({ pitchSemitones: 5, formant: true }, 'smoke_formant_on.wav');
+    log(off.c / dry.c > 1.2 && Math.abs(on.c / dry.c - 1) < 0.1 && on.unsupported.length === 0, '+5 félhang: formáns nélkül a hangszín felcsúszik, formánssal az eredeti marad', `eredeti ${dry.c.toFixed(0)} Hz · formáns KI ${off.c.toFixed(0)} Hz (${(off.c / dry.c).toFixed(2)}×) · BE ${on.c.toFixed(0)} Hz (${(on.c / dry.c).toFixed(2)}×) · ${on.ms} ms`);
+    const hOff = await render({ pitchSemitones: 5, harmony: 7 }, 'smoke_formant_hoff.wav');
+    const hOn = await render({ pitchSemitones: 5, harmony: 7, formant: true }, 'smoke_formant_hon.wav');
+    log(hOff.c / dry.c > 1.3 && Math.abs(hOn.c / dry.c - 1) < 0.12, 'harmóniával (+12 együtt): a formáns a harmónia-hangra is', `KI ${(hOff.c / dry.c).toFixed(2)}× · BE ${(hOn.c / dry.c).toFixed(2)}× · ${hOn.ms} ms`);
+  } finally {
+    for (const u of uris) {
+      const f = new File(u);
+      if (f.exists) f.delete();
+    }
+    if (f0.exists) f0.delete();
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -9442,6 +9521,10 @@ export async function runImageSmoke(
   }
   if (phase === 'freefx') {
     await step(phase, () => smokeFreeFx(log));
+    return;
+  }
+  if (phase === 'formant') {
+    await step(phase, () => smokeFormant(log));
     return;
   }
   if (phase === 'midi') {

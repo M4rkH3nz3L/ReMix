@@ -6631,6 +6631,65 @@ async function smokeInstrumentDock(log: Log) {
   }
 }
 
+/**
+ * 🧠 S17: a 16 kHz-es mono dekódolás hosszú forrásnál szakaszosan (20 s-os natív ablakok) — a hívó hossz nélkül
+ * is (a dekóder méri); az eredmény a teljes dekódolással egyezik (hossz, korreláció), a csend-keresés is ezen fut.
+ */
+async function smokeDecodeWindowed(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const { decodeToMono16k, detectSilenceOnDevice } = await import('@/lib/audioDecode');
+  const { setLongThresholdForTest, canSegment } = await import('@/lib/longSource');
+  // 45 s: hang 0–20 s, csend 20–30 s, hang 30–45 s (több 20 s-os szakaszhatáron át)
+  const sr = 44100;
+  const n = 45 * sr;
+  const bytes = new Uint8Array(44 + n * 2);
+  const v = new DataView(bytes.buffer);
+  const txt = (at: number, x: string) => [...x].forEach((ch, i) => v.setUint8(at + i, ch.charCodeAt(0)));
+  txt(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); txt(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); txt(36, 'data'); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const on = t < 20 || t >= 30;
+    v.setInt16(44 + i * 2, on ? Math.round(Math.sin(2 * Math.PI * 440 * t) * 0.5 * 32767) : 0, true);
+  }
+  const f = new File(Paths.cache, 'smoke_decwin.wav');
+  if (f.exists) f.delete();
+  f.create();
+  f.write(bytes);
+  try {
+    log(canSegment(), 'a build tud szakaszosan dekódolni (natív decodeWindow)', `${canSegment()}`);
+    setLongThresholdForTest(null);
+    const full = await decodeToMono16k(f.uri);
+    setLongThresholdForTest(10); // 45 s > 10 s → a szakaszos út, a hossz a dekóder mérése
+    const t0 = Date.now();
+    const win = await decodeToMono16k(f.uri);
+    const ms = Date.now() - t0;
+    const corrAt = (a: Float32Array, b: Float32Array, lag: number) => {
+      let dot = 0, na = 0, nb = 0;
+      const m = Math.min(a.length, b.length) - Math.abs(lag);
+      for (let i = Math.max(0, -lag); i < m; i++) { const x = a[i], y = b[i + lag]; dot += x * y; na += x * x; nb += y * y; }
+      return na > 0 && nb > 0 ? dot / Math.sqrt(na * nb) : 0;
+    };
+    // (a) ugyanazzal az átmintavételezővel: a teljes 44,1 kHz-es dekódolás lineárisan 16 kHz-re = a szakaszos út?
+    const api = (await loadAudioApi())!;
+    const buf = await api.decodeAudioData(f.uri, sr);
+    const { resampleLinear } = await import('@/lib/wav');
+    const ref = resampleLinear(buf.getChannelData(0), sr, 16000);
+    const same = win ? corrAt(ref, win, 0) : 0;
+    log(!!win && Math.abs(ref.length - win.length) <= 32 && same > 0.999, 'hossz nélküli hívás: a szakaszos 16 kHz mono = a teljes dekódolás ugyanazzal az átmintavételezővel (hossz, korreláció)', `teljes ${ref.length}, szakaszos ${win?.length}, ρ ${same.toFixed(6)}, ${ms} ms`);
+    // (b) a natív 16 kHz-es út az eltérő átmintavételező miatt eltolhat — a legjobb eltolás és korreláció (tájékoztató)
+    let best = { lag: 0, c: 0 };
+    for (let lag = -40; lag <= 40; lag++) { const c = full && win ? corrAt(full, win, lag) : 0; if (c > best.c) best = { lag, c }; }
+    log(null, 'a natív 16 kHz-es teljes út vs. szakaszos', `ρ0 ${full && win ? corrAt(full, win, 0).toFixed(5) : '-'}, legjobb eltolás ${best.lag} minta (${(best.lag / 16).toFixed(2)} ms), ρ ${best.c.toFixed(5)}`);
+    const sil = await detectSilenceOnDevice(f.uri);
+    const hit = (sil ?? []).some((r) => r.start > 19 && r.start < 21 && r.end > 29 && r.end < 31);
+    log(hit, 'a csend-keresés a szakaszos úton is megtalálja a 20–30 s csendet', JSON.stringify(sil?.map((r) => [Math.round(r.start * 10) / 10, Math.round(r.end * 10) / 10])));
+  } finally {
+    setLongThresholdForTest(null);
+    if (f.exists) f.delete();
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -8778,6 +8837,10 @@ export async function runImageSmoke(
   }
   if (phase === 'instdock') {
     await step(phase, () => smokeInstrumentDock(log));
+    return;
+  }
+  if (phase === 'decwin') {
+    await step(phase, () => smokeDecodeWindowed(log));
     return;
   }
   if (phase === 'modeldl') {

@@ -1,8 +1,8 @@
-import { decodeToMono16k } from '@/lib/audioDecode';
-import { canSegment, isLongSource, LongSource } from '@/lib/longSource';
+import { decodeMono16kWindowed, decodeToMono16k } from '@/lib/audioDecode';
+import { canSegment, isLongSource } from '@/lib/longSource';
 import { autoThresholdDb, levelsDb } from '@/lib/audioSilence';
 import { alignWordsToIslands, speechIslands, type SrcWord } from '@/lib/speechEdit';
-import { resampleLinear, WHISPER_SAMPLE_RATE } from '@/lib/wav';
+import { WHISPER_SAMPLE_RATE } from '@/lib/wav';
 import { transcribeWordsOnDevice } from '@/lib/whisperClient';
 
 /**
@@ -20,27 +20,9 @@ export function clearSpeechWordCache(): void {
 
 export async function windowPcm16k(uri: string, from: number, to: number, sourceDuration?: number): Promise<Float32Array | null> {
   if (canSegment() && isLongSource(sourceDuration)) {
-    const SR = 44100;
-    const src = new LongSource(uri);
-    const parts: Float32Array[] = [];
-    for (let a = Math.round(from * SR); a < Math.round(to * SR); a += 20 * SR) {
-      const b = Math.min(Math.round(to * SR), a + 20 * SR);
-      await src.ensure(a, b);
-      const ch = src.read(a, b);
-      if (!ch) return null;
-      const mono = new Float32Array(b - a);
-      for (const c of ch) for (let i = 0; i < mono.length; i++) mono[i] += c[i] / ch.length;
-      parts.push(resampleLinear(mono, SR, WHISPER_SAMPLE_RATE));
-    }
-    const out = new Float32Array(parts.reduce((s, p) => s + p.length, 0));
-    let at = 0;
-    for (const p of parts) {
-      out.set(p, at);
-      at += p.length;
-    }
-    return out;
+    return decodeMono16kWindowed(uri, from, to);
   }
-  const pcm = await decodeToMono16k(uri);
+  const pcm = await decodeToMono16k(uri, { sourceDurationSec: sourceDuration });
   return pcm ? pcm.subarray(Math.round(from * WHISPER_SAMPLE_RATE), Math.round(to * WHISPER_SAMPLE_RATE)) : null;
 }
 

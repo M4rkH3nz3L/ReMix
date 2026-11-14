@@ -1804,6 +1804,15 @@ export interface AudioMaster {
  * 🎚️ Effekt-busz (pl. közös zengés): a sávok küldés-mértékkel (`audioSends`) kevernek rá, a busz
  * a saját effekt-láncán át (a klip-effektekkel azonos DSP) a master elé kerül.
  */
+/**
+ * 🎚️ V9 sávonkénti sidechain: ez a sáv a `from` sáv (eredeti, halkítás előtti) jele alatt halkul — `ratio`-val
+ * (2–20; a küszöb, a felfutás és az elengedés a régi halkításé: 0,02 / 25 ms / 350 ms). Több csoport is lehet.
+ */
+export interface TrackSidechain {
+  from: TrackType;
+  ratio: number;
+}
+
 export interface AudioBus {
   id: string;
   name: string;
@@ -1884,7 +1893,7 @@ export interface Project {
   audioMaster?: AudioMaster;
   /** 🎚️ sávonkénti mixer-gain (fader, 0–1) — a music/voiceover/sfx sávokra; a
    *  hiányzó sáv = 1.0. Az előnézetben ÉS a renderben érvényesül (persistált). */
-  trackMix?: Partial<Record<TrackType, { gain: number }>>;
+  trackMix?: Partial<Record<TrackType, { gain: number; sidechain?: TrackSidechain }>>;
   /** 🎚️ effekt-buszok (a Hang Stúdió keverőjében) */
   audioBuses?: AudioBus[];
   /** 🎚️ küldések: sáv → busz-azonosító → mérték 0–1 (a fader UTÁN) */

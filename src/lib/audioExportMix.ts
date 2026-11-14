@@ -27,7 +27,7 @@ export function mixForExport(project: Project, audible: (type: TrackType) => boo
   }
   const trackMix = { ...project.trackMix };
   for (const type of AUDIO_TRACKS) {
-    trackMix[type] = { gain: (trackMix[type]?.gain ?? 1) * masterVolume };
+    trackMix[type] = { ...trackMix[type], gain: (trackMix[type]?.gain ?? 1) * masterVolume };
   }
   return { ...project, tracks, trackMix };
 }

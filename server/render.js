@@ -2858,6 +2858,8 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     const audioLabels = ['abase'];
     const speechLabels = [];
     const duckLabels = [];
+    // 🎚️ V9: a hangklip-címkék sávja (a sávonkénti sidechain-csoportokhoz)
+    const labelTrack = new Map();
     graph.push(
       `anullsrc=channel_layout=stereo:sample_rate=44100:d=${total.toFixed(3)}[abase]`
     );
@@ -3000,6 +3002,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       graph.push(chain);
       const isTrigger = isDuckTrigger(clip, clipTrackType[clip.id], duckTrigger);
       const pushToBus = (lbl) => {
+        labelTrack.set(lbl, clipTrackType[clip.id]);
         if (isTrigger) {
           speechLabels.push(lbl);
         } else if (clip.autoDuck) {
@@ -3053,6 +3056,58 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
         hchain += `,aresample=44100,adelay=${delayMs}|${delayMs}[${hlabel}]`;
         graph.push(hchain);
         pushToBus(hlabel);
+      }
+    }
+
+    // 🎚️ V9: sávonkénti sidechain (a kliens `offlineMixPlan.sidechains` + `mixRange` tükre): a célsáv klipjei egy
+    // sínre, a forrás jele szétválik (a saját helyére + csoportonként egy kulcs-másolat), sidechaincompress
+    // a régi halkítás paramétereivel (0,02 / 25 ms / 350 ms) és a sáv arányával; a célsáv a régi halkításból kimarad
+    {
+      const tracksWith = new Set(labelTrack.values());
+      const groups = [];
+      for (const [target, mix] of Object.entries(project.trackMix || {})) {
+        const sc = mix && mix.sidechain;
+        if (!sc || sc.from === target || !tracksWith.has(target) || !tracksWith.has(sc.from)) continue;
+        groups.push({ target, from: sc.from, ratio: Math.max(2, Math.min(20, Number(sc.ratio) || 2)) });
+      }
+      if (groups.length > 0) {
+        const lists = [audioLabels, speechLabels, duckLabels];
+        const current = new Map();
+        const cur = (l) => current.get(l) || l;
+        const take = (l) => {
+          for (const arr of lists) {
+            const i = arr.indexOf(l);
+            if (i >= 0) {
+              arr.splice(i, 1);
+              return;
+            }
+          }
+        };
+        const keyCopies = groups.map(() => []);
+        for (const [lbl, tr] of labelTrack) {
+          const using = groups.map((g, gi) => (g.from === tr ? gi : -1)).filter((gi) => gi >= 0);
+          if (using.length === 0) continue;
+          const main = `${lbl}_m`;
+          const outs = [main, ...using.map((gi) => `${lbl}_k${gi}`)];
+          graph.push(`[${lbl}]asplit=${outs.length}${outs.map((o) => `[${o}]`).join('')}`);
+          for (const arr of lists) {
+            const i = arr.indexOf(lbl);
+            if (i >= 0) arr[i] = main;
+          }
+          current.set(lbl, main);
+          using.forEach((gi) => keyCopies[gi].push(`${lbl}_k${gi}`));
+        }
+        groups.forEach((g, gi) => {
+          const targets = [...labelTrack].filter(([, tr]) => tr === g.target).map(([l]) => cur(l));
+          targets.forEach(take);
+          const mixOf = (ls, name) => (ls.length > 1 ? (graph.push(`${ls.map((l) => `[${l}]`).join('')}amix=inputs=${ls.length}:duration=longest:normalize=0[${name}]`), name) : ls[0]);
+          const inL = mixOf(targets, `scin${gi}`);
+          const keyL = mixOf(keyCopies[gi], `sck${gi}`);
+          graph.push(`[${inL}]aformat=sample_fmts=fltp:channel_layouts=stereo[scinf${gi}]`);
+          graph.push(`[${keyL}]aformat=sample_fmts=fltp:channel_layouts=stereo,apad[sckp${gi}]`);
+          graph.push(`[scinf${gi}][sckp${gi}]sidechaincompress=threshold=0.02:ratio=${g.ratio}:attack=25:release=350[scout${gi}]`);
+          audioLabels.push(`scout${gi}`);
+        });
       }
     }
 

@@ -230,6 +230,42 @@ export function MixerSheet({ onClose, onOpenMaster }: { onClose: () => void; onO
           );
         })}
 
+        {/* 🎚️ V9 sávonkénti sidechain: a sáv egy másik sáv (eredeti) jele alatt halkul — több csoport is lehet */}
+        <Text style={styles.section}>{t('studio.mixer.sc.title')}</Text>
+        <Text style={styles.scHint}>{t('studio.mixer.sc.hint')}</Text>
+        {LANES.filter((lane) => project.tracks.some((tr) => tr.type === lane.type && tr.clips.length > 0)).map((lane) => {
+          const sc = project.trackMix?.[lane.type]?.sidechain;
+          const others = LANES.filter((o) => o.type !== lane.type && project.tracks.some((tr) => tr.type === o.type && tr.clips.length > 0));
+          const setSc = (next: { from: TrackType; ratio: number } | null) =>
+            useEditorStore.getState().dispatch({ type: 'SET_TRACK_SIDECHAIN', trackType: lane.type, sidechain: next });
+          return (
+            <View key={`sc-${lane.type}`} style={styles.strip} testID={`mixer-sc-${lane.type}`}>
+              <View style={styles.stripHead}>
+                <Ionicons name={lane.icon} size={15} color={lane.color} />
+                <Text style={styles.stripName} numberOfLines={1}>
+                  {t('studio.mixer.sc.under', { track: laneLabel(lane, t) })}
+                </Text>
+              </View>
+              <View style={styles.btnRow}>
+                <Pressable onPress={() => setSc(null)} style={[styles.chip, !sc && styles.chipAccent]} accessibilityRole="button" accessibilityState={{ selected: !sc }}>
+                  <Text style={[styles.chipText, !sc && { color: '#fff' }]}>{t('studio.mixer.sc.none')}</Text>
+                </Pressable>
+                {others.map((o) => {
+                  const on = sc?.from === o.type;
+                  return (
+                    <Pressable key={o.type} onPress={() => setSc({ from: o.type, ratio: sc?.ratio ?? 6 })} style={[styles.chip, on && styles.chipAccent]} accessibilityRole="button" accessibilityState={{ selected: on }} testID={`mixer-sc-${lane.type}-${o.type}`}>
+                      <Text style={[styles.chipText, on && { color: '#fff' }]}>{laneLabel(o, t)}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {sc ? (
+                <Slider label={t('studio.mixer.sc.amount')} value={sc.ratio} min={2} max={20} onChange={(v) => setSc({ from: sc.from, ratio: Math.round(v) })} format={(v) => `${Math.round(v)}:1`} />
+              ) : null}
+            </View>
+          );
+        })}
+
         {/* 🎚️ effekt-buszok: a sávok küldései ide kevernek, a busz effektje után a master elé */}
         <Text style={styles.section}>{t('studio.mixer.bus.title')}</Text>
         {buses.map((b) => (
@@ -279,6 +315,7 @@ export function MixerSheet({ onClose, onOpenMaster }: { onClose: () => void; onO
 }
 
 const styles = StyleSheet.create({
+  scHint: { color: palette.textDim, fontSize: 11, marginBottom: 6 },
   console: { gap: 10, paddingVertical: 6, paddingHorizontal: 2 },
   column: { width: 84, alignItems: 'center', gap: 8, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surface },
   colName: { color: palette.text, fontSize: 12, fontWeight: '700', maxWidth: 76 },

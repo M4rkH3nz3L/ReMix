@@ -3282,7 +3282,7 @@
       "clipLabel": "Sampler",
       "pick": "Sample wählen (One-Shot)"
     },
-    "mixer": {
+    "mixer": { "sc": {"title": "Sidechain (Absenken unter einer anderen Spur)", "hint": "Die Spur wird unter dem Signal der gewählten Spur abgesenkt (z. B. Bass unter Drums, Musik unter Sprache) — beim Handy- und Cloud-Export gleich.", "under": "{{track}} senkt sich ab unter:", "none": "Keine", "amount": "Stärke (Ratio)"},
       "bus": {
         "title": "Effekt-Busse",
         "reverb": "Hall-Bus",

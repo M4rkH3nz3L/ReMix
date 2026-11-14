@@ -5,8 +5,10 @@ import { createEmptyProject } from '@/lib/projectUtils';
  * ⚡ Golden-teszt: a közös DSP kimenete bitre változatlan (minden effekt, automáció, busz, halkítás,
  * master kompresszorral és szaturációval). A natív magra váltás (dspKernels) előtti kód ugyanezt adta;
  * ha ez a szám változik, a telefon és a szerver közti paritás is változhatott — szándékos legyen.
+ * 2026-11-14 (V9): d03680fa → c13523c6 — a halkító (Ducker) együtthatói az ffmpeg `sidechaincompress`-éi lettek
+ * (1 / (ms · sr / 4000)); a telefon így a szerveres exporttal azonosan halkít (mérve: 25,0 dB mindkettőn).
  */
-it('a DSP kimenete bitre a rögzített (d03680fa)', () => {
+it('a DSP kimenete bitre a rögzített (c13523c6)', () => {
   const fx = { highpass: 90, lowpass: 12000, eq: { low: 3, mid: -2, high: 2 }, gate: true, deEsser: true, compressor: true, reverb: 0.5, delay: 0.4, stereoWide: true, limiter: true, normalize: true };
   const base = createEmptyProject('x', '9:16', undefined, 'audio');
   const kf = [{ id: 'k1', time: 0, value: 0.1 }, { id: 'k2', time: 3, value: 0.9 }];
@@ -27,7 +29,7 @@ it('a DSP kimenete bitre a rögzített (d03680fa)', () => {
     const v = new Uint32Array(out[1].buffer);
     for (let i = 0; i < u.length; i++) h = (Math.imul(h, 31) + u[i] + Math.imul(v[i], 7)) >>> 0;
   }
-  expect(h.toString(16)).toBe('d03680fa');
+  expect(h.toString(16)).toBe('c13523c6');
 });
 
 it('a JS-mag a natív bekötés nélkül fut, és azonos tömbre is a sorrendi viselkedést adja', () => {

@@ -3282,7 +3282,7 @@
       "clipLabel": "Sampler",
       "pick": "Minta kiválasztása (one-shot)"
     },
-    "mixer": {
+    "mixer": { "sc": {"title": "Sidechain (halkítás egy másik sáv alatt)", "hint": "A sáv a kiválasztott sáv jele alatt halkul (pl. a basszus a dob alatt, a zene a beszéd alatt) — a telefonos és a felhős export is.", "under": "{{track}} halkul ez alatt:", "none": "Nincs", "amount": "Erősség (arány)"},
       "bus": {
         "title": "Effekt-buszok",
         "reverb": "Zengés-busz",

@@ -145,6 +145,8 @@ export interface OfflineMixPlan {
   masterGain?: number;
   /** 🎚️ effekt-buszok (a sávok küldéseiből, a master előtt) */
   buses?: AudioBus[];
+  /** 🎚️ V9: sávonkénti sidechain-csoportok — a `target` sáv a `from` sáv eredeti jele alatt halkul */
+  sidechains?: { target: string; from: string; ratio: number }[];
   /**
    * 🎚️ stem: csak ezek a sávok szólnak a kimenetre (és a buszokra); a többi sáv beszéde csak a
    * halkítás kulcsát adja — így a stem pontosan úgy halkul, mint a keverésben
@@ -236,7 +238,15 @@ export function offlineMixPlan(project: Project): OfflineMixPlan {
   clips.push(...videoAudioClips(project, unsupported));
   clips.push(...pipAudioClips(project));
   const ducking = clips.some((c) => c.role === 'duck') && clips.some((c) => c.role === 'key');
+  // 🎚️ V9: csak a valódi csoportok (a forrás és a cél is szól, nem önmaga)
+  const sidechains = AUDIO_TRACKS.flatMap((ty) => {
+    const sc = project.trackMix?.[ty]?.sidechain;
+    if (!sc || sc.from === ty) return [];
+    const has = (t: string) => clips.some((c) => c.track === t);
+    return has(ty) && has(sc.from) ? [{ target: ty as string, from: sc.from as string, ratio: Math.max(2, Math.min(20, sc.ratio)) }] : [];
+  });
   return {
+    ...(sidechains.length > 0 ? { sidechains } : {}),
     duration: projectDuration(project),
     clips,
     unsupported: [...unsupported],
@@ -293,12 +303,24 @@ export function mixRange(
   // 🎚️ busz-pufferek (a küldések ide is szólnak)
   const busBufs = new Map<string, [Float32Array, Float32Array]>();
   for (const b of plan.buses ?? []) busBufs.set(b.id, [new Float32Array(len), new Float32Array(len)]);
+  // 🎚️ V9: csoportonként a cél-sáv sínje és a forrás kulcsa (a forrás a kimenetre is szól, halkítás előtt)
+  const scBus = new Map<string, [Float32Array, Float32Array]>();
+  const scKeys = new Map<string, [Float32Array, Float32Array][]>();
+  for (const sc of plan.sidechains ?? []) {
+    const key: [Float32Array, Float32Array] = [new Float32Array(len), new Float32Array(len)];
+    scBus.set(sc.target, [new Float32Array(len), new Float32Array(len)]);
+    scKeys.set(sc.from, [...(scKeys.get(sc.from) ?? []), key]);
+    scKeys.set(`#${sc.target}`, [key]);
+  }
   for (const clip of plan.clips) {
-    const dst = duckBus && clip.role === 'duck' ? duckBus : out;
+    const dst = scBus.get(clip.track) ?? (duckBus && clip.role === 'duck' ? duckBus : out);
     const sendTo = clip.sends ? Object.entries(clip.sends).map(([id, amt]) => [busBufs.get(id), amt] as const).filter(([b]) => b) : [];
-    const key = keyBus && clip.role === 'key' ? keyBus : null;
+    // a sidechain-csoport célsávja a régi halkításban nem vesz részt (a szerver tükre)
+    const key = keyBus && clip.role === 'key' && !scBus.has(clip.track) ? keyBus : null;
+    const keysSc = scKeys.get(clip.track) ?? [];
+    const nScKeys = keysSc.length;
     const heard = !plan.solo || plan.solo.includes(clip.track);
-    if (!heard && !key) {
+    if (!heard && !key && nScKeys === 0) {
       continue;
     }
     const src = sources.get(clip.uri);
@@ -419,6 +441,10 @@ export function mixRange(
           keyL[o] += vl;
           keyR![o] += vr;
         }
+        for (let k = 0; k < nScKeys; k++) {
+          keysSc[k][0][o] += vl;
+          keysSc[k][1][o] += vr;
+        }
         if (!heard) {
           continue;
         }
@@ -447,6 +473,21 @@ export function mixRange(
     for (let i = 0; i < len; i++) {
       out[0][i] += buf[0][i] * g;
       out[1][i] += buf[1][i] * g;
+    }
+  }
+  // 🎚️ V9: a sidechain-csoportok (a halkító állapota csoportonként, szeletről szeletre megmarad)
+  for (const sc of plan.sidechains ?? []) {
+    const bus = scBus.get(sc.target)!;
+    const key = scKeys.get(`#${sc.target}`)![0];
+    const id = `__sc:${sc.target}<${sc.from}|${sc.ratio}`;
+    const st = fxState.get(id);
+    let ducker = st?.ducker;
+    if (!ducker || st?.next !== fromSample) ducker = new Ducker(sr, 0.02, sc.ratio);
+    ducker.process(bus[0], bus[1], key[0], key[1]);
+    fxState.set(id, { chain: [], next: toSample, ducker });
+    for (let i = 0; i < len; i++) {
+      out[0][i] += bus[0][i];
+      out[1][i] += bus[1][i];
     }
   }
   if (duckBus && keyBus) {

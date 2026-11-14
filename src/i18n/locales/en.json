@@ -3282,7 +3282,7 @@
       "clipLabel": "Sampler",
       "pick": "Pick a sample (one-shot)"
     },
-    "mixer": {
+    "mixer": { "sc": {"title": "Sidechain (ducking under another lane)", "hint": "The lane ducks under the selected lane's signal (e.g. bass under drums, music under voice) — in phone and cloud exports alike.", "under": "{{track}} ducks under:", "none": "None", "amount": "Amount (ratio)"},
       "bus": {
         "title": "Effect buses",
         "reverb": "Reverb bus",

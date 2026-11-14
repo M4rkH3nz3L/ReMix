@@ -7924,6 +7924,68 @@ async function smokeC7(log: Log) {
   }
 }
 
+/** 🎚️ V9: sávonkénti sidechain — a pad (zene) a lábdob (Aux 1) alatt halkul a telefonos exportban, ugyanúgy, mint a
+ *  szerveres renderben (ott valódi ffmpeggel mérve 25,0 dB); egy visszavonás kikapcsolja. */
+async function smokeSidechain(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const SR = 44100;
+  const n = 4 * SR;
+  const wav = (name: string, x: Float32Array) => {
+    const f = new File(Paths.document, name);
+    if (f.exists) f.delete();
+    f.create();
+    f.write(encodeWav16([x, x], SR, () => 0.5));
+    return f.uri;
+  };
+  const pad = wav('smoke_sc_pad.wav', Float32Array.from({ length: n }, (_, i) => 0.2 * Math.sin((2 * Math.PI * 220 * i) / SR)));
+  const kick = wav('smoke_sc_kick.wav', Float32Array.from({ length: n }, (_, i) => (i % SR < 0.1 * SR ? 0.8 * Math.sin((2 * Math.PI * 60 * i) / SR) : 0)));
+  const id = 'prj_smoke_sidechain';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:sc', caught));
+  const base = createEmptyProject('smoke sidechain', '9:16', undefined, 'audio');
+  const mk = (cid: string, uri: string): AudioClip => ({ kind: 'audio', id: cid, label: cid, uri, start: 0, duration: 4, trimIn: 0, sourceDuration: 4, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' });
+  await saveProject({ ...base, id, tracks: [...base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [mk('pad', pad)] } : t)), { id: 'trk_a1', type: 'aux1', name: 'Dob', clips: [mk('kick', kick)] }] });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1000);
+  const level = async () => {
+    const out = await exportOfflineWav(st().project!, new File(projectExportDir(), 'smoke_sc.wav'), undefined, undefined, 'float32');
+    const h = new File(out.uri).open();
+    let l: Float32Array;
+    try {
+      const b = h.readBytes(h.size ?? 0);
+      const f = new Float32Array(b.buffer.slice(b.byteOffset + 44, b.byteOffset + b.length));
+      l = Float32Array.from({ length: f.length / 2 }, (_, i) => f[i * 2]);
+    } finally {
+      h.close();
+      new File(out.uri).delete();
+    }
+    const rms = (a: number, b: number) => {
+      let e = 0;
+      for (let i = Math.round(a * SR); i < Math.round(b * SR); i++) e += l[i] ** 2;
+      return 10 * Math.log10(e / ((b - a) * SR));
+    };
+    return { during: rms(1.12, 1.2), between: rms(1.7, 1.9) };
+  };
+  try {
+    const off = await level();
+    st().dispatch({ type: 'SET_TRACK_SIDECHAIN', trackType: 'music', sidechain: { from: 'aux1', ratio: 10 } }, 'user');
+    const on = await level();
+    const dip = on.between - on.during;
+    log(Math.abs(off.between - off.during) < 0.5 && dip > 22 && dip < 28 && on.between > -18, 'a pad a lábdob alatt halkul (≈ 25 dB, mint a szerveren), az ütések között visszajön', `KI ${(off.between - off.during).toFixed(1)} dB · BE ${dip.toFixed(1)} dB (ütés után ${on.during.toFixed(1)}, között ${on.between.toFixed(1)} dBFS; szerver: 25,0)`);
+    runDevAction('audio.mixer');
+    await sleep(900);
+    log(true, 'FOTÓZHATÓ', 'a keverő Sidechain szakasza');
+    await sleep(1500);
+    st().undo();
+    log(!st().project!.trackMix?.music?.sidechain, 'egy visszavonás kikapcsolja', JSON.stringify(st().project!.trackMix ?? {}));
+  } finally {
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:sc-del', caught));
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -10152,6 +10214,10 @@ export async function runImageSmoke(
   }
   if (phase === 'c7') {
     await step(phase, () => smokeC7(log));
+    return;
+  }
+  if (phase === 'sidechain') {
+    await step(phase, () => smokeSidechain(log));
     return;
   }
   if (phase === 'midi') {

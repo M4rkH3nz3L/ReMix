@@ -5,7 +5,7 @@ import { imageDocsReference, withImageDocAssets } from '@/lib/imageDocMedia';
 import { canHostClip, findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
 import type { LiveDoc } from '@/types/live';
 import type { Model3DDoc } from '@/types/model3d';
-import type { AlbumDoc, AspectRatio, Asset, AssetSource, AudioBus, AudioMaster, Chapter, Clip, ImageDoc, InstrumentDoc, Marker, ParticlesConfig, Project, TempoChange, TimelineRegion, Track, TrackType } from '@/types/project';
+import type { AlbumDoc, AspectRatio, Asset, AssetSource, AudioBus, TrackSidechain, AudioMaster, Chapter, Clip, ImageDoc, InstrumentDoc, Marker, ParticlesConfig, Project, TempoChange, TimelineRegion, Track, TrackType } from '@/types/project';
 import { normalizeTempoMap } from '@/lib/audioTransport';
 import { retimeTempoDelays } from '@/lib/fxParams';
 import type { WorkflowRun } from '@/lib/workflowTemplate';
@@ -70,6 +70,8 @@ export type EditorCommand =
   | { type: 'SET_AUDIO_MASTER'; audioMaster: AudioMaster | null }
   | { type: 'SET_TRACK_GAIN'; trackType: TrackType; gain: number }
   | { type: 'ADD_TRACK'; track: Track }
+  /** 🎚️ V9: sávonkénti sidechain (null = ki) */
+  | { type: 'SET_TRACK_SIDECHAIN'; trackType: TrackType; sidechain: TrackSidechain | null }
   | { type: 'REMOVE_TRACK'; trackType: TrackType }
   | { type: 'RENAME_TRACK'; trackType: TrackType; name: string }
   | { type: 'SET_AUDIO_BUSES'; buses: AudioBus[] }
@@ -413,6 +415,14 @@ function applyCommandRaw(project: Project, cmd: EditorCommand): Project | null {
       return { ...project, timeSignature: ts };
     }
 
+    case 'SET_TRACK_SIDECHAIN': {
+      const cur = project.trackMix?.[cmd.trackType];
+      const sc = cmd.sidechain && cmd.sidechain.from !== cmd.trackType ? { from: cmd.sidechain.from, ratio: Math.max(2, Math.min(20, Math.round(cmd.sidechain.ratio * 10) / 10)) } : null;
+      if (JSON.stringify(cur?.sidechain ?? null) === JSON.stringify(sc)) return null;
+      const gain = cur?.gain ?? 1;
+      return { ...project, trackMix: { ...project.trackMix, [cmd.trackType]: { gain, ...(sc ? { sidechain: sc } : {}) } } };
+    }
+
     case 'SET_BPM': {
       const bpm = Math.max(20, Math.min(300, Math.round(cmd.bpm)));
       if ((project.bpm ?? 120) === bpm) {
@@ -514,7 +524,8 @@ function applyCommandRaw(project: Project, cmd: EditorCommand): Project | null {
       if ((prev[cmd.trackType]?.gain ?? 1) === g) {
         return null;
       }
-      return { ...project, trackMix: { ...prev, [cmd.trackType]: { gain: g } } };
+      // a sáv többi beállítása (pl. a V9 sidechain) megmarad
+      return { ...project, trackMix: { ...prev, [cmd.trackType]: { ...prev[cmd.trackType], gain: g } } };
     }
 
     case 'ADD_TRACK': {
@@ -761,6 +772,8 @@ export function describeCommand(cmd: EditorCommand): string {
       );
     case 'SET_TIME_SIGNATURE':
       return tr('lib.commands.setTimeSignature', { defaultValue: `Ütemjelzés: ${cmd.timeSignature.beatsPerBar}/${cmd.timeSignature.beatUnit}` });
+    case 'SET_TRACK_SIDECHAIN':
+      return tr('lib.commands.setTrackSidechain', { defaultValue: 'Sidechain' });
     case 'SET_BPM':
       return tr('lib.commands.setBpm', { bpm: cmd.bpm, defaultValue: `BPM: ${cmd.bpm}` });
     case 'SET_WORKFLOW_RUN':

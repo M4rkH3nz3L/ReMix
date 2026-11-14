@@ -350,8 +350,11 @@ export class Ducker {
   private readonly curve: Compressor;
 
   constructor(sr: number, thresholdLin = 0.02, ratio = 6, attackMs = 25, releaseMs = 350) {
-    this.att = coeff(attackMs, sr);
-    this.rel = coeff(releaseMs, sr);
+    // 2026-11-14 (V9): az ffmpeg `sidechaincompress` együtthatói — 1 / (ms · sr / 4000), azaz ~ms/4 időállandó
+    // (a „350 ms” elengedés ≈ 88 ms); eddig ms-os időállandóval a zene a telefonon lassabban jött vissza, mint a
+    // szerveres exportban (mérve: ütések között −35 dB vs −17 dB)
+    this.att = Math.min(1, 4000 / (attackMs * sr));
+    this.rel = Math.min(1, 4000 / (releaseMs * sr));
     this.curve = new Compressor(20 * Math.log10(thresholdLin), ratio, attackMs, releaseMs, sr);
   }
 

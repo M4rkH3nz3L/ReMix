@@ -120,3 +120,18 @@ export class StreamResampler {
     return this.drain(total, true);
   }
 }
+
+/** egy teljes (nem folyamatos) darab átmintavételezése: process + flush, a pontos hosszal */
+export function resampleChannels(channels: Float32Array[], inRate: number, outRate: number): Float32Array[] {
+  if (inRate === outRate || channels.length === 0) return channels;
+  const r = new StreamResampler(inRate, outRate, channels.length);
+  const a = r.process(channels);
+  const b = r.flush();
+  return a.map((x, c) => {
+    const out = new Float32Array(x.length + b[c].length);
+    out.set(x);
+    out.set(b[c], x.length);
+    return out;
+  });
+}
+

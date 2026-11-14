@@ -299,19 +299,24 @@ public class RemixRenderModule: Module {
       throw RenderError.noTracks("audio")
     }
     var channels = 2
+    var srcRate = 44100.0
     if let desc = track.formatDescriptions.first,
        let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(desc as! CMAudioFormatDescription) {
       channels = max(1, min(2, Int(asbd.pointee.mChannelsPerFrame)))
+      if asbd.pointee.mSampleRate > 0 { srcRate = asbd.pointee.mSampleRate }
     }
+    // 2026-11-14: a FORRÁS mintavételén olvasunk — az AVAssetReader 44,1 kHz-re alakítója ~44 minta
+    // (≈ 1 ms) késleltetést adott, hívásonként változóan (iPhone, iPad mérve); a 44,1 kHz-re alakítás a
+    // JS-ben, késleltetés nélküli sinc-kel (`streamResampler.ts`). A kimenet mintavétele: `sampleRate`.
+    let rate = Int32(srcRate.rounded())
     let reader = try AVAssetReader(asset: asset)
     // mintára kerekítve (a CMTime(seconds:) csonkol: 19,9 × 44100 = 877589,999… → egy mintával korábbi
     // kezdet, mérve a szakaszhatáron)
     reader.timeRange = CMTimeRange(
-      start: CMTime(value: CMTimeValue((max(0, start) * 44100).rounded()), timescale: 44100),
-      duration: CMTime(value: CMTimeValue((max(0, duration) * 44100).rounded()), timescale: 44100))
+      start: CMTime(value: CMTimeValue((max(0, start) * Double(rate)).rounded()), timescale: rate),
+      duration: CMTime(value: CMTimeValue((max(0, duration) * Double(rate)).rounded()), timescale: rate))
     let settings: [String: Any] = [
       AVFormatIDKey: kAudioFormatLinearPCM,
-      AVSampleRateKey: 44100,
       AVNumberOfChannelsKey: channels,
       AVLinearPCMBitDepthKey: 32,
       AVLinearPCMIsFloatKey: true,
@@ -339,7 +344,7 @@ public class RemixRenderModule: Module {
       throw RenderError.exportFailed(reader.error?.localizedDescription ?? "hang-ablak olvasása")
     }
     try data.write(to: URL(fileURLWithPath: outputPath))
-    return ["frames": data.count / (4 * channels), "channels": channels]
+    return ["frames": data.count / (4 * channels), "channels": channels, "sampleRate": Int(rate)]
   }
 
   /** a Xing/Info-fejléc kódoló-címkéjének (LAME, Lavc) késleltetése (minta); nincs ilyen fejléc → 0 */

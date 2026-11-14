@@ -168,7 +168,7 @@ import { makeId } from '@/lib/id';
 import { magicWandSelect } from '@/lib/magicWandClient';
 import { normalizePickedImage } from '@/lib/media';
 import { projectMediaDir } from '@/lib/projectFolderClient';
-import { createEmptyProject, splitClip } from '@/lib/projectUtils';
+import { createEmptyProject, CURRENT_SCHEMA_VERSION, splitClip } from '@/lib/projectUtils';
 import { cloudBaseUrl, serverHost } from '@/lib/backend';
 import Constants from 'expo-constants';
 import { deleteProject, listProjects, loadProject, loadVersions, readRecovery, recoveryIsFresher, saveProjectAndEvents, saveProject, writeRecovery, clearRecovery } from '@/lib/storage';
@@ -4442,7 +4442,7 @@ async function smokeFromVideo(log: Log) {
     return;
   }
   const inFolder = r.uri.startsWith(projectMediaDir().uri) && new File(r.uri).exists;
-  log(inFolder && r.uri.endsWith('.m4a') && Math.abs(r.duration - 6) <= 1 / 30, 'a videó hangja M4A-ként a projekt-mappában, a hossza a videóé (± 1 képkocka)', `${r.duration.toFixed(3)} s, ${((new File(r.uri).size ?? 0) / 1024).toFixed(0)} kB, ${ms} ms, ${r.uri.split('/').slice(-2).join('/')}`);
+  log(inFolder && r.uri.endsWith('.wav') && Math.abs(r.duration - 6) <= 1 / 30, 'a videó hangja WAV-ként a projekt-mappában, a hossza a videóé (± 1 képkocka)', `${r.duration.toFixed(3)} s, ${((new File(r.uri).size ?? 0) / 1024).toFixed(0)} kB, ${ms} ms, ${r.uri.split('/').slice(-2).join('/')}`);
   const api = (await loadAudioApi())!;
   const ex = (await api.decodeAudioData(r.uri, SR)).getChannelData(0);
   const orig = (await api.decodeAudioData(vid, SR)).getChannelData(0);
@@ -4472,13 +4472,15 @@ async function smokeFromVideo(log: Log) {
     }
     return { lag: bl, rho: xy / Math.sqrt(xx * yy) };
   };
-  const vsVideo = best((j) => orig[j] ?? 0);
-  log(vsVideo.lag === 0 && vsVideo.rho >= 0.99, 'a kinyert hang = a videó hangja (eltolás 0, korreláció ≥ 0,99)', `eltolás ${vsVideo.lag} minta, ρ ${vsVideo.rho.toFixed(4)}`);
+  // 2026-11-14: a próbavideó hangja az ismert jel (`ref`) — ez az igazság; az M4A-átmásolás 1303 mintát
+  // késett (az AAC előtöltése), a WAV-kinyerés az előtöltést levágja
   const vsRef = best(ref);
-  log(null, 'a kinyert hang az ismert jelhez (az AAC kódolói késleltetésével együtt)', `eltolás ${vsRef.lag} minta, ρ ${vsRef.rho.toFixed(4)}`);
+  log(Math.abs(vsRef.lag) <= 1 && vsRef.rho >= 0.99, 'a kinyert hang = a videó ismert hangjele (eltolás 0 ± 1 minta, korreláció ≥ 0,99) — nincs AAC-előtöltés', `eltolás ${vsRef.lag} minta, ρ ${vsRef.rho.toFixed(4)}`);
+  const vsVideo = best((j) => orig[j] ?? 0);
+  log(null, 'a videó közvetlen dekódolásához képest (tájékoztató — a lejátszó-dekóder saját előtöltés-kezelése)', `eltolás ${vsVideo.lag} minta, ρ ${vsVideo.rho.toFixed(4)}`);
   // hangsáv nélküli videó: érthető hiba, nincs maradék fájl, a projekt változatlan
   const before = JSON.stringify(st().project);
-  const extracted = () => projectMediaDir().list().filter((x) => x.name.endsWith('_hang.m4a')).length;
+  const extracted = () => projectMediaDir().list().filter((x) => /_hang\.(m4a|wav)$/.test(x.name)).length;
   const files0 = extracted();
   const r2 = await extractVideoAudio(noa, 'néma.mp4');
   log(!r2.ok && r2.reason === 'noAudio' && extracted() === files0 && JSON.stringify(st().project) === before, 'hangsáv nélküli videó: „nincs hangsáv” hiba, nincs maradék fájl, a projekt változatlan', `${r2.ok ? 'ok?!' : r2.reason}; kinyert fájlok ${files0} → ${extracted()}; projekt ${JSON.stringify(st().project) === before ? 'változatlan' : 'változott'}`);
@@ -5088,7 +5090,9 @@ async function smokeConsole(log: Log) {
   await sleep(1200);
   runDevAction('audio.mixer');
   await sleep(1200);
-  log(Dimensions.get('window').width >= 700, 'tablet-szélesség: keverőpult-nézet', `${Dimensions.get('window').width} pt`);
+  // telefonon (keskeny ablak) a keverőpult-nézet nem alkalmazható — tájékoztató sor, nem hiba
+  const wide = Dimensions.get('window').width >= 700;
+  log(wide ? true : null, wide ? 'tablet-szélesség: keverőpult-nézet' : 'telefon-szélesség: a keverőpult-nézet csak tableten (nem mérhető itt)', `${Dimensions.get('window').width} pt`);
   log(true, 'FOTÓZHATÓ', 'a keverőpult: zene −6 dB, beszéd 0 dB, effekt −12 dB függőleges faderen');
   await sleep(3000);
   router.back();
@@ -5896,11 +5900,11 @@ async function smokeNewerSchema(log: Log) {
   const after = await AsyncStorage.getItem(key);
   log(after === raw, 'kilépés után a tárolt projekt bájtra változatlan (az ismeretlen mező is megmaradt)', `${raw.length} bájt`);
   await AsyncStorage.removeItem(key);
-  // a mai projekt v7-tel mentődik
+  // a mai projekt a jelenlegi sémával mentődik
   const cur = { ...createEmptyProject('smoke v7', '9:16', undefined, 'audio'), id: 'prj_smoke_v7' };
   await saveProject(cur);
   const back = JSON.parse((await AsyncStorage.getItem('vided.project.v1.prj_smoke_v7')) ?? '{}') as { schemaVersion?: number };
-  log(back.schemaVersion === 7, 'az új projekt a jelenlegi sémán (v7) mentődik', `v${back.schemaVersion}`);
+  log(back.schemaVersion === CURRENT_SCHEMA_VERSION, `az új projekt a jelenlegi sémán (v${CURRENT_SCHEMA_VERSION}) mentődik`, `v${back.schemaVersion}`);
   await deleteProject('prj_smoke_v7').catch((caught) => logCaught('lib/imageSmoke.tsx:newerschema', caught));
 }
 
@@ -6717,7 +6721,11 @@ async function smokeAudioFormat(log: Log) {
     const h = new File(ex.uri).open();
     try { headHex = Array.from(h.readBytes(16)).map((x) => x.toString(16).padStart(2, '0')).join(' '); } finally { h.close(); }
   }
-  log(m.container === 'm4a' && !!m.sampleRate && m.sampleRate >= 8000 && !!m.channels, 'M4A (videóból kinyerve) a fejlécből: mintavétel és csatornák', `${JSON.stringify(m)} · kinyerés ${vid ? (ex && ex.ok ? 'ok' : JSON.stringify(ex)) : 'nincs videó'} · fej ${headHex}`);
+  // 2026-11-14: a videóból kinyert hang WAV (mintára pontos, 44,1 kHz, 16 bit) — az mp4a-leíró olvasását a
+  // videófájl maga méri tovább
+  log(m.container === 'wav' && m.sampleRate === 44100 && m.channels === 2 && m.bitDepth === 16, 'WAV (videóból kinyerve) a fejlécből: 44,1 kHz, sztereó, 16 bit', `${JSON.stringify(m)} · kinyerés ${vid ? (ex && ex.ok ? 'ok' : JSON.stringify(ex)) : 'nincs videó'} · fej ${headHex}`);
+  const mv = vid ? readFileFormat(vid) : {};
+  log(mv.container === 'm4a' && mv.sampleRate === 48000 && mv.channels === 2, 'a videófájl hangja (mp4a-leíró) a fejlécből: 48 kHz, sztereó', JSON.stringify(mv));
   // 3) a klipszerkesztő mutatja (az asset mezőiből)
   const id = 'prj_smoke_fmt';
   await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:fmt', caught));
@@ -7338,6 +7346,43 @@ async function smokeFormant(log: Log) {
   }
 }
 
+/** 🔬 diagnózis: a natív `decodeWindow` ugyanarra a videóra többször — a kimenet hossza és eltolása az ismert jelhez */
+async function smokeDecodeDiag(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const Nat = requireOptionalNativeModule<{ decodeWindow(u: string, s: number, d: number, o: string): Promise<{ frames: number; channels: number }> }>('RemixRender');
+  const vid = await downloadToCache(`${smokeFileHost()}/vid_audio.mp4`, `smoke_diag_${Date.now()}.mp4`);
+  if (!Nat || !vid) {
+    log(false, 'diag', 'nincs natív modul vagy videó');
+    return;
+  }
+  const SR = 44100;
+  const ref = (i: number) => 0.4 * Math.sin(2 * Math.PI * (300 + 40 * (Math.floor((i / SR) * 10) % 25)) * (i / SR));
+  for (let run = 0; run < 8; run++) {
+    const f = new File(Paths.cache, `diag_${run}.f32`);
+    const start = run % 2 === 0 ? 0 : 0.5;
+    const info = await Nat.decodeWindow(vid, start, 4, f.uri.replace('file://', ''));
+    const h = f.open();
+    const b = h.readBytes(h.size ?? 0);
+    h.close();
+    f.delete();
+    const ch = info.channels;
+    const { to44k } = await import('@/lib/longSource');
+    const a = await to44k(new Float32Array(b.buffer, b.byteOffset, Math.floor(b.byteLength / 4)), ch, (info as { sampleRate?: number }).sampleRate);
+    let bl = 0;
+    let bv = -Infinity;
+    for (let lag = -200; lag <= 200; lag++) {
+      let xy = 0;
+      const off = Math.round(start * SR);
+      for (let j = SR; j < 2 * SR; j += 2) xy += (a[(j - off + lag) * ch] ?? 0) * ref(j);
+      if (xy > bv) {
+        bv = xy;
+        bl = lag;
+      }
+    }
+    log(null, `decodeWindow #${run} (kezdet ${start} s)`, `frames ${info.frames} @ ${(info as { sampleRate?: number }).sampleRate ?? 44100} Hz → ${a.length / ch} @ 44100, ch ${ch}, eltolás ${bl}`);
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -7814,7 +7859,8 @@ async function smokeSpeechEdit(log: Log) {
   log(fillers === 2 && pickedNorm.every((x) => ['um', 'uh', 'ah', 'er', 'erm', 'umm', 'uhh'].includes(x)), 'Töltelékek: a két töltelék („um”, „uh”) kijelölve', picked);
   log(true, 'FOTÓZHATÓ', 'az átirat-sáv két áthúzott töltelékkel, a sávon pirosan');
   await sleep(2500);
-  const plannedCuts = wordCutRanges(currentSpeechWords(), useSpeechEdit.getState().selected, 30);
+  // a stúdió rácsa (V6: hang-projektben a minta) — ugyanúgy, mint a szövegvágó sáv
+  const plannedCuts = wordCutRanges(currentSpeechWords(), useSpeechEdit.getState().selected, editGridRate(st().project));
   const beforeCut = st().project!;
   const cuts = runDevAction('audio.speechApply') as number;
   const vo = track('voiceover');
@@ -9525,6 +9571,10 @@ export async function runImageSmoke(
   }
   if (phase === 'formant') {
     await step(phase, () => smokeFormant(log));
+    return;
+  }
+  if (phase === 'decodediag') {
+    await step(phase, () => smokeDecodeDiag(log));
     return;
   }
   if (phase === 'midi') {

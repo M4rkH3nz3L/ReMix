@@ -2,6 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
 import { logCaught } from '@/lib/logCaught';
+import { resampleChannels } from '@/lib/streamResampler';
 
 /**
  * 🎧 Hosszú forrás (20 percnél hosszabb is) szakaszosan: a natív modul a fájlnak CSAK egy ablakát
@@ -14,7 +15,7 @@ import { logCaught } from '@/lib/logCaught';
  */
 
 interface DecodeWindowModule {
-  decodeWindow(uri: string, start: number, duration: number, outputPath: string): Promise<{ frames: number; channels: number }>;
+  decodeWindow(uri: string, start: number, duration: number, outputPath: string): Promise<{ frames: number; channels: number; sampleRate?: number }>;
   readonly supportsDecodeWindow?: boolean;
 }
 
@@ -51,6 +52,27 @@ const MAX_SEGMENTS = 8;
 /** tud-e a build szakaszosan dekódolni (az új natív modul) */
 export function canSegment(): boolean {
   return Native?.supportsDecodeWindow === true;
+}
+
+/**
+ * 🎚️ 2026-11-14: az iOS dekóder a forrás mintavételén ad (`sampleRate`; a régi build és az Android 44,1 kHz-et,
+ * mező nélkül) — ide a késleltetés nélküli sinc-átmintavételező (`streamResampler.ts`) hozza. A ráhagyás (0,1 s)
+ * a szélek beállását elnyeli. Összefésült be, összefésült ki.
+ */
+export async function to44k(all: Float32Array, ch: number, sampleRate: number | undefined): Promise<Float32Array> {
+  if (!sampleRate || sampleRate === SR) return all;
+  const n = Math.floor(all.length / ch);
+  const chans = Array.from({ length: ch }, (_, c) => {
+    const x = new Float32Array(n);
+    for (let i = 0; i < n; i++) x[i] = all[i * ch + c];
+    return x;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const out = resampleChannels(chans, sampleRate, SR);
+  const m = out[0].length;
+  const res = new Float32Array(m * ch);
+  for (let c = 0; c < ch; c++) for (let i = 0; i < m; i++) res[i * ch + c] = out[c][i];
+  return res;
 }
 
 export class LongSource {
@@ -97,8 +119,8 @@ export class LongSource {
         } finally {
           handle.close();
         }
-        const all = new Float32Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 4));
         const ch = Math.max(1, info.channels);
+        const all = await to44k(new Float32Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 4)), ch, info.sampleRate);
         this.channels = ch;
         const skip = Math.round(pad * SR);
         const chans = Array.from({ length: ch }, () => new Float32Array(SEG));

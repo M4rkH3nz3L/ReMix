@@ -1,4 +1,5 @@
-import { StreamResampler } from '@/lib/streamResampler';
+import { resampleChannels, StreamResampler } from '@/lib/streamResampler';
+import { to44k } from '@/lib/longSource';
 
 /** 🎚️ a folyamatos átmintavételező: pontos hossz, darabolás-független, tiszta szinusz 44,1 → 48 kHz-en. */
 function run(input: Float32Array, inRate: number, outRate: number, chunk: number): Float32Array {
@@ -50,4 +51,25 @@ describe('🎚️ StreamResampler', () => {
     for (let i = 2000; i < 42000; i++) peak = Math.max(peak, Math.abs(out[i]));
     expect(20 * Math.log10(peak / 0.5)).toBeLessThan(-40);
   });
+
+  it('to44k: összefésült 48 kHz-es sztereó → 44,1 kHz, késleltetés nélkül (a fázis a helyén), a csatornák nem keverednek', async () => {
+    const n = 48000;
+    const all = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) {
+      all[i * 2] = 0.5 * Math.sin((2 * Math.PI * 1000 * i) / 48000);
+      all[i * 2 + 1] = 0.25 * Math.sin((2 * Math.PI * 500 * i) / 48000);
+    }
+    const out = await to44k(all, 2, 48000);
+    expect(out.length).toBe(44100 * 2);
+    let e = 0;
+    for (let i = 2000; i < 42000; i++) {
+      e = Math.max(e, Math.abs(out[i * 2] - 0.5 * Math.sin((2 * Math.PI * 1000 * i) / 44100)));
+      e = Math.max(e, Math.abs(out[i * 2 + 1] - 0.25 * Math.sin((2 * Math.PI * 500 * i) / 44100)));
+    }
+    expect(e).toBeLessThan(1e-3);
+    expect(await to44k(all, 2, 44100)).toBe(all);
+    expect(await to44k(all, 2, undefined)).toBe(all);
+    expect(resampleChannels([new Float32Array(480)], 48000, 44100)[0].length).toBe(441);
+  });
 });
+

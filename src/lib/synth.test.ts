@@ -92,3 +92,54 @@ describe('🎹 velocity (R7)', () => {
     expect(pk(100) / pk(127)).toBeCloseTo(100 / 127, 2);
   });
 });
+
+// ── 🎹 S11 (MU2): hanghossz koppintással, rács-felbontás, skála, oktáv ──────────────────────────
+import { inScale, noteCovering, OCTAVE_MAX_MIDI, OCTAVE_MIN_MIDI, shiftOctave, STEP_GRIDS, stepBeats, tapCell } from '@/lib/synth';
+
+describe('synth — S11: hanghossz koppintással, rács, skála, oktáv', () => {
+  it('rácsok: negyed, nyolcad, tizenhatod, triola — a lépés ütemben', () => {
+    expect(STEP_GRIDS).toEqual([1, 2, 4, 3]);
+    expect(stepBeats(1)).toBe(1);
+    expect(stepBeats(4)).toBe(0.25);
+    expect(stepBeats(3)).toBeCloseTo(1 / 3, 9);
+  });
+
+  it('koppintás: új hang egy lépés hosszan; a vége után koppintva hosszabbodik; belül rövidül; a kezdetén törlődik', () => {
+    let n: SynthNote[] = [];
+    n = tapCell(n, 60, 0, 4, mkId, 100);
+    expect(n).toEqual([{ id: expect.any(String), midi: 60, startBeat: 0, lengthBeats: 0.25, velocity: 100 }]);
+    n = tapCell(n, 60, 0.25, 4, mkId); // a vége utáni cella → +1 lépés
+    n = tapCell(n, 60, 0.5, 4, mkId);
+    n = tapCell(n, 60, 0.75, 4, mkId);
+    expect(n[0].lengthBeats).toBeCloseTo(1, 9);
+    n = tapCell(n, 60, 0.5, 4, mkId); // belül → itt végződik
+    expect(n[0].lengthBeats).toBeCloseTo(0.5, 9);
+    expect(noteCovering(n, 60, 0.3)?.id).toBe(n[0].id);
+    expect(noteCovering(n, 60, 0.5)).toBeUndefined();
+    // más sor nem érintett; új hang a következő negyeden
+    n = tapCell(n, 64, 1, 4, mkId, 127);
+    expect(n).toHaveLength(2);
+    expect(n[1]).toMatchObject({ midi: 64, startBeat: 1, lengthBeats: 0.25, velocity: 127 });
+    n = tapCell(n, 60, 0, 4, mkId); // a kezdő cella → törlés
+    expect(n.map((x) => x.midi)).toEqual([64]);
+    // triola-rácson a lépés 1/3
+    const tri = tapCell([], 62, 1 / 3, 3, mkId);
+    expect(tri[0].lengthBeats).toBeCloseTo(1 / 3, 9);
+  });
+
+  it('skála: a kulcs nélkül minden hang „benne van"; C-dúrban a C# nincs; a pentaton szűkebb', () => {
+    expect(inScale(61, null)).toBe(true);
+    expect(inScale(60, { root: 0, scale: 'major' })).toBe(true);
+    expect(inScale(61, { root: 0, scale: 'major' })).toBe(false);
+    expect(inScale(65, { root: 0, scale: 'pentatonicMajor' })).toBe(false); // F nincs a C dúr pentatonban
+    expect(inScale(69, { root: 9, scale: 'naturalMinor' })).toBe(true);
+  });
+
+  it('oktáv-görgetés: az ablak hossza marad, a határ C1…C7', () => {
+    expect(shiftOctave(48, 84, 1)).toEqual({ lowMidi: 60, highMidi: 96 });
+    expect(shiftOctave(60, 96, 1)).toEqual({ lowMidi: 60, highMidi: 96 }); // a tetőn marad
+    expect(shiftOctave(48, 84, -1)).toEqual({ lowMidi: 36, highMidi: 72 });
+    expect(shiftOctave(36, 72, -1)).toEqual({ lowMidi: OCTAVE_MIN_MIDI, highMidi: 60 });
+    expect(OCTAVE_MAX_MIDI - OCTAVE_MIN_MIDI).toBe(72);
+  });
+});

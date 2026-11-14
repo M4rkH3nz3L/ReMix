@@ -12,20 +12,30 @@ import { palette } from '@/constants/editor';
 import { registerDevAction } from '@/lib/devActions';
 import type { InstrumentDoc } from '@/types/project';
 import { makeId } from '@/lib/id';
+import { snapMidiToScale, type MusicKey, type ScaleName } from '@/lib/pitch';
 import {
   cycleNoteVelocity,
   DEFAULT_HIGH_MIDI,
   DEFAULT_LOW_MIDI,
+  inScale,
   isBlackKey,
   noteAt,
+  noteCovering,
   noteLabel,
   NOTE_VELOCITIES,
   pitchRows,
+  shiftOctave,
+  STEP_GRIDS,
   synthDurationSec,
-  toggleNote,
+  tapCell,
+  type StepsPerBeat,
   type SynthNote,
   type SynthWave,
 } from '@/lib/synth';
+
+/** a felületen választható skálák (a `pitch.ts` kulcsai közül a leggyakoribbak) */
+const SCALE_CHOICES: ScaleName[] = ['major', 'naturalMinor', 'pentatonicMajor', 'pentatonicMinor', 'dorian', 'mixolydian'];
+const ROOT_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 /** a hang-sor magassága — a workspace-ben 28 pt (könnyebb eltalálni, mint a régi 20) */
 const ROW_H = 28;
@@ -67,11 +77,40 @@ export function PianoRollSheet({
   const [bars, setBars] = useState(() => initial?.bars ?? 4);
   /** az új hangok velocity-je */
   const [noteVel, setNoteVel] = useState<number>(100);
-  // 🧪 füstteszt (R7): a hangjegyek beállítása + a jelenlegiek
+  // 🎹 S11: rács-felbontás, skála (kiemelés + illesztés), látható oktávok
+  const [stepsPerBeat, setStepsPerBeat] = useState<StepsPerBeat>(4);
+  const [key, setKey] = useState<MusicKey | null>(null);
+  const [snap, setSnap] = useState(true);
+  const [range, setRange] = useState({ lowMidi: DEFAULT_LOW_MIDI, highMidi: DEFAULT_HIGH_MIDI });
+  const rows = pitchRows(range.lowMidi, range.highMidi);
+  const cols = Array.from({ length: bars * 4 * stepsPerBeat }, (_, i) => i);
+  const durSec = synthDurationSec(notes, bpm);
+
+  /** a sor, amire a koppintás esik: skála-illesztéssel a legközelebbi skálahang */
+  const targetMidi = (midi: number) => (key && snap ? snapMidiToScale(midi, key) : midi);
+  const tap = (midi: number, beat: number) => {
+    const m = targetMidi(midi);
+    // 🎧 az új vagy hosszabbodó hang azonnal megszólal (offline, a telefonon)
+    if (!noteAt(notes, m, beat)) void auditionNote(m, wave, bpm, noteVel);
+    setNotes((prev) => tapCell(prev, m, beat, stepsPerBeat, () => makeId('note'), noteVel));
+  };
+  const longPress = (midi: number, beat: number) => {
+    const n = noteAt(notes, midi, beat) ?? noteCovering(notes, midi, beat);
+    if (!n) return;
+    const next = cycleNoteVelocity(notes, n.id);
+    setNotes(next);
+    void auditionNote(midi, wave, bpm, next.find((x) => x.id === n.id)?.velocity ?? 100);
+  };
+
+  // 🧪 füstteszt (R7 + S11): a hangjegyek, a rács, a skála, az oktáv beállítása + a jelenlegiek
   const notesRef = useRef(notes);
   notesRef.current = notes;
   const bakeRef = useRef(() => onBake(notes, wave, bars));
   bakeRef.current = () => onBake(notes, wave, bars);
+  const tapRef = useRef(tap);
+  tapRef.current = tap;
+  const stateRef = useRef({ stepsPerBeat, key, snap, range });
+  stateRef.current = { stepsPerBeat, key, snap, range };
   useEffect(() => {
     const offs = [
       registerDevAction('synth.set', (arg) => {
@@ -83,27 +122,30 @@ export function PianoRollSheet({
       }),
       registerDevAction('synth.bake', () => bakeRef.current()),
       registerDevAction('synth.notes', () => notesRef.current.map((n) => `${n.midi}@${n.startBeat}v${n.velocity ?? 100}`).join(',')),
+      registerDevAction('synth.notesFull', () => notesRef.current.map((n) => `${n.midi}@${n.startBeat}+${Math.round(n.lengthBeats * 1000) / 1000}`).join(',')),
+      registerDevAction('synth.grid', (arg) => {
+        setStepsPerBeat(arg as StepsPerBeat);
+        return true;
+      }),
+      registerDevAction('synth.scale', (arg) => {
+        const a = arg as { root?: number; scale?: ScaleName; snap?: boolean } | null;
+        setKey(a && a.scale ? { root: a.root ?? 0, scale: a.scale } : null);
+        if (a && a.snap !== undefined) setSnap(a.snap);
+        return true;
+      }),
+      registerDevAction('synth.octave', (arg) => {
+        setRange((r) => shiftOctave(r.lowMidi, r.highMidi, (arg as 1 | -1) ?? 1));
+        return true;
+      }),
+      registerDevAction('synth.tap', (arg) => {
+        const a = arg as { midi: number; beat: number };
+        tapRef.current(a.midi, a.beat);
+        return true;
+      }),
+      registerDevAction('synth.state', () => ({ ...stateRef.current })),
     ];
     return () => offs.forEach((off) => off());
   }, []);
-
-  const rows = pitchRows(DEFAULT_LOW_MIDI, DEFAULT_HIGH_MIDI);
-  const beats = bars * 4;
-  const cols = Array.from({ length: beats }, (_, i) => i);
-  const durSec = synthDurationSec(notes, bpm);
-
-  const tap = (midi: number, beat: number) => {
-    // 🎧 az új hang azonnal megszólal (offline, a telefonon)
-    if (!noteAt(notes, midi, beat)) void auditionNote(midi, wave, bpm, noteVel);
-    setNotes((prev) => toggleNote(prev, midi, beat, () => makeId('note'), 1, noteVel));
-  };
-  const longPress = (midi: number, beat: number) => {
-    const n = noteAt(notes, midi, beat);
-    if (!n) return;
-    const next = cycleNoteVelocity(notes, n.id);
-    setNotes(next);
-    void auditionNote(midi, wave, bpm, next.find((x) => x.id === n.id)?.velocity ?? 100);
-  };
 
   return (
     <AudioSheetFrame id="pianoRoll" onClose={onClose} sheetStyle={styles.sheet}>
@@ -134,15 +176,62 @@ export function PianoRollSheet({
         </Pressable>
       </View>
 
-      {/* az új hangok erőssége (a meglévőé: hosszan nyomva) */}
+      {/* az új hangok erőssége (a meglévőé: hosszan nyomva) + a rács felbontása */}
       <View style={styles.controls}>
         <Text style={styles.velLabel}>{t('studio.pianoRoll.velocity', { defaultValue: 'Erősség' })}</Text>
         {NOTE_VELOCITIES.map((v) => (
-          <Pressable key={v} testID={`pianoroll-vel-${v}`} onPress={() => setNoteVel(v)} style={[styles.waveBtn, noteVel === v && styles.waveBtnActive]} accessibilityState={{ selected: noteVel === v }}>
+          <Pressable key={v} testID={`pianoroll-vel-${v}`} onPress={() => setNoteVel(v)} style={[styles.waveBtn, noteVel === v && styles.waveBtnActive]} accessibilityRole="button" accessibilityState={{ selected: noteVel === v }}>
             <Text style={[styles.waveText, noteVel === v && { color: '#fff' }]}>{t(`studio.pianoRoll.vel.${VEL_KEY[v]}`, { defaultValue: VEL_KEY[v] })}</Text>
           </Pressable>
         ))}
+        <View style={styles.spacer} />
+        <Text style={styles.velLabel}>{t('studio.pianoRoll.grid')}</Text>
+        {STEP_GRIDS.map((g) => (
+          <Pressable key={g} testID={`pianoroll-grid-${g}`} onPress={() => setStepsPerBeat(g)} style={[styles.waveBtn, stepsPerBeat === g && styles.waveBtnActive]} accessibilityRole="button" accessibilityState={{ selected: stepsPerBeat === g }}>
+            <Text style={[styles.waveText, stepsPerBeat === g && { color: '#fff' }]}>{t(`studio.pianoRoll.gridStep_${g}`)}</Text>
+          </Pressable>
+        ))}
       </View>
+
+      {/* 🎼 skála: kiemelés a rácson + illesztés a legközelebbi skálahangra; oktáv-görgetés C1…C7 */}
+      <View style={styles.controls}>
+        <Text style={styles.velLabel}>{t('studio.pianoRoll.scale')}</Text>
+        <Pressable testID="pianoroll-scale-off" onPress={() => setKey(null)} style={[styles.waveBtn, !key && styles.waveBtnActive]} accessibilityRole="button" accessibilityState={{ selected: !key }}>
+          <Text style={[styles.waveText, !key && { color: '#fff' }]}>{t('studio.pianoRoll.scaleOff')}</Text>
+        </Pressable>
+        <Pressable
+          testID="pianoroll-scale-root"
+          onPress={() => setKey((k) => ({ root: ((k?.root ?? -1) + 1) % 12, scale: k?.scale ?? 'major' }))}
+          style={[styles.waveBtn, !!key && styles.waveBtnActive]}
+          accessibilityRole="button"
+          accessibilityLabel={`${t('studio.pianoRoll.scale')}: ${key ? ROOT_NAMES[key.root] : t('studio.pianoRoll.scaleOff')}`}
+        >
+          <Text style={[styles.waveText, !!key && { color: '#fff' }]}>{key ? ROOT_NAMES[key.root] : 'C'}</Text>
+        </Pressable>
+        <Pressable
+          testID="pianoroll-scale-name"
+          onPress={() => setKey((k) => ({ root: k?.root ?? 0, scale: SCALE_CHOICES[(SCALE_CHOICES.indexOf(k?.scale ?? 'mixolydian') + 1) % SCALE_CHOICES.length] }))}
+          style={[styles.waveBtn, !!key && styles.waveBtnActive]}
+          accessibilityRole="button"
+          accessibilityLabel={`${t('studio.pianoRoll.scale')}: ${t(`studio.pianoRoll.scaleName_${key?.scale ?? 'major'}`)}`}
+        >
+          <Text style={[styles.waveText, !!key && { color: '#fff' }]}>{t(`studio.pianoRoll.scaleName_${key?.scale ?? 'major'}`)}</Text>
+        </Pressable>
+        {key ? (
+          <Pressable testID="pianoroll-scale-snap" onPress={() => setSnap((s) => !s)} style={[styles.waveBtn, snap && styles.waveBtnActive]} accessibilityRole="switch" accessibilityState={{ checked: snap }} accessibilityLabel={t('studio.pianoRoll.snapScale')}>
+            <Ionicons name="magnet-outline" size={14} color={snap ? '#fff' : palette.textDim} />
+          </Pressable>
+        ) : null}
+        <View style={styles.spacer} />
+        <Pressable onPress={() => setRange((r) => shiftOctave(r.lowMidi, r.highMidi, 1))} hitSlop={6} style={styles.stepBtn} accessibilityRole="button" accessibilityLabel={t('studio.pianoRoll.octaveUp')} testID="pianoroll-octave-up">
+          <Ionicons name="chevron-up" size={16} color={palette.text} />
+        </Pressable>
+        <Text style={styles.barsText}>{noteLabel(range.lowMidi)}–{noteLabel(range.highMidi)}</Text>
+        <Pressable onPress={() => setRange((r) => shiftOctave(r.lowMidi, r.highMidi, -1))} hitSlop={6} style={styles.stepBtn} accessibilityRole="button" accessibilityLabel={t('studio.pianoRoll.octaveDown')} testID="pianoroll-octave-down">
+          <Ionicons name="chevron-down" size={16} color={palette.text} />
+        </Pressable>
+      </View>
+      <Text style={styles.hint} numberOfLines={2}>{t('studio.pianoRoll.tapHint')}</Text>
 
       {/* ⭐ saját dallamok (hangjegyek + hullámforma + ütemszám) */}
       <UserPresetRow
@@ -161,28 +250,36 @@ export function PianoRollSheet({
           <View>
             {rows.map((midi) => {
               const black = isBlackKey(midi);
+              const scaled = inScale(midi, key);
               return (
                 <View key={midi} style={styles.row}>
-                  <View style={[styles.gutter, black && styles.gutterBlack]}>
-                    <Text style={styles.gutterText}>{noteLabel(midi)}</Text>
+                  <View style={[styles.gutter, black && styles.gutterBlack, key && scaled && styles.gutterScale]}>
+                    <Text style={[styles.gutterText, key && scaled && styles.gutterTextScale]}>{noteLabel(midi)}</Text>
                   </View>
-                  {cols.map((beat) => {
-                    const note = noteAt(notes, midi, beat);
-                    const on = !!note;
-                    const vel = note?.velocity ?? 100;
-                    const barStart = beat % 4 === 0;
+                  {cols.map((col) => {
+                    const beat = col / stepsPerBeat;
+                    const start = noteAt(notes, midi, beat);
+                    const covering = start ?? noteCovering(notes, midi, beat);
+                    const on = !!covering;
+                    const vel = covering?.velocity ?? 100;
+                    const barStart = col % (4 * stepsPerBeat) === 0;
+                    const beatStart = col % stepsPerBeat === 0;
                     return (
                       <Pressable
-                        key={beat}
+                        key={col}
                         onPress={() => tap(midi, beat)}
                         onLongPress={() => longPress(midi, beat)}
-                        accessibilityLabel={`${noteLabel(midi)} ${beat + 1}`}
+                        accessibilityLabel={`${noteLabel(midi)} ${Math.floor(beat) + 1}${stepsPerBeat > 1 ? `.${col % stepsPerBeat + 1}` : ''}`}
                         accessibilityState={{ selected: on }}
                         style={[
                           styles.cell,
+                          { width: stepsPerBeat === 1 ? CELL_W : Math.max(18, Math.round(CELL_W / (stepsPerBeat / 2))) },
                           black && styles.cellBlack,
+                          key && !scaled && styles.cellOffScale,
+                          beatStart && styles.cellBeat,
                           barStart && styles.cellBar,
                           on && styles.cellOn,
+                          on && !start && styles.cellOnTail,
                           on && vel >= 127 && styles.cellHard,
                           on && vel < 100 && styles.cellSoft,
                         ]}
@@ -244,10 +341,16 @@ const styles = StyleSheet.create({
   gutter: { width: GUTTER_W, height: ROW_H, justifyContent: 'center', paddingLeft: 4, backgroundColor: '#0d0f16', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.border },
   gutterBlack: { backgroundColor: '#070910' },
   gutterText: { color: palette.textDim, fontSize: 8, fontWeight: '700' },
+  gutterScale: { borderLeftWidth: 3, borderLeftColor: palette.accent },
+  gutterTextScale: { color: palette.text },
+  hint: { color: palette.textDim, fontSize: 10, marginBottom: 6 },
   cell: { width: CELL_W, height: ROW_H, borderRightWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: `${palette.border}55`, backgroundColor: '#0b0d14' },
   cellBlack: { backgroundColor: '#080a11' },
+  cellOffScale: { opacity: 0.55 },
+  cellBeat: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: `${palette.border}99` },
   cellBar: { borderLeftWidth: 1, borderLeftColor: palette.border },
   cellOn: { backgroundColor: palette.accent },
+  cellOnTail: { borderRightWidth: 0, opacity: 0.85 },
   cellHard: { borderWidth: 2, borderColor: '#fff' },
   cellSoft: { opacity: 0.45 },
   velLabel: { color: palette.textDim, fontSize: 11, fontWeight: '700' },

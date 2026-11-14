@@ -6,7 +6,7 @@
  * (`server/synth.js`) generál hangot (sine/square/triangle/saw + ADSR), de az IDŐZÍTÉS és a
  * rács-logika itt él, hogy önmagában tesztelhető legyen. Expo-mentes.
  */
-import { midiToFreq, midiToNoteName } from '@/lib/pitch';
+import { midiToFreq, midiToNoteName, snapMidiToScale, type MusicKey } from '@/lib/pitch';
 
 export type SynthWave = 'sine' | 'square' | 'triangle' | 'sawtooth';
 
@@ -98,6 +98,68 @@ export function cycleNoteVelocity(notes: SynthNote[], id: string): SynthNote[] {
     const cur = n.velocity ?? 100;
     return { ...n, velocity: cur >= 127 ? 50 : cur >= 100 ? 127 : 100 };
   });
+}
+
+// ── 🎹 S11 (MU2): hanghossz koppintással, rács-felbontás, skála, oktáv-görgetés ──────────────────
+
+/** a rács lépése ütemrészben: negyed (1 lépés/ütem), nyolcad (2), tizenhatod (4), triola (3) */
+export type StepsPerBeat = 1 | 2 | 4 | 3;
+export const STEP_GRIDS: readonly StepsPerBeat[] = [1, 2, 4, 3];
+
+/** a rács egy lépésének hossza ütemben */
+export const stepBeats = (stepsPerBeat: StepsPerBeat): number => 1 / stepsPerBeat;
+
+const EPS = 1e-6;
+
+/** az a hang ezen a soron, amelynek a [kezdet, vég) ablaka lefedi az ütem-pozíciót */
+export function noteCovering(notes: SynthNote[], midi: number, beat: number): SynthNote | undefined {
+  return notes.find((n) => n.midi === midi && beat > n.startBeat - EPS && beat < n.startBeat + n.lengthBeats - EPS);
+}
+
+/**
+ * Rács-cellára koppintás a hanghossz-szabállyal (érintős, húzás nélkül — PRO-MUSIC §alapszabály):
+ *  • a hang KEZDŐ celláján → a hang törlése (toggle-off, mint eddig);
+ *  • a hang BELSEJÉBEN → a hang itt végződik (rövidül);
+ *  • a hang VÉGE utáni (szomszédos) cellán → a hang egy lépéssel hosszabbodik;
+ *  • különben → új, egy lépés hosszú hang a választott erősséggel.
+ * Tiszta: új tömböt ad.
+ */
+export function tapCell(
+  notes: SynthNote[],
+  midi: number,
+  beat: number,
+  stepsPerBeat: StepsPerBeat,
+  makeId: () => string,
+  velocity = 100
+): SynthNote[] {
+  const step = stepBeats(stepsPerBeat);
+  const starting = noteAt(notes, midi, beat);
+  if (starting) return notes.filter((n) => n.id !== starting.id);
+  const inside = noteCovering(notes, midi, beat);
+  if (inside) {
+    return notes.map((n) => (n.id === inside.id ? { ...n, lengthBeats: Math.max(step, beat - n.startBeat) } : n));
+  }
+  const ending = notes.find((n) => n.midi === midi && Math.abs(n.startBeat + n.lengthBeats - beat) < EPS);
+  if (ending) {
+    return notes.map((n) => (n.id === ending.id ? { ...n, lengthBeats: n.lengthBeats + step } : n));
+  }
+  return [...notes, { id: makeId(), midi, startBeat: beat, lengthBeats: step, velocity }];
+}
+
+/** a hang a skálában van-e (a `pitch.ts` kulcsával) */
+export function inScale(midi: number, key: MusicKey | null): boolean {
+  return !key || snapMidiToScale(midi, key) === midi;
+}
+
+/** a piano roll teljes hangmagasság-tartománya: C1 … C7 (oktáv-görgetés) */
+export const OCTAVE_MIN_MIDI = 24; // C1
+export const OCTAVE_MAX_MIDI = 96; // C7
+
+/** a látható ablak eltolása egy oktávval, a C1–C7 határokon belül (az ablak hossza marad) */
+export function shiftOctave(lowMidi: number, highMidi: number, dir: 1 | -1): { lowMidi: number; highMidi: number } {
+  const span = highMidi - lowMidi;
+  const low = Math.max(OCTAVE_MIN_MIDI, Math.min(OCTAVE_MAX_MIDI - span, lowMidi + 12 * dir));
+  return { lowMidi: low, highMidi: low + span };
 }
 
 /** Hang törlése id alapján. */

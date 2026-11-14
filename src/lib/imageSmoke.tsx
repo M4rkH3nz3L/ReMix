@@ -6342,6 +6342,105 @@ async function smokeMusicWorkspace(log: Log) {
   }
 }
 
+/**
+ * 🎹 S11 (MU2): piano roll — hanghossz koppintással (a hang vége után hosszabbodik, belül rövidül), rács-felbontás
+ * (1/16, triola), skála-illesztés (C-dúr: a C# a legközelebbi skálahangra), oktáv-görgetés C1…C7; a sütés egy undo.
+ */
+async function smokePianoRoll2(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_pianoroll2';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:pianoroll2', caught));
+  await saveProject({ ...createEmptyProject('smoke piano roll', '9:16', undefined, 'audio'), id, bpm: 120 });
+  router.push(`/studio/audio/${id}` as Href);
+  const st = useEditorStore.getState;
+  for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+  await sleep(1200);
+  const music = () => st().project!.tracks.find((t) => t.type === 'music')!.clips as AudioClip[];
+  const waitFor = async (cond: () => boolean, ms: number) => {
+    for (let i = 0; i < ms / 100 && !cond(); i++) await sleep(100);
+    return cond();
+  };
+  try {
+    runDevAction('audio.openPianoRoll');
+    let ready = false;
+    for (let i = 0; i < 50 && !ready; i++) {
+      await sleep(100);
+      ready = runDevAction('synth.notesFull') !== undefined;
+    }
+    log(ready, 'a piano roll nyílik', `${ready}`);
+    // 1) 1/16-os rács: négy szomszédos koppintás egy 1 ütemes hangot ad (a vége után koppintva hosszabbodik)
+    runDevAction('synth.grid', 4);
+    await sleep(200);
+    for (const beat of [0, 0.25, 0.5, 0.75]) {
+      runDevAction('synth.tap', { midi: 60, beat });
+      await sleep(80);
+    }
+    await sleep(200);
+    const n1 = runDevAction('synth.notesFull') as string;
+    log(n1 === '60@0+1', 'hanghossz: a vége utáni cellák egy 1 ütemes hanggá hosszabbítják (1/16-os rács)', n1);
+    // 2) belül koppintva rövidül (0,5-nél végződik)
+    runDevAction('synth.tap', { midi: 60, beat: 0.5 });
+    await sleep(200);
+    const n2 = runDevAction('synth.notesFull') as string;
+    log(n2 === '60@0+0.5', 'belül koppintva a hang ott végződik (0,5 ütem)', n2);
+    // 3) triola-rács: a lépés 1/3 ütem
+    runDevAction('synth.grid', 3);
+    await sleep(200);
+    runDevAction('synth.tap', { midi: 64, beat: 1 });
+    await sleep(200);
+    const n3 = runDevAction('synth.notesFull') as string;
+    log(n3 === '60@0+0.5,64@1+0.333', 'triola-rács: az új hang 1/3 ütem hosszú', n3);
+    // 4) skála-illesztés: C-dúrban a C# (61) koppintása a legközelebbi skálahangra (60, döntetlennél lefelé) esik
+    //    (a lassú eszközön a lap újrarajzolását megvárjuk: a koppintás a friss skála-állapottal menjen)
+    const scaleIs = (want: string | null) => (runDevAction('synth.state') as { key: { scale: string } | null } | undefined)?.key?.scale === want || (want === null && (runDevAction('synth.state') as { key: unknown } | undefined)?.key === null);
+    runDevAction('synth.grid', 4);
+    runDevAction('synth.scale', { root: 0, scale: 'major', snap: true });
+    await waitFor(() => scaleIs('major'), 3000);
+    await sleep(150);
+    runDevAction('synth.tap', { midi: 61, beat: 2 });
+    await sleep(200);
+    const n4 = runDevAction('synth.notesFull') as string;
+    log(n4.endsWith('60@2+0.25'), 'skála-illesztés: a C# a C-dúr legközelebbi hangjára (C) esik', n4);
+    // skála ki → a C# marad C#
+    runDevAction('synth.scale', null);
+    await waitFor(() => scaleIs(null), 3000);
+    await sleep(150);
+    runDevAction('synth.tap', { midi: 61, beat: 3 });
+    await sleep(200);
+    const n5 = runDevAction('synth.notesFull') as string;
+    log(n5.endsWith('61@3+0.25'), 'skála nélkül a koppintott sor marad', n5);
+    // 5) oktáv-görgetés: C3–C6 → C4–C7 → a tetőn marad; vissza C1-ig (a lassú eszközön az újrarajzolást megvárjuk)
+    const rangeNow = () => (runDevAction('synth.state') as { range: { lowMidi: number; highMidi: number } }).range;
+    const octave = async (dir: 1 | -1, expectLow: number) => {
+      runDevAction('synth.octave', dir);
+      await waitFor(() => rangeNow().lowMidi === expectLow, 3000);
+      return rangeNow();
+    };
+    const s0 = rangeNow();
+    const s1 = await octave(1, 60);
+    const s2 = await octave(1, 60);
+    let s3 = s2;
+    for (let i = 0; i < 6; i++) s3 = await octave(-1, Math.max(24, s3.lowMidi - 12));
+    const ok5 = s0.lowMidi === 48 && s1.lowMidi === 60 && s1.highMidi === 96 && s2.lowMidi === 60 && s3.lowMidi === 24;
+    log(ok5, 'oktáv-görgetés: C3–C6 → C4–C7 (a tetőn marad), le C1-ig', `${s0.lowMidi}→${s1.lowMidi}→${s2.lowMidi}→${s3.lowMidi}`);
+    // 6) sütés: a hangok a klipbe, a minta a projektben (3 hang), egy undo
+    runDevAction('synth.bake');
+    const baked = await waitFor(() => music().length === 1, 15000);
+    const c = music()[0];
+    const doc = c ? instrumentDocOf(st().project, c.instrumentDocId) : null;
+    // az utolsó hang vége 3,25 ütem = 1,625 s 120 BPM-en (a tört hosszak a renderben is pontosak)
+    log(baked && doc?.kind === 'synth' && doc.synth?.notes.length === 4 && Math.abs(c.duration - 1.625) < 0.05, 'sütés: a klip a mintára hivatkozik (4 hang, tört hosszakkal), a hossz a hangokból (3,25 ütem = 1,625 s)', `${doc?.synth?.notes.length} hang, ${c?.duration.toFixed(3)} s`);
+    st().undo();
+    await sleep(300);
+    log(music().length === 0, 'egy visszavonás: nincs klip', `${music().length}`);
+  } finally {
+    runDevAction('audio.closePianoRoll');
+    router.back();
+    await sleep(500);
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:pianoroll2-del', caught));
+  }
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -8473,6 +8572,10 @@ export async function runImageSmoke(
   }
   if (phase === 'musicws') {
     await step(phase, () => smokeMusicWorkspace(log));
+    return;
+  }
+  if (phase === 'pianoroll2') {
+    await step(phase, () => smokePianoRoll2(log));
     return;
   }
   if (phase === 'modeldl') {

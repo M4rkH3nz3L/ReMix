@@ -51,3 +51,21 @@ describe('denoiseStereo', () => {
     expect(rmsDb(diff) - rmsDb(clean)).toBeLessThan(-20);
   });
 });
+
+describe('⚡ S20: a keretenkénti mag átszervezése bitre a régi kimenet', () => {
+  it('arany ujjlenyomat (FNV-1a a kimeneti mintákon) — a natív mag ugyanezt kell adja (eszközön: denoisenative)', async () => {
+    const run = denoiseStereo;
+    let seed = 11;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;
+    const n = 44100 * 3;
+    const l = Float32Array.from({ length: n }, (_, i) => 0.05 * rnd() + (i > 44100 && i < 88200 ? 0.4 * Math.sin(i / 7) : 0));
+    const r = Float32Array.from({ length: n }, (_, i) => 0.05 * rnd() + (i > 44100 && i < 88200 ? 0.3 * Math.sin(i / 9) : 0));
+    const [a, b] = await run(l, r);
+    let h = 2166136261;
+    for (const x of [a, b]) {
+      const u = new Uint32Array(x.buffer);
+      for (let i = 0; i < u.length; i++) h = Math.imul(h ^ u[i], 16777619) >>> 0;
+    }
+    expect(h.toString(16)).toBe('80181d20');
+  });
+});

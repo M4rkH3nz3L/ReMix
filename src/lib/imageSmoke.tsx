@@ -7791,6 +7791,55 @@ async function smokeShiftLatency(log: Log) {
   }
 }
 
+/** ⚡ S20: a zajszűrés natív magja — bitre azonos a JS-sel (az arany ujjlenyomattal is), és a sebesség: a cél
+ *  10 perc hang ≤ 1 perc (≤ 0,1 s / hang-mp) iPaden. */
+async function smokeDenoiseNative(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const dn = await import('@/lib/denoise');
+  const native = dn.getNativeDenoise();
+  log(!!native, 'a natív zajszűrő-mag be van kötve', `${!!native}`);
+  if (!native) return;
+  const hash = (xs: Float32Array[]) => {
+    let h = 2166136261;
+    for (const x of xs) {
+      const u = new Uint32Array(x.buffer, x.byteOffset, x.length);
+      for (let i = 0; i < u.length; i++) h = Math.imul(h ^ u[i], 16777619) >>> 0;
+    }
+    return h.toString(16);
+  };
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;
+  const n = 44100 * 3;
+  const l = Float32Array.from({ length: n }, (_, i) => 0.05 * rnd() + (i > 44100 && i < 88200 ? 0.4 * Math.sin(i / 7) : 0));
+  const r = Float32Array.from({ length: n }, (_, i) => 0.05 * rnd() + (i > 44100 && i < 88200 ? 0.3 * Math.sin(i / 9) : 0));
+  const hn = hash(await dn.denoiseStereo(l, r));
+  dn.setNativeDenoise(null);
+  let hj = '';
+  try {
+    hj = hash(await dn.denoiseStereo(l, r));
+  } finally {
+    dn.setNativeDenoise(native);
+  }
+  log(hn === hj && hn === '80181d20', 'natív = JS bitre (és az arany ujjlenyomat)', `natív ${hn} · JS ${hj} · arany 80181d20`);
+  // sebesség: 60 s zajos „beszéd” sztereóban
+  const m = 44100 * 60;
+  const bl = Float32Array.from({ length: m }, (_, i) => 0.03 * rnd() + 0.3 * Math.sin(i / 11) * (Math.floor(i / 22050) % 2));
+  const br = Float32Array.from(bl, (v) => v * 0.9);
+  let t0 = Date.now();
+  await dn.denoiseStereo(bl, br);
+  const tn = (Date.now() - t0) / 1000;
+  dn.setNativeDenoise(null);
+  let tj = 0;
+  try {
+    t0 = Date.now();
+    await dn.denoiseStereo(bl.subarray(0, 44100 * 10), br.subarray(0, 44100 * 10));
+    tj = ((Date.now() - t0) / 1000) * 6;
+  } finally {
+    dn.setNativeDenoise(native);
+  }
+  log(tn / 60 <= 0.1, 'sebesség: 10 perc hang ≤ 1 perc (≤ 0,1 s / hang-mp)', `natív ${(tn / 60).toFixed(3)} s/mp (60 s: ${tn.toFixed(1)} s, 10 perc ≈ ${(tn * 10).toFixed(0)} s) · JS ≈ ${(tj / 60).toFixed(3)} s/mp · ${(tj / tn).toFixed(0)}×`);
+}
+
 /** 🎬 AP8: a videóból nyitott Hang Stúdióban a lejátszófejhez tartozó videó-képkocka látszik (± 1 kocka). */
 async function smokeVideoRef(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -10007,6 +10056,10 @@ export async function runImageSmoke(
   }
   if (phase === 'shiftlat') {
     await step(phase, () => smokeShiftLatency(log));
+    return;
+  }
+  if (phase === 'denoisenative') {
+    await step(phase, () => smokeDenoiseNative(log));
     return;
   }
   if (phase === 'midi') {

@@ -44,6 +44,49 @@ class RemixRenderModule : Module() {
     // 🎧 hosszú forrás szakaszosan (az iOS decodeWindow párja): csak az ablak dekódolódik,
     // 44,1 kHz float32, összefésülve a kimeneti fájlba
     Constant("supportsDecodeWindow") { true }
+    Constant("supportsDenoiseRun") { true }
+
+    // ⚡ S20: a zajszűrés keretenkénti munkája natívan (a `src/lib/denoise.ts` `denoiseRunJs` tükre, azonos
+    // aritmetikával és sorrendben; a táblák a JS-ből jönnek). Csak a darab által érintett tartomány másolódik.
+    Function("denoiseRun") { l: expo.modules.kotlin.typedarray.Float32Array, r: expo.modules.kotlin.typedarray.Float32Array, tabs: expo.modules.kotlin.typedarray.Float64Array, state: expo.modules.kotlin.typedarray.Float64Array, outL: expo.modules.kotlin.typedarray.Float64Array, outR: expo.modules.kotlin.typedarray.Float64Array, params: expo.modules.kotlin.typedarray.Float64Array ->
+      val o = java.nio.ByteOrder.nativeOrder()
+      val p = DoubleArray(params.length).also { params.toDirectBuffer().order(o).asDoubleBuffer().get(it) }
+      val n = p[0].toInt()
+      val hop = p[1].toInt()
+      val len = p[2].toInt()
+      val f0 = p[3].toInt()
+      val f1 = p[4].toInt()
+      val mode = p[7].toInt()
+      val half = n / 2
+      if (f1 <= f0) return@Function
+      val inFrom = maxOf(0, f0 * hop - half)
+      val inTo = minOf(len, (f1 - 1) * hop - half + n)
+      val segLen = maxOf(0, inTo - inFrom)
+      val lb = l.toDirectBuffer().order(o).asFloatBuffer()
+      val rb = r.toDirectBuffer().order(o).asFloatBuffer()
+      val ls = FloatArray(segLen).also { lb.position(inFrom); lb.get(it) }
+      val rs = FloatArray(segLen).also { rb.position(inFrom); rb.get(it) }
+      val ta = DoubleArray(tabs.length).also { tabs.toDirectBuffer().order(o).asDoubleBuffer().get(it) }
+      val sb = state.toDirectBuffer().order(o).asDoubleBuffer()
+      val sa = DoubleArray(state.length).also { sb.get(it) }
+      val olb = outL.toDirectBuffer().order(o).asDoubleBuffer()
+      val orb = outR.toDirectBuffer().order(o).asDoubleBuffer()
+      if (mode == 0) {
+        val oa = DoubleArray(outL.length)
+        DspKernels.denoiseRun(ls, rs, inFrom, ta, sa, oa, DoubleArray(0), 0, p)
+        olb.rewind(); olb.put(oa)
+      } else {
+        val outFrom = f0 * hop - half + n
+        val outTo = minOf(outL.length, (f1 - 1) * hop - half + 2 * n)
+        val span = maxOf(0, outTo - outFrom)
+        val oa = DoubleArray(span).also { olb.position(outFrom); olb.get(it) }
+        val ob = DoubleArray(span).also { orb.position(outFrom); orb.get(it) }
+        DspKernels.denoiseRun(ls, rs, inFrom, ta, sa, oa, ob, outFrom, p)
+        olb.position(outFrom); olb.put(oa)
+        orb.position(outFrom); orb.put(ob)
+        sb.rewind(); sb.put(sa)
+      }
+    }
 
     // 🎙️⏱️ a hangrendszer késései (mp): a kimeneti a rejtett AudioManager.getOutputLatency-ből (ms), a puffer a tulajdonságokból
     Function("ioLatency") {

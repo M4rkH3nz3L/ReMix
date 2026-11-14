@@ -14,6 +14,115 @@ import kotlin.math.tanh
  * double számolás → float32 írás, ugyanaz a sorrend). Állapot nélküli: az állapot a JS `Float64Array`-ben.
  */
 object DspKernels {
+  /**
+   * ⚡ S20: a zajszűrés keretei (a JS `denoiseRunJs` pontos tükre). A bemenet a `[inFrom, …)` szelet, a kimenet a
+   * `outOff`-tól kezdődő szelet (a modul csak az érintett tartományt másolja).
+   */
+  fun denoiseRun(l: FloatArray, r: FloatArray, inFrom: Int, tabs: DoubleArray, state: DoubleArray, outL: DoubleArray, outR: DoubleArray, outOff: Int, params: DoubleArray) {
+    val mode = params[7].toInt()
+    val n = params[0].toInt()
+    val hop = params[1].toInt()
+    val len = params[2].toInt()
+    val f0 = params[3].toInt()
+    val f1 = params[4].toInt()
+    val step = params[5].toInt()
+    val floor = params[6]
+    val half = n / 2
+    val bins = half + 1
+    val re = DoubleArray(n)
+    val im = DoubleArray(n)
+    val g = DoubleArray(bins)
+    val dn = n.toDouble()
+    fun fftT(inverse: Boolean) {
+      for (i in 0 until n) {
+        val j = tabs[n + i].toInt()
+        if (i < j) {
+          var t = re[i]; re[i] = re[j]; re[j] = t
+          t = im[i]; im[i] = im[j]; im[j] = t
+        }
+      }
+      val sign = if (inverse) 1.0 else -1.0
+      var size = 2
+      while (size <= n) {
+        val hs = size shr 1
+        val st = n / size
+        var i = 0
+        while (i < n) {
+          for (k in 0 until hs) {
+            val wr = tabs[k * st]
+            val wi = sign * tabs[half + k * st]
+            val p = i + k
+            val q = p + hs
+            val ar = re[q] * wr - im[q] * wi
+            val ai = re[q] * wi + im[q] * wr
+            re[q] = re[p] - ar
+            im[q] = im[p] - ai
+            re[p] += ar
+            im[p] += ai
+          }
+          i += size
+        }
+        size = size shl 1
+      }
+    }
+    fun load(f: Int) {
+      val start = f * hop - half
+      for (i in 0 until n) {
+        val s = start + i
+        val inside = s >= 0 && s < len
+        re[i] = if (inside) l[s - inFrom].toDouble() * tabs[2 * n + i] else 0.0
+        im[i] = if (inside) r[s - inFrom].toDouble() * tabs[2 * n + i] else 0.0
+      }
+      fftT(false)
+    }
+    fun power(k: Int): Double {
+      val j = (n - k) % n
+      val lr = (re[k] + re[j]) / 2
+      val li = (im[k] - im[j]) / 2
+      val rr = (im[k] + im[j]) / 2
+      val ri = (re[j] - re[k]) / 2
+      return (lr * lr + li * li + rr * rr + ri * ri) / 2
+    }
+    if (mode == 0) {
+      var at = 0
+      var f = f0
+      while (f < f1) {
+        load(f)
+        for (k in 0 until bins) { outL[at] = power(k); at++ }
+        f += step
+      }
+      return
+    }
+    var f = f0
+    while (f < f1) {
+      load(f)
+      for (k in 0 until bins) {
+        val p = power(k)
+        val raw = if (p > 0) 1 - (2 * state[k]) / p else 0.0
+        g[k] = max(floor, sqrt(max(0.0, raw)))
+      }
+      for (k in 0 until bins) {
+        val sm = (g[max(0, k - 1)] + g[k] + g[kotlin.math.min(bins - 1, k + 1)]) / 3
+        val v = max(sm, state[bins + k] * 0.5)
+        state[bins + k] = v
+        re[k] *= v
+        im[k] *= v
+        if (k > 0 && k < half) {
+          re[n - k] *= v
+          im[n - k] *= v
+        }
+      }
+      fftT(true)
+      val start = f * hop - half + n - outOff
+      for (i in 0 until n) {
+        val at = start + i
+        if (at < 0 || at >= outL.size) continue
+        outL[at] += (re[i] / dn) * tabs[2 * n + i]
+        outR[at] += (im[i] / dn) * tabs[2 * n + i]
+      }
+      f += 1
+    }
+  }
   private fun dbToLin(db: Double): Double = 10.0.pow(db / 20.0)
 
   private fun compGainDb(levelDb: Double, thr: Double, ratio: Double, knee: Double): Double {

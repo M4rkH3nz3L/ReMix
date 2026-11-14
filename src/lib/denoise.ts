@@ -75,35 +75,98 @@ const win = new Float64Array(N);
 for (let i = 0; i < N; i++) win[i] = Math.sin((Math.PI * (i + 0.5)) / N); // gyök-Hann: sin² 50%-on összegezve 1
 
 /**
- * sztereó zajszűrés; a kimenet ugyanolyan hosszú. A telefon JS-motorján ~0,4 s egy hang-
- * másodpercre — ezért ~12 ms munka után mindig visszaadja a vezérlést (a felület folyékony marad).
+ * ⚡ S20: a keretenkénti munka (FFT, teljesítmény / maszk, visszaalakítás) egy hívásban — a JS-változat és a natív
+ * (`RemixRender.denoiseRun`, Swift / Kotlin) UGYANEZT számolja azonos sorrendben; a trigonometrikus táblákat és az
+ * ablakot a JS adja át (`tabs` = cos | sin | rev | win), így a natív bitre egyezik (eszközön mérve).
+ *
+ * `params` = [N, HOP, len, f0, f1, step, floor, mód]; `state` = zajprofil (N/2+1) | az időbeli simítás állapota
+ * (N/2+1). Mód 0 (profil): a `f0, f0+step, … < f1` keretek bin-teljesítménye sorban az `outL`-be (keretenként N/2+1
+ * érték); mód 1 (alkalmazás): a `f0 … f1−1` keretek maszkolva, átlapoltan összeadva az `outL` / `outR`-be (a teljes
+ * hossz + 2N).
  */
-export async function denoiseStereo(l: Float32Array, r: Float32Array, maxReductionDb = 12): Promise<[Float32Array, Float32Array]> {
-  let slice = Date.now();
-  const breathe = async () => {
-    if (Date.now() - slice > 12) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      slice = Date.now();
+export type DenoiseRun = (l: Float32Array, r: Float32Array, tabs: Float64Array, state: Float64Array, outL: Float64Array, outR: Float64Array, params: Float64Array) => void;
+
+let nativeRun: DenoiseRun | null = null;
+/** a natív mag bekötése (`dspNativeClient`); null = a JS fut */
+export function setNativeDenoise(fn: DenoiseRun | null): void {
+  nativeRun = fn;
+}
+export const nativeDenoiseActive = (): boolean => nativeRun !== null;
+/** 🧪 a bekötött natív mag (füstteszt: natív ↔ JS összevetés) */
+export const getNativeDenoise = (): DenoiseRun | null => nativeRun;
+
+/** a JS-oldali táblák egy tömbben: cos (N/2) | sin (N/2) | rev (N) | ablak (N) */
+export function denoiseTabs(): Float64Array {
+  const { rev, cos, sin } = tablesFor(N);
+  const t = new Float64Array(N / 2 + N / 2 + N + N);
+  t.set(cos, 0);
+  t.set(sin, N / 2);
+  for (let i = 0; i < N; i++) t[N + i] = rev[i];
+  t.set(win, 2 * N);
+  return t;
+}
+
+/** a JS-változat (a natív tükre; tesztben és natív nélkül ez fut) */
+export function denoiseRunJs(l: Float32Array, r: Float32Array, tabs: Float64Array, state: Float64Array, outL: Float64Array, outR: Float64Array, params: Float64Array): void {
+  const mode = params[7];
+  const n = params[0];
+  const hop = params[1];
+  const len = params[2];
+  const f0 = params[3];
+  const f1 = params[4];
+  const step = params[5];
+  const floor = params[6];
+  const half = n / 2;
+  const bins = half + 1;
+  const noise = state.subarray(0, bins);
+  const prev = state.subarray(bins, 2 * bins);
+  const re = new Float64Array(n);
+  const im = new Float64Array(n);
+  const g = new Float64Array(bins);
+  const fftT = (inverse: boolean) => {
+    for (let i = 0; i < n; i++) {
+      const j = tabs[n + i];
+      if (i < j) {
+        let t = re[i];
+        re[i] = re[j];
+        re[j] = t;
+        t = im[i];
+        im[i] = im[j];
+        im[j] = t;
+      }
+    }
+    const sign = inverse ? 1 : -1;
+    for (let size = 2; size <= n; size <<= 1) {
+      const hs = size >> 1;
+      const st = n / size;
+      for (let i = 0; i < n; i += size) {
+        for (let k = 0; k < hs; k++) {
+          const wr = tabs[k * st];
+          const wi = sign * tabs[half + k * st];
+          const p = i + k;
+          const q = p + hs;
+          const ar = re[q] * wr - im[q] * wi;
+          const ai = re[q] * wi + im[q] * wr;
+          re[q] = re[p] - ar;
+          im[q] = im[p] - ai;
+          re[p] += ar;
+          im[p] += ai;
+        }
+      }
     }
   };
-  const len = l.length;
-  const frames = Math.ceil((len + N) / HOP);
-  const bins = N / 2 + 1;
-  const re = new Float64Array(N);
-  const im = new Float64Array(N);
   const load = (f: number) => {
-    const start = f * HOP - N / 2;
-    for (let i = 0; i < N; i++) {
+    const start = f * hop - half;
+    for (let i = 0; i < n; i++) {
       const s = start + i;
       const inside = s >= 0 && s < len;
-      re[i] = inside ? l[s] * win[i] : 0;
-      im[i] = inside ? r[s] * win[i] : 0;
+      re[i] = inside ? l[s] * tabs[2 * n + i] : 0;
+      im[i] = inside ? r[s] * tabs[2 * n + i] : 0;
     }
-    fft(re, im);
+    fftT(false);
   };
-  /** a két csatorna átlagos teljesítménye a k. binben (a csomagolt spektrumból) */
   const power = (k: number) => {
-    const j = (N - k) % N;
+    const j = (n - k) % n;
     // X_L = (Z[k] + conj Z[N−k]) / 2, X_R = (Z[k] − conj Z[N−k]) / 2i
     const lr = (re[k] + re[j]) / 2;
     const li = (im[k] - im[j]) / 2;
@@ -111,31 +174,15 @@ export async function denoiseStereo(l: Float32Array, r: Float32Array, maxReducti
     const ri = (re[j] - re[k]) / 2;
     return (lr * lr + li * li + rr * rr + ri * ri) / 2;
   };
-  // 1. menet: zajprofil minden 2. keretből — bin-enként a teljesítmény 15. percentilise
-  const sampled: Float32Array[] = [];
-  for (let f = 0; f < frames; f += 2) {
-    await breathe();
-    load(f);
-    const p = new Float32Array(bins);
-    for (let k = 0; k < bins; k++) p[k] = power(k);
-    sampled.push(p);
+  if (mode === 0) {
+    let at = 0;
+    for (let f = f0; f < f1; f += step) {
+      load(f);
+      for (let k = 0; k < bins; k++) outL[at++] = power(k);
+    }
+    return;
   }
-  const noise = new Float64Array(bins);
-  const col = new Float32Array(sampled.length);
-  for (let k = 0; k < bins; k++) {
-    for (let f = 0; f < sampled.length; f++) col[f] = sampled[f][k];
-    col.sort();
-    // a zaj teljesítménye bin-enként exponenciális eloszlású: a 15. percentilis = −ln(0,85)·átlag
-    noise[k] = col[Math.floor(sampled.length * 0.15)] / 0.1625;
-  }
-  // 2. menet: maszk + visszaalakítás (átlapolt összeadás)
-  const floor = Math.pow(10, -maxReductionDb / 20);
-  const outL = new Float64Array(len + 2 * N);
-  const outR = new Float64Array(len + 2 * N);
-  const prev = new Float64Array(bins).fill(1);
-  const g = new Float64Array(bins);
-  for (let f = 0; f < frames; f++) {
-    await breathe();
+  for (let f = f0; f < f1; f++) {
     load(f);
     for (let k = 0; k < bins; k++) {
       const p = power(k);
@@ -150,17 +197,62 @@ export async function denoiseStereo(l: Float32Array, r: Float32Array, maxReducti
       prev[k] = v;
       re[k] *= v;
       im[k] *= v;
-      if (k > 0 && k < N / 2) {
-        re[N - k] *= v;
-        im[N - k] *= v;
+      if (k > 0 && k < half) {
+        re[n - k] *= v;
+        im[n - k] *= v;
       }
     }
-    fft(re, im, true);
-    const start = f * HOP - N / 2 + N;
-    for (let i = 0; i < N; i++) {
-      outL[start + i] += (re[i] / N) * win[i];
-      outR[start + i] += (im[i] / N) * win[i];
+    fftT(true);
+    const start = f * hop - half + n;
+    for (let i = 0; i < n; i++) {
+      outL[start + i] += (re[i] / n) * tabs[2 * n + i];
+      outR[start + i] += (im[i] / n) * tabs[2 * n + i];
     }
+  }
+}
+
+/**
+ * sztereó zajszűrés; a kimenet ugyanolyan hosszú. A natív mag (ha van) a keretenkénti munkát végzi, a JS a
+ * zajprofil rendezését; darabokban fut, közben visszaadja a vezérlést (a felület folyékony marad).
+ */
+export async function denoiseStereo(l: Float32Array, r: Float32Array, maxReductionDb = 12): Promise<[Float32Array, Float32Array]> {
+  const run = nativeRun ?? denoiseRunJs;
+  const chunk = nativeRun ? 2048 : 64;
+  const breathe = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const len = l.length;
+  const frames = Math.ceil((len + N) / HOP);
+  const bins = N / 2 + 1;
+  const tabs = denoiseTabs();
+  const floor = Math.pow(10, -maxReductionDb / 20);
+  // 1. menet: zajprofil minden 2. keretből — bin-enként a teljesítmény 15. percentilise
+  const sampledCount = Math.ceil(frames / 2);
+  const cols = Array.from({ length: bins }, () => new Float32Array(sampledCount));
+  const empty = new Float64Array(0);
+  const state = new Float64Array(2 * bins);
+  let si = 0;
+  for (let f0 = 0; f0 < frames; f0 += chunk * 2) {
+    const f1 = Math.min(frames, f0 + chunk * 2);
+    const cnt = Math.ceil((f1 - f0) / 2);
+    const buf = new Float64Array(cnt * bins);
+    run(l, r, tabs, state, buf, empty, Float64Array.of(N, HOP, len, f0, f1, 2, floor, 0));
+    for (let j = 0; j < cnt; j++) for (let k = 0; k < bins; k++) cols[k][si + j] = buf[j * bins + k];
+    si += cnt;
+    await breathe();
+  }
+  const noise = state.subarray(0, bins);
+  for (let k = 0; k < bins; k++) {
+    const col = cols[k];
+    col.sort();
+    // a zaj teljesítménye bin-enként exponenciális eloszlású: a 15. percentilis = −ln(0,85)·átlag
+    noise[k] = col[Math.floor(sampledCount * 0.15)] / 0.1625;
+  }
+  // 2. menet: maszk + visszaalakítás (átlapolt összeadás)
+  const outL = new Float64Array(len + 2 * N);
+  const outR = new Float64Array(len + 2 * N);
+  state.fill(1, bins); // az időbeli simítás 1-ről indul
+  for (let f0 = 0; f0 < frames; f0 += chunk) {
+    run(l, r, tabs, state, outL, outR, Float64Array.of(N, HOP, len, f0, Math.min(frames, f0 + chunk), 1, floor, 1));
+    await breathe();
   }
   const yl = new Float32Array(len);
   const yr = new Float32Array(len);

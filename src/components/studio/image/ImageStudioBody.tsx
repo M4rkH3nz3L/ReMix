@@ -9,6 +9,7 @@ import { ActivityIndicator, Alert, Image, PixelRatio, Pressable, ScrollView, Sty
 import { captureRef } from 'react-native-view-shot';
 
 import { NewerSchemaBanner } from '@/components/NewerSchemaBanner';
+import { RenderStage, type RenderStageHandle } from '@/components/studio/image/RenderStage';
 import { Chip } from '@/components/ui/controls';
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { ImageAdjustStrip } from '@/components/studio/image/ImageAdjustStrip';
@@ -78,6 +79,7 @@ import { publishImageProject } from '@/lib/feed';
 import type { ImageShareMode } from '@/lib/imageShare';
 import { ExportCancelled, exportPsd, importPdf, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
 import { ImageRenderRejected, imageDocContentKey, isRenderFresh } from '@/lib/imageExport';
+import { chooseImageRenderRoute } from '@/lib/imageRenderRoute';
 import { type ToolKey, selectionMenu } from '@/lib/imageMenu';
 import { shapeToPathPoints } from '@/lib/shapeGeometry';
 import { panelState, workspaceLayout } from '@/lib/imageWorkspaceLayout';
@@ -255,16 +257,17 @@ export function ImageStudioBody({
   const canvasRef = useRef<View>(null);
 
   /**
-   * 🖼️ A dokumentum PNG-vé raszterizálása. ELSŐ a worker-Chromium (teljes
-   * felbontás, pontos), és ha az nem elérhető (weben, vagy nem fut a render-worker),
-   * ESZKÖZÖN a vászon `captureRef`-je a fallback — így a MENTÉS worker nélkül is
-   * működik (offline/Expo Go). A kijelölés-króm elrejtve, hogy ne kerüljön a képbe.
+   * 🖼️ A dokumentum raszterizálása — OFFLINE FIRST (CORE K1): elsőként a TELEFON renderel
+   * (`RenderStage`: a vászon réteg-fája rejtetten, a kért pixelméreten, bármely lapra). A
+   * worker csak a telefonon nem rajzolható effektekért kell (`serverOnlyEffects`), illetve
+   * tartalék, ha a telefonos render nem sikerült.
    */
   const canUndo = useEditorStore((s) => s.past.length > 0);
   const canRedo = useEditorStore((s) => s.future.length > 0);
   const undo = () => useEditorStore.getState().undo();
   const redo = () => useEditorStore.getState().redo();
   const rejectedRef = useRef(false);
+  const renderStageRef = useRef<RenderStageHandle>(null);
   const exportAbort = useRef<AbortController | null>(null);
   const [exporting, setExporting] = useState(false);
   const rasterize = async (
@@ -273,19 +276,48 @@ export function ImageStudioBody({
   ): Promise<string | null> => {
     rejectedRef.current = false;
     const height = opts?.height ?? target.height ?? 1280;
+    // 🧭 CORE K1: offline first — a worker csak a telefonon nem rajzolható effektekért kell
+    const needsWorker = chooseImageRenderRoute(target, true) === 'worker';
+    if (needsWorker) {
+      const viaWorker = await rasterizeOnWorker(target, height, opts);
+      if (viaWorker || rejectedRef.current) {
+        return viaWorker;
+      }
+    }
+    if (opts?.signal?.aborted) {
+      throw new ExportCancelled();
+    }
+    // a telefon renderel, BÁRMELY lapot, a kért pixelméreten (a vászon paritás-mért réteg-fája)
+    const onDevice = (await renderStageRef.current?.render(target, height, { format: opts?.format, quality: opts?.quality })) ?? null;
+    if (opts?.signal?.aborted) {
+      throw new ExportCancelled();
+    }
+    if (onDevice) {
+      if (needsWorker) {
+        Alert.alert(t('studio.image.deviceRenderGaps.title'), t('studio.image.deviceRenderGaps.body'));
+      }
+      return onDevice;
+    }
+    // tartalék: a worker (ha a telefonos render nem sikerült)
+    return needsWorker ? null : rasterizeOnWorker(target, height, opts);
+  };
+
+  /** a worker-render (pontos, teljes felbontás) — `null`, ha nem érhető el */
+  const rasterizeOnWorker = async (
+    target: ImageDoc,
+    height: number,
+    opts?: { format?: 'png' | 'jpg' | 'webp'; quality?: number; signal?: AbortSignal }
+  ): Promise<string | null> => {
     try {
-      const viaWorker = await renderImageDoc(target, height, {
+      return await renderImageDoc(target, height, {
         format: opts?.format,
         quality: opts?.quality,
         signal: opts?.signal,
         onMissingLayers: (count) =>
           Alert.alert(t('studio.image.missingInExport.title'), t('studio.image.missingInExport.body', { count })),
       });
-      if (viaWorker) {
-        return viaWorker;
-      }
     } catch (e) {
-      // 🚫 I13: szándékos elutasítás — a fallback a user elől rejtené el az okot
+      // 🚫 I13: szándékos elutasítás — a tartalék a user elől rejtené el az okot
       if (e instanceof ImageRenderRejected) {
         rejectedRef.current = true;
         Alert.alert(t('studio.image.renderFailTitle'), e.message);
@@ -293,11 +325,6 @@ export function ImageStudioBody({
       }
       throw e;
     }
-    // ⚠️ I12: a vászon csak az AKTÍV dokumentumot mutatja — másik lapot nem szabad lefotózni
-    if (target.id !== doc?.id) {
-      return null;
-    }
-    return captureCanvas(target, height, opts);
   };
 
   /** A vászon képe az eszközön, a dokumentum felbontásán, vízjel és kijelölés-króm nélkül. */
@@ -1885,6 +1912,8 @@ export function ImageStudioBody({
 
   return (
     <View style={styles.root}>
+      {/* 🖨️ a telefonos render rejtett színpada — első gyerek, a stúdió eltakarja */}
+      <RenderStage ref={renderStageRef} />
       <NewerSchemaBanner />
       {/* felső sáv */}
       <View style={[styles.topBar, precisionMode ? styles.hidden : null]}>

@@ -3791,6 +3791,10 @@
       "undoReorder": "Layer order",
       "svgPartialTitle": "Partial SVG import",
       "svgPartialBody": "These elements couldn't be imported and were left out: {{items}}",
+      "deviceRenderGaps": {
+        "title": "Some effects were left out",
+        "body": "Noise reduction, chromatic aberration and lens distortion are only rendered in the cloud. The image was made on your phone without them."
+      },
       "missingInExport": {
         "title": "Incomplete export",
         "body_one": "{{count}} layer's image isn't available, so it was left out of the export.",

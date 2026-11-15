@@ -3824,6 +3824,10 @@
       "undoReorder": "Ebenenreihenfolge",
       "svgPartialTitle": "SVG teilweise importiert",
       "svgPartialBody": "Diese Elemente konnten nicht importiert werden und fehlen: {{items}}",
+      "deviceRenderGaps": {
+        "title": "Einige Effekte fehlen",
+        "body": "Rauschreduzierung, chromatische Aberration und Objektivverzeichnung werden nur in der Cloud gerendert. Das Bild wurde ohne sie auf dem Gerät erstellt."
+      },
       "missingInExport": {
         "title": "Unvollständiger Export",
         "body_one": "Das Bild von {{count}} Ebene ist nicht verfügbar und fehlt im Export.",

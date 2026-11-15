@@ -170,6 +170,7 @@ import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelecti
 import { applyRing, ellipseRing, invertSelection, rectRing, selectionToMask } from '@/lib/selection';
 import { DEFAULT_BRUSH, type RetouchTool, type Stroke } from '@/lib/brushEngine';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
+import { RenderStage, type RenderStageHandle } from '@/components/studio/image/RenderStage';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { PhotoSkiaContent, makeLutImage } from '@/components/studio/image/SkiaPhotoLayer';
 import { flushProjectSave, useProjectAutosave } from '@/hooks/useProjectAutosave';
@@ -503,6 +504,108 @@ function gridDiff(a: SkImage, b: SkImage, size: number, stop: number): { bad: nu
     }
   }
   return { bad, total };
+}
+
+/**
+ * 🖨️ CORE K1 (IMAGE-PROD C1): offline kép-render — a rejtett render-színpad BÁRMELY lapot a
+ * telefonon raszterizál, a kért pixelméreten, alfával; a worker-renderrel paritásban.
+ */
+async function smokeOfflineImg(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}, pixelarány ${PixelRatio.get()}`);
+  const surface = Skia.Surface.MakeOffscreen(320, 320)!;
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color('#3070d0'));
+  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, 320, 320), paint);
+  paint.setColor(Skia.Color('#f0c040'));
+  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, 160, 160), paint);
+  surface.flush();
+  const file = new File(projectMediaDir(), `smoke_offimg_${Date.now().toString(36)}.png`);
+  file.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(
+    <View style={{ width: 1, height: 1 }}>
+      <RenderStage ref={ref} />
+    </View>
+  );
+  await sleep(300);
+  const stage = ref.current;
+  if (!stage) {
+    log(false, 'render-színpad', 'nem csatolódott fel');
+    return;
+  }
+
+  const photo = { kind: 'photo', id: 'p', uri: file.uri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch' } as PhotoLayer;
+  const text = { kind: 'text', id: 't', text: 'ÁRVÍZ', position: { x: 0.5, y: 0.75 }, fontSize: 18, color: '#ffffff', fontFamily: 'Poppins' } as unknown as ImageLayer;
+  const rect = { kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.75, y: 0.3 }, w: 0.3, h: 0.3, fill: '#ff2d95' } as ShapeLayer;
+  const mk = (id: string, layers: ImageLayer[]) => ({ id, name: id, aspectRatio: '1:1', width: 320, height: 320, layers }) as unknown as ImageDoc;
+  const pages: [string, ImageDoc][] = [
+    ['1. lap: fotó + szöveg + forma', mk('lap1', [photo as ImageLayer, rect as ImageLayer, text])],
+    ['2. lap: korrekció + szorzás-keverés', mk('lap2', [photo as ImageLayer, { ...photo, id: 'top', w: 0.6, h: 0.6, blendMode: 'multiply', adjust: { saturation: -1, contrast: 0.3 } } as ImageLayer])],
+    ['3. lap: átlátszó háttér, alakzat', mk('lap3', [{ ...rect, position: { x: 0.5, y: 0.5 } } as ImageLayer])],
+  ];
+
+  const shots: SkImage[] = [];
+  for (const [name, doc] of pages) {
+    const t0 = Date.now();
+    const uri = await stage.render(doc, 320);
+    const ms = Date.now() - t0;
+    if (!uri) {
+      log(false, `telefonos render: ${name}`, 'nincs kép');
+      continue;
+    }
+    const img = await decode(uri);
+    shots.push(img);
+    log(img.width() === 320 && img.height() === 320, `telefonos render: ${name}`, `${img.width()}×${img.height()}, ${ms} ms, worker nélkül`);
+    const workerUri = await renderImageDoc(doc, 320);
+    if (workerUri) {
+      const d = gridDiff(img, await decode(workerUri), 320, 280);
+      log(d.bad / d.total <= 0.06, `telefon = worker: ${name}`, `${d.bad}/${d.total} rácspont tér el`);
+      removeFile(workerUri);
+    } else {
+      log(null, `telefon = worker: ${name}`, 'a worker nem érhető el, az összevetés kimarad');
+    }
+    removeFile(uri);
+  }
+  if (shots.length >= 2) {
+    const ctrl = gridDiff(shots[0], shots[1], 320, 280);
+    log(ctrl.bad > 0, 'ellenpróba: a lapok képe különbözik', `${ctrl.bad} rácspont tér el az 1. és a 2. lap között`);
+  }
+  if (shots.length >= 3) {
+    const corner = pixel(shots[2], 10, 10);
+    const middle = pixel(shots[2], 160, 160);
+    log(corner[3] === 0 && middle[3] === 255, 'átlátszó háttér megmarad', `sarok α=${corner[3]}, közép α=${middle[3]} ${middle.slice(0, 3).join(',')}`);
+  }
+
+  // nagy felbontás: a natív kép a kért pixelméret, nem képernyő-felbontás
+  for (const height of [2048, 4096]) {
+    const t0 = Date.now();
+    const uri = await stage.render(pages[0][1], height);
+    const ms = Date.now() - t0;
+    if (!uri) {
+      log(false, `doc-felbontás ${height} px`, 'nincs kép');
+      continue;
+    }
+    const img = await decode(uri);
+    const ok = img.width() === height && img.height() === height;
+    const p = pixel(img, Math.round(height * 0.1), Math.round(height * 0.1));
+    log(ok, `doc-felbontás ${height} px`, `${img.width()}×${img.height()}, ${ms} ms, bal felső ${p.slice(0, 3).join(',')} (sárga várt)`);
+    removeFile(uri);
+  }
+
+  // WebP: átkódolva, az alfa megmarad
+  const webp = await stage.render(pages[2][1], 320, { format: 'webp' });
+  if (webp) {
+    const img = await decode(webp);
+    const corner = pixel(img, 10, 10);
+    log(webp.endsWith('.webp') && corner[3] === 0, 'WebP alfával', `${webp.split('.').pop()} · sarok α=${corner[3]}`);
+    removeFile(webp);
+  } else {
+    log(false, 'WebP alfával', 'nincs kép');
+  }
+
+  setHarness(null);
+  removeFile(file.uri);
 }
 
 /** 🔬 A második kör mérései: sebesség, effektek, és a TELJES valódi vászon. */
@@ -11551,6 +11654,10 @@ export async function runImageSmoke(
   }
   if (phase === 'deep2') {
     await step('deep2', () => smokeDeep2(log, setHarness, ratio));
+    return;
+  }
+  if (phase === 'offlineimg') {
+    await step('offlineimg', () => smokeOfflineImg(log, setHarness));
     return;
   }
   if (phase === 'deep') {

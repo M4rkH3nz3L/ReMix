@@ -21,6 +21,12 @@ describe('caughtVerdict — csak a valódi hiba kerül a naplóba', () => {
     expect(reported(new Error('Nincs ilyen fájl vagy mappa.'), 'lib/projectSyncClient.ts:readPlan')).toBe(true);
   });
 
+  it('a Fájlokból választott, nem olvasható kép a beviteli kapu válasza, máshol ugyanez hiba', () => {
+    const e = new Error("FunctionCallException: Calling the 'renderAsync' function has failed → Caused by: FileSystemReadPermissionException: File 'rossz.png' is not readable");
+    expect(reported(e, 'lib/media.ts:ingestImageFile')).toBe(false);
+    expect(reported(e, 'lib/media.ts:normalizePickedImage')).toBe(true);
+  });
+
   it('a séma-eltérés és a programhiba valódi hiba', () => {
     expect(reported(new Error('Supabase 404 GET: Could not find the table \'public.referrals\' in the schema cache'))).toBe(true);
     expect(reported(new Error('Supabase 400 GET: column gift_events.creator_cents does not exist'))).toBe(true);

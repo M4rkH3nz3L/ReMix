@@ -10,7 +10,8 @@ import { classifyError, errorDetail } from '@/lib/errors';
  * - a push-jogosultság nélküli build (`aps-environment`, ingyenes Apple-profil) nem kódhiba;
  * - a foglalt hangmunkamenet (OSStatus 561017449 = `!pri`: hívás vagy más app tartja) várt;
  * - a betelt tárhely a felhasználó állapota (érthető üzenetet kap);
- * - törlésnél a „nincs ilyen” = a cél már nincs meg, a törlés ezzel kész.
+ * - törlésnél a „nincs ilyen” = a cél már nincs meg, a törlés ezzel kész;
+ * - a Fájlokból választott, nem olvasható „kép” a beviteli kapu válasza (érthető üzenet).
  *
  * Minden más valódi hiba — a hiányzó tábla/oszlop/függvény (404/400) is: az séma-eltérés.
  */
@@ -21,6 +22,9 @@ const RULES: { reason: string; test: (detail: string, kind: string, where: strin
   { reason: 'push-jogosultság nélküli build', test: (d) => d.includes('aps-environment') },
   { reason: 'a hangmunkamenetet más tartja (hívás)', test: (d) => d.includes('561017449') },
   { reason: 'betelt a készülék tárhelye', test: (d) => isDiskFullError(d) },
+  // a Fájlokból választott „kép” nem dekódolható: ez a beviteli kapu (a felhasználó érthető üzenetet kap),
+  // nem kódhiba — a füstteszt szándékosan rossz fájlja 10× jelentésként jött (IMAGE-PROD S21)
+  { reason: 'a választott fájl nem olvasható kép', test: (_d, _kind, where) => where === 'lib/media.ts:ingestImageFile' },
   { reason: 'a törlendő már nincs meg', test: (_d, kind, where) => kind === 'notFound' && /(remove|delete)/i.test(where) },
 ];
 

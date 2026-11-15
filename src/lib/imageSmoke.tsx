@@ -6360,10 +6360,10 @@ async function smokeThumbDoc(log: Log) {
     const pimg = poster ? await decode(poster) : null;
     const textPx = pimg ? pixel(pimg, Math.round(pimg.width() / 2), Math.round(pimg.height() * 0.8)) : [];
     log(posterNeedsRefresh(fake, thumb) && !!pimg && pimg.height() === 720 && pimg.width() === 1280, 'a feed-poszter a lapból, a telefonon (a régi poszter elavultként jelölve)', `${pimg?.width()}×${pimg?.height()}, a cím helyén ${textPx.slice(0, 3).join(',')}`);
-    // 5) mentés + újratöltés: a lap és a hivatkozás megmarad, séma v9
+    // 5) mentés + újratöltés: a lap és a hivatkozás megmarad, az aktuális sémával (v9 óta)
     await saveProject(st().project!);
     const reloaded = await loadProject(id);
-    log(reloaded?.thumbnailDocId === 'th' && !!thumbnailDocOf(reloaded) && reloaded.schemaVersion === 9, 'mentés után is megvan (séma v9)', `v${reloaded?.schemaVersion}`);
+    log(reloaded?.thumbnailDocId === 'th' && !!thumbnailDocOf(reloaded) && reloaded.schemaVersion === CURRENT_SCHEMA_VERSION, `mentés után is megvan (séma v${CURRENT_SCHEMA_VERSION})`, `v${reloaded?.schemaVersion}`);
     frames.forEach((f) => removeFile(f.uri));
     if (poster) removeFile(poster);
   } finally {

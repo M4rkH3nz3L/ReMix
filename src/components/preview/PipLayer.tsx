@@ -219,7 +219,7 @@ function PipVideoClip({
   // sebesség + hangerő; 🎧 ha az előnézeti motor szól, a PiP hangját is az keveri (`videoVoiceActive`)
   const engineMix = useEditorStore((s) => s.videoVoiceActive);
   useEffect(() => {
-    player.playbackRate = clip.speed;
+    player.playbackRate = clip.speed ?? 1; // hiányzó `speed` → natív hiba volt (S21)
     player.volume = engineMix ? 0 : (clip.volume ?? 1);
   }, [player, clip, engineMix]);
 

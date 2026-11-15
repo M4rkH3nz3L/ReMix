@@ -282,7 +282,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     if (!videoClip) {
       return;
     }
-    player.playbackRate = videoClip.speed;
+    player.playbackRate = videoClip.speed ?? 1; // régi / hiányos klipen nincs `speed` → natív hiba volt (S21)
     // 🎚️ a videósáv némítása/solója is csak az előnézetre hat; a master-hangerő skáláz
     const base = videoAudible
       ? clamp(

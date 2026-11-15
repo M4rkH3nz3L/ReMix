@@ -1,5 +1,7 @@
 import ExpoModulesCore
+import Accelerate
 import AVFoundation
+import CoreML
 import CoreMedia
 import UIKit
 import Vision
@@ -162,6 +164,55 @@ public class RemixRenderModule: Module {
     // nyers fájlba — a keverő így 20 percnél hosszabb forrást is a memória töredékével játszik.
     Constant("supportsDecodeWindow") { true }
     Constant("supportsDenoiseRun") { true }
+
+    // 🎚️ V5 (prototípus): stem-szétválasztás Core ML-lel (Spleeter 2stems, MIT) — a bemenet/kimenet szinkron
+    // másolással natív pufferbe (a JS-tömb nem megy át másik szálra), a futtatás háttérszálon
+    AsyncFunction("stemLoad") { (path: String) -> Bool in
+      let url = path.hasPrefix("file://") ? (URL(string: path) ?? URL(fileURLWithPath: path)) : URL(fileURLWithPath: path)
+      let compiled = try MLModel.compileModel(at: url)
+      let cfg = MLModelConfiguration()
+      cfg.computeUnits = .all
+      StemModel.model = try MLModel(contentsOf: compiled, configuration: cfg)
+      return true
+    }
+    Function("stemSetInput") { (mag: Float32Array) -> Bool in
+      let arr = try MLMultiArray(shape: [1, 2, 512, 1024], dataType: .float32)
+      let n = min(mag.length, arr.count)
+      memcpy(arr.dataPointer, mag.rawPointer, n * MemoryLayout<Float32>.size)
+      StemModel.input = arr
+      return true
+    }
+    AsyncFunction("stemRun") { () -> Double in
+      guard let m = StemModel.model, let x = StemModel.input else { return -1 }
+      let t0 = Date()
+      let out = try m.prediction(from: MLDictionaryFeatureProvider(dictionary: ["mag": MLFeatureValue(multiArray: x)]))
+      StemModel.outV = out.featureValue(for: "vocals")?.multiArrayValue
+      StemModel.outA = out.featureValue(for: "accompaniment")?.multiArrayValue
+      return Date().timeIntervalSince(t0) * 1000
+    }
+    Function("stemGetOutput") { (v: Float32Array, a: Float32Array) -> Bool in
+      guard let ov = StemModel.outV, let oa = StemModel.outA else { return false }
+      StemModel.copy(ov, into: v.rawPointer.bindMemory(to: Float32.self, capacity: v.length), count: v.length)
+      StemModel.copy(oa, into: a.rawPointer.bindMemory(to: Float32.self, capacity: a.length), count: a.length)
+      return true
+    }
+    // ⚡ a jelút natívan (vDSP) — a `stemSeparation.ts` JS-ágának tükre: blokkonként előre (L + iR egy DFT-ben,
+    // magnitúdó a modellnek) és vissza (arány-maszk, inverz DFT, ablakolt átlapolt összeadás az ablak-összeggel)
+    Function("stemForward") { (l: Float32Array, r: Float32Array, frameStart: Int, nb: Int, re: Float32Array, im: Float32Array, mag: Float32Array) -> Bool in
+      StemDSP.forward(l: l, r: r, frameStart: frameStart, nb: nb, re: re, im: im, mag: mag)
+      return true
+    }
+    Function("stemInverse") { (re: Float32Array, im: Float32Array, v: Float32Array, a: Float32Array, frameStart: Int, nb: Int, out: Float32Array, wsum: Float32Array, length: Int) -> Bool in
+      StemDSP.inverse(re: re, im: im, v: v, a: a, frameStart: frameStart, nb: nb, out: out, wsum: wsum, length: length)
+      return true
+    }
+    Function("stemUnload") { () -> Bool in
+      StemModel.model = nil
+      StemModel.input = nil
+      StemModel.outV = nil
+      StemModel.outA = nil
+      return true
+    }
 
     // 🌡️ S19: hőállapot és akkumulátor (a hosszú export alkalmazkodásához és naplózásához)
     // thermal: 0 névleges · 1 emelkedett · 2 súlyos · 3 kritikus; battery: 0–1 (−1 = ismeretlen)
@@ -1233,6 +1284,123 @@ enum DspKernels {
       st[3] = b0; st[4] = b1; st[5] = b2; st[6] = a1; st[7] = a2
     default:
       break
+    }
+  }
+}
+
+/// 🎚️ V5: a stem-modell és a pufferei (a modul élettartama alatt)
+enum StemModel {
+  static var model: MLModel?
+  static var input: MLMultiArray?
+  static var outV: MLMultiArray?
+  static var outA: MLMultiArray?
+
+  /// a kimenet (4D, tetszőleges lépésközökkel és típussal) → sűrű Float32 sor [1, 2, 512, 1024] sorrendben
+  static func copy(_ src: MLMultiArray, into dst: UnsafeMutablePointer<Float32>, count: Int) {
+    let shape = src.shape.map { $0.intValue }
+    let strides = src.strides.map { $0.intValue }
+    guard shape.count == 4 else { return }
+    var k = 0
+    for b in 0..<shape[0] {
+      for c in 0..<shape[1] {
+        for t in 0..<shape[2] {
+          let base = b * strides[0] + c * strides[1] + t * strides[2]
+          for f in 0..<shape[3] {
+            if k >= count { return }
+            let idx = base + f * strides[3]
+            switch src.dataType {
+            case .float32: dst[k] = src.dataPointer.assumingMemoryBound(to: Float32.self)[idx]
+            case .double: dst[k] = Float32(src.dataPointer.assumingMemoryBound(to: Double.self)[idx])
+            case .float16: dst[k] = Float32(src.dataPointer.assumingMemoryBound(to: Float16.self)[idx])
+            default: dst[k] = src[idx].floatValue
+            }
+            k += 1
+          }
+        }
+      }
+    }
+  }
+}
+
+/// ⚡ V5: a stem-jelút natív magja (N = 4096, hop = 1024, T = 512 keret, F = 1024 sáv)
+enum StemDSP {
+  static let n = 4096, hop = 1024, T = 512, F = 1024
+  static let win: [Float] = (0..<4096).map { 0.5 - 0.5 * cos(2 * Float.pi * Float($0) / 4096) }
+  static let fwd = vDSP_DFT_zop_CreateSetup(nil, vDSP_Length(4096), .FORWARD)!
+  static let inv = vDSP_DFT_zop_CreateSetup(fwd, vDSP_Length(4096), .INVERSE)!
+
+  /// re / im: [2 csatorna][T][F] egymás után; mag: [2][T][F]
+  static func forward(l: Float32Array, r: Float32Array, frameStart: Int, nb: Int, re: Float32Array, im: Float32Array, mag: Float32Array) {
+    let L = l.length
+    let lp = l.rawPointer.bindMemory(to: Float32.self, capacity: L)
+    let rp = r.rawPointer.bindMemory(to: Float32.self, capacity: L)
+    let RE = re.rawPointer.bindMemory(to: Float32.self, capacity: re.length)
+    let IM = im.rawPointer.bindMemory(to: Float32.self, capacity: im.length)
+    let M = mag.rawPointer.bindMemory(to: Float32.self, capacity: mag.length)
+    let plane = T * F
+    var ir = [Float](repeating: 0, count: n), ii = [Float](repeating: 0, count: n)
+    var orr = [Float](repeating: 0, count: n), oi = [Float](repeating: 0, count: n)
+    for i in 0..<(2 * plane) { M[i] = 0 }
+    for t in 0..<nb {
+      let s0 = (frameStart + t) * hop - n / 2
+      for i in 0..<n {
+        let p = s0 + i
+        let inside = p >= 0 && p < L
+        ir[i] = inside ? lp[p] * win[i] : 0
+        ii[i] = inside ? rp[p] * win[i] : 0
+      }
+      vDSP_DFT_Execute(fwd, ir, ii, &orr, &oi)
+      for k in 0..<F {
+        let nk = (n - k) % n
+        let lr = (orr[k] + orr[nk]) * 0.5, li = (oi[k] - oi[nk]) * 0.5
+        let rr = (oi[k] + oi[nk]) * 0.5, ri = (orr[nk] - orr[k]) * 0.5
+        let o = t * F + k
+        RE[o] = lr; IM[o] = li
+        RE[plane + o] = rr; IM[plane + o] = ri
+        M[o] = (lr * lr + li * li).squareRoot()
+        M[plane + o] = (rr * rr + ri * ri).squareRoot()
+      }
+    }
+  }
+
+  /// out: 4 × length (ének L, ének R, kíséret L, kíséret R); wsum: length (az első stemnél gyűlik)
+  static func inverse(re: Float32Array, im: Float32Array, v: Float32Array, a: Float32Array, frameStart: Int, nb: Int, out: Float32Array, wsum: Float32Array, length L: Int) {
+    let RE = re.rawPointer.bindMemory(to: Float32.self, capacity: re.length)
+    let IM = im.rawPointer.bindMemory(to: Float32.self, capacity: im.length)
+    let V = v.rawPointer.bindMemory(to: Float32.self, capacity: v.length)
+    let A = a.rawPointer.bindMemory(to: Float32.self, capacity: a.length)
+    let O = out.rawPointer.bindMemory(to: Float32.self, capacity: out.length)
+    let W = wsum.rawPointer.bindMemory(to: Float32.self, capacity: wsum.length)
+    let plane = T * F
+    let eps: Float = 1e-10
+    var zr = [Float](repeating: 0, count: n), zi = [Float](repeating: 0, count: n)
+    var yr = [Float](repeating: 0, count: n), yi = [Float](repeating: 0, count: n)
+    for stem in 0..<2 {
+      for t in 0..<nb {
+        for i in 0..<n { zr[i] = 0; zi[i] = 0 }
+        for k in 0..<F {
+          let o = t * F + k
+          let vl = V[o] * V[o], al = A[o] * A[o]
+          let vr = V[plane + o] * V[plane + o], ar = A[plane + o] * A[plane + o]
+          let ml = ((stem == 0 ? vl : al) + eps / 2) / (vl + al + eps)
+          let mr = ((stem == 0 ? vr : ar) + eps / 2) / (vr + ar + eps)
+          let xlr = RE[o] * ml, xli = IM[o] * ml
+          let xrr = RE[plane + o] * mr, xri = IM[plane + o] * mr
+          zr[k] = xlr - xri; zi[k] = xli + xrr
+          if k > 0 { zr[n - k] = xlr + xri; zi[n - k] = -xli + xrr }
+        }
+        vDSP_DFT_Execute(inv, zr, zi, &yr, &yi)
+        let s0 = (frameStart + t) * hop - n / 2
+        let oL = O + (stem * 2) * L, oR = O + (stem * 2 + 1) * L
+        let scale = 1 / Float(n)
+        for i in 0..<n {
+          let p = s0 + i
+          if p < 0 || p >= L { continue }
+          oL[p] += yr[i] * scale * win[i]
+          oR[p] += yi[i] * scale * win[i]
+          if stem == 0 { W[p] += win[i] * win[i] }
+        }
+      }
     }
   }
 }

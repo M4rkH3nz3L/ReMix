@@ -68,6 +68,8 @@ import { exportOfflineWav, measureStretchLatency, probeStretchTiming, recentExpo
 import { readPowerState } from '@/lib/powerStateClient';
 import { matrixRow } from '@/lib/perfMatrix';
 import { packFromProject } from '@/lib/soundPack';
+import { ensureStemModel, separateOnDevice, stemKernels, stemOnDeviceSupported } from '@/lib/stemSeparationClient';
+import { jsStemKernels, separateTwoStems } from '@/lib/stemSeparation';
 import { getPayload, listShopItems, purchaseItem, storeSoundPack, syncOwnedSoundPacks } from '@/lib/shop';
 import { useSoundPacks } from '@/store/soundPackStore';
 import { denoiseStereo } from '@/lib/denoise';
@@ -3319,6 +3321,86 @@ async function smokePerfMatrix(log: Log) {
   await noteThermal();
   const row = matrixRow({ date: new Date().toISOString().slice(0, 10), device, os, engine, exportRun: { tracks: 8, sec: SEC, ms: exportMs }, longSourceMs, denoise60Ms, formant10Ms, maxThermal });
   log(null, 'MATRIX', row);
+}
+
+/**
+ * 🎚️ V5 (prototípus) mérés: Spleeter 2stems Core ML-lel a telefonon — a modell a Mac fájlszerveréről, a keverék
+ * valódi beszéd (ének helyett) + szintetikus kíséret (akkord + lábdob), 3 / 5 / 10 perc; idő, modell-idő, az ének
+ * SDR-je az első 60 s-on (a keverékhez képest), a hőállapot.
+ */
+async function smokeStemDevice(log: Log) {
+  log(null, 'eszköz', `${Device.modelName ?? Platform.OS}`);
+  log(stemOnDeviceSupported(), 'a build tartalmazza a stem-modult');
+  {
+    // natív (vDSP) jelút = JS jelút (azonos „modellel”), 20 s sztereó
+    const n = 20 * 44100;
+    const l = Float32Array.from({ length: n }, (_, i) => 0.3 * Math.sin(i * 0.031) + 0.1 * Math.sin(i * 0.23));
+    const r = Float32Array.from({ length: n }, (_, i) => 0.25 * Math.sin(i * 0.017 + 1));
+    const fake = async (mag: Float32Array): Promise<[Float32Array, Float32Array]> => [mag, Float32Array.from(mag, (x, i) => x * ((i % 7) / 7))];
+    const t1 = Date.now();
+    const js = await separateTwoStems(l, r, fake, undefined, jsStemKernels);
+    const jsMs = Date.now() - t1;
+    const t2 = Date.now();
+    const nat = await separateTwoStems(l, r, fake, undefined, stemKernels());
+    const natMs = Date.now() - t2;
+    let worst = 0;
+    for (const [x, y] of [[js.vocals[0], nat.vocals[0]], [js.vocals[1], nat.vocals[1]], [js.accompaniment[0], nat.accompaniment[0]], [js.accompaniment[1], nat.accompaniment[1]]] as const) {
+      for (let i = 0; i < n; i++) worst = Math.max(worst, Math.abs(x[i] - y[i]));
+    }
+    log(stemKernels() !== jsStemKernels && worst < 1e-4, 'a natív jelút = a JS jelút (20 s)', `max eltérés ${worst.toExponential(1)} · JS ${jsMs} ms, natív ${natMs} ms`);
+  }
+  const t0 = Date.now();
+  const ok = await ensureStemModel(`${smokeFileHost()}/spleeter2.mlmodel`);
+  log(ok, 'a modell letöltve és betöltve (Core ML)', `${Date.now() - t0} ms`);
+  if (!ok) return;
+  const SR = 44100;
+  const sp = new File(Paths.document, 'smoke_stem_speech.wav');
+  if (!sp.exists) await File.downloadFileAsync(`${smokeFileHost()}/speech_hu.wav`, sp);
+  const api = (await loadAudioApi())!;
+  const speech = (await api.decodeAudioData(sp.uri, SR)).getChannelData(0);
+  for (const min of [3, 5, 10]) {
+    const n = min * 60 * SR;
+    const voc = new Float32Array(n);
+    for (let i = 0; i < n; i++) voc[i] = speech[i % speech.length];
+    const acc = new Float32Array(n);
+    const fr = [110, 138.6, 164.8, 220];
+    for (let i = 0; i < n; i++) {
+      const tt = i / SR;
+      let v = 0;
+      for (let k = 0; k < 4; k++) v += 0.08 * Math.sign(Math.sin(2 * Math.PI * fr[k] * tt + k));
+      v += 0.3 * Math.exp(-((tt % 0.5) * 30)) * Math.sin(2 * Math.PI * 55 * tt);
+      acc[i] = v;
+    }
+    const mixL = Float32Array.from(voc, (x, i) => x + acc[i]);
+    const f = new File(Paths.document, `smoke_stem_mix_${min}.wav`);
+    if (f.exists) f.delete();
+    f.create();
+    f.write(encodeWav16([mixL, mixL], SR));
+    const p0 = await readPowerState();
+    const res = await separateOnDevice(f.uri);
+    const p1 = await readPowerState();
+    f.delete();
+    if (!res) {
+      log(false, `${min} perc: szétválasztás`, 'nem sikerült');
+      continue;
+    }
+    const est = (await api.decodeAudioData(res.vocalsUri, SR)).getChannelData(0);
+    const m = Math.min(60 * SR, est.length);
+    let num = 0;
+    let den = 0;
+    let den0 = 0;
+    for (let i = 0; i < m; i++) {
+      num += voc[i] * voc[i];
+      den += (voc[i] - est[i]) ** 2;
+      den0 += acc[i] * acc[i];
+    }
+    const sdr = 10 * Math.log10(num / den);
+    const sdr0 = 10 * Math.log10(num / den0);
+    const tm = res.timings;
+    log(sdr > sdr0 + 5, `${min} perc: az ének elválik (SDR ${sdr.toFixed(1)} dB, a keverék ${sdr0.toFixed(1)} dB)`, `${(tm.totalMs / 1000).toFixed(1)} s összesen = ${((min * 60) / (tm.totalMs / 1000)).toFixed(1)}× valós idő · modell ${(tm.modelMs / 1000).toFixed(1)} s (${tm.blocks} blokk, ${Math.round(tm.modelMs / tm.blocks)} ms/blokk) · hő ${p0?.thermal}→${p1?.thermal}`);
+    new File(res.vocalsUri).delete();
+    new File(res.accompanimentUri).delete();
+  }
 }
 
 /**
@@ -10846,6 +10928,10 @@ export async function runImageSmoke(
   }
   if (phase === 'crossfade') {
     await step(phase, () => smokeCrossfade(log));
+    return;
+  }
+  if (phase === 'stemdevice') {
+    await step(phase, () => smokeStemDevice(log));
     return;
   }
   if (phase === 'hummelody') {

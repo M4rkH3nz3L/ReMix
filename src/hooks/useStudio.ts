@@ -337,7 +337,16 @@ export function useStudio() {
       .catch((caught) => { logCaught('hooks/useStudio.ts:saveRename', caught); return Alert.alert(t('common.error'), t('home.renameFailed')); });
   };
 
-  const shareToFeed = (meta: ProjectMeta) => {
+  const shareToFeed = (meta: ProjectMeta, remixTracks?: boolean) => {
+    // 🔀 C3: hang-projektnél az alkotó dönt — a remix a sávokat is megkapja-e (alapból nem)
+    if (meta.kind === 'audio' && remixTracks === undefined) {
+      Alert.alert(t('feed.remixTracksTitle'), t('feed.remixTracksBody'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('feed.remixTracksNo'), onPress: () => shareToFeed(meta, false) },
+        { text: t('feed.remixTracksYes'), onPress: () => shareToFeed(meta, true) },
+      ]);
+      return;
+    }
     loadProject(meta.id)
       .then((p) => {
         if (!p) {
@@ -346,7 +355,7 @@ export function useStudio() {
         // render (ha kell) → feltöltés → posztolás; Pro-kapu a felhő-renderre
         return guardPro(
           () =>
-            withProgress(t('feed.rendering'), (report) => publishRenderedProject(p, report)).then(
+            withProgress(t('feed.rendering'), (report) => publishRenderedProject(p, report, remixTracks ? { remixTracks } : undefined)).then(
               (res) => {
                 if (res) {
                   refresh();

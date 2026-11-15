@@ -29,6 +29,7 @@ import { useAuth } from '@/store/authStore';
 import type { Asset, AspectRatio, Project, Track, VideoClip } from '@/types/project';
 import type { Creator, FeedMode, FeedPost, PostVisibility } from '@/types/social';
 import { logCaught } from '@/lib/logCaught';
+import { buildRemixManifest, manifestUris, parseRemixManifest, remixProjectFromManifest, remixUploadUris, type RemixTracksManifest } from '@/lib/remixTracks';
 
 /**
  * 📱 Feed / csatorna kliens-réteg. A poszt a Project egy NÉZETE — a
@@ -87,7 +88,7 @@ function toPost(r: PostRow, liked: Set<string>, saved: Set<string>): FeedPost {
   // a project_snapshot jsonb KÉTFÉLE hasznot hordozhat: interaktív (hotspot) sáv
   // `{ tracks }`, és/vagy a carousel kép-lista `{ carousel }` (kép-projekt lapozható
   // megosztása). Visszafelé kompatibilis: a régi posztok csak `{ tracks }`-ot tároltak.
-  const snap = (r.project_snapshot ?? null) as { tracks?: Track[]; carousel?: string[]; sourceKind?: string } | null;
+  const snap = (r.project_snapshot ?? null) as { tracks?: Track[]; carousel?: string[]; sourceKind?: string; remixTracks?: unknown } | null;
   const carousel = Array.isArray(snap?.carousel)
     ? snap!.carousel.map((u) => reachableMediaUrl(u)).filter((u): u is string => !!u)
     : undefined;
@@ -106,6 +107,11 @@ function toPost(r: PostRow, liked: Set<string>, saved: Set<string>): FeedPost {
     interactive: snap?.tracks ? { tracks: snap.tracks } : undefined,
     rendered: !!r.video_url,
     ...(snap?.sourceKind === 'audio' ? { sourceKind: 'audio' as const } : {}),
+    // 🔀 C3: a sáv-leírás idegen adat → ellenőrizve (csak hang-poszton és remixelhetőn)
+    ...(snap?.sourceKind === 'audio' && r.remixable && snap.remixTracks ? (() => {
+      const m = parseRemixManifest(snap.remixTracks);
+      return m ? { remixTracks: m } : {};
+    })() : {}),
     remixable: r.remixable,
     remixOfPostId: r.remix_of_post_id ?? undefined,
     remixOfCreator: r.remix_of_creator ?? undefined,
@@ -525,6 +531,8 @@ export async function publishPost(
     remixable?: boolean;
     /** 🖐️ carousel kép-poszt (kép-projekt lapozható megosztása): a lapok feltöltött URL-jei */
     carouselUrls?: string[];
+    /** 🔀 C3: a remix a sávokat kapja (a feltöltött sáv-leírás) */
+    remixTracks?: RemixTracksManifest;
   }
 ): Promise<FeedPost> {
   const sb = requireSupabase();
@@ -534,12 +542,15 @@ export async function publishPost(
   }
   const { username, name, avatar } = await creatorFields();
   // CSAK az interaktív (hotspot) réteget hordozzuk a poszton (feed-overlay) — a
-  // teljes, szerkeszthető projektet SZÁNDÉKOSAN nem (a remix a videót importálja).
+  // teljes, szerkeszthető projektet SZÁNDÉKOSAN nem (a remix a videót importálja);
+  // kivétel a C3: a hang-sávok leírása, ha az alkotó engedte.
   // A carousel kép-lista (ha van) ugyanebbe a jsonb-be megy (`carousel`).
   const interactiveTrack = project.tracks.find((tr) => tr.type === 'interactive');
   // 🎵 hang-projektből készült poszt: a remixe hang-projekt lesz (ugyanebben a jsonb-ben — migráció nélkül)
-  const snapshot: { tracks?: Track[]; carousel?: string[]; sourceKind?: 'audio' } = {};
+  const snapshot: { tracks?: Track[]; carousel?: string[]; sourceKind?: 'audio'; remixTracks?: RemixTracksManifest } = {};
   if (project.kind === 'audio') snapshot.sourceKind = 'audio';
+  // 🔀 C3: csak ha az alkotó engedte (a hang-sávok — más projekt-adat nem kerül a posztba)
+  if (project.kind === 'audio' && opts?.remixTracks && opts.remixable !== false) snapshot.remixTracks = opts.remixTracks;
   if (interactiveTrack && interactiveTrack.clips.length > 0) {
     snapshot.tracks = [interactiveTrack];
   }
@@ -614,6 +625,8 @@ export async function publishRenderedProject(
     renderMode?: RenderMode;
     /** 🔀 remixelhető-e (az alkotó dönt — B27) */
     remixable?: boolean;
+    /** 🔀 C3: a remix a sávokat kapja — a hang-sávok fájljai feltöltődnek (a kvótát terhelik) */
+    remixTracks?: boolean;
   }
 ): Promise<{ post: FeedPost; project: Project }> {
   let updated = project;
@@ -673,7 +686,18 @@ export async function publishRenderedProject(
     }
   }
 
+  // 🔀 C3: a hang-sávok fájljai fel (egyszer fájlonként), a sáv-leírás a posztba
+  let remixTracks: RemixTracksManifest | undefined;
+  if (opts?.remixTracks && updated.kind === 'audio' && opts.remixable !== false) {
+    const remote = new Map<string, string>();
+    for (const uri of remixUploadUris(updated)) {
+      const url = await uploadMedia(uri, { projectId: project.id, kind: 'media', name: uri.split('/').pop() || 'track.wav' });
+      remote.set(uri, url);
+    }
+    remixTracks = buildRemixManifest(updated, remote);
+  }
   const post = await publishPost(updated, {
+    remixTracks,
     visibility: opts?.visibility ?? 'public',
     videoUrl: rendered.url ?? null,
     posterUrl: rendered.posterUrl ?? null,
@@ -870,6 +894,24 @@ export async function remixFromPost(post: FeedPost): Promise<string | null> {
     const remix = imageRemixProject(post);
     await saveProject(remix);
     return remix.id;
+  }
+  // 🔀 C3: az alkotó a sávokat is adta → szerkeszthető sávok (a fájlok a projekt mappájába letöltve);
+  // ha egy sem jön le, a régi út (a videó hangja)
+  if (post.remixable && post.sourceKind === 'audio' && post.remixTracks) {
+    const local = new Map<string, string>();
+    for (const [i, url] of manifestUris(post.remixTracks).entries()) {
+      const got = await downloadToCache(reachableMediaUrl(url) ?? url, `remix_${post.id}_${i}.${(url.split('.').pop() || 'wav').slice(0, 4)}`);
+      if (got) local.set(url, got);
+    }
+    if (local.size > 0) {
+      const base = createEmptyProject(`Remix – ${post.title}`, post.aspectRatio ?? '9:16', undefined, 'audio');
+      const remix: Project = {
+        ...remixProjectFromManifest(base, post.remixTracks, local, makeId),
+        remixOf: { projectId: post.projectId ?? post.id, name: post.creator.displayName, postId: post.id },
+      };
+      await saveProject(remix);
+      return remix.id;
+    }
   }
   // 🎵 hang-poszt: a videó hangja kinyerve → hang-projekt (ha a kinyerés nem megy, a régi videós remix)
   if (post.remixable && post.sourceKind === 'audio' && post.videoUri) {

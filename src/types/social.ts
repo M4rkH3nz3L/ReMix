@@ -77,6 +77,8 @@ export interface FeedPost {
   rendered: boolean;
   /** 🎵 a poszt hang-projektből készült — a remixe hang-projekt (a videó hangjából) */
   sourceKind?: 'audio';
+  /** 🔀 C3: az alkotó engedte — a remix a szerkeszthető hang-sávokat kapja (a feltöltött fájlokkal) */
+  remixTracks?: import('@/lib/remixTracks').RemixTracksManifest;
   /** remixelhető-e (M4): ha false, csak megtekintés */
   remixable: boolean;
   /** ha ez egy remix, a forrás-poszt azonosítója (M4 attribúció) */

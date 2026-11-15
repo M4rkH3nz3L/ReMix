@@ -12,8 +12,8 @@ export const remixRoute = (post: FeedPost, projectId: string): string =>
 
 /**
  * 🎵 A hang-posztból (hang-projektből készült poszt) a remix hang-projekt: a poszt videójának kinyert
- * hangja egy klipként a zene-sávon, a forrás megjelölésével. Az eredeti sávokat itt sem kapja meg a
- * remixelő — csak azt, amit a poszt nyilvánosan ad.
+ * hangja egy klipként a zene-sávon, a forrás megjelölésével. Ez az alapeset: az eredeti sávokat csak akkor
+ * kapja meg a remixelő, ha az alkotó posztoláskor engedte (C3 — `remixTracks.ts`, `remixFromPost`).
  */
 export function audioRemixProject(post: FeedPost, audio: { uri: string; duration: number }, ids: (prefix: string) => string = makeId): Project {
   const base = createEmptyProject(`Remix – ${post.title}`, post.aspectRatio ?? '9:16', undefined, 'audio');

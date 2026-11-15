@@ -3322,6 +3322,47 @@ async function smokePerfMatrix(log: Log) {
 }
 
 /**
+ * 🔀 C3: a hang-poszt remixe a sávokkal — a sáv-leírású poszt (a Mac fájlszerverén lévő hangokkal, a prod
+ * nélkül) az app `remixFromPost`-ján át: a fájlok letöltve, a sávok és a tempó megvannak, a klipek helyiek.
+ */
+async function smokeRemixTracks(log: Log) {
+  const host = smokeFileHost();
+  const clipOf = (id: string, file: string, start: number): AudioClip => ({ kind: 'audio', id, uri: `${host}/${file}`, label: file, start, duration: 2, trimIn: 0, sourceDuration: 2, volume: 0.9, fadeIn: 0, fadeOut: 0, source: 'imported' });
+  const post = {
+    id: `smoke_rt_${Date.now().toString(36)}`,
+    creator: { id: 'x', username: 'smoke', displayName: 'Smoke' },
+    title: 'Sávos poszt',
+    description: '',
+    hashtags: [],
+    videoUri: null,
+    posterUri: null,
+    aspectRatio: '9:16',
+    durationSec: 4,
+    rendered: false,
+    sourceKind: 'audio',
+    remixable: true,
+    remixTracks: {
+      v: 1,
+      bpm: 104,
+      tracks: [
+        { id: 't1', type: 'voiceover', name: 'Ének', clips: [clipOf('a', 'speech_hu.wav', 0), clipOf('b', 'speech_hu.wav', 2)] },
+        { id: 't2', type: 'aux1', name: 'Második hang', clips: [clipOf('c', 'speech_en.wav', 1)] },
+      ],
+      trackMix: { voiceover: { gain: -2 } },
+    },
+  } as unknown as FeedPost;
+  const id = await remixFromPost(post);
+  const p = id ? await loadProject(id) : null;
+  const clips = (p?.tracks ?? []).flatMap((t) => t.clips.map((c) => ({ t: t.type, c: c as AudioClip })));
+  log(!!p && p.kind === 'audio' && p.bpm === 104 && p.remixOf?.postId === post.id, 'a remix hang-projekt, a poszt tempójával és eredetével', p ? `${p.kind}, ${p.bpm} BPM` : 'nincs projekt');
+  log(clips.length === 3 && clips.filter((x) => x.t === 'voiceover').length === 2 && clips.some((x) => x.t === 'aux1'), 'a sávok és a klipek megvannak (2 + 1)', clips.map((x) => `${x.t}:${x.c.start}`).join(', '));
+  const localOk = clips.every((x) => x.c.uri.startsWith('file://') && new File(x.c.uri).exists);
+  const shared = new Set(clips.filter((x) => x.t === 'voiceover').map((x) => x.c.assetId)).size === 1;
+  log(localOk && shared && p?.trackMix?.voiceover?.gain === -2, 'a klipek helyi fájlokra mutatnak (közös fájl → közös asset), a keverés átjött', `${clips.map((x) => (x.c.uri.split('/').pop() ?? '').slice(0, 24)).join(', ')}`);
+  if (id) await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:remixtracks', caught));
+}
+
+/**
  * 🛍️ V4 e2e a VALÓDI Shopon (prod adatbázis — engedéllyel, 2026-11-15): a „SMOKE V4 hangcsomag” ingyenes
  * tételt egy teszt-eladó teszi ki (a Mac-ről); a bejelentkezett felhasználó az app kódján át megveszi
  * (RPC), a tartalom RLS-sel olvasható, a csomag a tárba kerül, „új eszközön” a fiókból visszajön, és a
@@ -10733,6 +10774,10 @@ export async function runImageSmoke(
   }
   if (phase === 'crossfade') {
     await step(phase, () => smokeCrossfade(log));
+    return;
+  }
+  if (phase === 'remixtracks') {
+    await step(phase, () => smokeRemixTracks(log));
     return;
   }
   if (phase === 'shoppack') {

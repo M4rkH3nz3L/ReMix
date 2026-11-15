@@ -12,10 +12,10 @@
  */
 
 /** A jelenlegi tájékoztató-verzió. Változáskor emeld (→ újra-hozzájárulás kérhető). */
-export const CONSENT_VERSION = '2026-09-18.2';
+export const CONSENT_VERSION = '2026-11-15.1';
 
 /** Utolsó tartalmi frissítés (a szövegben megjelenik). */
-export const LEGAL_UPDATED = '2026. szeptember 18.';
+export const LEGAL_UPDATED = '2026. november 15.';
 
 export type LegalDoc = 'privacy' | 'terms';
 
@@ -54,6 +54,23 @@ g) Szerepkör / jogosultság: a platform-szerepköröd (pl. néző, moderátor, 
 h) Saját AI-beállítás (opcionális, BYOK): ha saját AI-szolgáltatót adsz meg, annak
    címe/modellje és API-kulcsa — KIZÁRÓLAG a te AI-hívásaid továbbítására. Az
    API-kulcsot az adat-exportból biztonsági okból kihagyjuk.
+
+2/A. HANG, FELVÉTEL ÉS ÁTIRAT
+- Mikrofon: a Hang Stúdióban, a videóid és élő adásaid hangjához, valamint a
+  kimondott parancsokhoz használjuk — csak ha engedélyezted, és csak amikor te
+  indítod a felvételt vagy a diktálást.
+- A felvételek a TELEFONODON maradnak, a projekt mappájában. Free szinten nem
+  töltjük fel őket.
+- Átirat és hangparancs: a beszédfelismerés (Whisper) és a hang-asszisztens a
+  telefonon fut; hangot ehhez nem küldünk szerverre.
+- AI-hang (felolvasás): alapból a telefon beszédmotorja. A Pro felhő-hangnál csak
+  a felolvasandó SZÖVEG kerül a szerverünkre.
+- Pro felhő-export és szinkron: a telefonon elkészült keverés (ritkán a
+  forrásfájlok) a szerverünkre és az objektumtárba kerül a kódoláshoz és a
+  tároláshoz.
+- Közzététel, közös szerkesztés, hangcsomag eladása: csak az kerül fel, amit te
+  megosztasz.
+- A hangodat nem használjuk modell-tanításra és reklámra, és nem adjuk el.
 
 3. AZ ADATKEZELÉS CÉLJAI ÉS JOGALAPJAI
 - A szolgáltatás nyújtása (fiók, szerkesztő, feed, remix, kommentek): a szerződés

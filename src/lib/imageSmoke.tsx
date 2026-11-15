@@ -22,7 +22,7 @@ import { foregroundMask } from '@/lib/foregroundMask';
 import { AssistantBar } from '@/components/studio/image/body/AssistantBar';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { loadBrandStyle, saveBrandStyle } from '@/lib/brandStore';
-import { remixFromPost } from '@/lib/feed';
+import { listPostsByIds, remixFromPost } from '@/lib/feed';
 import { remixRoute } from '@/lib/imageRemix';
 import { loginWithIdentifier } from '@/lib/loginIdentifier';
 import { useActionMenu } from '@/store/actionMenuStore';
@@ -3319,6 +3319,24 @@ async function smokePerfMatrix(log: Log) {
   await noteThermal();
   const row = matrixRow({ date: new Date().toISOString().slice(0, 10), device, os, engine, exportRun: { tracks: 8, sec: SEC, ms: exportMs }, longSourceMs, denoise60Ms, formant10Ms, maxThermal });
   log(null, 'MATRIX', row);
+}
+
+/**
+ * 🔀 C3 e2e a VALÓDI feeden (prod — engedéllyel, 2026-11-15): egy teszt-alkotó nem listázott hang-posztja
+ * sáv-leírással (a Mac-ről, azonosító a fájlszerveren); az iPad a valódi úton olvassa (RLS, ellenőrző) és
+ * remixeli: a fájl az R2-ről letöltve, a remix szerkeszthető sávokkal.
+ */
+async function smokeRemixTracksProd(log: Log) {
+  const postId = (await (await fetch(`${smokeFileHost()}/c3post.txt`)).text()).trim();
+  const [post] = await listPostsByIds([postId]);
+  log(!!post && post.sourceKind === 'audio' && !!post.remixTracks, 'a poszt a feedről: hang-poszt, ellenőrzött sáv-leírással', post ? `${post.remixTracks?.tracks.length ?? 0} sáv` : `nincs (${postId.slice(0, 8)})`);
+  if (!post) return;
+  const id = await remixFromPost(post);
+  const p = id ? await loadProject(id) : null;
+  const clips = (p?.tracks ?? []).flatMap((t) => t.clips as AudioClip[]);
+  const ok = clips.length === 2 && clips.every((c) => c.uri.startsWith('file://') && (new File(c.uri).size ?? 0) > 1000);
+  log(!!p && p.bpm === 92 && ok && p.remixOf?.postId === post.id, 'a remix az R2-ről letöltött sávokkal, tempóval, eredettel', `${clips.length} klip, ${p?.bpm} BPM, ${clips.map((c) => new File(c.uri).size).join('/')} bájt`);
+  if (id) await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:remixtracksprod', caught));
 }
 
 /**
@@ -10774,6 +10792,10 @@ export async function runImageSmoke(
   }
   if (phase === 'crossfade') {
     await step(phase, () => smokeCrossfade(log));
+    return;
+  }
+  if (phase === 'remixtracksprod') {
+    await step(phase, () => smokeRemixTracksProd(log));
     return;
   }
   if (phase === 'remixtracks') {

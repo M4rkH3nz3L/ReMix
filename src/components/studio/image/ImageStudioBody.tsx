@@ -858,7 +858,9 @@ export function ImageStudioBody({
       case 'toPath':
         // 🔷 forma → szerkeszthető pontok (a kinézet nem változik)
         if (selectedLayer?.kind === 'shape') {
-          const points = shapeToPathPoints(selectedLayer);
+          const cv = effectiveCanvas(doc);
+          // S18: a lekerekített sarok is görbe lesz (a sugárhoz a doboz képpont-aránya kell)
+          const points = shapeToPathPoints(selectedLayer, (selectedLayer.w * cv.width) / Math.max(1e-6, selectedLayer.h * cv.height));
           if (points) {
             commit(updateLayer<ShapeLayer>(doc, selectedLayer.id, { shape: 'path', points, closed: true, cornerRadius: undefined }), t('studio.imageTools.toPath'));
           }

@@ -63,15 +63,38 @@ const KAPPA = 0.5522847498;
 
 /**
  * Forma → szerkeszthető görbe: a pontjai a doboz 0–1 terében vannak, így a kinézet azonos
- * marad. `null`, ha a formának nincs zárt körvonala (vonal, már görbe).
+ * marad. `null`, ha a formának nincs zárt körvonala (vonal, már görbe). S18: a lekerekített
+ * téglalap sarka megmarad — a render sugara `cornerRadius × min(szélesség, magasság)` a doboz
+ * képpontjaiban, ezért a doboz aránya (`aspect` = szélesség / magasság, képpontban) kell hozzá.
  */
-export function shapeToPathPoints(layer: Pick<ShapeLayer, 'shape' | 'sides' | 'starPoints' | 'innerRadius'>): PathPoint[] | null {
+export function shapeToPathPoints(
+  layer: Pick<ShapeLayer, 'shape' | 'sides' | 'starPoints' | 'innerRadius'> & { cornerRadius?: number },
+  aspect = 1
+): PathPoint[] | null {
   const poly = polygonFor(layer);
   if (poly) {
     return poly.map(([x, y]) => ({ x: x / 100, y: y / 100 }));
   }
   if (layer.shape === 'rectangle') {
-    return [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
+    const cr = Math.max(0, Math.min(0.5, Number(layer.cornerRadius) || 0));
+    if (cr <= 0) {
+      return [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
+    }
+    const a = aspect > 0 && Number.isFinite(aspect) ? aspect : 1;
+    const rx = (cr * Math.min(a, 1)) / a;
+    const ry = cr * Math.min(a, 1);
+    const [kx, ky] = [KAPPA * rx, KAPPA * ry];
+    // óramutató szerint, minden sarok két ponttal: a sarok-ív a Bézier-fogókból, az oldalak egyenesek
+    return [
+      { x: rx, y: 0, h1: { x: rx - kx, y: 0 } },
+      { x: 1 - rx, y: 0, h2: { x: 1 - rx + kx, y: 0 } },
+      { x: 1, y: ry, h1: { x: 1, y: ry - ky } },
+      { x: 1, y: 1 - ry, h2: { x: 1, y: 1 - ry + ky } },
+      { x: 1 - rx, y: 1, h1: { x: 1 - rx + kx, y: 1 } },
+      { x: rx, y: 1, h2: { x: rx - kx, y: 1 } },
+      { x: 0, y: 1 - ry, h1: { x: 0, y: 1 - ry + ky } },
+      { x: 0, y: ry, h2: { x: 0, y: ry - ky } },
+    ];
   }
   if (layer.shape === 'ellipse') {
     const k = KAPPA / 2;

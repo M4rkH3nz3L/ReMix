@@ -127,6 +127,22 @@ describe('forma → görbe', () => {
     for (let k = 3; k < a.d.length; k += 4) if (Math.abs(a.d[k] - b.d[k]) > 110) diff += 1;
     expect(diff / (W * H)).toBeLessThan(0.01);
   });
+  it('S18: a lekerekített téglalap sarka a görbén is megmarad (nem négyzetes dobozban)', async () => {
+    const before = shape({ cornerRadius: 0.3 });
+    const aspect = (0.5 * W) / (0.8 * H);
+    const points = shapeToPathPoints(before as ShapeLayer, aspect)!;
+    expect(points).toHaveLength(8);
+    const after = { ...before, shape: 'path', points, closed: true, cornerRadius: undefined } as unknown as ImageLayer;
+    const sharp = { ...after, points: shapeToPathPoints({ shape: 'rectangle' })! } as unknown as ImageLayer;
+    const [a, b, c] = [await render([before]), await render([after]), await render([sharp])];
+    const off = (x: { d: ArrayLike<number> }, y: { d: ArrayLike<number> }) => {
+      let n = 0;
+      for (let k = 3; k < x.d.length; k += 4) if (Math.abs(x.d[k] - y.d[k]) > 110) n += 1;
+      return n / (W * H);
+    };
+    expect(off(a, b)).toBeLessThan(0.002);
+    expect(off(a, c)).toBeGreaterThan(0.005);
+  });
   it('a vonalnak nincs körvonala, ezért nem kínáljuk fel', () => {
     expect(shapeToPathPoints({ shape: 'line' })).toBeNull();
     expect(selectionMenu(shape({ shape: 'line' }), { canAlign: false, canBoolean: false }).actions).not.toContain('toPath');

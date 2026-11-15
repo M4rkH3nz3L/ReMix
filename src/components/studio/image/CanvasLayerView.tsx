@@ -24,6 +24,7 @@ export const CanvasLayerView = memo(function CanvasLayerView({
   onSelect,
   onMove,
   onEdit,
+  rendering,
 }: {
   layer: ImageLayer;
   box: { w: number; h: number };
@@ -35,12 +36,17 @@ export const CanvasLayerView = memo(function CanvasLayerView({
   onSelect: (id: string | null) => void;
   onMove: (id: string, position: { x: number; y: number }) => void;
   onEdit?: (id: string) => void;
+  /** a kész kép rajzolása (render-színpad): a sablon üres helyőrzője kimarad */
+  rendering?: boolean;
 }) {
   const { above, masked } = corrections;
   if (l.kind === 'fill') {
     return <FillLayerView layer={correctPaint(l, above)} box={box} onSelect={() => onSelect(l.id)} />;
   }
   if (l.kind === 'photo') {
+    if (l.placeholder && rendering) {
+      return null;
+    }
     return (
       <PhotoLayerView
         layer={l}

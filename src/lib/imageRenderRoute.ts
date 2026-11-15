@@ -42,18 +42,29 @@ export function chooseImageRenderRoute(doc: ImageDoc, workerAvailable: boolean):
 }
 
 /**
- * A render-színpad mérete képpontban (pt) úgy, hogy a natív kép pontosan a kért pixelméretű
- * legyen: a kimeneti szélesség a vászon arányából, a magasság a kért érték.
+ * a színpad leghosszabb oldala legalább ennyi pont: kis pontméreten a betűk szélessége nem
+ * arányosan kicsinyedik, és a szöveg máshol tördel, mint a vásznon (eszközön mérve: 640 px-es
+ * story 120 pont szélesen „ÚJDONSÁ/G”)
+ */
+export const STAGE_MIN_LONG_PT = 720;
+
+/**
+ * A render-színpad mérete: a kimeneti kép pixelmérete (`widthPx`×`heightPx`, a vászon arányában),
+ * a rajzolás pontmérete (`w`×`h`, legalább `STAGE_MIN_LONG_PT` a hosszabb oldalon), és a rögzítés
+ * mérete pontban (`capW`×`capH` — a natív kép = a kért pixelek; ha a rajz nagyobb, kicsinyít).
  */
 export function stageSize(
   canvas: { width: number; height: number },
   heightPx: number,
   pixelRatio: number
-): { widthPx: number; heightPx: number; w: number; h: number } {
+): { widthPx: number; heightPx: number; w: number; h: number; capW: number; capH: number } {
   const h = Math.max(1, Math.round(heightPx));
   const widthPx = Math.max(1, Math.round((h * canvas.width) / canvas.height));
   const r = pixelRatio > 0 ? pixelRatio : 1;
-  return { widthPx, heightPx: h, w: widthPx / r, h: h / r };
+  const capW = widthPx / r;
+  const capH = h / r;
+  const up = Math.max(1, STAGE_MIN_LONG_PT / Math.max(capW, capH));
+  return { widthPx, heightPx: h, w: capW * up, h: capH * up, capW, capH };
 }
 
 /**

@@ -1548,6 +1548,11 @@ export type HslBands = Partial<Record<HslBand, { h?: number; s?: number; l?: num
 export interface PhotoLayer extends ImageLayerBase {
   kind: 'photo';
   uri: string;
+  /**
+   * 🧩 sablon média-helyőrzője (IMAGE-PROD S9 · DS1): még nincs kép (`uri` üres) — a vásznon
+   * szaggatott keret, koppintásra a galéria; a kész képből (export, render) kimarad
+   */
+  placeholder?: boolean;
   /** 🖌️ ecsettel festett réteg: újra megnyitható, a radír is rajta dolgozik */
   paint?: boolean;
   /** 👾 pixel art: a szerkeszthető rács; a `uri` ennek az első kockája */

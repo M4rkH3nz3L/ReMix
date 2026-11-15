@@ -316,7 +316,11 @@ export function TextOverlay({
             styles.inner,
             selected && editable ? styles.selected : null,
             {
-              ...(clip.boxWidth ? { width: clip.boxWidth * box.w } : { maxWidth: '92%' as const }),
+              // a szövegdoboz TARTALMA a megadott szélesség (mint a renderben, ahol nincs belső margó):
+              // a belső margó (2×8, a buboréknál a sajátja) rájön, különben a határeseti sor máshol törik
+              ...(clip.boxWidth
+                ? { width: clip.boxWidth * box.w + ('paddingHorizontal' in preset.box ? 0 : 2 * INNER_PAD_X) }
+                : { maxWidth: '92%' as const }),
               transform: [
                 { translateY: '-50%' },
                 { translateY: anim.translateY },
@@ -477,13 +481,16 @@ export function TextOverlay({
   );
 }
 
+/** a szöveg-blokk belső vízszintes margója (pt) */
+const INNER_PAD_X = 8;
+
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
     alignItems: 'center',
   },
   inner: {
-    paddingHorizontal: 8,
+    paddingHorizontal: INNER_PAD_X,
     paddingVertical: 4,
     borderRadius: 6,
   },

@@ -128,6 +128,7 @@ export function ImageStudioSheets({
       ) : null}
       {sheet === 'templates' ? (
         <TemplatesSheet
+          currentDoc={doc}
           onPick={(tpl) => {
             onTemplate(tpl);
             setSheet(null);

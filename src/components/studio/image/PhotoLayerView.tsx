@@ -1,5 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { StyleSheet } from 'react-native';
+import { t as tr } from 'i18next';
+import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
@@ -103,8 +105,14 @@ export function PhotoLayerView({
   const w = layer.w * box.w;
   const scale = box.w / canvas.width;
   const h = layer.h * box.h;
-  const skia = needsSkiaPreview(layer, corrections, maskedCorrections?.length ?? 0);
-  const plain = (
+  const skia = !layer.placeholder && needsSkiaPreview(layer, corrections, maskedCorrections?.length ?? 0);
+  // 🧩 S9: a sablon üres helyőrzője — szaggatott keret, koppintásra kép a galériából
+  const plain = layer.placeholder ? (
+    <View style={styles.placeholder} accessibilityRole="button" accessibilityLabel={tr('studio.image.placeholder.pick')}>
+      <Ionicons name="image-outline" size={Math.max(16, Math.min(40, Math.min(w, h) / 3))} color={palette.textDim} />
+      {Math.min(w, h) > 60 ? <Text style={styles.placeholderText}>{tr('studio.image.placeholder.pick')}</Text> : null}
+    </View>
+  ) : (
     <Image
       source={{ uri: layer.uri }}
       style={StyleSheet.absoluteFill}
@@ -138,4 +146,6 @@ export function PhotoLayerView({
 const styles = StyleSheet.create({
   wrap: { position: 'absolute' },
   selected: { borderWidth: 1, borderColor: palette.accent },
+  placeholder: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 2, borderStyle: 'dashed', borderColor: palette.textDim, backgroundColor: '#ffffff14' },
+  placeholderText: { color: palette.textDim, fontSize: 11, fontWeight: '700' },
 });

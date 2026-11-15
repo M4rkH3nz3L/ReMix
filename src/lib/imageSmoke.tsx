@@ -40,7 +40,7 @@ import type { FeedPost } from '@/types/social';
 import { type Href, router } from 'expo-router';
 import { useBrandStyle } from '@/store/brandStyleStore';
 import { TemplatesSheet } from '@/components/studio/image/TemplatesSheet';
-import { docFromTemplate, IMAGE_TEMPLATES } from '@/lib/imageTemplates';
+import { docFromTemplate, IMAGE_TEMPLATES, templateFromDoc } from '@/lib/imageTemplates';
 import { addImageDocToVideo } from '@/lib/imageToVideo';
 import { variantDoc } from '@/lib/imageVariants';
 import { applyImageCommands, parseImageIntent } from '@/lib/imageIntent';
@@ -122,6 +122,8 @@ import { applyCommand } from '@/lib/commands';
 import { linkedAssets, mixdownVersion, relinkPlan, stillVersion } from '@/lib/linkedAsset';
 import { sendMixdownToVideo, sendStillToVideo, sourceVersionOf } from '@/lib/linkedAssetClient';
 import { renderProjectVersion } from '@/lib/render';
+import { useUserTemplates } from '@/store/userTemplatesStore';
+import AsyncStorageTpl from '@react-native-async-storage/async-storage';
 import { thumbnailFramesOnDevice } from '@/lib/thumbStudio';
 import { posterNeedsRefresh, thumbnailDoc, thumbnailDocOf } from '@/lib/thumbnailDoc';
 import { renderOnDevice } from '@/lib/renderStageRegistry';
@@ -1950,7 +1952,9 @@ async function smokeEcosystem(log: Log, setHarness: (n: ReactNode) => void, rati
     await saveBrandStyle(brand);
     const stored = await loadBrandStyle();
     log(stored.fontFamily === 'Bungee' && stored.colors.length === 2, 'márka: visszaolvasva a tárolóból', JSON.stringify(stored));
-    for (const tpl of IMAGE_TEMPLATES) {
+    // a márka-alkalmazás az eredeti négy sablonon (a vászon itt egy apró tesztkeretben fotózódik, ahol a
+    // magas sablon szövege a kis pontméret miatt máshol tördel); a teljes könyvtár paritását a `templib` méri
+    for (const tpl of IMAGE_TEMPLATES.filter((x) => ['youtubeThumb', 'instaPost', 'story', 'banner'].includes(x.key))) {
       const doc = docFromTemplate(tpl, tpl.key, id, stored);
       // ellenpróba: ugyanaz a sablon márka nélkül; ha a szerver nem kapná a fontot, ez bukna
       await check(`márkás sablon = export: ${tpl.key}`, doc, docFromTemplate(tpl, tpl.key, id));
@@ -7511,6 +7515,123 @@ async function smokeDesignEntry(log: Log) {
   }
 }
 
+/**
+ * 🧩 IMAGE-PROD S9 (DS1): sablon-könyvtár — minden sablon a telefonon renderelve = a szerver-render
+ * (a helyőrző mindkettőből kimarad); a helyőrzőbe tett kép a helyén marad (valódi stúdió, egy
+ * visszavonás); a saját sablon a telefonon tárolva, a fotó helyőrzővé válik.
+ */
+async function smokeTemplateLibrary(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(
+    <View style={{ width: 1, height: 1 }}>
+      <RenderStage ref={ref} />
+    </View>
+  );
+  await sleep(300);
+  // 1) a teljes könyvtár: telefon = szerver (640 px magasan, átlagos színeltérés — mint a márka-mérés)
+  const meanDiff = (p: SkImage, q: SkImage) => {
+    let sum = 0;
+    let count = 0;
+    for (let i = 0; i < 60; i++) {
+      for (let j = 0; j < 60; j++) {
+        const [x, y] = [(j + 0.5) / 60, (i + 0.5) / 60];
+        const u = pixel(p, Math.floor(x * p.width()), Math.floor(y * p.height()));
+        const w = pixel(q, Math.floor(x * q.width()), Math.floor(y * q.height()));
+        sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+        count += 1;
+      }
+    }
+    return sum / count;
+  };
+  let ok = 0;
+  const bad: string[] = [];
+  const all: string[] = [];
+  const t0 = Date.now();
+  for (const tpl of IMAGE_TEMPLATES) {
+    const doc = docFromTemplate(tpl, tpl.key, () => makeId('lyr'));
+    const h = 640;
+    const w = Math.round((h * tpl.width) / tpl.height);
+    const dev = await ref.current!.render(doc, h);
+    const srv = await renderImageDoc(doc, h).catch((caught) => {
+      logCaught('lib/imageSmoke.tsx:templib', caught);
+      return null;
+    });
+    if (!dev || !srv) {
+      bad.push(`${tpl.key}:nincs`);
+      continue;
+    }
+    const a = await decode(dev);
+    const d = meanDiff(a, await decode(srv));
+    all.push(`${tpl.key} ${d.toFixed(1)}`);
+    if (Math.abs(a.width() - w) <= 1 && d <= 7) {
+      ok += 1;
+      removeFile(dev);
+      removeFile(srv);
+    } else {
+      bad.push(`${tpl.key}:${d.toFixed(1)}`);
+      // az eltérő pár megmarad a vizsgálathoz (a Mac-re másolható)
+      const keep = (uri: string, tag: string) => new File(uri).move(new File(projectMediaDir(), `smoke_cmp_${tpl.key}_${tag}.png`));
+      keep(dev, 'dev');
+      keep(srv, 'srv');
+    }
+  }
+  log(null, 'sablononként (átlag /255)', all.join(' · '));
+  log(null, 'eltérő párok helye', projectMediaDir().uri);
+  log(ok === IMAGE_TEMPLATES.length, `mind a ${IMAGE_TEMPLATES.length} sablon: telefon = szerver (a helyőrző kimarad)`, `${ok}/${IMAGE_TEMPLATES.length} egyezik (≤ 7/255), ${Date.now() - t0} ms${bad.length ? ` — eltér: ${bad.join(', ')}` : ''}`);
+  setHarness(null);
+
+  // 2) a helyőrző kitöltése a valódi stúdióban
+  const id = 'prj_smoke_templib';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:templib-del0', caught));
+  const surface = Skia.Surface.MakeOffscreen(200, 200)!;
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color('#20c060'));
+  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, 200, 200), paint);
+  surface.flush();
+  const img = new File(projectMediaDir(), `smoke_tpl_${Date.now().toString(36)}.png`);
+  img.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const tpl = IMAGE_TEMPLATES.find((x) => x.key === 'postPhoto')!;
+  const page = docFromTemplate(tpl, 'Fotó', () => makeId('lyr'));
+  const base = createEmptyProject('smoke sablon-könyvtár', '1:1', undefined, 'design');
+  await saveProject({ ...base, id, imageDocs: [page] });
+  const st = useEditorStore.getState;
+  try {
+    router.push(`/studio/design/${id}` as Href);
+    for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+    await sleep(1500);
+    const phLayer = st().project!.imageDocs![0].layers.find((l) => l.kind === 'photo') as PhotoLayer;
+    const filled = (await runDevAction('image.fillPlaceholder', { layerId: phLayer.id, uri: img.uri })) as boolean;
+    await sleep(400);
+    const after = st().project!.imageDocs![0].layers.find((l) => l.id === phLayer.id) as PhotoLayer;
+    const r = await renderOnDevice(st().project!.imageDocs![0], 320);
+    const mid = r ? pixel(await decode(r), 160, 120).slice(0, 3) : [];
+    log(filled && after.uri === img.uri && !after.placeholder && after.w === phLayer.w && after.h === phLayer.h && mid[1] > 150 && mid[0] < 80, 'a helyőrzőbe tett kép a helyén és méretében, a kész képen is', `${after.w}×${after.h} (helyőrző ${phLayer.w}×${phLayer.h}), a kép közepe ${mid.join(',')}`);
+    log(true, 'FOTÓZHATÓ', 'a kitöltött sablon a Design munkaterületen');
+    await sleep(4000);
+    st().undo();
+    await sleep(300);
+    const undone = st().project!.imageDocs![0].layers.find((l) => l.id === phLayer.id) as PhotoLayer;
+    log(!!undone.placeholder && undone.uri === '', 'egy visszavonás: újra helyőrző');
+    st().redo();
+    // 3) mentés sablonként → a telefonon tárolva, a fotó helyőrző, a kategória a méretből
+    const mine = templateFromDoc(st().project!.imageDocs![0], 'tpl_smoke', 'smoke saját');
+    await useUserTemplates.getState().add(mine);
+    const stored = JSON.parse((await AsyncStorageTpl.getItem('remix.imagetemplates.v1')) ?? '[]') as { key: string; layers: { kind: string; placeholder?: boolean; uri?: string }[]; category: string }[];
+    const saved = stored.find((x) => x.key === 'tpl_smoke');
+    log(!!saved && saved.category === 'post' && saved.layers.some((l) => l.kind === 'photo' && l.placeholder && l.uri === '') && !JSON.stringify(saved).includes(img.uri), 'mentés sablonként: a telefonon tárolva, a fotóból helyőrző (nincs fájl-hivatkozás)', `${saved?.category}, ${saved?.layers.length} réteg`);
+    await useUserTemplates.getState().remove('tpl_smoke');
+    if (r) removeFile(r);
+  } finally {
+    if (st().project?.id === id) {
+      router.back();
+      await sleep(500);
+    }
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:templib-del', caught));
+    removeFile(img.uri);
+  }
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -11432,6 +11553,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'templib') {
+    await step(phase, () => smokeTemplateLibrary(log, setHarness));
     return;
   }
   if (phase === 'designentry') {

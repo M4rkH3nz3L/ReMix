@@ -41,10 +41,16 @@ describe('🧭 kép-render útvonal (offline first)', () => {
     expect(serverOnlyEffects(doc([photo('a', develop({ noiseReduction: 0, lensDistortion: 0 }))]))).toEqual([]);
   });
 
-  it('a színpad mérete a kért pixelmagasságból és a vászon arányából', () => {
-    expect(stageSize({ width: 1000, height: 500 }, 2000, 2)).toEqual({ widthPx: 4000, heightPx: 2000, w: 2000, h: 1000 });
-    expect(stageSize({ width: 1080, height: 1920 }, 4096, 3)).toEqual({ widthPx: 2304, heightPx: 4096, w: 768, h: 4096 / 3 });
-    expect(stageSize({ width: 1, height: 1 }, 0, 0)).toEqual({ widthPx: 1, heightPx: 1, w: 1, h: 1 });
+  it('a színpad mérete: a kimenet a kért pixeleken, a rajz legalább 720 pont a hosszabb oldalon', () => {
+    // nagy kép: a rajz = a rögzítés (nincs kicsinyítés)
+    expect(stageSize({ width: 1000, height: 500 }, 2000, 2)).toEqual({ widthPx: 4000, heightPx: 2000, w: 2000, h: 1000, capW: 2000, capH: 1000 });
+    // kicsi, magas story: a rajz 720 pont magas (nem 213), a rögzítés a kért 360×640 px-re kicsinyít
+    const s = stageSize({ width: 1080, height: 1920 }, 640, 3);
+    expect([s.widthPx, s.heightPx]).toEqual([360, 640]);
+    expect(s.h).toBeCloseTo(720);
+    expect(s.w).toBeCloseTo(405);
+    expect([s.capW, s.capH]).toEqual([120, 640 / 3]);
+    expect(stageSize({ width: 1, height: 1 }, 0, 0).heightPx).toBe(1);
   });
 
   it('a várakozás a betöltendő képekkel nő, felül korlátos', () => {

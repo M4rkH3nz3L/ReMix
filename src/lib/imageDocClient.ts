@@ -287,6 +287,10 @@ export async function renderImageDoc(
   if (limit) {
     throw new ImageRenderRejected(tr(`studio.image.limits.${limit}`));
   }
+  // 🧩 S9: a sablon üres helyőrzője a kész képből kimarad (a szerver hiányzó médiának venné)
+  if (doc.layers.some((l) => l.kind === 'photo' && l.placeholder)) {
+    doc = { ...doc, layers: doc.layers.filter((l) => !(l.kind === 'photo' && l.placeholder)) };
+  }
   try {
     const dir = projectMediaDir();
     if (!dir.exists) {

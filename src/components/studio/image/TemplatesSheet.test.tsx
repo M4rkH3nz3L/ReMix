@@ -8,6 +8,20 @@ import { useBrandStyle } from '@/store/brandStyleStore';
 jest.mock('@/components/studio/image/StudioSheet', () => ({
   StudioSheet: ({ children }: { children: unknown }) => children,
 }));
+// a kicsinyített sablon-előnézet a vászon réteg-komponenseit rajzolja (Reanimated/Skia) — a paritását az
+// eszközös `templib` füstteszt méri, itt a lap logikája számít
+jest.mock('@/components/studio/image/StageLayers', () => ({ StageLayers: () => null }));
+// a kategória-chip animált (Reanimated) — itt egy sima gomb is elég
+jest.mock('@/components/ui/controls', () => {
+  const { Pressable, Text } = jest.requireActual('react-native');
+  return {
+    Chip: ({ label, onPress }: { label: string; onPress: () => void }) => (
+      <Pressable onPress={onPress} accessibilityRole="button">
+        <Text>{label}</Text>
+      </Pressable>
+    ),
+  };
+});
 
 const mount = async () => {
   let view!: ReactTestRenderer;

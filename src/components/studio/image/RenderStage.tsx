@@ -1,19 +1,16 @@
 import { File } from 'expo-file-system';
 import { SaveFormat, ImageManipulator } from 'expo-image-manipulator';
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { PixelRatio, StyleSheet, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
-import { CanvasLayerView } from '@/components/studio/image/CanvasLayerView';
-import { DocGrain, DocVignette } from '@/components/studio/image/DocVignette';
+import { StageLayers } from '@/components/studio/image/StageLayers';
 import { effectiveCanvas } from '@/lib/canvasPresets';
-import { effectiveLayerOpacity, visibleLayers } from '@/lib/imageDoc';
-import { correctionContext, docVignetteAngles, NO_CORRECTIONS } from '@/lib/imagePixelPipeline';
 import { stageSettleMs, stageSize } from '@/lib/imageRenderRoute';
 import { logCaught } from '@/lib/logCaught';
 import { registerRenderStage, renderOnDevice, type RenderStageHandle, type RenderStageOptions } from '@/lib/renderStageRegistry';
 import { projectMediaDir } from '@/lib/projectFolderClient';
-import type { ClipMask, ImageDoc, ImageLayer } from '@/types/project';
+import type { ImageDoc } from '@/types/project';
 
 /**
  * 🖨️ RENDER-SZÍNPAD (CORE K1 · IMAGE-PROD C1): a kép-dokumentum raszterizálása a TELEFONON,
@@ -26,48 +23,13 @@ import type { ClipMask, ImageDoc, ImageLayer } from '@/types/project';
  */
 
 export type { RenderStageHandle, RenderStageOptions };
+export { StageLayers };
 export { renderOnDevice };
 
-const noop = () => {};
-const MOVE_RANGE: [number, number] = [0, 1];
 /** ha a színpad ennyi idő alatt sem rajzolódik ki (nincs felcsatolva), feladjuk */
 const MOUNT_TIMEOUT_MS = 3000;
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-function StageLayers({ doc, w, h }: { doc: ImageDoc; w: number; h: number }) {
-  const box = useMemo(() => ({ w, h }), [w, h]);
-  const { width, height } = effectiveCanvas(doc);
-  const canvas = useMemo(() => ({ width, height }), [width, height]);
-  const corrections = useMemo(() => correctionContext<ClipMask>(doc), [doc]);
-  return (
-    <>
-      {visibleLayers(doc).map((raw0) => {
-        // 🗂️ csoport-opacity a réteg saját opacity-jére szorozva (mint a vásznon)
-        const raw =
-          raw0.groupId && doc.groups?.some((g) => g.id === raw0.groupId && (g.opacity ?? 1) < 1)
-            ? ({ ...raw0, opacity: effectiveLayerOpacity(doc, raw0) } as ImageLayer)
-            : raw0;
-        return (
-          <CanvasLayerView
-            key={raw.id}
-            layer={raw}
-            box={box}
-            canvas={canvas}
-            zoom={1}
-            moveRange={MOVE_RANGE}
-            selected={false}
-            corrections={corrections.get(raw.id) ?? NO_CORRECTIONS}
-            onSelect={noop}
-            onMove={noop}
-          />
-        );
-      })}
-      <DocVignette angles={docVignetteAngles(doc as Parameters<typeof docVignetteAngles>[0])} box={box} />
-      <DocGrain grain={doc.grain ?? 0} cell={w / (doc.width || w)} />
-    </>
-  );
-}
 
 /**
  * A telefonos render ideiglenes fájlt ad; ami a projektben marad (réteg, bélyegkép), az a
@@ -120,8 +82,9 @@ export const RenderStage = forwardRef<RenderStageHandle>(function RenderStage(_p
           const png = await captureRef(viewRef, {
             format: opts.format === 'jpg' ? 'jpg' : 'png',
             quality: opts.quality ?? 1,
-            width: size.w,
-            height: size.h,
+            // a rajz legalább `STAGE_MIN_LONG_PT` méretű; a rögzítés a kért pixelekre kicsinyít
+            width: size.capW,
+            height: size.capH,
           });
           if (opts.format !== 'webp') {
             return png;

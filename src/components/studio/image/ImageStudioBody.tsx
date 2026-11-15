@@ -1018,9 +1018,38 @@ export function ImageStudioBody({
     setSelectedId(id);
     setSheet('layerMenu');
   };
+  // 🧩 S9: a sablon média-helyőrzője koppintásra a galériát nyitja; a kép a helyőrző helyén és
+  // méretében, kitöltéssel (`cover`) jelenik meg — a kompozíció megmarad, egy visszavonás
+  const placeImage = (layerId: string, uri: string): boolean => {
+    const fresh = useEditorStore.getState().project?.imageDocs?.find((d) => d.id === doc?.id) ?? doc;
+    const target = fresh?.layers.find((l) => l.id === layerId);
+    if (!fresh || !target || target.kind !== 'photo' || !target.placeholder) {
+      return false;
+    }
+    commit(updateLayer<PhotoLayer>(fresh, layerId, { uri, placeholder: undefined, fit: 'cover' }), t('studio.image.undoAddPhoto'));
+    return true;
+  };
+  const fillPlaceholder = (layerId: string) => {
+    void pickImage().then((picked) => {
+      if (picked) {
+        placeImage(layerId, picked.uri);
+      }
+    });
+  };
+  // 🧪 füstteszt: a galéria (rendszer-felület) helyett a kép közvetlenül, ugyanazzal a paranccsal
+  const placeImageRef = useRef(placeImage);
+  placeImageRef.current = placeImage;
+  useEffect(() => registerDevAction('image.fillPlaceholder', (arg) => {
+    const a = arg as { layerId: string; uri: string };
+    return placeImageRef.current(a.layerId, a.uri);
+  }), []);
   const onCanvasSelect = (id: string | null) => {
     if (!multiIds) {
       setSelectedId(id);
+      const hit = id ? doc?.layers.find((l) => l.id === id) : undefined;
+      if (hit?.kind === 'photo' && hit.placeholder && !hit.locked) {
+        fillPlaceholder(hit.id);
+      }
     } else if (id) {
       setMultiIds(toggleId(multiIds, id));
     }

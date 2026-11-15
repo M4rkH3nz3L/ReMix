@@ -195,6 +195,7 @@ import { colorRangeSelect, magicWandSelect, refineSelectionToEdges } from '@/lib
 import { normalizePickedImage } from '@/lib/media';
 import { toSrgbIfNeeded } from '@/lib/colorIntakeClient';
 import { createAdjustment, flattenAdjustments } from '@/lib/adjustmentStack';
+import { IMAGE_LOOKS, applyLook } from '@/lib/imageLooks';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { createEmptyProject, CURRENT_SCHEMA_VERSION, splitClip } from '@/lib/projectUtils';
 import { cloudBaseUrl, serverHost } from '@/lib/backend';
@@ -8639,6 +8640,58 @@ async function smokeRefineEdge(log: Log) {
   }
 }
 
+/** 🎞️ S17: a 10 beépített look a fotón — telefon = szerver, mindegyik érdemben változtat */
+async function smokeLooks(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  // 8×8 színrács: oszloponként árnyalat, soronként világosság (sötéttől a világosig)
+  const surface = Skia.Surface.MakeOffscreen(400, 400)!;
+  const paint = Skia.Paint();
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
+    paint.setColor(Skia.Color(`hsl(${i * 45}, ${j === 7 ? 0 : 70}%, ${10 + j * 11}%)`));
+    surface.getCanvas().drawRect(Skia.XYWHRect(i * 50, j * 50, 50, 50), paint);
+  }
+  surface.flush();
+  const f = new File(projectMediaDir(), `smoke_looks_${Date.now().toString(36)}.png`);
+  f.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const meanDiff = (p: SkImage, q: SkImage) => {
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < 64; i++) for (let j = 0; j < 64; j++) {
+      const u = pixel(p, Math.floor(((j + 0.5) / 64) * p.width()), Math.floor(((i + 0.5) / 64) * p.height()));
+      const w = pixel(q, Math.floor(((j + 0.5) / 64) * q.width()), Math.floor(((i + 0.5) / 64) * q.height()));
+      sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+      n += 1;
+    }
+    return sum / n;
+  };
+  const doc = (extra: Record<string, unknown>) => ({ id: 'lk', name: 'lk', aspectRatio: '1:1', width: 400, height: 400, layers: [{ id: 'p', kind: 'photo', uri: f.uri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch', ...extra }] }) as unknown as ImageDoc;
+  const plain = await ref.current!.render(doc({}), 400);
+  const res: string[] = [];
+  let ok = 0;
+  for (const look of IMAGE_LOOKS) {
+    const d = doc(applyLook(look));
+    const dev = await ref.current!.render(d, 400);
+    const srv = await renderImageDoc(d, 400);
+    if (!dev || !srv || !plain) {
+      res.push(`${look.key}: nincs kép`);
+      continue;
+    }
+    const a = await decode(dev);
+    const diff = meanDiff(a, await decode(srv));
+    const ctl = meanDiff(a, await decode(plain));
+    if (diff <= 6 && ctl > diff * 2) ok += 1;
+    res.push(`${look.key} ${diff.toFixed(2)} (${ctl.toFixed(1)})`);
+    [dev, srv].forEach((u) => removeFile(u));
+  }
+  log(ok === IMAGE_LOOKS.length, `mind a ${IMAGE_LOOKS.length} look: telefon = szerver, és érdemben változtat`, `${ok}/${IMAGE_LOOKS.length} · ${res.join(' · ')}`);
+  if (plain) removeFile(plain);
+  setHarness(null);
+  removeFile(f.uri);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -12560,6 +12613,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'looks') {
+    await step(phase, () => smokeLooks(log, setHarness));
     return;
   }
   if (phase === 'refine') {

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -8,6 +8,9 @@ import { ToneCurveEditor } from '@/components/editor/ToneCurveEditor';
 import { Slider } from '@/components/studio/audio/primitives';
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { palette } from '@/constants/editor';
+import { IMAGE_LOOKS, applyLook, lookFromLayer, type ImageLook } from '@/lib/imageLooks';
+import { makeId } from '@/lib/id';
+import { useUserLooks } from '@/store/userLooksStore';
 import {
   addAdjustment,
   createAdjustment,
@@ -136,6 +139,19 @@ export function AdjustStackSheet({
       ? [createAdjustment('custom', layer.adjust, t('studio.image.adjustStack.base'))]
       : []);
 
+  const userLooks = useUserLooks((st) => st.looks);
+  const removeLook = useUserLooks((st) => st.remove);
+  useEffect(() => {
+    void useUserLooks.getState().hydrate();
+  }, []);
+  const applyLookToLayer = (look: ImageLook) => commit(updateLayer<PhotoLayer>(doc, layer.id, applyLook(look, (k) => t(k))), 'look');
+  const saveLook = () => {
+    const look = lookFromLayer({ ...layer, adjustmentStack: stack }, makeId('look'), `${t('studio.image.looks.mine')} ${userLooks.length + 1}`);
+    if (look) {
+      void useUserLooks.getState().add(look);
+    }
+  };
+
   const commitStack = (next: AdjustmentLayer[]) =>
     commit(
       updateLayer<PhotoLayer>(doc, layer.id, { adjustmentStack: next, adjust: flattenAdjustments(next) }),
@@ -164,6 +180,35 @@ export function AdjustStackSheet({
         ) : undefined
       }
     >
+      {/* 🎞️ S17: lookok — a verem + színenkénti HSL kész beállítása (utána minden lépése állítható) */}
+      <Text style={styles.section}>{t('studio.image.looks.title')}</Text>
+      <View style={styles.chipRow}>
+        {IMAGE_LOOKS.map((look) => (
+          <Chip key={look.key} label={t(look.name)} active={false} onPress={() => applyLookToLayer(look)} />
+        ))}
+        {/* saját look: hosszú nyomásra törlődik */}
+        {userLooks.map((look) => (
+          <Pressable
+            key={look.key}
+            style={styles.addChip}
+            onPress={() => applyLookToLayer(look)}
+            onLongPress={() => void removeLook(look.key)}
+            accessibilityRole="button"
+            accessibilityLabel={look.name}
+            accessibilityHint={t('studio.image.looks.removeHint')}
+          >
+            <Ionicons name="bookmark" size={14} color={palette.accent} />
+            <Text style={styles.addChipText}>{look.name}</Text>
+          </Pressable>
+        ))}
+        {stack.length > 0 || layer.hsl ? (
+          <Pressable style={styles.addChip} onPress={saveLook} accessibilityRole="button">
+            <Ionicons name="bookmark-outline" size={15} color={palette.accent} />
+            <Text style={styles.addChipText}>{t('studio.image.looks.save')}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
       {/* 🎨 szűrők (gyors preset — a stacktől független filterId) */}
       <Text style={styles.section}>{t('studio.image.filter')}</Text>
       <View style={styles.chipRow}>

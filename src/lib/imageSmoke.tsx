@@ -8692,6 +8692,37 @@ async function smokeLooks(log: Log, setHarness: (n: ReactNode) => void) {
   removeFile(f.uri);
 }
 
+/** 📸 S18: a kijelölő keret fogói a stúdióban (képernyőképhez: sarok-, oldal- és forgató fogó) */
+async function smokeFrameShot(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const id = 'prj_smoke_frameshot';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:frameshot-del0', caught));
+  const page = { id: 'pg', name: 'pg', aspectRatio: '1:1', width: 600, height: 600, layers: [
+    { id: 'bg', kind: 'fill', fill: '#203040' },
+    { id: 's', kind: 'shape', shape: 'rectangle', position: { x: 0.45, y: 0.5 }, w: 0.4, h: 0.3, rotation: 15, fill: '#ff8a3d' },
+    { id: 't', kind: 'text', text: 'Oldal-fogó', position: { x: 0.5, y: 0.2 }, fontSize: 7, color: '#ffffff', fontFamily: 'Poppins', fontWeight: 'bold', textAlign: 'center', backgroundColor: null },
+  ] } as unknown as ImageDoc;
+  await saveProject({ ...createEmptyProject('smoke keret-fogók', '1:1', undefined, 'image'), id, imageDocs: [page] });
+  const st = useEditorStore.getState;
+  try {
+    router.push(`/studio/image/${id}` as Href);
+    for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+    await sleep(1500);
+    await runDevAction('image.selectLayer', 's');
+    log(true, 'FOTÓZHATÓ', 'forgatott forma kijelölve: 4 sarok-, 4 oldal- és a forgató fogó');
+    await sleep(7000);
+    await runDevAction('image.selectLayer', 't');
+    log(true, 'FOTÓZHATÓ', 'szöveg kijelölve: csak bal/jobb oldal-fogó');
+    await sleep(7000);
+  } finally {
+    if (st().project?.id === id) {
+      router.back();
+      await sleep(500);
+    }
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:frameshot-del', caught));
+  }
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -12613,6 +12644,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'frameshot') {
+    await step(phase, () => smokeFrameShot(log));
     return;
   }
   if (phase === 'looks') {

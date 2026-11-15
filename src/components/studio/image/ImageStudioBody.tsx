@@ -1601,6 +1601,11 @@ export function ImageStudioBody({
     return true;
   }), []);
 
+  // 🧪 füstteszt: réteg kijelölése (a kijelölő keret és a fogói képernyőképhez)
+  useEffect(() => registerDevAction('image.selectLayer', (arg) => {
+    setSelectedId(typeof arg === 'string' ? arg : null);
+    return true;
+  }), []);
   // 🧪 füstteszt: kijelölés-művelet a valódi kezelőn át (a szöveg/forma raszterizálásával együtt)
   const selectionActionRef = useRef(selectionAction);
   selectionActionRef.current = selectionAction;

@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Platform, StyleSheet, Text } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 import { palette } from '@/constants/editor';
+import { tightLeadingShift } from '@/lib/fontMetrics';
 import { sampleChannel } from '@/lib/keyframes';
 import { clamp } from '@/lib/time';
 import { activeWordIndex } from '@/lib/wordTiming';
@@ -261,6 +262,18 @@ export function TextOverlay({
   const anim = animatedProps(clip, t);
   const fontSize = (clip.fontSize / 100) * box.h * kfScale;
   const preset = presetStyles(clip, fontSize);
+  // 🔡 a tipográfia a render CSS-ével azonos: a sorköz CSS-szorzó (alap 1,25, mint a `text-render.js`),
+  // a betűköz em-arány — a körvonal-másolatok is ezt kapják, különben többsoros szövegen szétcsúsznak
+  const typo = clip.text3d
+    ? null
+    : {
+        lineHeight: (clip.lineHeight && clip.lineHeight > 0 ? clip.lineHeight : 1.25) * fontSize,
+        ...(clip.letterSpacing ? { letterSpacing: clip.letterSpacing * fontSize } : null),
+      };
+  // iOS a font természetes sormagasságánál szorosabb sorban a betűt a sor tetejéhez igazítja, a CSS
+  // középre: a különbség felével lejjebb toljuk (a font saját hhea-értékéből, `fontMetrics.ts`)
+  const tightShift =
+    typo && Platform.OS === 'ios' ? tightLeadingShift(clip.fontFamily, typo.lineHeight / fontSize) * fontSize : 0;
   const shown =
     clip.animation === 'typewriter' || clip.textMotion?.preset === 'typeOn'
       ? clip.text.slice(0, Math.max(0, anim.chars))
@@ -365,13 +378,15 @@ export function TextOverlay({
                   style={{
                     position: 'absolute',
                     left: dx * (clip.textStyle!.stroke!.width * fontSize) / 2,
-                    top: dy * (clip.textStyle!.stroke!.width * fontSize) / 2,
                     right: -dx * (clip.textStyle!.stroke!.width * fontSize) / 2,
                     color: clip.textStyle!.stroke!.color,
                     fontSize,
                     fontWeight: clip.fontWeight,
                     fontFamily: clip.fontFamily,
                     textAlign: clip.textAlign ?? 'center',
+                    ...typo,
+                    top: dy * (clip.textStyle!.stroke!.width * fontSize) / 2,
+                    paddingTop: tightShift,
                   }}
                 >
                   {shown}
@@ -414,10 +429,10 @@ export function TextOverlay({
               // a glow/shadow textShadow-val közelít)
               !clip.text3d
                 ? {
-                    ...(clip.letterSpacing
-                      ? { letterSpacing: clip.letterSpacing * fontSize }
-                      : null),
-                    ...(clip.lineHeight ? { lineHeight: clip.lineHeight * fontSize * 1.2 } : null),
+                    ...typo,
+                    // padding (nem eltolás): a sor fölé lógó betűrész (ékezet) a nézeten belül marad,
+                    // a negatív alsó margó a doboz méretét változatlanul hagyja
+                    ...(tightShift ? { paddingTop: tightShift, marginBottom: -tightShift } : null),
                     ...(clip.textStyle?.gradient ? { color: clip.textStyle.gradient.from } : null),
                     ...(clip.textStyle?.glow
                       ? {

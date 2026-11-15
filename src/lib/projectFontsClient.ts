@@ -2,6 +2,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import * as Font from 'expo-font';
 
+import { naturalLeadingFromFont, registerFontLeading } from '@/lib/fontMetrics';
 import { logCaught } from '@/lib/logCaught';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { fontDisplayName, fontFamilyKey, isFontHeader } from '@/lib/projectFonts';
@@ -74,6 +75,8 @@ export async function loadProjectFonts(fonts: readonly ProjectFont[] | undefined
     try {
       if (!new File(f.uri).exists) continue; // hiányzó média — a relink-út intézi
       await Font.loadAsync({ [f.family]: f.uri });
+      // a sorköz-igazításhoz (`fontMetrics.ts`) a font saját természetes sormagassága
+      registerFontLeading(f.family, naturalLeadingFromFont(await new File(f.uri).bytes()));
       loaded.add(f.family);
     } catch (caught) {
       logCaught('lib/projectFontsClient.ts:loadProjectFonts', caught);

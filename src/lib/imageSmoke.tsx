@@ -8014,6 +8014,80 @@ async function smokeLensFx(log: Log, setHarness: (n: ReactNode) => void) {
   removeFile(f.uri);
 }
 
+/** 📏 S15: a szöveg sorköze — a vászon/telefon = a szerver (egy- és többsoros, alap és megadott sorköz) */
+async function smokeLeading(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  // a tinta függőleges kiterjedése (sorok, ahol a háttértől eltér) a kép magasságára normálva
+  const ink = (img: SkImage) => {
+    const W = img.width();
+    const H = img.height();
+    let top = -1;
+    let bottom = -1;
+    // az alsó sáv kimarad (a szerveres kép vízjele)
+    for (let y = 0; y < H * 0.88; y += 1) {
+      let hit = false;
+      for (let x = 0; x < W && !hit; x += 3) {
+        const p = pixel(img, x, y);
+        if (p[0] > 150 && p[1] > 150) hit = true;
+      }
+      if (hit) {
+        if (top < 0) top = y;
+        bottom = y;
+      }
+    }
+    return { top: top / H, bottom: bottom / H };
+  };
+  const meanDiff = (p: SkImage, q: SkImage) => {
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < 100; i++) for (let j = 0; j < 100; j++) {
+      const u = pixel(p, Math.floor(((j + 0.5) / 100) * p.width()), Math.floor(((i + 0.5) / 100) * p.height()));
+      const w = pixel(q, Math.floor(((j + 0.5) / 100) * q.width()), Math.floor(((i + 0.5) / 100) * q.height()));
+      sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+      n += 1;
+    }
+    return sum / n;
+  };
+  const bg = { id: 'bg', kind: 'fill', fill: '#203040' } as unknown as ImageLayer;
+  const mk = (text: string, extra: Record<string, unknown>) => ({ id: 'lead', name: 'lead', aspectRatio: '1:1', width: 600, height: 600, layers: [bg, { id: 't', kind: 'text', text, position: { x: 0.5, y: 0.5 }, fontSize: 12, color: '#ffffff', fontFamily: 'Inter', fontWeight: 'bold', textAlign: 'center', backgroundColor: null, ...extra }] }) as unknown as ImageDoc;
+  const CASES: [string, string, Record<string, unknown>][] = [
+    ['egysoros, alap sorköz', 'Sorköz', {}],
+    ['kétsoros, alap sorköz', 'Első sor\nMásodik', {}],
+    ['háromsoros, alap sorköz', 'Egy\nKettő\nHárom', {}],
+    ['kétsoros, sorköz 1,0', 'Első sor\nMásodik', { lineHeight: 1 }],
+    ['kétsoros, sorköz 1,6', 'Első sor\nMásodik', { lineHeight: 1.6 }],
+    ['kétsoros körvonallal, sorköz 1,0', 'Első sor\nMásodik', { lineHeight: 1, textStyle: { stroke: { color: '#ff3030', width: 0.06 } } }],
+    ['Poppins egysoros, alap', 'Sorköz', { fontFamily: 'Poppins' }],
+    ['Poppins kétsoros, alap', 'Első sor\nMásodik', { fontFamily: 'Poppins' }],
+    ['Anton kétsoros, sorköz 1,0', 'ELSŐ SOR\nMÁSODIK', { fontFamily: 'Anton', lineHeight: 1 }],
+    ['Pacifico kétsoros, alap', 'Első sor\nMásodik', { fontFamily: 'Pacifico', fontWeight: 'normal' }],
+    ['ArchivoBlack kétsoros, alap', 'Első sor\nMásodik', { fontFamily: 'ArchivoBlack', fontWeight: 'normal' }],
+    ['tördelt (dobozszélesség), alap', 'hosszú szöveg ami két sorba törik', { boxWidth: 0.6, fontSize: 6 }],
+  ];
+  for (const [name, text, extra] of CASES) {
+    const doc = mk(text, extra);
+    const dev = await ref.current!.render(doc, 600);
+    const srv = await renderImageDoc(doc, 600);
+    if (!dev || !srv) {
+      log(false, name, 'nincs kép');
+      continue;
+    }
+    const a = await decode(dev);
+    const b = await decode(srv);
+    const ia = ink(a);
+    const ib = ink(b);
+    const d = meanDiff(a, b);
+    const off = Math.max(Math.abs(ia.top - ib.top), Math.abs(ia.bottom - ib.bottom)) * 600;
+    log(off <= 6 && d <= 6, `${name} — a sorok helye telefon = szerver (72 px-es betű)`, `tinta telefon ${(ia.top * 600).toFixed(0)}–${(ia.bottom * 600).toFixed(0)} · szerver ${(ib.top * 600).toFixed(0)}–${(ib.bottom * 600).toFixed(0)} px · eltérés ${off.toFixed(1)} px · átlag ${d.toFixed(2)}/255`);
+    removeFile(dev);
+    removeFile(srv);
+  }
+  setHarness(null);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -11935,6 +12009,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'leading') {
+    await step(phase, () => smokeLeading(log, setHarness));
     return;
   }
   if (phase === 'lensfx') {

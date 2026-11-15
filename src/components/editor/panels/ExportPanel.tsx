@@ -7,20 +7,16 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native
 
 import { Chip, PanelSection, PrimaryButton } from '@/components/ui/controls';
 import { AudioOnlyExportSection } from '@/components/editor/panels/AudioOnlyExportSection';
-import { palette } from '@/constants/editor';
+import { aspectValue, palette } from '@/constants/editor';
 import { deactivateProDev } from '@/lib/billing';
 import { isNativeRenderAvailable } from '@/lib/nativeRender';
 import { nudgeUpsell } from '@/store/upsellStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
 import { withCancellableProgress, withProgress } from '@/store/progressStore';
-import {
-  composeThumbnail,
-  fetchThumbHeadlines,
-  saveAndShareThumbnail,
-  suggestThumbnails,
-} from '@/lib/thumbStudio';
-import type { ThumbCandidate } from '@/lib/thumbStudio';
+import { discardThumbFrames, fetchThumbHeadlines, thumbnailFramesOnDevice, type ThumbFrame } from '@/lib/thumbStudio';
+import { thumbnailDoc, thumbnailDocOf } from '@/lib/thumbnailDoc';
+import { makeId } from '@/lib/id';
 import {
   shareCaptionsAss,
   shareCaptionsSrt,
@@ -105,7 +101,7 @@ export function ExportPanel() {
   const [sampleRate, setSampleRate] = useState<44100 | 48000>(48000);
   const [channels, setChannels] = useState<1 | 2>(2);
   const [thumbStatus, setThumbStatus] = useState<string | null>(null);
-  const [thumbs, setThumbs] = useState<ThumbCandidate[] | null>(null);
+  const [thumbs, setThumbs] = useState<ThumbFrame[] | null>(null);
   const [headlines, setHeadlines] = useState<string[] | null>(null);
   const [headlineStatus, setHeadlineStatus] = useState<string | null>(null);
   const [selectedHeadline, setSelectedHeadline] = useState<string | null>(null);
@@ -136,26 +132,33 @@ export function ExportPanel() {
     }
   };
 
-  // kocka kiválasztása: címmel ráégetés, anélkül nyers mentés/megosztás
-  const pickThumb = async (thumb: ThumbCandidate) => {
-    try {
-      let final = thumb;
-      if (selectedHeadline) {
-        setThumbStatus(t('panels.export.burningHeadline'));
-        const composed = await composeThumbnail(thumb, selectedHeadline);
-        setThumbStatus(null);
-        if (!composed) {
-          Alert.alert('Thumbnail Studio', t('panels.export.headlineBurnFailed'));
-          return;
-        }
-        final = composed;
-      }
-      await saveAndShareThumbnail(final, project.name);
-    } catch (caught) {
-      logCaught('components/editor/panels/ExportPanel.tsx:pickThumb', caught);
-      setThumbStatus(null);
-      Alert.alert('Thumbnail Studio', t('panels.export.saveFailed'));
+  // 🖼️ CORE K5: a választott kockából a projekt SZERKESZTHETŐ thumbnail-lapja lesz (kocka + cím),
+  // egy visszavonás-lépésben, és a Kép Stúdió nyílik rajta — ugyanazon a projekten
+  const pickThumb = (frame: ThumbFrame) => {
+    const st = useEditorStore.getState();
+    if (!st.project) {
+      return;
     }
+    const existing = thumbnailDocOf(st.project);
+    const doc = thumbnailDoc({
+      id: existing?.id ?? makeId('doc'),
+      name: t('panels.export.thumbDocName'),
+      frameUri: frame.uri,
+      headline: selectedHeadline,
+      aspect: aspectValue(st.project.aspectRatio),
+      aspectRatio: st.project.aspectRatio,
+      layerId: makeId,
+    });
+    st.applyBatch(
+      [
+        { type: 'UPSERT_IMAGE_DOC', doc, label: t('lib.commands.setThumbnail') },
+        { type: 'SET_THUMBNAIL_DOC', docId: doc.id },
+      ],
+      'user'
+    );
+    if (thumbs) discardThumbFrames(thumbs, frame.uri);
+    setThumbs(null);
+    router.push(`/studio/image/${st.project.id}?doc=${doc.id}`);
   };
 
   const durationSec = projectDuration(project);
@@ -718,6 +721,13 @@ export function ExportPanel() {
 
       <PanelSection title="Thumbnail Studio">
         <AiProviderPicker task="thumbHeadlines" />
+        {thumbnailDocOf(project) ? (
+          <PrimaryButton
+            icon="create-outline"
+            label={t('panels.export.editThumbnail')}
+            onPress={() => router.push(`/studio/image/${project.id}?doc=${project.thumbnailDocId}`)}
+          />
+        ) : null}
         <PrimaryButton
           icon="images-outline"
           label={thumbStatus ?? t('panels.export.thumbSuggestions')}
@@ -727,17 +737,15 @@ export function ExportPanel() {
             }
             setThumbs(null);
             setThumbStatus(t('panels.export.findingBestFrames'));
-            suggestThumbnails(project)
+            thumbnailFramesOnDevice(project)
               .then((result) => {
                 if (!result) {
-                  Alert.alert(
-                    'Thumbnail Studio',
-                    t('panels.export.noVideoClip')
-                  );
+                  Alert.alert('Thumbnail Studio', t('panels.export.noVideoClip'));
                   return;
                 }
                 setThumbs(result);
               })
+              .catch((caught) => { logCaught('components/editor/panels/ExportPanel.tsx:thumbs', caught); })
               .finally(() => setThumbStatus(null));
           }}
         />
@@ -747,9 +755,9 @@ export function ExportPanel() {
               {thumbs.map((thumb) => (
                 <Pressable
                   key={thumb.t}
-                  onPress={() => {
-                    void pickThumb(thumb);
-                  }}
+                  onPress={() => pickThumb(thumb)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('panels.export.seconds', { seconds: thumb.t.toFixed(0) })}
                 >
                   <Image source={{ uri: thumb.uri }} style={styles.thumb} contentFit="cover" />
                   <Text style={styles.thumbMeta}>{t('panels.export.seconds', { seconds: thumb.t.toFixed(0) })}</Text>

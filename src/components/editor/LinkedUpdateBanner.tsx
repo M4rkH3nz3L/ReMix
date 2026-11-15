@@ -7,7 +7,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { palette } from '@/constants/editor';
 import { clearCswcrLog, cswcrStats, logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { registerDevAction } from '@/lib/devActions';
-import { RenderStage, renderOnDevice } from '@/components/studio/image/RenderStage';
+import { renderOnDevice } from '@/lib/renderStageRegistry';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { linkedAssets, relinkPlan, staleLinks, stillRelinkCommands, STILL_OUTPUT, type AssetSource, type StaleLink } from '@/lib/linkedAsset';
 import { loadSourceProject, renderMixdown, sourceVersionOf } from '@/lib/linkedAssetClient';
@@ -126,14 +126,10 @@ export function LinkedUpdateBanner() {
     return () => offs.forEach((off) => off());
   }, [check]);
 
-  // a kép-frissítés telefonos render-színpada (rejtett; a szerkesztő eltakarja)
-  const stage = linkedAssets({ assets: assets ?? [] }).some((a) => a.source?.output === STILL_OUTPUT) ? <RenderStage /> : null;
-  if (stale.length === 0) return stage;
+  if (stale.length === 0) return null;
   const first = stale[0];
   const name = first.asset.source?.name ?? first.asset.name ?? '';
   return (
-    <>
-    {stage}
     <View style={styles.bar} accessibilityRole="alert" testID="linked-update-banner">
       <Ionicons name="link" size={14} color="#fff" />
       <Text style={styles.text} maxFontSizeMultiplier={1.4} numberOfLines={2}>
@@ -151,7 +147,6 @@ export function LinkedUpdateBanner() {
         <Text style={styles.btnText}>{busy ? '…' : t('editor.linked.update')}</Text>
       </Pressable>
     </View>
-    </>
   );
 }
 

@@ -192,11 +192,13 @@ export function projectMediaBytes(project: Project): number {
  * opcionális hang-mezők (take-ek, effekt-sorrend, master-dinamika, sáv-zár, hangszer-minták) —
  * a lépés csak a verziót lépteti. v8 (2026-11-14): `Asset.source` (linked asset: a videó a
  * hang-projekt mixdownjára hivatkozik, verzióval) és a sampler hangszer-minta — mind opcionális,
- * a lépés csak a verziót lépteti. Ennél ÚJABB projekt (egy későbbi app-verzió mentette) csak
+ * a lépés csak a verziót lépteti. v9 (2026-11-15): a kép-hivatkozás (`Asset.source.output: 'still'`,
+ * CORE K2) és a szerkeszthető thumbnail (`thumbnailDocId`, `RenderedVersion.posterKey`, CORE K5) —
+ * opcionálisak, csak a verzió lép. Ennél ÚJABB projekt (egy későbbi app-verzió mentette) csak
  * olvasható: a parancs-busz, a helyi mentés és a felhő-feltöltés sem írja (különben a régi app
  * csendben elhagyná, amit nem ismer — pl. a v7-es app a hivatkozást).
  */
-export const CURRENT_SCHEMA_VERSION = 8;
+export const CURRENT_SCHEMA_VERSION = 9;
 
 /** egy újabb app-verzió projektje-e (csak olvasható) */
 export function isNewerSchema(project: Pick<Project, 'schemaVersion'> | null | undefined): boolean {
@@ -230,6 +232,10 @@ export function migrateProject(project: Project): Project {
   if (next.schemaVersion < 8) {
     // v7 → v8: linked asset (`Asset.source`) és sampler-minta — opcionálisak, csak a verzió lép
     next = { ...next, schemaVersion: 8 };
+  }
+  if (next.schemaVersion < 9) {
+    // v8 → v9: kép-hivatkozás (still) és szerkeszthető thumbnail — opcionálisak, csak a verzió lép
+    next = { ...next, schemaVersion: 9 };
   }
   // 🔗 verzió-független backfill (ADR-012): a séma-migráció utáni úton (preset/AI/
   // hang-leválasztás) assetId NÉLKÜL hozzáadott media-klipek is kapjanak asset-linket.

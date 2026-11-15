@@ -1,6 +1,5 @@
-import { Directory, File, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import { t as tr } from 'i18next';
+import { File } from 'expo-file-system';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { Platform } from 'react-native';
 
 import { aiConfigForTask } from '@/lib/aiProviders';
@@ -8,63 +7,62 @@ import { localThumbHeadlines } from '@/lib/localTasks';
 import { uploadFetch } from '@/lib/upload';
 import { renderServerUrl } from '@/lib/render';
 import { workerAuthHeaders } from '@/lib/workerAuth';
-import type { Project, VideoClip } from '@/types/project';
+import { makeId } from '@/lib/id';
+import { projectMediaDir } from '@/lib/projectFolderClient';
+import { thumbnailFrameTimes } from '@/lib/thumbnailDoc';
+import type { Project } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
 
 /**
- * Thumbnail Studio (Creative Canvas): a worker kiválasztja a projekt első
- * videójának legjobb borítókép-kockáit — a jelöltek data-URI-ként jönnek,
- * mentés/megosztás koppintásra.
+ * 🖼️ Thumbnail Studio (CORE K5): a képkocka-jelöltek a TELEFONON készülnek a videó első klipjéből
+ * (nincs szerveres kiválasztás, offline is megy); a választott kockából a videó-projekt
+ * szerkeszthető thumbnail-lapja lesz (`thumbnailDoc`), amelyet a Kép Stúdió nyit meg.
  */
 
-export interface ThumbCandidate {
+export interface ThumbFrame {
   /** forrás-mp */
   t: number;
-  score: number;
-  /** data URI az azonnali megjelenítéshez */
+  /** a kocka képe a projekt média-mappájában */
   uri: string;
-  jpegBase64: string;
 }
 
-export async function suggestThumbnails(
-  project: Project,
-  count = 4
-): Promise<ThumbCandidate[] | null> {
+export async function thumbnailFramesOnDevice(project: Project, count = 4): Promise<ThumbFrame[] | null> {
   if (Platform.OS === 'web') {
     return null;
   }
-  const video = project.tracks
-    .filter((t) => t.type === 'video')
-    .flatMap((t) => t.clips)
-    .filter((c): c is VideoClip => c.kind === 'video')
-    .sort((a, b) => a.start - b.start)[0];
-  if (!video) {
+  const plan = thumbnailFrameTimes(project, count);
+  if (!plan) {
     return null;
   }
-  const base = renderServerUrl();
-  try {
-    const form = new FormData();
-    form.append('media', new File(video.uri) as unknown as Blob, video.uri.split('/').pop() ?? 'media');
-    form.append('count', String(count));
-    const res = await uploadFetch(`${base}/thumbnails`, { method: 'POST', body: form });
-    if (!res.ok) {
-      return null;
+  const dir = projectMediaDir();
+  if (!dir.exists) {
+    dir.create();
+  }
+  const out: ThumbFrame[] = [];
+  for (const t of plan.times) {
+    try {
+      const { uri } = await VideoThumbnails.getThumbnailAsync(plan.clip.uri, { time: Math.max(0, Math.round(t * 1000)), quality: 1 });
+      // tartós helyre — a thumbnail-cache ideiglenes, a választott kocka a lap rétege lesz
+      const target = new File(dir, `thumbframe_${makeId('img')}.jpg`);
+      new File(uri).copy(target);
+      out.push({ t, uri: target.uri });
+    } catch (caught) {
+      logCaught('lib/thumbStudio.ts:thumbnailFramesOnDevice', caught);
     }
-    const body = (await res.json()) as {
-      thumbs: { t: number; score: number; jpegBase64: string }[];
-    };
-    if (!Array.isArray(body.thumbs) || body.thumbs.length === 0) {
-      return null;
+  }
+  return out.length > 0 ? out : null;
+}
+
+/** a nem választott jelöltek törlése (a választott a lap rétege marad) */
+export function discardThumbFrames(frames: ThumbFrame[], keepUri?: string): void {
+  for (const f of frames) {
+    if (f.uri === keepUri) continue;
+    try {
+      const file = new File(f.uri);
+      if (file.exists) file.delete();
+    } catch (caught) {
+      logCaught('lib/thumbStudio.ts:discardThumbFrames', caught);
     }
-    return body.thumbs.map((t) => ({
-      t: t.t,
-      score: t.score,
-      jpegBase64: t.jpegBase64,
-      uri: `data:image/jpeg;base64,${t.jpegBase64}`,
-    }));
-  } catch (caught) {
-    logCaught('lib/thumbStudio.ts:suggestThumbnails', caught);
-    return null;
   }
 }
 
@@ -92,90 +90,5 @@ export async function fetchThumbHeadlines(summary: string): Promise<string[] | n
   } catch (caught) {
     logCaught('lib/thumbStudio.ts:fetchThumbHeadlines', caught);
     return localThumbHeadlines(summary);
-  }
-}
-
-/** 🎬 a headline ráégetése a kiválasztott borítóra (worker Chromium-raszter) */
-export async function composeThumbnail(
-  thumb: ThumbCandidate,
-  headline: string
-): Promise<ThumbCandidate | null> {
-  try {
-    // a jelölt base64-e helyi fájlba kerül, mert a natív FormData fájl-uri-t vár
-    const dir = new Directory(Paths.cache, 'thumbs');
-    if (!dir.exists) {
-      dir.create();
-    }
-    const src = new File(dir, `compose-src-${thumb.t.toFixed(1)}.jpg`);
-    try {
-      if (src.exists) {
-        src.delete();
-      }
-    } catch (caught) {
-      logCaught('lib/thumbStudio.ts:composeThumbnail', caught);
-      // felülírja a write
-    }
-    src.write(Uint8Array.from(atob(thumb.jpegBase64), (c) => c.charCodeAt(0)));
-    const form = new FormData();
-    form.append('media', new File(src.uri) as unknown as Blob, 'thumb.jpg');
-    form.append('headline', headline);
-    const res = await uploadFetch(`${renderServerUrl()}/thumbnails/compose`, {
-      method: 'POST',
-      body: form,
-    });
-    if (!res.ok) {
-      return null;
-    }
-    const body = (await res.json()) as { jpegBase64: string };
-    if (!body.jpegBase64) {
-      return null;
-    }
-    return {
-      ...thumb,
-      jpegBase64: body.jpegBase64,
-      uri: `data:image/jpeg;base64,${body.jpegBase64}`,
-    };
-  } catch (caught) {
-    logCaught('lib/thumbStudio.ts:composeThumbnail', caught);
-    return null;
-  }
-}
-
-/** a kiválasztott borító mentése a Fotókba (ha engedélyezett) + megosztás */
-export async function saveAndShareThumbnail(
-  thumb: ThumbCandidate,
-  projectName: string
-): Promise<void> {
-  const dir = new Directory(Paths.cache, 'thumbs');
-  if (!dir.exists) {
-    dir.create();
-  }
-  const safe = projectName.replace(/[^\p{L}\p{N}_-]+/gu, '-') || 'borito';
-  const target = new File(dir, `${safe}-${thumb.t.toFixed(0)}s.jpg`);
-  try {
-    if (target.exists) {
-      target.delete();
-    }
-  } catch (caught) {
-    logCaught('lib/thumbStudio.ts:saveAndShareThumbnail', caught);
-    // ha nem törölhető, a write úgyis hibát ad
-  }
-  target.write(Uint8Array.from(atob(thumb.jpegBase64), (c) => c.charCodeAt(0)));
-
-  try {
-    const MediaLibrary = await import('expo-media-library');
-    const permission = await MediaLibrary.requestPermissionsAsync(true);
-    if (permission.granted) {
-      await MediaLibrary.saveToLibraryAsync(target.uri);
-    }
-  } catch (caught) {
-    logCaught('lib/thumbStudio.ts:saveAndShareThumbnail', caught);
-    // engedély nélkül a megosztó is felajánlja a mentést
-  }
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(target.uri, {
-      mimeType: 'image/jpeg',
-      dialogTitle: tr('lib.thumbStudio.shareDialogTitle', { projectName }),
-    });
   }
 }

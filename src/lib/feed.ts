@@ -13,6 +13,9 @@ import type { ViewEvent } from '@/lib/viewSignals';
 import { isLoopbackUrl, reachableMediaUrl } from '@/lib/mediaUrl';
 import type { ProgressUpdate } from '@/lib/progress';
 import { needsPoster, posterFrameTime } from '@/lib/feedMedia';
+import { stillVersion } from '@/lib/linkedAsset';
+import { renderOnDevice } from '@/lib/renderStageRegistry';
+import { posterNeedsRefresh, thumbnailDocOf } from '@/lib/thumbnailDoc';
 import {
   buildSlideshowProject,
   carouselImageUris,
@@ -665,18 +668,21 @@ export async function publishRenderedProject(
   // reprezentatív kockájából generálunk egyet és feltöltjük (<id>/poster/…).
   // Best-effort: a getFilmstrip weben null-t ad, hibánál csendesen kimarad — a
   // publikálást SOHA nem buktatja. (A ffmpeg-transcoding + több-thumbnail a worker/infra.)
-  if (needsPoster(rendered)) {
+  // 🖼️ CORE K5: ha a projektnek szerkeszthető thumbnail-lapja van, a poszter abból készül (a
+  // telefonon), és ha a lap azóta változott, újra — különben a videó egy kockája, mint eddig.
+  const thumb = thumbnailDocOf(updated);
+  if (thumb ? posterNeedsRefresh(rendered, thumb) : needsPoster(rendered)) {
     try {
-      const [poster] = await getFilmstrip(rendered.uri, [
-        snapThumbTime(posterFrameTime(rendered.durationSec)),
-      ]);
+      const poster = thumb
+        ? await renderOnDevice(thumb, 720, { format: 'jpg', quality: 0.9 })
+        : (await getFilmstrip(rendered.uri, [snapThumbTime(posterFrameTime(rendered.durationSec))]))[0];
       if (poster) {
         const posterUrl = await uploadMedia(poster, {
           projectId: project.id,
           kind: 'poster',
-          name: `${project.id}.jpg`,
+          name: thumb ? `${project.id}_${stillVersion(thumb)}.jpg` : `${project.id}.jpg`,
         });
-        rendered = { ...rendered, posterUrl };
+        rendered = { ...rendered, posterUrl, ...(thumb ? { posterKey: stillVersion(thumb) } : {}) };
         updated = { ...updated, rendered };
         await saveProject(updated);
       }

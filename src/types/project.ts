@@ -1768,6 +1768,8 @@ export interface RenderedVersion {
   url?: string;
   posterUri?: string;
   posterUrl?: string;
+  /** a poszter melyik thumbnail-lap verziójából készült (`stillVersion`) — CORE K5 */
+  posterKey?: string;
   renderedAt: string;
   durationSec: number;
   width?: number;
@@ -1861,6 +1863,8 @@ export interface Project {
   seo?: ProjectSeo;
   /** 🎞️ a legutóbb renderelt kész MP4 (a projekthez tárolva; lásd RenderedVersion) */
   rendered?: RenderedVersion;
+  /** 🖼️ CORE K5: a szerkeszthető thumbnail (`imageDocs` egyik lapja) — a projekt-előnézet és a feed-poszter forrása */
+  thumbnailDocId?: string;
   tracks: Track[];
   /** a projekt által hivatkozott médiafájlok */
   assets: Asset[];

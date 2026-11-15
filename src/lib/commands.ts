@@ -32,6 +32,8 @@ export type EditorCommand =
   | { type: 'SET_PROJECT_SYNC'; enabled: boolean }
   /** 🖼️ a projekt borítóképe / album-borítója (null → eltávolítás; a kép-asset regisztrálódik) */
   | { type: 'SET_PROJECT_COVER'; asset: Asset | null }
+  /** 🖼️ CORE K5: a szerkeszthető thumbnail lapja (`imageDocs` egyik eleme); null = nincs */
+  | { type: 'SET_THUMBNAIL_DOC'; docId: string | null }
   | { type: 'ADD_ASSET'; asset: Asset }
   | { type: 'UPDATE_ASSET'; assetId: string; patch: Partial<Asset> }
   | { type: 'REMOVE_ASSET'; assetId: string }
@@ -293,6 +295,18 @@ function applyCommandRaw(project: Project, cmd: EditorCommand): Project | null {
       return { ...project, coverAssetId: cmd.asset.id, assets: [...assets, cmd.asset] };
     }
 
+    case 'SET_THUMBNAIL_DOC': {
+      const docId = cmd.docId ?? undefined;
+      if (docId === project.thumbnailDocId || (docId && !project.imageDocs?.some((d) => d.id === docId))) {
+        return null;
+      }
+      if (!docId) {
+        const { thumbnailDocId: _removed, ...rest } = project;
+        return rest;
+      }
+      return { ...project, thumbnailDocId: docId };
+    }
+
     case 'SET_PARTICLES': {
       const next = cmd.particles ?? undefined;
       if (JSON.stringify(next) === JSON.stringify(project.particles)) {
@@ -372,7 +386,13 @@ function applyCommandRaw(project: Project, cmd: EditorCommand): Project | null {
       if (next.length === docs.length) {
         return null;
       }
-      return { ...project, imageDocs: next.length > 0 ? next : undefined };
+      const removed = { ...project, imageDocs: next.length > 0 ? next : undefined };
+      // 🖼️ CORE K5: a törölt thumbnail-lapra nem maradhat hivatkozás
+      if (project.thumbnailDocId === cmd.docId) {
+        const { thumbnailDocId: _gone, ...rest } = removed;
+        return rest;
+      }
+      return removed;
     }
 
     case 'REORDER_IMAGE_DOCS': {
@@ -687,6 +707,8 @@ export function describeCommand(cmd: EditorCommand): string {
       return tr(cmd.enabled ? 'lib.commands.projectSyncOn' : 'lib.commands.projectSyncOff');
     case 'SET_PROJECT_COVER':
       return tr(cmd.asset ? 'lib.commands.setCover' : 'lib.commands.clearCover');
+    case 'SET_THUMBNAIL_DOC':
+      return tr(cmd.docId ? 'lib.commands.setThumbnail' : 'lib.commands.clearThumbnail');
     case 'SET_PARTICLES':
       return cmd.particles
         ? tr('lib.commands.setParticles', {

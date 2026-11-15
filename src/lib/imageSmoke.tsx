@@ -122,6 +122,10 @@ import { applyCommand } from '@/lib/commands';
 import { linkedAssets, mixdownVersion, relinkPlan, stillVersion } from '@/lib/linkedAsset';
 import { sendMixdownToVideo, sendStillToVideo, sourceVersionOf } from '@/lib/linkedAssetClient';
 import { renderProjectVersion } from '@/lib/render';
+import { thumbnailFramesOnDevice } from '@/lib/thumbStudio';
+import { posterNeedsRefresh, thumbnailDoc, thumbnailDocOf } from '@/lib/thumbnailDoc';
+import { renderOnDevice } from '@/lib/renderStageRegistry';
+import { projectPreviewSource } from '@/lib/projectPreview';
 import { clearCswcrLog, logCswcr, type CswcrStats } from '@/lib/cswcrClient';
 import { USER_PRESETS_KEY, useUserPresets } from '@/store/userPresetStore';
 import { useAudioEditMode } from '@/store/audioEditModeStore';
@@ -6283,6 +6287,83 @@ async function smokeLinkedImage(log: Log, setHarness: (n: ReactNode) => void) {
   }
 }
 
+/**
+ * 🖼️ CORE K5 (IMAGE-PROD C3): szerkeszthető videó-thumbnail — kockák a telefonon, a lap a
+ * videó-projektben (egy köteg), a Kép Stúdió ugyanazon a projekten nyitja, az előnézet és a
+ * feed-poszter a lapból készül, mentés után is megvan.
+ */
+async function smokeThumbDoc(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}, pixelarány ${PixelRatio.get()}`);
+  const asset = Asset.fromModule(require('../../assets/videos/fekvo.mp4'));
+  await asset.downloadAsync();
+  const uri = asset.localUri ?? asset.uri;
+  const id = 'prj_smoke_thumbdoc';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:thumbdoc', caught));
+  const base = createEmptyProject('smoke thumbnail', '16:9', undefined, 'video');
+  const clip = { id: 'v', kind: 'video', uri, start: 0, duration: 8, trimIn: 0, sourceDuration: 10, speed: 1, volume: 1, filterId: 'none' } as VideoClip;
+  await saveProject({ ...base, id, tracks: base.tracks.map((tr) => (tr.type === 'video' ? { ...tr, clips: [clip] } : tr)) });
+  const st = useEditorStore.getState;
+  try {
+    router.push(`/editor/${id}` as Href);
+    for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+    await sleep(1200);
+    // 1) kockák a telefonon (szerver nélkül)
+    const t0 = Date.now();
+    const frames = (await thumbnailFramesOnDevice(st().project!)) ?? [];
+    const sizes = await Promise.all(frames.map(async (f) => (await decode(f.uri)).width()));
+    log(frames.length === 4 && sizes.every((w) => w > 100), 'képkockák a telefonon a videóból', `${frames.length} kocka (${frames.map((f) => f.t).join(', ')} s), szélesség ${sizes.join('/')}, ${Date.now() - t0} ms`);
+    if (frames.length === 0) throw new Error('nincs kocka');
+    // 2) a választott kockából a lap — ugyanaz a köteg, amit az export-panel ad
+    const doc = thumbnailDoc({ id: 'th', name: 'Thumbnail', frameUri: frames[1].uri, headline: 'NAGY CÍM', aspect: 16 / 9, aspectRatio: '16:9', layerId: makeId });
+    const past0 = st().past.length;
+    st().applyBatch([{ type: 'UPSERT_IMAGE_DOC', doc }, { type: 'SET_THUMBNAIL_DOC', docId: 'th' }], 'user');
+    log(thumbnailDocOf(st().project!)?.id === 'th' && st().past.length === past0 + 1, 'a thumbnail-lap a videó-projektben, egy visszavonás-lépés', `${st().project!.imageDocs?.length} lap`);
+    st().undo();
+    log(!st().project!.thumbnailDocId && !st().project!.imageDocs?.some((d) => d.id === 'th'), 'egy visszavonás: a lap és a hivatkozás is eltűnik');
+    st().redo();
+    // 3) a Kép Stúdió ugyanazon a projekten nyitja a lapot, a cím szerkeszthető
+    router.push(`/studio/image/${id}?doc=th` as Href);
+    await sleep(2000);
+    const live = st().project!.imageDocs!.find((d) => d.id === 'th')!;
+    st().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: { ...live, layers: live.layers.map((l) => (l.kind === 'text' ? { ...l, text: 'JAVÍTOTT CÍM', color: '#ffcc00' } : l)) } }, 'user');
+    const thumbed = await (async () => {
+      for (let i = 0; i < 80; i++) {
+        const d = st().project!.imageDocs!.find((x) => x.id === 'th');
+        if (d?.thumbUri) return d.thumbUri;
+        await sleep(100);
+      }
+      return null;
+    })();
+    log(st().project!.id === id && !!thumbed, 'a Kép Stúdió ugyanazt a projektet nyitja; a szerkesztett lapnak élő bélyegképe van (a telefonon)', `${thumbed?.split('/').pop()}`);
+    router.back();
+    await sleep(1200);
+    // 4) az előnézet a lapból, a poszter a lapból (a telefonos színpadon, a videó-szerkesztőben)
+    const prev = projectPreviewSource(st().project!);
+    log(prev?.type === 'image' && prev.uri === thumbed, 'a projekt-előnézet a thumbnail-lap képe', `${prev?.type}`);
+    const thumb = thumbnailDocOf(st().project!)!;
+    const fake = { url: 'https://x/v.mp4', posterUrl: 'https://x/p.jpg', posterKey: 'régi' };
+    log(null, 'FOTÓZHATÓ-RENDER', 'a poszter-render alatt a rejtett színpad nem látszik');
+    const t1 = Date.now();
+    let poster: string | null = null;
+    while (Date.now() - t1 < 6000) poster = await renderOnDevice(thumb, 720, { format: 'jpg', quality: 0.9 });
+    const pimg = poster ? await decode(poster) : null;
+    const textPx = pimg ? pixel(pimg, Math.round(pimg.width() / 2), Math.round(pimg.height() * 0.8)) : [];
+    log(posterNeedsRefresh(fake, thumb) && !!pimg && pimg.height() === 720 && pimg.width() === 1280, 'a feed-poszter a lapból, a telefonon (a régi poszter elavultként jelölve)', `${pimg?.width()}×${pimg?.height()}, a cím helyén ${textPx.slice(0, 3).join(',')}`);
+    // 5) mentés + újratöltés: a lap és a hivatkozás megmarad, séma v9
+    await saveProject(st().project!);
+    const reloaded = await loadProject(id);
+    log(reloaded?.thumbnailDocId === 'th' && !!thumbnailDocOf(reloaded) && reloaded.schemaVersion === 9, 'mentés után is megvan (séma v9)', `v${reloaded?.schemaVersion}`);
+    frames.forEach((f) => removeFile(f.uri));
+    if (poster) removeFile(poster);
+  } finally {
+    if (st().project?.id === id) {
+      router.back();
+      await sleep(500);
+    }
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:thumbdoc-del', caught));
+  }
+}
+
 async function smokeLinkedMix(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const SR = 44100;
@@ -11302,6 +11383,10 @@ export async function runImageSmoke(
   }
   if (phase === 'a11y') {
     await step(phase, () => smokeA11y(log));
+    return;
+  }
+  if (phase === 'thumbdoc') {
+    await step(phase, () => smokeThumbDoc(log));
     return;
   }
   if (phase === 'linkimg') {

@@ -36,6 +36,14 @@ export function projectPreviewSource(project: Project): PreviewSource {
       return { type: 'image', uri: cover.uri };
     }
   }
+  // 2) 🖼️ CORE K5: a szerkeszthető thumbnail-lap (a legutóbbi képe, különben a képkockája)
+  if (project.thumbnailDocId) {
+    const thumb = project.imageDocs?.find((d) => d.id === project.thumbnailDocId);
+    const uri = thumb?.thumbUri ?? (thumb ? imageDocPicture(project, thumb.id) : null);
+    if (uri) {
+      return { type: 'image', uri };
+    }
+  }
   const kind = project.kind ?? 'video';
   if (kind === 'model3d') {
     const poster = project.model3d?.poster;

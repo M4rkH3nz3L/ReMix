@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NewerSchemaBanner } from '@/components/NewerSchemaBanner';
 import { LinkedUpdateBanner } from '@/components/editor/LinkedUpdateBanner';
+import { RenderStage } from '@/components/studio/image/RenderStage';
 import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { CollabPresence } from '@/components/editor/CollabPresence';
 import { UndoGestureArea } from '@/components/UndoGestureArea';
@@ -1024,6 +1025,9 @@ export default function EditorScreen() {
       style={styles.container}
       edges={L.isLandscape ? ['top', 'bottom', 'left', 'right'] : ['top', 'bottom']}
     >
+      {/* 🖨️ CORE K2/K5: a telefonos kép-render rejtett színpada (kép-hivatkozás frissítése, thumbnail,
+          feed-poszter) — első gyerek, a szerkesztő eltakarja */}
+      <RenderStage />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

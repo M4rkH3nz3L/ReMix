@@ -11,6 +11,7 @@ import { effectiveLayerOpacity, visibleLayers } from '@/lib/imageDoc';
 import { correctionContext, docVignetteAngles, NO_CORRECTIONS } from '@/lib/imagePixelPipeline';
 import { stageSettleMs, stageSize } from '@/lib/imageRenderRoute';
 import { logCaught } from '@/lib/logCaught';
+import { registerRenderStage, renderOnDevice, type RenderStageHandle, type RenderStageOptions } from '@/lib/renderStageRegistry';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import type { ClipMask, ImageDoc, ImageLayer } from '@/types/project';
 
@@ -24,15 +25,8 @@ import type { ClipMask, ImageDoc, ImageLayer } from '@/types/project';
  * A munkák sorban futnak; a színpad csak a munka idejére él.
  */
 
-export interface RenderStageOptions {
-  format?: 'png' | 'jpg' | 'webp';
-  quality?: number;
-}
-
-export interface RenderStageHandle {
-  /** a dokumentum képe `heightPx` magasan; `null`, ha nem sikerült (a hiba naplózva) */
-  render(doc: ImageDoc, heightPx: number, opts?: RenderStageOptions): Promise<string | null>;
-}
+export type { RenderStageHandle, RenderStageOptions };
+export { renderOnDevice };
 
 const noop = () => {};
 const MOVE_RANGE: [number, number] = [0, 1];
@@ -97,18 +91,6 @@ export function keepRenderedInProject(uri: string, base: string): string {
   return target.uri;
 }
 
-/**
- * A felcsatolt színpadok (a legutóbbi az aktív): így a stúdión kívülről (pl. a videó-szerkesztő
- * „Frissítés elérhető” sávjából) is a telefonon renderelhető egy kép-dokumentum.
- */
-const mounted: RenderStageHandle[] = [];
-
-/** a dokumentum képe a telefonon; `null`, ha nincs felcsatolt színpad vagy nem sikerült */
-export function renderOnDevice(doc: ImageDoc, heightPx: number, opts?: RenderStageOptions): Promise<string | null> {
-  const stage = mounted[mounted.length - 1];
-  return stage ? stage.render(doc, heightPx, opts) : Promise.resolve(null);
-}
-
 export const RenderStage = forwardRef<RenderStageHandle>(function RenderStage(_props, ref) {
   const [job, setJob] = useState<{ doc: ImageDoc; w: number; h: number; seq: number } | null>(null);
   const viewRef = useRef<View>(null);
@@ -163,13 +145,7 @@ export const RenderStage = forwardRef<RenderStageHandle>(function RenderStage(_p
     },
   }).current;
   useImperativeHandle(ref, () => handle, [handle]);
-  useEffect(() => {
-    mounted.push(handle);
-    return () => {
-      const i = mounted.lastIndexOf(handle);
-      if (i >= 0) mounted.splice(i, 1);
-    };
-  }, [handle]);
+  useEffect(() => registerRenderStage(handle), [handle]);
 
   if (!job) {
     return null;
@@ -190,7 +166,8 @@ export const RenderStage = forwardRef<RenderStageHandle>(function RenderStage(_p
 });
 
 const styles = StyleSheet.create({
-  // a stúdió többi része eltakarja (a gyökér első gyereke): a felhasználó nem látja
-  host: { position: 'absolute', left: 0, top: 0 },
+  // a képernyőn KÍVÜL: az áttetsző fejléc / állapotsor alatt sem látszik (eszközön látott hiba:
+  // a bal felső sarokban áttűnt); a rögzítés a nézet saját rétegéből dolgozik, így ide is ér
+  host: { position: 'absolute', left: -100000, top: 0 },
   stage: { overflow: 'hidden', backgroundColor: 'transparent' },
 });

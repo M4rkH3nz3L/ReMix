@@ -178,7 +178,7 @@ import { computeHistogram, histogramShift } from '@/lib/histogram';
 import { SelectionAnts } from '@/components/studio/image/SelectionAnts';
 import { updateLayer } from '@/lib/imageDoc';
 import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection, rasterSubForSelection, replaceWithSelectionRaster } from '@/lib/imageSelectionOps';
-import { applyRing, ellipseRing, invertSelection, rectRing, type Selection as ImgSelection, selectionToMask } from '@/lib/selection';
+import { applyRing, ellipseRing, invertSelection, rectRing, type Selection as ImgSelection, selectionContains, selectionToMask } from '@/lib/selection';
 import { DEFAULT_BRUSH, type RetouchTool, type Stroke } from '@/lib/brushEngine';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { keepRenderedInProject, RenderStage, type RenderStageHandle } from '@/components/studio/image/RenderStage';
@@ -191,7 +191,7 @@ import { renderImageDoc } from '@/lib/imageDocClient';
 import { LUT_DRAFT_SIZE, LUT_SIZE } from '@/lib/imagePreviewLut';
 import { exportSize } from '@/lib/imageExport';
 import { makeId } from '@/lib/id';
-import { colorRangeSelect, magicWandSelect } from '@/lib/magicWandClient';
+import { colorRangeSelect, magicWandSelect, refineSelectionToEdges } from '@/lib/magicWandClient';
 import { normalizePickedImage } from '@/lib/media';
 import { toSrgbIfNeeded } from '@/lib/colorIntakeClient';
 import { createAdjustment, flattenAdjustments } from '@/lib/adjustmentStack';
@@ -8573,6 +8573,72 @@ async function smokeAdjustHsl(log: Log, setHarness: (n: ReactNode) => void) {
   removeFile(f.uri);
 }
 
+/** 🧲 S17: él-finomítás — a durva kijelölés a fotó valódi élére húzódik (Skia-olvasással, a stúdió kezelőjén át is) */
+async function smokeRefineEdge(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  // 600×600-as fotó: világos alapon sötét kör (középpont 300,300, sugár 150)
+  const surface = Skia.Surface.MakeOffscreen(600, 600)!;
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color('#e0e0e0'));
+  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, 600, 600), paint);
+  paint.setColor(Skia.Color('#303030'));
+  surface.getCanvas().drawCircle(300, 300, 150, paint);
+  surface.flush();
+  const f = new File(projectMediaDir(), `smoke_refine_${Date.now().toString(36)}.png`);
+  f.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  // durva, túl tág, csipkés kör (0–1-ben)
+  const rough = Array.from({ length: 24 }, (_, i) => {
+    const a = (i / 24) * Math.PI * 2;
+    const r = (165 + (i % 2 ? 9 : -6)) / 600;
+    return { x: 0.5 + r * Math.cos(a), y: 0.5 + r * Math.sin(a) };
+  });
+  const iou = (poly: { x: number; y: number }[]) => {
+    const sel = { ops: [{ op: 'add' as const, points: poly }], feather: 0, invert: false };
+    let [i, u] = [0, 0];
+    for (let y = 0; y < 1; y += 0.005) for (let x = 0; x < 1; x += 0.005) {
+      const a = selectionContains(sel, { x, y });
+      const b = Math.hypot(x - 0.5, y - 0.5) <= 0.25;
+      if (a && b) i += 1;
+      if (a || b) u += 1;
+    }
+    return i / u;
+  };
+  const t0 = Date.now();
+  const out = await refineSelectionToEdges(f.uri, [rough], { boxAspect: 1, fit: 'stretch' });
+  const ms = Date.now() - t0;
+  const [before, after] = [iou(rough), out ? iou(out[0]) : 0];
+  log(after > 0.95 && before < 0.85, 'a durva kijelölés a kör élére húzódik (metszet/unió)', `előtte ${before.toFixed(3)} → utána ${after.toFixed(3)} · ${ms} ms`);
+
+  // a valódi stúdióban, a kezelőn át (a kijelölés a vásznon: a fotó a teljes vásznat kitölti)
+  const id = 'prj_smoke_refine';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:refine-del0', caught));
+  const page = { id: 'pg', name: 'pg', aspectRatio: '1:1', width: 600, height: 600, layers: [{ id: 'p', kind: 'photo', uri: f.uri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch' }] } as unknown as ImageDoc;
+  await saveProject({ ...createEmptyProject('smoke él-finomítás', '1:1', undefined, 'image'), id, imageDocs: [page] });
+  const st = useEditorStore.getState;
+  try {
+    router.push(`/studio/image/${id}` as Href);
+    for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+    await sleep(1500);
+    await runDevAction('image.selectionRefine', { ring: rough, targetId: 'p' });
+    await sleep(300);
+    await runDevAction('image.selectionRefineRun');
+    let sel = (await runDevAction('image.getSelection')) as { ops: { points: { x: number; y: number }[] }[] } | null;
+    for (let i = 0; i < 40 && sel && iou(sel.ops[0].points) < 0.9; i++) {
+      await sleep(200);
+      sel = (await runDevAction('image.getSelection')) as typeof sel;
+    }
+    const v = sel ? iou(sel.ops[0].points) : 0;
+    log(v > 0.95, 'stúdióban: „Élhez igazítás” a kijelölt fotón', `metszet/unió ${v.toFixed(3)}`);
+  } finally {
+    if (st().project?.id === id) {
+      router.back();
+      await sleep(500);
+    }
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:refine-del', caught));
+    removeFile(f.uri);
+  }
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -12494,6 +12560,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'refine') {
+    await step(phase, () => smokeRefineEdge(log));
     return;
   }
   if (phase === 'adjhsl') {

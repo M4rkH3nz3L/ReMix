@@ -3655,6 +3655,8 @@
         "edit": "Edit",
         "clear": "Clear selection",
         "invert": "Invert",
+        "refine": "Snap to edges",
+        "refineNeedsPhoto": "Snap to edges works on a photo layer: select a photo.",
         "feather": "Feather",
         "failTitle": "This can't be done",
         "failBody": "This selection can't be applied to this layer. Try a simpler selection or remove the layer's mask.",

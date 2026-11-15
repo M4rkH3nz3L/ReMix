@@ -3655,6 +3655,8 @@
         "edit": "Bearbeiten",
         "clear": "Auswahl aufheben",
         "invert": "Umkehren",
+        "refine": "An Kanten ausrichten",
+        "refineNeedsPhoto": "Das Ausrichten an Kanten funktioniert auf einer Foto-Ebene: wähle ein Foto.",
         "feather": "Weiche Kante",
         "failTitle": "Das ist nicht möglich",
         "failBody": "Diese Auswahl lässt sich auf diese Ebene nicht anwenden. Versuche eine einfachere Auswahl oder entferne die Ebenenmaske.",

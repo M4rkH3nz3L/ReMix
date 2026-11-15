@@ -35,6 +35,7 @@ export function SelectionBar({
   onTool,
   onMode,
   onInvert,
+  onRefine,
   onFeather,
   onAction,
   onClear,
@@ -49,6 +50,8 @@ export function SelectionBar({
   onTool: (tool: SelectTool) => void;
   onMode: (mode: SelectionMode) => void;
   onInvert: () => void;
+  /** S17: a kijelölés a fotó éleire húzva */
+  onRefine?: () => void;
   onFeather: (feather: number) => void;
   onAction: (action: SelectionAction) => void;
   onClear: () => void;
@@ -90,6 +93,11 @@ export function SelectionBar({
         {selection ? (
           <Pressable onPress={onInvert} style={[styles.chip, selection.invert && styles.chipActive]} accessibilityRole="button" accessibilityState={{ selected: selection.invert }}>
             <Text style={[styles.chipText, selection.invert && styles.chipTextActive]}>{t('studio.image.select.invert')}</Text>
+          </Pressable>
+        ) : null}
+        {selection && onRefine ? (
+          <Pressable onPress={onRefine} style={styles.chip} accessibilityRole="button">
+            <Text style={styles.chipText}>{t('studio.image.select.refine')}</Text>
           </Pressable>
         ) : null}
       </ScrollView>

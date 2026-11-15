@@ -3655,6 +3655,8 @@
         "edit": "Szerkesztés",
         "clear": "Kijelölés megszüntetése",
         "invert": "Invertálás",
+        "refine": "Élhez igazítás",
+        "refineNeedsPhoto": "Az élhez igazítás fotó-rétegen működik: jelölj ki egy fotót.",
         "feather": "Lágy szél",
         "failTitle": "Ez nem hajtható végre",
         "failBody": "Ezen a rétegen ez a kijelölés így nem alkalmazható. Próbáld egyszerűbb kijelöléssel, vagy szüntesd meg a réteg maszkját.",

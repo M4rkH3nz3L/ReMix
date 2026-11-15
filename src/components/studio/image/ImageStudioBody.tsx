@@ -38,7 +38,7 @@ import { customExportSize, exportSize } from '@/lib/imageExport';
 import { EXPORT_PACK_SCALES, expectsAlpha, layerOnlyDoc, selectionOnlyDoc } from '@/lib/imageExportCheck';
 import { DEFAULT_GRID, GRID_SIZES } from '@/lib/imageGrid';
 import { projectMediaDir } from '@/lib/projectFolderClient';
-import { layerBoxToCanvas, photoBoxFor } from '@/lib/imageLayerGeometry';
+import { canvasToLayerBox, layerBoxToCanvas, photoBoxFor } from '@/lib/imageLayerGeometry';
 import {
   adjustSelection,
   copySelectionToLayer,
@@ -1554,6 +1554,53 @@ export function ImageStudioBody({
     }
   };
 
+  // 🧲 S17: él-finomítás — a kijelölés a cél-fotó valódi éleire húzva (a kijelölés állapot, nem undo-lépés)
+  const refineSelection = () => {
+    if (!doc || !selection || busy) {
+      return;
+    }
+    const target = doc.layers.find((l) => l.id === selectTargetId);
+    if (target?.kind !== 'photo') {
+      Alert.alert(t('studio.image.select.failTitle'), t('studio.image.select.refineNeedsPhoto'));
+      return;
+    }
+    setBusy(true);
+    void (async () => {
+      try {
+        const { refineSelectionToEdges } = await import('@/lib/magicWandClient');
+        const canvas = effectiveCanvas(doc);
+        const boxAspect = (target.w * canvas.width) / (target.h * canvas.height);
+        const rings = selection.ops.map((o) => o.points.map((p) => canvasToLayerBox(p, target, canvas)));
+        const refined = await refineSelectionToEdges(target.uri, rings, { boxAspect, fit: target.fit });
+        if (!refined) {
+          Alert.alert(t('studio.image.select.failTitle'), t('studio.image.select.failBody'));
+          return;
+        }
+        const ops = selection.ops.map((o, i) => ({ ...o, points: refined[i].map((p) => layerBoxToCanvas(p, target, canvas)) }));
+        setSelection((sel) => (sel === selection ? { ...sel, ops } : sel));
+      } catch (caught) {
+        logCaught('components/studio/image/ImageStudioBody.tsx:refineSelection', caught);
+      } finally {
+        setBusy(false);
+      }
+    })();
+  };
+  useEffect(() => registerDevAction('image.selectionRefine', (arg) => {
+    const a = arg as { ring: Point[]; targetId: string };
+    setSelectTargetId(a.targetId);
+    setSelection(applyRing(null, a.ring, 'new', 0));
+    return true;
+  }), []);
+  const refineRef = useRef(refineSelection);
+  refineRef.current = refineSelection;
+  const selectionNowRef = useRef(selection);
+  selectionNowRef.current = selection;
+  useEffect(() => registerDevAction('image.getSelection', () => selectionNowRef.current), []);
+  useEffect(() => registerDevAction('image.selectionRefineRun', () => {
+    refineRef.current();
+    return true;
+  }), []);
+
   // 🧪 füstteszt: kijelölés-művelet a valódi kezelőn át (a szöveg/forma raszterizálásával együtt)
   const selectionActionRef = useRef(selectionAction);
   selectionActionRef.current = selectionAction;
@@ -2569,6 +2616,7 @@ export function ImageStudioBody({
               onTool={openSelectTool}
               onMode={setSelectMode}
               onInvert={() => setSelection((sel) => (sel ? invertSelection(sel) : sel))}
+              onRefine={refineSelection}
               onFeather={(feather) => setSelection((sel) => (sel ? { ...sel, feather } : sel))}
               onAction={selectionAction}
               onClear={clearSelection}

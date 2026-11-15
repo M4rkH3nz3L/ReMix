@@ -1481,6 +1481,12 @@ export interface ImageLayerBase {
   /** 🖊️ kontúr/körvonal (bármely pozícionált rétegre): a réteg színezett, N px-rel megnövelt
    *  sziluettje MÖGÉ — keretként jelenik meg. `width` a vászonszélesség törtje (0–~0.05). */
   stroke?: { color: string; width: number };
+  /** 🎨 színátfedés (IMAGE-PROD S13 · DS5): a réteg a saját alakján belül egy színnel átfestve (0–1 erővel) */
+  colorOverlay?: { color: string; opacity?: number };
+  /** 🌘 belső árnyék: a réteg szélén BELÜL, eltolva (dx/dy/blur a vászon törtje, mint a vetett árnyéknál) */
+  innerShadow?: { color?: string; dx?: number; dy?: number; blur?: number; opacity?: number };
+  /** 🌕 belső ragyogás: a réteg szélén belül, minden irányban (size a vászonszélesség törtje) */
+  innerGlow?: { color?: string; size?: number; opacity?: number };
   /** 🗂️ csoport-tagság: a réteg EHHEZ a `ImageGroup`-hoz tartozik (lapos modell — a rajzolási
    *  sorrend a `layers` tömbé marad; az azonos groupId-jú rétegeket a panel egy mappába fogja). */
   groupId?: string;

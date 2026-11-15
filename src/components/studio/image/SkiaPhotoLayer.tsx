@@ -27,6 +27,7 @@ import { File } from 'expo-file-system';
 
 import { selectionSkPath } from '@/components/studio/image/selectionPath';
 import { canvasToLayerBox, maskOutlineInBox } from '@/lib/imageLayerGeometry';
+import { innerEffectsOf } from '@/lib/innerEffects';
 import { type CubeLut, parseCubeLut } from '@/lib/lutImport';
 import type { ColorFields } from '@/lib/imagePixelPipeline';
 import { LUT_DRAFT_SIZE, LUT_SHADER, LUT_SIZE, buildLutBytes, hasColorOps, hasDetail, layerDetail } from '@/lib/imagePreviewLut';
@@ -92,6 +93,7 @@ export function needsSkiaPreview(layer: PhotoLayer, after: ColorFields[] = [], m
     !!layer.maskGradient ||
     !!layer.dropShadow ||
     !!layer.outerGlow ||
+    !!innerEffectsOf(layer) ||
     !!layer.filters?.some((f) => f.type === 'blur' && (f.amount ?? 0) > 0)
   );
 }
@@ -230,6 +232,33 @@ export function PhotoSkiaContent({
           ) : null
         )}
       </>
+    );
+  }
+  // 🎨 S13: belső stílusok a réteg saját terében (a szerverrel azonos sorrend: átfedés → ragyogás →
+  // árnyék), a réteg alfájára rajzolva (srcATop) — az átlátszó PNG széle is szél
+  const inner = innerEffectsOf(layer);
+  if (inner) {
+    const base = content;
+    const px = canvas.width * scale;
+    const py = canvas.height * scale;
+    const ring = (key: string, dx: number, dy: number, sigma: number, color: string, opacity: number) => {
+      const pad = Math.abs(dx) + Math.abs(dy) + 3 * sigma + 4;
+      return (
+        <Group key={key} layer={<Paint blendMode="srcATop" opacity={opacity}><Blur blur={sigma} /></Paint>}>
+          <Group transform={[{ translateX: dx }, { translateY: dy }]}>
+            <Rect x={-pad} y={-pad} width={w + 2 * pad} height={h + 2 * pad} color={color} />
+            <Group layer={<Paint blendMode="dstOut" />}>{base}</Group>
+          </Group>
+        </Group>
+      );
+    };
+    content = (
+      <Group layer={<Paint />}>
+        {base}
+        {inner.overlay ? <Rect x={0} y={0} width={w} height={h} color={inner.overlay.color} opacity={inner.overlay.opacity} blendMode="srcATop" /> : null}
+        {inner.glow ? ring('glow', 0, 0, inner.glow.size * px, inner.glow.color, inner.glow.opacity) : null}
+        {inner.shadow ? ring('shadow', inner.shadow.dx * px, inner.shadow.dy * py, inner.shadow.blur * px, inner.shadow.color, inner.shadow.opacity) : null}
+      </Group>
     );
   }
   if (layer.mask?.shape) {

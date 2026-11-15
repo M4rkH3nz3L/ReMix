@@ -1,7 +1,7 @@
 import * as Device from 'expo-device';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requireOptionalNativeModule } from 'expo-modules-core';
-import { AlphaType, ColorType, drawAsImage, Group, ImageFormat, Skia, type SkImage } from '@shopify/react-native-skia';
+import { AlphaType, ColorType, drawAsImage, Group, ImageFormat, Skia, type SkImage, type SkSurface as SkSurfaceT } from '@shopify/react-native-skia';
 import { File, Paths } from 'expo-file-system';
 import type { ReactNode, RefObject } from 'react';
 import { createRef, Profiler, useEffect, useRef } from 'react';
@@ -7887,6 +7887,74 @@ async function smokePdfOffline(log: Log, setHarness: (n: ReactNode) => void) {
   setHarness(null);
 }
 
+/**
+ * 🎨 IMAGE-PROD S13 (DS5): belső réteg-stílusok — színátfedés, belső ragyogás, belső árnyék fotón
+ * (átlátszatlan és átlátszó szélű) és formán: a telefonos kép = a szerveres, ellenpróbával.
+ */
+async function smokeInnerFx(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  const png = (draw: (c: ReturnType<SkSurfaceT['getCanvas']>, p: ReturnType<typeof Skia.Paint>) => void, name: string) => {
+    const surface = Skia.Surface.MakeOffscreen(200, 200)!;
+    const paint = Skia.Paint();
+    draw(surface.getCanvas(), paint);
+    surface.flush();
+    const f = new File(projectMediaDir(), `smoke_inner_${name}_${Date.now().toString(36)}.png`);
+    f.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+    return f.uri;
+  };
+  const grey = png((c, p) => { p.setColor(Skia.Color('#909090')); c.drawRect(Skia.XYWHRect(0, 0, 200, 200), p); }, 'grey');
+  const disc = png((c, p) => { p.setColor(Skia.Color('#909090')); c.drawCircle(100, 100, 90, p); }, 'disc');
+  const meanDiff = (p: SkImage, q: SkImage) => {
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < 80; i++) for (let j = 0; j < 80; j++) {
+      const u = pixel(p, Math.floor(((j + 0.5) / 80) * p.width()), Math.floor(((i + 0.5) / 80) * p.height()));
+      const w = pixel(q, Math.floor(((j + 0.5) / 80) * q.width()), Math.floor(((i + 0.5) / 80) * q.height()));
+      sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+      n += 1;
+    }
+    return sum / n;
+  };
+  const bg = { id: 'bg', kind: 'fill', fill: '#203040' } as unknown as ImageLayer;
+  const mk = (layer: Record<string, unknown>) => ({ id: 'fx', name: 'fx', aspectRatio: '1:1', width: 400, height: 400, layers: [bg, layer] }) as unknown as ImageDoc;
+  const photo = (uri: string, fx: Record<string, unknown>) => ({ id: 'p', kind: 'photo', uri, position: { x: 0.5, y: 0.5 }, w: 0.6, h: 0.6, fit: 'stretch', ...fx });
+  const shape = (fx: Record<string, unknown>) => ({ id: 's', kind: 'shape', shape: 'ellipse', position: { x: 0.5, y: 0.5 }, w: 0.6, h: 0.6, fill: '#909090', ...fx });
+  const FX: [string, Record<string, unknown>][] = [
+    ['színátfedés', { colorOverlay: { color: '#ff2d95', opacity: 0.7 } }],
+    ['belső ragyogás', { innerGlow: { color: '#ffee00', size: 0.05, opacity: 1 } }],
+    ['belső árnyék', { innerShadow: { color: '#000000', dx: 0.02, dy: 0.02, blur: 0.012, opacity: 0.8 } }],
+  ];
+  const cases: [string, (fx: Record<string, unknown>) => Record<string, unknown>][] = [
+    ['fotó', (fx) => photo(grey, fx)],
+    ['átlátszó szélű fotó', (fx) => photo(disc, fx)],
+    ['forma', (fx) => shape(fx)],
+  ];
+  for (const [cname, make] of cases) {
+    const plain = await ref.current!.render(mk(make({})), 400);
+    for (const [fname, fx] of FX) {
+      const doc = mk(make(fx));
+      const dev = await ref.current!.render(doc, 400);
+      const srv = await renderImageDoc(doc, 400);
+      if (!dev || !srv || !plain) {
+        log(false, `${cname}: ${fname}`, 'nincs kép');
+        continue;
+      }
+      const a = await decode(dev);
+      const d = meanDiff(a, await decode(srv));
+      const ctl = meanDiff(a, await decode(plain));
+      log(d <= 6 && ctl > d * 2, `${cname}: ${fname} — telefon = szerver`, `${d.toFixed(2)} · ellenpróba (effekt nélkül) ${ctl.toFixed(2)} /255`);
+      removeFile(dev);
+      removeFile(srv);
+    }
+    if (plain) removeFile(plain);
+  }
+  setHarness(null);
+  [grey, disc].forEach((u) => removeFile(u));
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -11808,6 +11876,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'innerfx') {
+    await step(phase, () => smokeInnerFx(log, setHarness));
     return;
   }
   if (phase === 'pdfoffline') {

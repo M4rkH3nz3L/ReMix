@@ -3884,6 +3884,18 @@
         "design": "Design",
         "label": "Arbeitsbereich"
       },
+      "inner": {
+        "overlay": "Farbüberlagerung",
+        "glow": "Schein nach innen",
+        "shadow": "Schatten nach innen",
+        "overlayColor": "Überlagerungsfarbe",
+        "overlayOpacity": "Überlagerungsstärke",
+        "glowColor": "Innerer Schein: Farbe",
+        "glowSize": "Innerer Schein: Größe",
+        "shadowColor": "Innerer Schatten: Farbe",
+        "shadowDistance": "Innerer Schatten: Abstand",
+        "shadowBlur": "Innerer Schatten: Weichheit"
+      },
       "fonts": {
         "import": "Eigene Schrift",
         "invalid": "Das ist keine TTF- oder OTF-Schriftdatei.",

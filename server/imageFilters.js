@@ -269,7 +269,87 @@ function channelMixFilter(mix) {
   return `,colorchannelmixer=${rr}:${rg}:${rb}:0:${gr}:${gg}:${gb}:0:${br}:${bg}:${bb}:0:0:0:0:1`;
 }
 
+/**
+ * 🎨 IMAGE-PROD S13: réteg-stílusok a réteg ALAKJÁN BELÜL (a kliens `innerEffects.ts` párja) —
+ * színátfedés → belső ragyogás → belső árnyék. A bemenet egy rgba-réteg (a saját doboz-terében, a
+ * geometria és az átlátszóság ELŐTT); minden lépés után az eredeti alfa visszaáll (a stílus a réteg
+ * alakját nem változtatja). A „gyűrű” az alfa negáltja (kívül 1), eltolva és elmosva, az alfára szorítva.
+ * A színek csak #rrggbb formában jutnak a szűrőgráfba (a klienstől jönnek).
+ */
+function innerEffectsFilters(input, output, fx, canvasW, canvasH, tag) {
+  if (!fx || (!fx.colorOverlay && !fx.innerGlow && !fx.innerShadow)) {
+    return [];
+  }
+  const out = [];
+  let n = 0;
+  const L = () => `[ie${tag}_${n++}]`;
+  const hex = (c, d) => (typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c) ? `0x${c.slice(1)}` : d);
+  const unit = (v, d, lo, hi) => {
+    const x = Number(v);
+    return Math.min(hi, Math.max(lo, Number.isFinite(x) ? x : d));
+  };
+  let cur = input;
+  const step = (color, opacity, ring) => {
+    const [a, b, c, d] = [L(), L(), L(), L()];
+    // a gyűrűhöz (ragyogás, árnyék) egy negyedik másolat is kell az alfa-negálthoz
+    out.push(ring ? `${cur}format=rgba,split=4${a}${b}${c}${d}` : `${cur}format=rgba,split=3${a}${b}${d}`);
+    const al = L();
+    out.push(`${d}alphaextract${al}`);
+    const col = L();
+    out.push(`${b}drawbox=x=0:y=0:w=iw:h=ih:color=${color}@1:t=fill${col}`);
+    let mask;
+    if (ring) {
+      const { dx, dy, sigma } = ring;
+      const pad = Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) + 3 * sigma + 2);
+      const r = L();
+      const al2 = L();
+      // a kívüli (fehér) perem az elmosás ELŐTT kell, különben nincs miből a szélre mosni
+      out.push(`${c}alphaextract,negate,pad=w=iw+${2 * pad}:h=ih+${2 * pad}:x=${pad}:y=${pad}:color=white${sigma > 0 ? `,gblur=sigma=${sigma.toFixed(2)}` : ''},crop=w=iw-${2 * pad}:h=ih-${2 * pad}:x=${pad - dx}:y=${pad - dy}${r}`);
+      // az alfából egy újabb másolat kell a szorzáshoz (a `${al}` a végső visszaállításé)
+      const [alA, alB] = [L(), L()];
+      out.push(`${al}split${alA}${alB}`);
+      out.push(`${r}${alA}blend=all_mode=multiply${al2}`);
+      mask = al2;
+      const g = L();
+      out.push(`${col}${mask}alphamerge,colorchannelmixer=aa=${opacity.toFixed(3)}${g}`);
+      const o = L();
+      out.push(`${a}${g}overlay=0:0:format=auto${o}`);
+      const nx = L();
+      out.push(`${o}${alB}alphamerge${nx}`);
+      cur = nx;
+      return;
+    }
+    const [alA, alB] = [L(), L()];
+    out.push(`${al}split${alA}${alB}`);
+    const g = L();
+    out.push(`${col}${alA}alphamerge,colorchannelmixer=aa=${opacity.toFixed(3)}${g}`);
+    const o = L();
+    out.push(`${a}${g}overlay=0:0:format=auto${o}`);
+    const nx = L();
+    out.push(`${o}${alB}alphamerge${nx}`);
+    cur = nx;
+  };
+  if (fx.colorOverlay) {
+    step(hex(fx.colorOverlay.color, '0xff2d95'), unit(fx.colorOverlay.opacity, 1, 0, 1), null);
+  }
+  if (fx.innerGlow) {
+    const g = fx.innerGlow;
+    step(hex(g.color, '0xffffff'), unit(g.opacity, 0.75, 0, 1), { dx: 0, dy: 0, sigma: unit(g.size, 0.02, 0, 0.2) * canvasW });
+  }
+  if (fx.innerShadow) {
+    const sh = fx.innerShadow;
+    step(hex(sh.color, '0x000000'), unit(sh.opacity, 0.6, 0, 1), {
+      dx: Math.round(unit(sh.dx, 0.012, -0.2, 0.2) * canvasW),
+      dy: Math.round(unit(sh.dy, 0.012, -0.2, 0.2) * canvasH),
+      sigma: unit(sh.blur, 0.012, 0, 0.2) * canvasW,
+    });
+  }
+  out.push(`${cur}format=rgba${output}`);
+  return out;
+}
+
 module.exports = {
+  innerEffectsFilters,
   filterChain,
   oneFilter,
   sepiaMixer,

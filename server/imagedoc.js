@@ -23,6 +23,7 @@ const {
   healChain,
   levelsFilter,
   channelMixFilter,
+  innerEffectsFilters,
 } = require('./imageFilters');
 const { maskGrayChain, maskToBox } = require('./imageMask');
 const { hslCube, isNeutralHsl } = require('./hslBands');
@@ -554,6 +555,12 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
           prepared = `lc${li}`;
         }
       }
+      // 🎨 S13: belső stílusok a réteg saját terében, a geometria és az átlátszóság ELŐTT (mint a vásznon)
+      const innerP = innerEffectsFilters(`[${prepared}]`, `[ief${geomIdx}]`, layer, canvas.w, canvas.h, `p${geomIdx}`);
+      if (innerP.length > 0) {
+        filters.push(...innerP);
+        prepared = `ief${geomIdx}`;
+      }
       filters.push(
         `[${prepared}]format=rgba${persp}${flip}${rotate}${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[pg${geomIdx}]`
       );
@@ -570,8 +577,11 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       const placed = layer.kind === 'shape';
       const flip = placed ? `${layer.flipH ? ',hflip' : ''}${layer.flipV ? ',vflip' : ''}` : '';
       const rot = placed ? rotateChain(layer.rotation) : '';
+      // 🎨 S13: a forma belső stílusai a forgatás/átlátszóság ELŐTT (a vásznon is a forma saját terében)
+      const innerS = placed ? innerEffectsFilters(`[${idx}:v]`, `[ies${idx}]`, layer, canvas.w, canvas.h, `s${idx}`) : [];
+      filters.push(...innerS);
       filters.push(
-        `[${idx}:v]format=rgba${flip}${rot}${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
+        `${innerS.length > 0 ? `[ies${idx}]` : `[${idx}:v]`}format=rgba${flip}${rot}${maskGradientFilter(layer.maskGradient)},colorchannelmixer=aa=${opacity.toFixed(3)}[${prepared}]`
       );
       idx += 1;
     }

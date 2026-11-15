@@ -3851,6 +3851,18 @@
         "design": "Design",
         "label": "Workspace"
       },
+      "inner": {
+        "overlay": "Colour overlay",
+        "glow": "Inner glow",
+        "shadow": "Inner shadow",
+        "overlayColor": "Overlay colour",
+        "overlayOpacity": "Overlay strength",
+        "glowColor": "Inner glow colour",
+        "glowSize": "Inner glow size",
+        "shadowColor": "Inner shadow colour",
+        "shadowDistance": "Inner shadow distance",
+        "shadowBlur": "Inner shadow softness"
+      },
       "fonts": {
         "import": "Own font",
         "invalid": "This is not a TTF or OTF font file.",

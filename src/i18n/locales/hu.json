@@ -3851,6 +3851,18 @@
         "design": "Design",
         "label": "Munkaterület"
       },
+      "inner": {
+        "overlay": "Színátfedés",
+        "glow": "Belső ragyogás",
+        "shadow": "Belső árnyék",
+        "overlayColor": "Átfedés színe",
+        "overlayOpacity": "Átfedés ereje",
+        "glowColor": "Belső ragyogás színe",
+        "glowSize": "Belső ragyogás mérete",
+        "shadowColor": "Belső árnyék színe",
+        "shadowDistance": "Belső árnyék távolsága",
+        "shadowBlur": "Belső árnyék lágysága"
+      },
       "fonts": {
         "import": "Saját font",
         "invalid": "Ez nem TTF vagy OTF betűtípus-fájl.",

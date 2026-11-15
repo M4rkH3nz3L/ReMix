@@ -14,6 +14,7 @@ import { getFilterAmount, hasFilter, IMAGE_FILTER_TYPES, setFilterAmount, toggle
 import { assignLayerToGroup, createGroup, updateLayer } from '@/lib/imageDoc';
 import { makeId } from '@/lib/id';
 import { withProjectFont } from '@/lib/projectFonts';
+import { INNER_DEFAULTS } from '@/lib/innerEffects';
 import { loadProjectFonts, pickAndImportFont } from '@/lib/projectFontsClient';
 import { useEditorStore } from '@/store/editorStore';
 import { pickCubeLut } from '@/lib/media';
@@ -940,6 +941,47 @@ export function LayerInspector({
               />
               <Slider label={t('studio.image.glowSize', { defaultValue: 'Ragyogás méret' })} value={glowCfg.size ?? 0.02} min={0.005} max={0.08} onChange={(v) => setGlow({ size: v })} format={(v) => v.toFixed(3)} />
               <Slider label={t('studio.image.glowOpacity', { defaultValue: 'Ragyogás erő' })} value={glowCfg.opacity ?? 0.85} min={0} max={1} onChange={(v) => setGlow({ opacity: v })} format={(v) => `${Math.round(v * 100)}%`} />
+            </>
+          ) : null}
+          {/* 🎨 S13: a réteg alakján BELÜLI stílusok (fotó, forma) — színátfedés, belső ragyogás, belső árnyék */}
+          {layer.kind === 'photo' || layer.kind === 'shape' ? (
+            <>
+              <View style={styles.chipRow}>
+                <Chip
+                  label={t('studio.image.inner.overlay')}
+                  active={!!layer.colorOverlay}
+                  onPress={() => commit(updateLayer(doc, layer.id, { colorOverlay: layer.colorOverlay ? undefined : { ...INNER_DEFAULTS.overlay, opacity: 0.6 } } as Partial<ImageLayer>), t('studio.image.inner.overlay'))}
+                />
+                <Chip
+                  label={t('studio.image.inner.glow')}
+                  active={!!layer.innerGlow}
+                  onPress={() => commit(updateLayer(doc, layer.id, { innerGlow: layer.innerGlow ? undefined : {} } as Partial<ImageLayer>), t('studio.image.inner.glow'))}
+                />
+                <Chip
+                  label={t('studio.image.inner.shadow')}
+                  active={!!layer.innerShadow}
+                  onPress={() => commit(updateLayer(doc, layer.id, { innerShadow: layer.innerShadow ? undefined : {} } as Partial<ImageLayer>), t('studio.image.inner.shadow'))}
+                />
+              </View>
+              {layer.colorOverlay ? (
+                <>
+                  <ColorField label={t('studio.image.inner.overlayColor')} value={layer.colorOverlay.color} onChange={(color) => commit(updateLayer(doc, layer.id, { colorOverlay: { ...layer.colorOverlay!, color } } as Partial<ImageLayer>))} />
+                  <Slider label={t('studio.image.inner.overlayOpacity')} value={layer.colorOverlay.opacity ?? 1} min={0} max={1} onChange={(v) => commit(updateLayer(doc, layer.id, { colorOverlay: { ...layer.colorOverlay!, opacity: v } } as Partial<ImageLayer>))} format={(v) => `${Math.round(v * 100)}%`} />
+                </>
+              ) : null}
+              {layer.innerGlow ? (
+                <>
+                  <ColorField label={t('studio.image.inner.glowColor')} value={layer.innerGlow.color ?? INNER_DEFAULTS.glow.color} onChange={(color) => commit(updateLayer(doc, layer.id, { innerGlow: { ...layer.innerGlow, color } } as Partial<ImageLayer>))} />
+                  <Slider label={t('studio.image.inner.glowSize')} value={layer.innerGlow.size ?? INNER_DEFAULTS.glow.size} min={0.004} max={0.08} onChange={(v) => commit(updateLayer(doc, layer.id, { innerGlow: { ...layer.innerGlow, size: v } } as Partial<ImageLayer>))} format={(v) => v.toFixed(3)} />
+                </>
+              ) : null}
+              {layer.innerShadow ? (
+                <>
+                  <ColorField label={t('studio.image.inner.shadowColor')} value={layer.innerShadow.color ?? INNER_DEFAULTS.shadow.color} onChange={(color) => commit(updateLayer(doc, layer.id, { innerShadow: { ...layer.innerShadow, color } } as Partial<ImageLayer>))} />
+                  <Slider label={t('studio.image.inner.shadowDistance')} value={layer.innerShadow.dy ?? INNER_DEFAULTS.shadow.dy} min={0} max={0.06} onChange={(v) => commit(updateLayer(doc, layer.id, { innerShadow: { ...layer.innerShadow, dx: v, dy: v } } as Partial<ImageLayer>))} format={(v) => v.toFixed(3)} />
+                  <Slider label={t('studio.image.inner.shadowBlur')} value={layer.innerShadow.blur ?? INNER_DEFAULTS.shadow.blur} min={0} max={0.06} onChange={(v) => commit(updateLayer(doc, layer.id, { innerShadow: { ...layer.innerShadow, blur: v } } as Partial<ImageLayer>))} format={(v) => v.toFixed(3)} />
+                </>
+              ) : null}
             </>
           ) : null}
           {layer.stroke ? (

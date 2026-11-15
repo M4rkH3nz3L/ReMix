@@ -4,7 +4,7 @@ import { ShapeOverlay } from '@/components/preview/ShapeOverlay';
 import { TextOverlay } from '@/components/preview/TextOverlay';
 import { FillLayerView } from '@/components/studio/image/FillLayerView';
 import { PhotoLayerView } from '@/components/studio/image/PhotoLayerView';
-import { ShapeEffects } from '@/components/studio/image/ShapeEffects';
+import { ShapeEffects, ShapeInnerEffects } from '@/components/studio/image/ShapeEffects';
 import { layerToShapeClip, layerToTextClip, textEffectStyle } from '@/lib/imageLayerClip';
 import { correctHex, correctPaint, type LayerCorrections } from '@/lib/imagePixelPipeline';
 import type { ClipMask, ImageLayer } from '@/types/project';
@@ -83,6 +83,7 @@ export const CanvasLayerView = memo(function CanvasLayerView({
           onSelect={onSelect}
           onMove={onMove}
         />
+        <ShapeInnerEffects layer={l} box={box} canvas={canvas} />
       </Fragment>
     );
   }

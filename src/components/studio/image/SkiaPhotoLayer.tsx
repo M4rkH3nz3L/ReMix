@@ -333,7 +333,7 @@ export function SkiaPhotoLayer({
 }: {
   layer: PhotoLayer;
   after?: ColorFields[];
-  maskedAfter?: { mask: ClipMask; adjust?: PhotoLayer['adjust']; grade?: PhotoLayer['grade'] }[];
+  maskedAfter?: { mask: ClipMask; adjust?: PhotoLayer['adjust']; grade?: PhotoLayer['grade']; hsl?: PhotoLayer['hsl'] }[];
   w: number;
   h: number;
   scale: number;
@@ -346,7 +346,7 @@ export function SkiaPhotoLayer({
   // a maszkon belül más színlánc fut: a saját lokális korrekció + a fölötte lévő maszkolt rétegek
   const masked = useMemo(() => {
     const local = layer.localAdjust?.mask ? [{ mask: layer.localAdjust.mask, adjust: layer.localAdjust.adjust, grade: layer.localAdjust.grade }] : [];
-    return [...local, ...maskedAfter].map((m) => ({ mask: m.mask, after: [{ adjust: m.adjust, grade: m.grade }, ...after] }));
+    return [...local, ...maskedAfter].map((m) => ({ mask: m.mask, after: [{ adjust: m.adjust, grade: m.grade, hsl: 'hsl' in m ? m.hsl : undefined }, ...after] }));
   }, [layer.localAdjust, maskedAfter, after]);
   const key = JSON.stringify([layer.adjust, layer.hsl, layer.grade, layer.filterId, layer.filterIntensity, layer.gradientMap, layer.levels, layer.channelMix, layer.filters, layer.develop, after, masked, !!cube, layer.lut, layer.heal]);
   const hasLut = hasColorOps(layer, after, cube) || masked.length > 0 || hasDetail(layerDetail(layer, scale));

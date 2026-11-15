@@ -624,6 +624,9 @@ export function LayerInspector({
           <Slider label={t('panels.adjust.adjust_exposure', { defaultValue: 'Expozíció' })} value={layer.adjust?.exposure ?? 0} min={-1} max={1} onChange={(v) => commit(updateLayer<AdjustmentImageLayer>(doc, layer.id, { adjust: { ...layer.adjust, exposure: v } }))} format={(v) => v.toFixed(2)} />
           <Slider label={t('panels.adjust.adjust_contrast', { defaultValue: 'Kontraszt' })} value={layer.adjust?.contrast ?? 0} min={-0.4} max={0.4} onChange={(v) => commit(updateLayer<AdjustmentImageLayer>(doc, layer.id, { adjust: { ...layer.adjust, contrast: v } }))} format={(v) => v.toFixed(2)} />
           <Slider label={t('panels.adjust.adjust_saturation', { defaultValue: 'Telítettség' })} value={layer.adjust?.saturation ?? 0} min={-1} max={1} onChange={(v) => commit(updateLayer<AdjustmentImageLayer>(doc, layer.id, { adjust: { ...layer.adjust, saturation: v } }))} format={(v) => v.toFixed(2)} />
+          <View style={styles.chipRow}>
+            <Chip label={t('studio.image.hsl.title')} active={!!layer.hsl} onPress={onOpenAdjust} />
+          </View>
           <Text style={styles.hintText}>{t('studio.image.adjustLayerHint', { defaultValue: 'A korrekció az ALATTA lévő rétegekre hat. Alább maszkolható.' })}</Text>
         </>
       ) : null}

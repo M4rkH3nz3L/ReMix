@@ -3934,7 +3934,8 @@
         "empty": "No adjustments yet. Add one above.",
         "reset": "Clear all",
         "base": "Base",
-        "kind": { "exposure": "Exposure", "contrast": "Contrast", "whiteBalance": "White balance", "tone": "Tone", "saturation": "Saturation", "vibrance": "Vibrance", "vignette": "Vignette" }
+        "kind": { "exposure": "Exposure", "contrast": "Contrast", "whiteBalance": "White balance", "tone": "Tone", "saturation": "Saturation", "vibrance": "Vibrance", "vignette": "Vignette", "curves": "Curves", "colorBalance": "Color balance" },
+        "balance": { "sh": "Shadows", "mid": "Midtones", "hi": "Highlights", "r": "Cyan – Red", "g": "Magenta – Green", "b": "Yellow – Blue" }
       },
       "develop": {
         "title": "Develop",

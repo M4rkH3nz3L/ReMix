@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -62,6 +63,8 @@ const ADD_ENTRIES: AddEntry[] = [
   { id: 'vibrance', kind: 'vibrance', seed: { vibrance: 0 }, icon: 'color-filter-outline', nameKey: 'studio.image.adjustStack.kind.vibrance' },
   { id: 'vignette', kind: 'vignette', seed: { vignette: 0 }, icon: 'ellipse-outline', nameKey: 'studio.image.adjustStack.kind.vignette' },
   { id: 'curves', kind: 'curves', seed: {}, icon: 'analytics-outline', nameKey: 'studio.image.adjustStack.kind.curves' },
+  // S17: 3 tartományos színegyensúly (árnyék / középtónus / csúcsfény) — a render `colorbalance`-a
+  { id: 'colorBalance', kind: 'colorBalance', seed: { balance: {} }, icon: 'color-wand-outline', nameKey: 'studio.image.adjustStack.kind.colorBalance' },
 ];
 
 const KIND_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -72,8 +75,39 @@ const KIND_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   vibrance: 'color-filter-outline',
   vignette: 'ellipse-outline',
   curves: 'analytics-outline',
+  colorBalance: 'color-wand-outline',
   custom: 'sunny',
 };
+
+type Zone = 'sh' | 'mid' | 'hi';
+const ZONES: Zone[] = ['sh', 'mid', 'hi'];
+const CHANNELS = ['r', 'g', 'b'] as const;
+
+/** 🎨 S17: színegyensúly-szerkesztő — tartomány választó + csatornánként egy csúszka (−1…1) */
+function ColorBalanceEditor({ value, onChange }: { value: ClipAdjust['balance']; onChange: (next: NonNullable<ClipAdjust['balance']>) => void }) {
+  const { t } = useTranslation();
+  const [zone, setZone] = useState<Zone>('mid');
+  return (
+    <>
+      <View style={styles.chipRow}>
+        {ZONES.map((z) => (
+          <Chip key={z} label={t(`studio.image.adjustStack.balance.${z}`)} active={zone === z} onPress={() => setZone(z)} />
+        ))}
+      </View>
+      {CHANNELS.map((ch) => (
+        <Slider
+          key={ch}
+          label={t(`studio.image.adjustStack.balance.${ch}`)}
+          value={value?.[zone]?.[ch] ?? 0}
+          min={-1}
+          max={1}
+          onChange={(v) => onChange({ ...value, [zone]: { ...value?.[zone], [ch]: v } })}
+          format={(v) => v.toFixed(2)}
+        />
+      ))}
+    </>
+  );
+}
 
 /**
  * 🎚️ Non-destruktív KORREKCIÓS-VEREM szerkesztő (érintő-first) — a fotó
@@ -226,6 +260,13 @@ export function AdjustStackSheet({
                       />
                     );
                   })}
+
+                  {l.kind === 'colorBalance' ? (
+                    <ColorBalanceEditor
+                      value={l.adjust.balance}
+                      onChange={(balance) => commitStack(updateAdjustment(stack, l.id, { adjust: { balance } }))}
+                    />
+                  ) : null}
 
                   {/* 📈 tónusgörbe-szerkesztő (RGB + csatornánként) — a renderben ffmpeg `curves` */}
                   {l.kind === 'curves' ? (

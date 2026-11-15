@@ -3967,7 +3967,8 @@
         "empty": "Noch keine Korrekturen. Oben eine hinzufügen.",
         "reset": "Alle löschen",
         "base": "Basis",
-        "kind": { "exposure": "Belichtung", "contrast": "Kontrast", "whiteBalance": "Weißabgleich", "tone": "Ton", "saturation": "Sättigung", "vibrance": "Dynamik", "vignette": "Vignette" }
+        "kind": { "exposure": "Belichtung", "contrast": "Kontrast", "whiteBalance": "Weißabgleich", "tone": "Ton", "saturation": "Sättigung", "vibrance": "Dynamik", "vignette": "Vignette", "curves": "Kurven", "colorBalance": "Farbbalance" },
+        "balance": { "sh": "Tiefen", "mid": "Mitteltöne", "hi": "Lichter", "r": "Cyan – Rot", "g": "Magenta – Grün", "b": "Gelb – Blau" }
       },
       "develop": {
         "title": "Entwickeln",

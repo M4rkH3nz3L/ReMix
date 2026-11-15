@@ -194,6 +194,7 @@ import { makeId } from '@/lib/id';
 import { colorRangeSelect, magicWandSelect } from '@/lib/magicWandClient';
 import { normalizePickedImage } from '@/lib/media';
 import { toSrgbIfNeeded } from '@/lib/colorIntakeClient';
+import { createAdjustment, flattenAdjustments } from '@/lib/adjustmentStack';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { createEmptyProject, CURRENT_SCHEMA_VERSION, splitClip } from '@/lib/projectUtils';
 import { cloudBaseUrl, serverHost } from '@/lib/backend';
@@ -8516,6 +8517,62 @@ async function smokeSelectText(log: Log, setHarness: (n: ReactNode) => void) {
   }
 }
 
+/** 🎨 S17: színenkénti HSL korrekciós rétegen (maszkkal is) és színegyensúly a veremben — telefon = szerver */
+async function smokeAdjustHsl(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  // négy színsáv: piros, zöld, kék, szürke
+  const surface = Skia.Surface.MakeOffscreen(400, 400)!;
+  const paint = Skia.Paint();
+  ['#d03030', '#30b040', '#3050d0', '#808080'].forEach((col, i) => {
+    paint.setColor(Skia.Color(col));
+    surface.getCanvas().drawRect(Skia.XYWHRect(i * 100, 0, 100, 400), paint);
+  });
+  surface.flush();
+  const f = new File(projectMediaDir(), `smoke_adjhsl_${Date.now().toString(36)}.png`);
+  f.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const meanDiff = (p: SkImage, q: SkImage) => {
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < 60; i++) for (let j = 0; j < 60; j++) {
+      const u = pixel(p, Math.floor(((j + 0.5) / 60) * p.width()), Math.floor(((i + 0.5) / 60) * p.height()));
+      const w = pixel(q, Math.floor(((j + 0.5) / 60) * q.width()), Math.floor(((i + 0.5) / 60) * q.height()));
+      sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+      n += 1;
+    }
+    return sum / n;
+  };
+  const photo = (extra: Record<string, unknown> = {}) => ({ id: 'p', kind: 'photo', uri: f.uri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch', ...extra });
+  const doc = (layers: unknown[]) => ({ id: 'ah', name: 'ah', aspectRatio: '1:1', width: 400, height: 400, layers }) as unknown as ImageDoc;
+  const hsl = { red: { h: 0.4, s: 0.3 }, blue: { l: -0.4 } };
+  const stack = [createAdjustment('colorBalance', { balance: { sh: { b: 0.4 }, mid: { r: 0.3, g: -0.2 }, hi: { g: 0.3 } } }, 'cb')];
+  const CASES: [string, ImageDoc][] = [
+    ['HSL korrekciós rétegen', doc([photo(), { id: 'a', kind: 'adjust', hsl }])],
+    ['HSL maszkolt korrekciós rétegen', doc([photo(), { id: 'a', kind: 'adjust', hsl, mask: { shape: 'rectangle', x: 0.25, y: 0.5, w: 0.5, h: 1, feather: 0 } }])],
+    ['HSL + grade + adjust egy korrekciós rétegen', doc([photo(), { id: 'a', kind: 'adjust', grade: 'teal-orange', adjust: { saturation: 0.3 }, hsl }])],
+    ['színegyensúly a veremben', doc([photo({ adjustmentStack: stack, adjust: flattenAdjustments(stack) })])],
+  ];
+  const plain = await ref.current!.render(doc([photo()]), 400);
+  for (const [name, d] of CASES) {
+    const dev = await ref.current!.render(d, 400);
+    const srv = await renderImageDoc(d, 400);
+    if (!dev || !srv || !plain) {
+      log(false, name, 'nincs kép');
+      continue;
+    }
+    const a = await decode(dev);
+    const diff = meanDiff(a, await decode(srv));
+    const ctl = meanDiff(a, await decode(plain));
+    log(diff <= 6 && ctl > diff * 2, `${name} — telefon = szerver`, `${diff.toFixed(2)} · ellenpróba (korrekció nélkül) ${ctl.toFixed(2)} /255`);
+    [dev, srv].forEach((u) => removeFile(u));
+  }
+  if (plain) removeFile(plain);
+  setHarness(null);
+  removeFile(f.uri);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -12437,6 +12494,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'adjhsl') {
+    await step(phase, () => smokeAdjustHsl(log, setHarness));
     return;
   }
   if (phase === 'seltext') {

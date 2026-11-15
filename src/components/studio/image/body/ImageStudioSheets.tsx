@@ -119,6 +119,9 @@ export function ImageStudioSheets({
           onOpenAdjust={() => {
             if (selectedLayer.kind === 'photo') {
               setSheet('adjust');
+            } else if (selectedLayer.kind === 'adjust') {
+              // S17: a korrekciós réteg színenkénti HSL-je
+              setSheet('hsl');
             }
           }}
           onDrawMask={onDrawMask}
@@ -145,7 +148,7 @@ export function ImageStudioSheets({
           onClose={() => setSheet(null)}
         />
       ) : null}
-      {sheet === 'hsl' && doc && selectedLayer?.kind === 'photo' ? (
+      {sheet === 'hsl' && doc && (selectedLayer?.kind === 'photo' || selectedLayer?.kind === 'adjust') ? (
         <HslSheet doc={doc} layer={selectedLayer} commit={commit} onClose={() => setSheet(null)} />
       ) : null}
       {sheet === 'fx' && doc && selectedLayer?.kind === 'shape' ? (

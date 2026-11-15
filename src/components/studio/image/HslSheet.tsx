@@ -7,19 +7,22 @@ import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { palette } from '@/constants/editor';
 import { HSL_BANDS, isNeutralHsl } from '@/lib/hslBands';
 import { updateLayer } from '@/lib/imageDoc';
-import type { HslBand, ImageDoc, PhotoLayer } from '@/types/project';
+import type { AdjustmentImageLayer, HslBand, ImageDoc, PhotoLayer } from '@/types/project';
 
 const HistogramView = lazy(() => import('@/components/studio/image/HistogramView').then((m) => ({ default: m.HistogramView })));
 
 const FIELDS = ['h', 's', 'l'] as const;
 const percent = (v: number) => `${v > 0 ? '+' : ''}${Math.round(v * 100)}`;
 
-/** 🎨 Színenkénti HSL: sávot választasz, és csak az a szín mozdul. A hisztogram élőben követi. */
-export function HslSheet({ doc, layer, commit, onClose }: { doc: ImageDoc; layer: PhotoLayer; commit: (next: ImageDoc, label?: string) => void; onClose: () => void }) {
+/**
+ * 🎨 Színenkénti HSL: sávot választasz, és csak az a szín mozdul. Fotón a hisztogram élőben követi;
+ * korrekciós rétegen (S17) az alatta lévő kompozitra hat.
+ */
+export function HslSheet({ doc, layer, commit, onClose }: { doc: ImageDoc; layer: PhotoLayer | AdjustmentImageLayer; commit: (next: ImageDoc, label?: string) => void; onClose: () => void }) {
   const { t } = useTranslation();
   const [band, setBand] = useState<HslBand>('red');
   const set = (field: (typeof FIELDS)[number], value: number) =>
-    commit(updateLayer<PhotoLayer>(doc, layer.id, { hsl: { ...layer.hsl, [band]: { ...layer.hsl?.[band], [field]: value } } }), 'hsl-bands');
+    commit(updateLayer<PhotoLayer | AdjustmentImageLayer>(doc, layer.id, { hsl: { ...layer.hsl, [band]: { ...layer.hsl?.[band], [field]: value } } }), 'hsl-bands');
 
   return (
     <StudioSheet
@@ -28,15 +31,17 @@ export function HslSheet({ doc, layer, commit, onClose }: { doc: ImageDoc; layer
       onClose={onClose}
       footer={
         isNeutralHsl(layer.hsl) ? undefined : (
-          <Pressable onPress={() => commit(updateLayer<PhotoLayer>(doc, layer.id, { hsl: undefined }), 'hsl-bands')} style={styles.reset} accessibilityRole="button">
+          <Pressable onPress={() => commit(updateLayer<PhotoLayer | AdjustmentImageLayer>(doc, layer.id, { hsl: undefined }), 'hsl-bands')} style={styles.reset} accessibilityRole="button">
             <Text style={styles.resetText}>{t('studio.image.hsl.reset')}</Text>
           </Pressable>
         )
       }
     >
-      <Suspense fallback={null}>
-        <HistogramView layer={layer} uri={layer.uri} />
-      </Suspense>
+      {layer.kind === 'photo' ? (
+        <Suspense fallback={null}>
+          <HistogramView layer={layer} uri={layer.uri} />
+        </Suspense>
+      ) : null}
       <View style={styles.bands}>
         {HSL_BANDS.map(({ key, color }) => {
           const changed = !isNeutralHsl({ [key]: layer.hsl?.[key] });

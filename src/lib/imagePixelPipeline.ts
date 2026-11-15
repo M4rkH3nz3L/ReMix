@@ -429,6 +429,11 @@ export function layerOps(layer: ColorFields, after: ColorFields[] = [], cube?: C
   for (const up of after) {
     // a korrekciós réteg és a dokumentum sorrendje a renderben: grade, utána adjust
     ops.push(...(up.grade ? GRADE_OPS[up.grade]?.() ?? [] : []), ...adjustOps(up.adjust));
+    // S17: a korrekciós réteg színenkénti HSL-je (a szerveren a grade + adjust után, `.cube`-ként)
+    const upHsl = up.hsl;
+    if (upHsl && !isNeutralHsl(upHsl)) {
+      ops.push((c) => shiftColor(c[0], c[1], c[2], upHsl));
+    }
   }
   return ops;
 }
@@ -447,7 +452,7 @@ export function correctionsAbove(doc: { layers: { kind: string; id: string; hidd
 /** egy réteg fölött ható korrekciók */
 export interface LayerCorrections<M> {
   above: ColorFields[];
-  masked: { mask: M; adjust?: ColorFields['adjust']; grade?: ColorFields['grade'] }[];
+  masked: { mask: M; adjust?: ColorFields['adjust']; grade?: ColorFields['grade']; hsl?: ColorFields['hsl'] }[];
 }
 export type CorrectionMap<M> = Map<string, LayerCorrections<M>>;
 
@@ -466,7 +471,7 @@ export function correctionsKey(doc: { layers: { kind: string; id: string }[]; gr
  * A `correctionsAbove` és a `maskedCorrectionsAbove` minden rétegre, egy menetben (nem rétegenként
  * az egész listán). Az azonos készletű rétegek ugyanazt az objektumot kapják, ezért a memo nem rajzolja újra őket.
  */
-export function correctionContext<M>(doc: { layers: { kind: string; id: string; hidden?: boolean; mask?: unknown; adjust?: unknown; grade?: unknown }[]; grade?: unknown; adjust?: unknown }): CorrectionMap<M> {
+export function correctionContext<M>(doc: { layers: { kind: string; id: string; hidden?: boolean; mask?: unknown; adjust?: unknown; grade?: unknown; hsl?: unknown }[]; grade?: unknown; adjust?: unknown }): CorrectionMap<M> {
   const map: CorrectionMap<M> = new Map();
   let current: LayerCorrections<M> = { above: doc.grade || doc.adjust ? ([{ grade: doc.grade, adjust: doc.adjust }] as ColorFields[]) : [], masked: [] };
   for (let i = doc.layers.length - 1; i >= 0; i--) {
@@ -474,7 +479,7 @@ export function correctionContext<M>(doc: { layers: { kind: string; id: string; 
     map.set(l.id, current);
     if (l.kind === 'adjust' && !l.hidden) {
       current = l.mask
-        ? { above: current.above, masked: [{ mask: l.mask as M, adjust: l.adjust as ColorFields['adjust'], grade: l.grade as ColorFields['grade'] }, ...current.masked] }
+        ? { above: current.above, masked: [{ mask: l.mask as M, adjust: l.adjust as ColorFields['adjust'], grade: l.grade as ColorFields['grade'], hsl: l.hsl as ColorFields['hsl'] }, ...current.masked] }
         : { above: [l as ColorFields, ...current.above], masked: current.masked };
     }
   }

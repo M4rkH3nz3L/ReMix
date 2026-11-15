@@ -1672,6 +1672,8 @@ export type AdjustmentImageLayer = ImageLayerBase & {
   kind: 'adjust';
   grade?: GradeId;
   adjust?: ClipAdjust;
+  /** 🎨 S17: színenkénti HSL az alatta lévő kompozitra (a lánc: grade → adjust → HSL) */
+  hsl?: HslBands;
   mask?: ClipMask;
 };
 

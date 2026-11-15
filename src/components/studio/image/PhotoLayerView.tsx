@@ -40,7 +40,7 @@ export function PhotoLayerView({
   /** a fölötte ható korrekciós rétegek + a dokumentum-szintű grade */
   corrections?: ColorFields[];
   /** a fölötte ható maszkolt korrekciós rétegek */
-  maskedCorrections?: { mask: ClipMask; adjust?: PhotoLayer['adjust']; grade?: PhotoLayer['grade'] }[];
+  maskedCorrections?: { mask: ClipMask; adjust?: PhotoLayer['adjust']; grade?: PhotoLayer['grade']; hsl?: PhotoLayer['hsl'] }[];
   onSelect?: (id: string) => void;
   onMove?: (id: string, position: { x: number; y: number }) => void;
 }) {

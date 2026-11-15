@@ -439,7 +439,14 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
     // 🎚️ korrekció-réteg: nincs saját tartalma — az ALATTA felépült kompozitra (last) hat.
     // `mask` esetén csak a maszkolt régióra (a korrigált alfa = maszk → az eredeti fölé overlay).
     if (layer.kind === 'adjust') {
-      const corr = (gradeFilterChain(layer.grade) + adjustChain({ adjust: layer.adjust })).replace(/^,/, '');
+      // 🎨 S17: a korrekciós réteg színenkénti HSL-je a grade + adjust után (a kliens `layerOps`-ával azonos sorrend)
+      let adjHsl = '';
+      if (!isNeutralHsl(layer.hsl)) {
+        const cube = path.join(workDir, `hsladj${idx}_${maskSeq}.cube`);
+        fs.writeFileSync(cube, hslCube(layer.hsl));
+        adjHsl = `,lut3d='${cube.replace(/'/g, "'\\''")}'`;
+      }
+      const corr = (gradeFilterChain(layer.grade) + adjustChain({ adjust: layer.adjust }) + adjHsl).replace(/^,/, '');
       if (!corr) {
         continue;
       }

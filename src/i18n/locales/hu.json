@@ -3934,7 +3934,8 @@
         "empty": "Nincs korrekció. Adj hozzá egyet fent.",
         "reset": "Mind törlése",
         "base": "Alap",
-        "kind": { "exposure": "Expozíció", "contrast": "Kontraszt", "whiteBalance": "Fehéregyensúly", "tone": "Tónus", "saturation": "Telítettség", "vibrance": "Élénkség", "vignette": "Vignetta" }
+        "kind": { "exposure": "Expozíció", "contrast": "Kontraszt", "whiteBalance": "Fehéregyensúly", "tone": "Tónus", "saturation": "Telítettség", "vibrance": "Élénkség", "vignette": "Vignetta", "curves": "Görbék", "colorBalance": "Színegyensúly" },
+        "balance": { "sh": "Árnyékok", "mid": "Középtónusok", "hi": "Csúcsfények", "r": "Cián – Vörös", "g": "Bíbor – Zöld", "b": "Sárga – Kék" }
       },
       "develop": {
         "title": "Előhívás",

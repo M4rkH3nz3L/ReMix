@@ -1616,6 +1616,12 @@ export interface PhotoLayer extends ImageLayerBase {
    * Hiányzó / neutrális = nincs hatás (a `adjust`/`adjustmentStack` mellett, additív).
    */
   develop?: PhotoDevelop;
+  /**
+   * ✂️ S18: vágómaszk — a fotó csak az ALATTA lévő forma-réteg (ennek az id-je) alakján belül látszik.
+   * Élő kapcsolat: a forma mozgatása/átalakítása a vágást is viszi. A render előtt `resolveClipMasks`
+   * (`imageClip.ts`) a forma körvonalából maszkot képez — a vászon és a szerver ugyanazt kapja.
+   */
+  clipTo?: string;
   mask?: ClipMask;
   /** 🎯 kijelölés-alapú (lokális) korrekció: a `grade`/`adjust` CSAK a `mask` régión BELÜL hat,
    *  kívül az eredeti marad (a render `maskedmerge`-del keveri). A `mask` vászon-normalizált — a worker

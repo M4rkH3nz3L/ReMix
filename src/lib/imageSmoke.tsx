@@ -8723,6 +8723,62 @@ async function smokeFrameShot(log: Log) {
   }
 }
 
+/** ✂️ S18: vágómaszk — a fotó a forma alakjában; telefon = szerver, ellenpróba vágás nélkül */
+async function smokeClipMask(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  const surface = Skia.Surface.MakeOffscreen(400, 400)!;
+  const paint = Skia.Paint();
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
+    paint.setColor(Skia.Color(`hsl(${(i * 45 + j * 20) % 360}, 75%, 55%)`));
+    surface.getCanvas().drawRect(Skia.XYWHRect(i * 50, j * 50, 50, 50), paint);
+  }
+  surface.flush();
+  const f = new File(projectMediaDir(), `smoke_clip_${Date.now().toString(36)}.png`);
+  f.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const meanDiff = (p: SkImage, q: SkImage) => {
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < 80; i++) for (let j = 0; j < 80; j++) {
+      const u = pixel(p, Math.floor(((j + 0.5) / 80) * p.width()), Math.floor(((i + 0.5) / 80) * p.height()));
+      const w = pixel(q, Math.floor(((j + 0.5) / 80) * q.width()), Math.floor(((i + 0.5) / 80) * q.height()));
+      sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+      n += 1;
+    }
+    return sum / n;
+  };
+  const bg = { id: 'bg', kind: 'fill', fill: '#101018' };
+  const photo = (extra: Record<string, unknown> = {}) => ({ id: 'p', kind: 'photo', uri: f.uri, position: { x: 0.5, y: 0.5 }, w: 0.9, h: 0.9, fit: 'stretch', clipTo: 's', ...extra });
+  const doc = (shape: Record<string, unknown>, ph: Record<string, unknown> = photo()) => ({ id: 'cl', name: 'cl', aspectRatio: '1:1', width: 400, height: 400, layers: [bg, { id: 's', kind: 'shape', fill: '#ffffff', position: { x: 0.5, y: 0.5 }, w: 0.6, h: 0.6, ...shape }, ph] }) as unknown as ImageDoc;
+  const CASES: [string, ImageDoc][] = [
+    ['ellipszis', doc({ shape: 'ellipse' })],
+    ['forgatott csillag', doc({ shape: 'star', starPoints: 5, rotation: 20 })],
+    ['lekerekített téglalap', doc({ shape: 'rectangle', w: 0.7, h: 0.45, cornerRadius: 0.3 })],
+    ['görbe (Bézier) forma', doc({ shape: 'path', closed: true, points: [{ x: 0, y: 0.5, h2: { x: 0, y: -0.2 } }, { x: 1, y: 0.3, h1: { x: 0.8, y: -0.1 } }, { x: 0.6, y: 1 }] })],
+    ['saját maszkkal metszve', doc({ shape: 'ellipse' }, photo({ mask: { shape: 'rectangle', x: 0.35, y: 0.5, w: 0.5, h: 1, feather: 0 } }))],
+  ];
+  for (const [name, d] of CASES) {
+    const dev = await ref.current!.render(d, 400);
+    const srv = await renderImageDoc(d, 400);
+    const open = await ref.current!.render({ ...d, layers: d.layers.map((l) => (l.id === 'p' ? { ...l, clipTo: undefined, mask: undefined } : l)) } as ImageDoc, 400);
+    if (!dev || !srv || !open) {
+      log(false, name, 'nincs kép');
+      continue;
+    }
+    const a = await decode(dev);
+    const diff = meanDiff(a, await decode(srv));
+    const ctl = meanDiff(a, await decode(open));
+    // a sarok mindig kívül esik: ott a háttér látszik, nem a fotó
+    const corner = pixel(a, 30, 30);
+    log(diff <= 6 && ctl > diff * 2 && corner[0] < 40 && corner[1] < 40, `${name} — telefon = szerver`, `${diff.toFixed(2)} · ellenpróba (vágás nélkül) ${ctl.toFixed(2)} /255 · sarok ${corner.slice(0, 3).join(',')}`);
+    [dev, srv, open].forEach((u) => removeFile(u));
+  }
+  setHarness(null);
+  removeFile(f.uri);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -12644,6 +12700,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'clip') {
+    await step(phase, () => smokeClipMask(log, setHarness));
     return;
   }
   if (phase === 'frameshot') {

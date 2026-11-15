@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { CanvasLayerView } from '@/components/studio/image/CanvasLayerView';
 import { DocGrain, DocVignette } from '@/components/studio/image/DocVignette';
 import { effectiveCanvas } from '@/lib/canvasPresets';
+import { resolveClipMasks } from '@/lib/imageClip';
 import { effectiveLayerOpacity, visibleLayers } from '@/lib/imageDoc';
 import { correctionContext, docVignetteAngles, NO_CORRECTIONS } from '@/lib/imagePixelPipeline';
 import type { ClipMask, ImageDoc, ImageLayer } from '@/types/project';
@@ -16,9 +17,11 @@ export function StageLayers({ doc, w, h }: { doc: ImageDoc; w: number; h: number
   const { width, height } = effectiveCanvas(doc);
   const canvas = useMemo(() => ({ width, height }), [width, height]);
   const corrections = useMemo(() => correctionContext<ClipMask>(doc), [doc]);
+  // ✂️ S18: a vágómaszkok feloldva (ugyanaz a lépés, mint a vásznon és a szerver előtt)
+  const clipped = useMemo(() => resolveClipMasks(doc), [doc]);
   return (
     <>
-      {visibleLayers(doc).map((raw0) => {
+      {visibleLayers(clipped).map((raw0) => {
         // 🗂️ csoport-opacity a réteg saját opacity-jére szorozva (mint a vásznon)
         const raw =
           raw0.groupId && doc.groups?.some((g) => g.id === raw0.groupId && (g.opacity ?? 1) < 1)

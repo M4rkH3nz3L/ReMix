@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { resolveClipMasks } from '@/lib/imageClip';
 import { t as tr } from 'i18next';
 import { Platform } from 'react-native';
 
@@ -232,7 +233,7 @@ export async function exportPsd(doc: ImageDoc, projectId?: string): Promise<stri
   // a rétegek helyi fájljai is felmennek (I29) — eddig csak a http-s kép jutott a PSD-be
   const form = new FormData();
   form.append('uriMap', JSON.stringify(appendDocMedia(form, doc)));
-  form.append('doc', JSON.stringify(doc));
+  form.append('doc', JSON.stringify(resolveClipMasks(doc)));
   if (projectId) {
     form.append('projectId', projectId);
   }
@@ -319,7 +320,7 @@ export async function renderImageDoc(
     const uriMap = appendDocMedia(form, doc);
     // a pixel-rácsot a szerver nem kapja meg (a réteg képe a `uri`), csak a jelzést: a pixel-art réteget
     // legközelebbi szomszéddal skálázza (S15), különben a kész képen elmosódik
-    form.append('doc', JSON.stringify(doc, (key, value) => (key === 'pixelArt' ? (value ? 1 : undefined) : value)));
+    form.append('doc', JSON.stringify(resolveClipMasks(doc), (key, value) => (key === 'pixelArt' ? (value ? 1 : undefined) : value)));
     form.append('uriMap', JSON.stringify(uriMap));
     form.append('height', String(height));
     if (opts.format) {

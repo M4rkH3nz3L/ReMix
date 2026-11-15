@@ -11,6 +11,7 @@ import { ColorField } from '@/components/studio/image/ColorField';
 import { GradientEditor } from '@/components/studio/image/GradientEditor';
 import { palette } from '@/constants/editor';
 import { getFilterAmount, hasFilter, IMAGE_FILTER_TYPES, setFilterAmount, toggleFilter } from '@/lib/imageFilters';
+import { clipBaseBelow } from '@/lib/imageClip';
 import { assignLayerToGroup, createGroup, updateLayer } from '@/lib/imageDoc';
 import { makeId } from '@/lib/id';
 import { withProjectFont } from '@/lib/projectFonts';
@@ -385,6 +386,22 @@ export function LayerInspector({
             />
             <Chip label={t('studio.image.corrections')} active={false} onPress={onOpenAdjust} />
           </View>
+          {/* ✂️ S18: vágómaszk — a fotó az alatta lévő forma alakján belül látszik (élő kapcsolat) */}
+          {(() => {
+            const base = clipBaseBelow(doc, layer.id);
+            const on = !!layer.clipTo && doc.layers.some((l) => l.id === layer.clipTo);
+            return base || on ? (
+              <View style={styles.chipRow}>
+                <Chip
+                  label={t('studio.image.clipToShape')}
+                  active={on}
+                  onPress={() => commit(updateLayer<PhotoLayer>(doc, layer.id, { clipTo: on ? undefined : base?.id }), t('studio.image.clipToShape'))}
+                />
+              </View>
+            ) : (
+              <Text style={styles.hintText}>{t('studio.image.clipNeedsShape')}</Text>
+            );
+          })()}
           <Slider
             label={t('studio.image.rotation')}
             value={normalizeRotation(layer.rotation ?? 0)}

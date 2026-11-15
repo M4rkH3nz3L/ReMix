@@ -262,6 +262,7 @@ export function ImageStudioBody({
   const [maskTarget, setMaskTarget] = useState<{ id: string; target: 'clip' | 'local' | 'heal' | 'paint' } | null>(null);
   const [wandActive, setWandActive] = useState(false);
   const [wandTolerance, setWandTolerance] = useState(32);
+  const [cornerPinId, setCornerPinId] = useState<string | null>(null);
   // S17: ki = színtartomány (a kép minden hasonló színű képpontja, nem csak az összefüggő régió)
   const [wandContiguous, setWandContiguous] = useState(true);
   const [brushActive, setBrushActive] = useState(false);
@@ -853,6 +854,13 @@ export function ImageStudioBody({
       case 'offsetIn':
         if (selectedLayer?.kind === 'shape') {
           void pathOperation(selectedLayer, key);
+        }
+        break;
+      case 'cornerPin':
+        // 🔲 S18: 4-sarkos perspektíva — a sarokfogók a vásznon
+        if (selectedLayer?.kind === 'photo') {
+          setSheet(null);
+          setCornerPinId(selectedLayer.id);
         }
         break;
       case 'toPath':
@@ -1603,6 +1611,13 @@ export function ImageStudioBody({
     return true;
   }), []);
 
+  // 🧪 füstteszt: egy réteg-művelet indítása (mintha a sávon koppintanák)
+  const onToolRef = useRef<(k: ToolKey) => void>(() => {});
+  onToolRef.current = onTool;
+  useEffect(() => registerDevAction('image.tool', (arg) => {
+    onToolRef.current(arg as ToolKey);
+    return true;
+  }), []);
   // 🧪 füstteszt: réteg kijelölése (a kijelölő keret és a fogói képernyőképhez)
   useEffect(() => registerDevAction('image.selectLayer', (arg) => {
     setSelectedId(typeof arg === 'string' ? arg : null);
@@ -2385,6 +2400,7 @@ export function ImageStudioBody({
               onPenAddPoint={(p) => setPenPoints((prev) => [...(prev ?? []), p])}
               onPenClose={() => commitPen(true)}
               pathEditId={pathEditId}
+              cornerPinId={cornerPinId}
               pathEditRing={pathEditRing}
               selectedNode={pathEditNode}
               onSelectNode={setPathEditNode}
@@ -2669,6 +2685,24 @@ export function ImageStudioBody({
               retouch={!!brush.tool}
               onPickSource={() => brushRef.current?.pickSource()}
             />
+          ) : cornerPinId && doc ? (
+            /* 🔲 S18: 4-sarkos perspektíva sáv (alaphelyzet + kész) */
+            <View style={styles.cropBar}>
+              <Pressable
+                onPress={() => commit(updateLayer<PhotoLayer>(doc, cornerPinId, { corners: undefined }), t('studio.image.cornerPin.reset'))}
+                style={styles.penClose}
+                hitSlop={6}
+                accessibilityRole="button"
+              >
+                <Text style={styles.penCloseText}>{t('studio.image.cornerPin.reset')}</Text>
+              </Pressable>
+              <Text style={styles.lassoLabel} numberOfLines={1}>
+                {t('studio.image.cornerPin.hint')}
+              </Text>
+              <Pressable onPress={() => setCornerPinId(null)} style={styles.penClose} hitSlop={6} accessibilityRole="button">
+                <Text style={styles.penCloseText}>{t('common.done')}</Text>
+              </Pressable>
+            </View>
           ) : guidesActive ? (
             /* 📐 vonalzók/segédvonalak sáv (Harmadok / Törlés + kilépés) */
             <View style={styles.cropBar}>

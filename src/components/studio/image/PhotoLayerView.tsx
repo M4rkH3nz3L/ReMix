@@ -8,6 +8,7 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-nativ
 import { cssBlendMode, palette } from '@/constants/editor';
 import { SkiaPhotoLayer, needsSkiaPreview } from '@/components/studio/image/SkiaPhotoLayer';
 import type { ColorFields } from '@/lib/imagePixelPipeline';
+import { isIdentityCorners, normalizeCorners } from '@/lib/cornerPin';
 import { clamp } from '@/lib/time';
 import type { ClipMask, PhotoLayer } from '@/types/project';
 
@@ -87,8 +88,10 @@ export function PhotoLayerView({
   const sx = layer.flipH ? -1 : 1;
   const sy = layer.flipV ? -1 : 1;
   // 📐 perspektíva-közelítés: X>0 → jobb él hátra (rotateY<0), Y>0 → alsó él hátra (rotateX>0)
-  const pX = layer.perspectiveX ?? 0;
-  const pY = layer.perspectiveY ?? 0;
+  // a 4-sarkos perspektíva (S18) felülírja a dőlést — a szerver is csak azt rajzolja
+  const pinned = !isIdentityCorners(normalizeCorners(layer.corners));
+  const pX = pinned ? 0 : layer.perspectiveX ?? 0;
+  const pY = pinned ? 0 : layer.perspectiveY ?? 0;
   const dragStyle = useAnimatedStyle(() => ({
     transform: [
       { perspective: 900 },

@@ -1624,6 +1624,8 @@ export interface PhotoLayer extends ImageLayerBase {
   clipTo?: string;
   /** 📐 S18: kiegyenesítés — a tartalom elforgatása a dobozon belül (fok, −45…45), üres sarok nélkül */
   straighten?: number;
+  /** 🔲 S18: 4-sarkos perspektíva — a doboz sarkai (bal felső, jobb felső, jobb alsó, bal alsó; 0–1) */
+  corners?: { x: number; y: number }[];
   mask?: ClipMask;
   /** 🎯 kijelölés-alapú (lokális) korrekció: a `grade`/`adjust` CSAK a `mask` régión BELÜL hat,
    *  kívül az eredeti marad (a render `maskedmerge`-del keveri). A `mask` vászon-normalizált — a worker

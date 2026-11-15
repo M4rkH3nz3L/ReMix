@@ -12,6 +12,8 @@ export interface LivePatch {
   fontSize?: number;
   /** S18: a szöveg tördelési szélessége (oldal-fogóval), a vászon szélességének aránya */
   boxWidth?: number;
+  /** S18: a 4-sarkos perspektíva sarkai (élő húzás) */
+  corners?: { x: number; y: number }[];
   /** sarokfogós méretezésnél a szemközti sarok áll, így a közép is mozog */
   position?: { x: number; y: number };
   /** ✏️ path node-húzás élő előnézete (a toll v2 node-szerkesztője) */

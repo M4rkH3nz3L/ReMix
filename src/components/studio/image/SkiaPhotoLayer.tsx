@@ -27,6 +27,7 @@ import { File } from 'expo-file-system';
 
 import { selectionSkPath } from '@/components/studio/image/selectionPath';
 import { canvasToLayerBox, maskOutlineInBox } from '@/lib/imageLayerGeometry';
+import { cornerPinMatrix, isIdentityCorners, normalizeCorners } from '@/lib/cornerPin';
 import { straightenZoom } from '@/lib/imageStraighten';
 import { innerEffectsOf } from '@/lib/innerEffects';
 import { type CubeLut, parseCubeLut } from '@/lib/lutImport';
@@ -86,6 +87,7 @@ export function needsSkiaPreview(layer: PhotoLayer, after: ColorFields[] = [], m
   return (
     maskedCount > 0 ||
     Math.abs(layer.straighten ?? 0) >= 0.01 ||
+    !isIdentityCorners(normalizeCorners(layer.corners)) ||
     // 👾 a pixel-art réteg éles pixelekkel (legközelebbi szomszéd) — a sima kép simítana
     !!layer.pixelArt ||
     hasColorOps(layer, after) ||
@@ -283,6 +285,12 @@ export function PhotoSkiaContent({
         {inner.shadow ? ring('shadow', inner.shadow.dx * px, inner.shadow.dy * py, inner.shadow.blur * px, inner.shadow.color, inner.shadow.opacity) : null}
       </Group>
     );
+  }
+  // 🔲 S18: 4-sarkos perspektíva — a tartalom a négyszögre torzul (homográfia-mátrix); a szerverrel azonos
+  // helyen: a belső stílusok UTÁN, a maszk és a színátmenetes maszk ELŐTT
+  const pin = normalizeCorners(layer.corners);
+  if (pin && !isIdentityCorners(pin)) {
+    content = <Group matrix={Skia.Matrix(cornerPinMatrix(pin, w, h))}>{content}</Group>;
   }
   if (layer.mask?.shape) {
     content = (

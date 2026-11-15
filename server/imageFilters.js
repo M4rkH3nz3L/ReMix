@@ -375,7 +375,62 @@ function straightenChain(deg, boxW, boxH) {
   return `,format=rgba,rotate=${rad}:ow=iw:oh=ih:c=none,scale=${sw}:${sh},crop=${boxW}:${boxH}`;
 }
 
+/**
+ * 🔲 S18: 4-sarkos perspektíva — a doboz-méretű fotó sarkai a megadott (0–1, bal felső, jobb felső,
+ * jobb alsó, bal alsó) pontokra; a négyszögön kívül átlátszó. A kliens `cornerPin.ts`-ének párja.
+ */
+function squareToQuad(q) {
+  const [p0, p1, p2, p3] = q;
+  const dx1 = p1.x - p2.x;
+  const dx2 = p3.x - p2.x;
+  const dx3 = p0.x - p1.x + p2.x - p3.x;
+  const dy1 = p1.y - p2.y;
+  const dy2 = p3.y - p2.y;
+  const dy3 = p0.y - p1.y + p2.y - p3.y;
+  if (Math.abs(dx3) < 1e-12 && Math.abs(dy3) < 1e-12) {
+    return [p1.x - p0.x, p3.x - p0.x, p0.x, p1.y - p0.y, p3.y - p0.y, p0.y, 0, 0, 1];
+  }
+  const den = dx1 * dy2 - dx2 * dy1 || 1e-12;
+  const g = (dx3 * dy2 - dx2 * dy3) / den;
+  const h = (dx1 * dy3 - dx3 * dy1) / den;
+  return [p1.x - p0.x + g * p1.x, p3.x - p0.x + h * p3.x, p0.x, p1.y - p0.y + g * p1.y, p3.y - p0.y + h * p3.y, p0.y, g, h, 1];
+}
+
+function cornerPinFilter(corners, boxW, boxH) {
+  if (!Array.isArray(corners) || corners.length !== 4) {
+    return '';
+  }
+  const c = corners.map((p) => ({
+    x: Math.max(0, Math.min(1, Number(p && p.x))),
+    y: Math.max(0, Math.min(1, Number(p && p.y))),
+  }));
+  if (c.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y))) {
+    return '';
+  }
+  const def = [[0, 0], [1, 0], [1, 1], [0, 1]];
+  if (c.every((p, i) => Math.abs(p.x - def[i][0]) < 1e-4 && Math.abs(p.y - def[i][1]) < 1e-4)) {
+    return '';
+  }
+  // átlátszó keret köré: az ffmpeg a négyszögön kívül a forrás SZÉLÉT nyújtaná — a keret átlátszó széle
+  // ad átlátszót. A keret sarkai ugyanazzal a homográfiával vetülnek, a végén a doboz vágódik vissza.
+  const m = Math.max(2, Math.round(Math.min(boxW, boxH) * 0.02));
+  const H = squareToQuad(c);
+  const map = (u, v) => {
+    const z = H[6] * u + H[7] * v + H[8];
+    return [((H[0] * u + H[1] * v + H[2]) / z) * boxW + m, ((H[3] * u + H[4] * v + H[5]) / z) * boxH + m];
+  };
+  const [eu, ev] = [m / boxW, m / boxH];
+  const pts = [map(-eu, -ev), map(1 + eu, -ev), map(-eu, 1 + ev), map(1 + eu, 1 + ev)];
+  // az ffmpeg sorrendje: bal felső, jobb felső, bal alsó, jobb alsó
+  const coords = pts.map(([x, y]) => `${x.toFixed(2)}:${y.toFixed(2)}`).join(':');
+  return (
+    `,format=rgba,pad=iw+${2 * m}:ih+${2 * m}:${m}:${m}:color=black@0,` +
+    `perspective=${coords}:sense=destination:interpolation=linear,crop=${boxW}:${boxH}:${m}:${m}`
+  );
+}
+
 module.exports = {
+  cornerPinFilter,
   straightenChain,
   straightenZoom,
   innerEffectsFilters,

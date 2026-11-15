@@ -20,6 +20,7 @@ import { snapBoxToGrid, snapPointToGrid } from '@/lib/imageGrid';
 import { MarqueeOverlay } from '@/components/studio/image/MarqueeOverlay';
 import type { SkImage } from '@shopify/react-native-skia';
 import type { Point, Selection } from '@/lib/selection';
+import { CornerPinOverlay } from '@/components/studio/image/CornerPinOverlay';
 import { PathEditOverlay } from '@/components/studio/image/PathEditOverlay';
 import { PenOverlay } from '@/components/studio/image/PenOverlay';
 import { RulersOverlay } from '@/components/studio/image/RulersOverlay';
@@ -84,6 +85,7 @@ export function ImageCanvas({
   onPenAddPoint,
   onPenClose,
   pathEditId,
+  cornerPinId,
   pathEditRing = 0,
   selectedNode,
   onSelectNode,
@@ -129,6 +131,8 @@ export function ImageCanvas({
   onPenClose?: () => void;
   /** ✏️ toll v2 node-szerkesztő mód: a megadott id-jű path-forma horgonypontjait húzhatja */
   pathEditId?: string | null;
+  /** 🔲 S18: 4-sarkos perspektíva mód — ennek a fotónak a sarokfogói */
+  cornerPinId?: string | null;
   /** összetett útvonalnál a szerkesztett gyűrű */
   pathEditRing?: number;
   /** ✏️ toll v3: a kijelölt node indexe (ennél jelennek meg a bezier-fogók) */
@@ -388,6 +392,8 @@ export function ImageCanvas({
   const selectedLayer = doc.layers.find((l) => l.id === selectedId) ?? null;
 
   // ✏️ node-szerkesztő: a kijelölt path-forma (committed = a moveAnchor stabil alapja)
+  const cornerPinFound = cornerPinId ? doc.layers.find((l) => l.id === cornerPinId) : undefined;
+  const cornerPinLayer = cornerPinFound?.kind === 'photo' ? cornerPinFound : null;
   const rawPathEdit = pathEditId ? doc.layers.find((l) => l.id === pathEditId) ?? null : null;
   const rawPathShape = rawPathEdit && rawPathEdit.kind === 'shape' && rawPathEdit.shape === 'path' ? rawPathEdit : null;
   const pathEditShape = rawPathShape ? pathEditView(rawPathShape, pathEditRing) : null;
@@ -541,7 +547,7 @@ export function ImageCanvas({
             />
           ))}
 
-          {!capturing && !cropRect && !penPoints && !pathEditId && !marquee && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && selectedLayer.kind !== 'adjust' && !selectedLayer.hidden && !selectedLayer.locked ? (
+          {!capturing && !cropRect && !penPoints && !pathEditId && !cornerPinId && !marquee && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && selectedLayer.kind !== 'adjust' && !selectedLayer.hidden && !selectedLayer.locked ? (
             <SelectionFrame
               layer={live?.id === selectedLayer.id ? withLive(selectedLayer, live.patch) : selectedLayer}
               box={fit}
@@ -572,6 +578,21 @@ export function ImageCanvas({
                 onPenAddPoint({ ...at, ...(p.h1 ? { h1: shift(p.h1) } : {}), ...(p.h2 ? { h2: shift(p.h2) } : {}) });
               }}
               onClosePath={onPenClose}
+            />
+          ) : null}
+
+          {/* 🔲 S18: 4-sarkos perspektíva fogói */}
+          {!capturing && cornerPinLayer ? (
+            <CornerPinOverlay
+              layer={live?.id === cornerPinLayer.id ? (withLive(cornerPinLayer, live.patch) as PhotoLayer) : cornerPinLayer}
+              box={fit}
+              canvas={docCanvas}
+              zoom={zoom}
+              onLive={(corners) => setLive({ id: cornerPinLayer.id, patch: { corners } })}
+              onCommit={(corners) => {
+                setLive(null);
+                commit(updateLayer<PhotoLayer>(doc, cornerPinLayer.id, { corners }), 'corner-pin');
+              }}
             />
           ) : null}
 

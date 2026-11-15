@@ -36,6 +36,7 @@ export type LayerAction =
   | 'fx'
   | 'pattern'
   | 'editPath'
+  | 'cornerPin'
   | 'toPath'
   | 'outlineStroke'
   | 'offsetOut'
@@ -106,6 +107,7 @@ export const TOOL_ICONS: Record<RailTool | LayerAction | 'delete', string> = {
   fx: 'sparkles-outline',
   pattern: 'apps-outline',
   editPath: 'git-network-outline',
+  cornerPin: 'tablet-landscape-outline',
   toPath: 'analytics-outline',
   outlineStroke: 'resize-outline',
   offsetOut: 'add-circle-outline',
@@ -143,7 +145,7 @@ export function selectionMenu(layer: ImageLayer, ctx: { canAlign: boolean; canBo
   const order: LayerAction[] = ['forward', 'back'];
   switch (layer.kind) {
     case 'photo':
-      return { actions: ['adjust', 'bgRemove', 'develop', 'style', ...placed, ...order, 'duplicate', 'exportLayer'], canDelete: true };
+      return { actions: ['adjust', 'bgRemove', 'develop', 'style', 'cornerPin', ...placed, ...order, 'duplicate', 'exportLayer'], canDelete: true };
     case 'shape': {
       const path: LayerAction[] =
         layer.shape === 'path' ? [...((layer.points?.length ?? 0) >= 2 || layer.subpaths?.length ? (['editPath'] as const) : []), ...(!layer.closed && layer.strokeWidth ? (['outlineStroke'] as const) : ['offsetOut' as const, 'offsetIn' as const])] : layer.shape === 'line' ? [] : ['toPath'];

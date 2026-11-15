@@ -25,6 +25,7 @@ const {
   channelMixFilter,
   innerEffectsFilters,
   straightenChain,
+  cornerPinFilter,
 } = require('./imageFilters');
 const { maskGrayChain, maskToBox } = require('./imageMask');
 const { hslCube, isNeutralHsl } = require('./hslBands');
@@ -511,7 +512,8 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
         }
       }
       // 📐 perspektíva/3D-dőlés a box-méretű fotóra (a filterek UTÁN, a flip/rotate ELŐTT)
-      const persp = perspectiveFilter(layer.perspectiveX, layer.perspectiveY, boxW, boxH);
+      // 🔲 S18: a 4-sarkos perspektíva felülírja a régi dőlést (a kettő egyszerre nem él)
+      const persp = cornerPinFilter(layer.corners, boxW, boxH) || perspectiveFilter(layer.perspectiveX, layer.perspectiveY, boxW, boxH);
       // 🎨 gradient-map (egyedi-színű duotone) — a grade/lut UTÁN, a struktúra-szűrők ELŐTT
       const gmap = layer.gradientMap
         ? gradientMapFilter(layer.gradientMap.shadow, layer.gradientMap.highlight)

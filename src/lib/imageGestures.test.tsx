@@ -459,3 +459,28 @@ describe('rács-illesztés a vásznon', () => {
     expect(Math.abs(left / 32 - Math.round(left / 32))).toBeGreaterThan(1e-3);
   });
 });
+
+describe('S18: 4-sarkos perspektíva fogói', () => {
+  it('a bal felső sarok húzása csak azt a sarkot viszi, a dobozon belül marad', async () => {
+    const onCommit = jest.fn();
+    const { CornerPinOverlay } = require('@/components/studio/image/CornerPinOverlay');
+    render(<CornerPinOverlay layer={layer} box={box} canvas={{ width: 300, height: 300 }} onLive={() => {}} onCommit={onCommit} />);
+    type Handlers = { onStart: (e: object) => void; onUpdate: (e: object) => void; onEnd: (e: object, ok: boolean) => void };
+    const h = () => (getByGestureTestId('pin-0') as unknown as { handlers: Handlers }).handlers;
+    const step = (fn: () => void) => act(async () => { fn(); await Promise.resolve(); });
+    await step(() => h().onStart({}));
+    await step(() => h().onUpdate({ translationX: 30, translationY: 15 }));
+    await step(() => h().onEnd({}, true));
+    const c = onCommit.mock.calls[0][0] as { x: number; y: number }[];
+    // a doboz 150×150 px (0,5 a 300-ból): 30 px = 0,2, 15 px = 0,1
+    expect(c[0].x).toBeCloseTo(0.2, 3);
+    expect(c[0].y).toBeCloseTo(0.1, 3);
+    expect(c.slice(1)).toEqual([{ x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }]);
+    // a dobozon kívülre húzva a széle marad
+    await step(() => h().onStart({}));
+    await step(() => h().onUpdate({ translationX: -200, translationY: -200 }));
+    await step(() => h().onEnd({}, true));
+    expect(onCommit.mock.calls[1][0][0]).toEqual({ x: 0, y: 0 });
+  });
+});
+

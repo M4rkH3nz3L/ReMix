@@ -8695,11 +8695,22 @@ async function smokeLooks(log: Log, setHarness: (n: ReactNode) => void) {
 /** 📸 S18: a kijelölő keret fogói a stúdióban (képernyőképhez: sarok-, oldal- és forgató fogó) */
 async function smokeFrameShot(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const fs = Skia.Surface.MakeOffscreen(200, 200)!;
+  const fp = Skia.Paint();
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+    fp.setColor(Skia.Color(`hsl(${(i * 70 + j * 30) % 360}, 70%, 55%)`));
+    fs.getCanvas().drawRect(Skia.XYWHRect(i * 50, j * 50, 50, 50), fp);
+  }
+  fs.flush();
+  const frameshotFile = new File(projectMediaDir(), `smoke_frameshot_${Date.now().toString(36)}.png`);
+  frameshotFile.write(fs.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const frameshotPhoto = frameshotFile.uri;
   const id = 'prj_smoke_frameshot';
   await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:frameshot-del0', caught));
   const page = { id: 'pg', name: 'pg', aspectRatio: '1:1', width: 600, height: 600, layers: [
     { id: 'bg', kind: 'fill', fill: '#203040' },
     { id: 's', kind: 'shape', shape: 'rectangle', position: { x: 0.45, y: 0.5 }, w: 0.4, h: 0.3, rotation: 15, fill: '#ff8a3d' },
+    { id: 'ph', kind: 'photo', uri: frameshotPhoto, position: { x: 0.72, y: 0.72 }, w: 0.4, h: 0.4, fit: 'stretch', corners: [{ x: 0.1, y: 0.05 }, { x: 0.95, y: 0.15 }, { x: 0.85, y: 0.95 }, { x: 0, y: 0.8 }] },
     { id: 't', kind: 'text', text: 'Oldal-fogó', position: { x: 0.5, y: 0.2 }, fontSize: 7, color: '#ffffff', fontFamily: 'Poppins', fontWeight: 'bold', textAlign: 'center', backgroundColor: null },
   ] } as unknown as ImageDoc;
   await saveProject({ ...createEmptyProject('smoke keret-fogók', '1:1', undefined, 'image'), id, imageDocs: [page] });
@@ -8713,6 +8724,12 @@ async function smokeFrameShot(log: Log) {
     await sleep(7000);
     await runDevAction('image.selectLayer', 't');
     log(true, 'FOTÓZHATÓ', 'szöveg kijelölve: csak bal/jobb oldal-fogó');
+    await sleep(7000);
+    // S18: 4-sarkos perspektíva mód a fotón (már torzítva)
+    await runDevAction('image.selectLayer', 'ph');
+    await sleep(300);
+    await runDevAction('image.tool', 'cornerPin');
+    log(true, 'FOTÓZHATÓ', 'perspektíva mód: 4 sarokfogó a torzított fotón');
     await sleep(7000);
   } finally {
     if (st().project?.id === id) {
@@ -8832,6 +8849,66 @@ async function smokeStraighten(log: Log, setHarness: (n: ReactNode) => void) {
       log(diff <= 6 && ctl > diff * 2 && corners === 0, `${deg}°${name} — telefon = szerver, üres sarok nélkül`, `${diff.toFixed(2)} · ellenpróba (egyenesen) ${ctl.toFixed(2)} /255 · rózsaszín sarok ${corners}`);
       [dev, srv].forEach((u) => removeFile(u));
     }
+  }
+  if (plain) removeFile(plain);
+  setHarness(null);
+  removeFile(f.uri);
+}
+
+/** 🔲 S18: 4-sarkos perspektíva — telefon = szerver, a négyszögön kívül a háttér */
+async function smokeCornerPin(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  const surface = Skia.Surface.MakeOffscreen(480, 360)!;
+  const paint = Skia.Paint();
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 6; j++) {
+    paint.setColor(Skia.Color(`hsl(${(i * 40 + j * 25) % 360}, 70%, ${35 + j * 6}%)`));
+    surface.getCanvas().drawRect(Skia.XYWHRect(i * 60, j * 60, 60, 60), paint);
+  }
+  surface.flush();
+  const f = new File(projectMediaDir(), `smoke_pin_${Date.now().toString(36)}.png`);
+  f.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const meanDiff = (p: SkImage, q: SkImage) => {
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < 80; i++) for (let j = 0; j < 80; j++) {
+      const u = pixel(p, Math.floor(((j + 0.5) / 80) * p.width()), Math.floor(((i + 0.5) / 80) * p.height()));
+      const w = pixel(q, Math.floor(((j + 0.5) / 80) * q.width()), Math.floor(((i + 0.5) / 80) * q.height()));
+      sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+      n += 1;
+    }
+    return sum / n;
+  };
+  const doc = (extra: Record<string, unknown>) => ({ id: 'pin', name: 'pin', aspectRatio: '4:3', width: 480, height: 360, layers: [{ id: 'bg', kind: 'fill', fill: '#ff00ff' }, { id: 'p', kind: 'photo', uri: f.uri, position: { x: 0.5, y: 0.5 }, w: 0.8, h: 0.8, fit: 'stretch', ...extra }] }) as unknown as ImageDoc;
+  const plain = await ref.current!.render(doc({}), 360);
+  const CASES: [string, Record<string, unknown>][] = [
+    ['plakát a falon', { corners: [{ x: 0.15, y: 0.05 }, { x: 0.95, y: 0.2 }, { x: 0.9, y: 0.85 }, { x: 0.1, y: 0.95 }] }],
+    ['trapéz (felül keskeny)', { corners: [{ x: 0.25, y: 0 }, { x: 0.75, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }] }],
+    ['forgatott réteggel', { rotation: 15, corners: [{ x: 0, y: 0.1 }, { x: 1, y: 0 }, { x: 0.8, y: 1 }, { x: 0.1, y: 0.9 }] }],
+  ];
+  for (const [name, extra] of CASES) {
+    const d = doc(extra);
+    const dev = await ref.current!.render(d, 360);
+    const srv = await renderImageDoc(d, 360);
+    if (!dev || !srv || !plain) {
+      log(false, name, 'nincs kép');
+      continue;
+    }
+    const a = await decode(dev);
+    const diff = meanDiff(a, await decode(srv));
+    const ctl = meanDiff(a, await decode(plain));
+    log(diff <= 6 && ctl > diff * 2, `${name} — telefon = szerver`, `${diff.toFixed(2)} · ellenpróba (torzítás nélkül) ${ctl.toFixed(2)} /255`);
+    [dev, srv].forEach((u) => removeFile(u));
+  }
+  // a „trapéz” esetben a doboz bal felső sarka (a négyszögön kívül) a háttér
+  const t = doc(CASES[1][1]);
+  const dev = await ref.current!.render(t, 360);
+  if (dev) {
+    const p = pixel(await decode(dev), 48 + 8, 36 + 8);
+    log(p[0] > 200 && p[1] < 60 && p[2] > 200, 'a négyszögön kívül a háttér látszik', `${p.slice(0, 3).join(',')}`);
+    removeFile(dev);
   }
   if (plain) removeFile(plain);
   setHarness(null);
@@ -12759,6 +12836,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'cornerpin') {
+    await step(phase, () => smokeCornerPin(log, setHarness));
     return;
   }
   if (phase === 'straighten') {

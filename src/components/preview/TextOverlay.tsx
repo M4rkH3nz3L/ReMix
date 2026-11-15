@@ -272,6 +272,14 @@ export function TextOverlay({
       };
   // iOS a font természetes sormagasságánál szorosabb sorban a betűt a sor tetejéhez igazítja, a CSS
   // középre: a különbség felével lejjebb toljuk (a font saját hhea-értékéből, `fontMetrics.ts`)
+  // a render második ragyogás-árnyéka: a textStyle-ragyogás belső (g/2) rétege, vagy a neon külső rétege
+  const glowCopy = clip.text3d
+    ? null
+    : clip.textStyle?.glow && clip.textStyle.glow.size > 0
+      ? { color: clip.textStyle.glow.color, radius: Math.max(2, clip.textStyle.glow.size * fontSize * 0.5) }
+      : (clip.stylePreset ?? 'plain') === 'neon'
+        ? { color: clip.color, radius: Math.max(16, fontSize * 0.9) }
+        : null;
   const tightShift =
     typo && Platform.OS === 'ios' ? tightLeadingShift(clip.fontFamily, typo.lineHeight / fontSize) * fontSize : 0;
   const shown =
@@ -369,6 +377,35 @@ export function TextOverlay({
               : null,
           ]}
         >
+          {glowCopy ? (
+            // ragyogás / neon: a render két árnyékot rétegez, az RN-szövegnek egy árnyéka van → a második
+            // réteg egy betű mögötti, ragyogás-színű másolat árnyéka (iPaden mérve: egy árnyékkal az
+            // energia 0,59–0,71×)
+            <Text
+              allowFontScaling={false}
+              style={{
+                position: 'absolute',
+                // a nagy sugarú árnyékot a szöveg kerete levágná: a másolat kerete függőlegesen a sugárral nagyobb
+                left: 0,
+                top: -glowCopy.radius,
+                right: 0,
+                paddingBottom: glowCopy.radius,
+                color: glowCopy.color,
+                fontSize,
+                fontWeight: clip.fontWeight,
+                fontFamily: clip.fontFamily,
+                textAlign: clip.textAlign ?? 'center',
+                ...typo,
+                paddingTop: tightShift + glowCopy.radius,
+                textShadowColor: glowCopy.color,
+                textShadowRadius: glowCopy.radius,
+                textShadowOffset: { width: 0, height: 0 },
+                ...(clip.fontStyle === 'italic' ? { transform: [{ skewX: '-12deg' }] } : null),
+              }}
+            >
+              {shown}
+            </Text>
+          ) : null}
           {!clip.text3d && clip.textStyle?.stroke
             ? // körvonal: az RN-szövegnek nincs kontúrja, ezért eltolt másolatok a betűk mögött (a CSS-stroke fele kifelé esik)
               STROKE_DIRS.map(([dx, dy]) => (

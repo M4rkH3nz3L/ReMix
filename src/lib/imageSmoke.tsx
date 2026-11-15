@@ -8156,6 +8156,55 @@ async function smokeMaskFollow(log: Log, setHarness: (n: ReactNode) => void) {
   removeFile(f.uri);
 }
 
+/** ✨ S15: a szöveg ragyogása és árnyéka — energia és hely a vásznon = a kész képen */
+async function smokeTextFx(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  // a ragyogás/árnyék színcsatornájának többlete (a fehér betű r=g=b, a fekete háttér 0) és súlypontja
+  const fx = (img: SkImage, ch: 0 | 2) => {
+    let e = 0;
+    let sx = 0;
+    let sy = 0;
+    const N = 160;
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const p = pixel(img, Math.floor(((j + 0.5) / N) * img.width()), Math.floor(((i + 0.5) / N) * img.height()));
+      const v = Math.max(0, p[ch] - p[1]);
+      e += v;
+      sx += v * (j / N);
+      sy += v * (i / N);
+    }
+    return { e: e / (N * N), cx: e ? sx / e : 0, cy: e ? sy / e : 0 };
+  };
+  const bg = { id: 'bg', kind: 'fill', fill: '#000000' } as unknown as ImageLayer;
+  const mk = (textStyle: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({ id: 'tfx', name: 'tfx', aspectRatio: '1:1', width: 600, height: 600, layers: [bg, { id: 't', kind: 'text', text: 'Fény', position: { x: 0.5, y: 0.5 }, fontSize: 14, color: '#ffffff', fontFamily: 'Poppins', fontWeight: 'bold', textAlign: 'center', backgroundColor: null, stylePreset: 'plain', textStyle, ...extra }] }) as unknown as ImageDoc;
+  const CASES: [string, Record<string, unknown>, 0 | 2, Record<string, unknown>?][] = [
+    ['neon stílus', {}, 0, { stylePreset: 'neon', color: '#ff0000' }],
+    ['ragyogás kicsi', { glow: { color: '#ff0000', size: 0.15 } }, 0],
+    ['ragyogás nagy', { glow: { color: '#ff0000', size: 0.4 } }, 0],
+    ['árnyék éles', { shadow: { color: '#0000ff', dx: 0.06, dy: 0.06, blur: 0 } }, 2],
+    ['árnyék lágy', { shadow: { color: '#0000ff', dx: 0.05, dy: 0.08, blur: 0.1 } }, 2],
+  ];
+  for (const [name, style, ch, extra] of CASES) {
+    const doc = mk(style, extra);
+    const dev = await ref.current!.render(doc, 600);
+    const srv = await renderImageDoc(doc, 600);
+    if (!dev || !srv) {
+      log(false, name, 'nincs kép');
+      continue;
+    }
+    const a = fx(await decode(dev), ch);
+    const b = fx(await decode(srv), ch);
+    const ratio = a.e / Math.max(b.e, 1e-6);
+    const off = Math.hypot(a.cx - b.cx, a.cy - b.cy) * 600;
+    log(Math.abs(ratio - 1) <= 0.12 && off <= 4, `${name} — energia és hely telefon = szerver`, `energia ${ratio.toFixed(2)}× (telefon ${a.e.toFixed(2)} · szerver ${b.e.toFixed(2)}) · súlypont-eltérés ${off.toFixed(1)} px`);
+    removeFile(dev);
+    removeFile(srv);
+  }
+  setHarness(null);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -12077,6 +12126,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'textfx') {
+    await step(phase, () => smokeTextFx(log, setHarness));
     return;
   }
   if (phase === 'maskfollow') {

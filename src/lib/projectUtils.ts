@@ -194,11 +194,12 @@ export function projectMediaBytes(project: Project): number {
  * hang-projekt mixdownjára hivatkozik, verzióval) és a sampler hangszer-minta — mind opcionális,
  * a lépés csak a verziót lépteti. v9 (2026-11-15): a kép-hivatkozás (`Asset.source.output: 'still'`,
  * CORE K2) és a szerkeszthető thumbnail (`thumbnailDocId`, `RenderedVersion.posterKey`, CORE K5) —
- * opcionálisak, csak a verzió lép. Ennél ÚJABB projekt (egy későbbi app-verzió mentette) csak
+ * opcionálisak, csak a verzió lép. v10 (2026-11-15): a projekt saját betűtípusai (`fonts`, IMAGE-PROD
+ * S10) — opcionális, csak a verzió lép. Ennél ÚJABB projekt (egy későbbi app-verzió mentette) csak
  * olvasható: a parancs-busz, a helyi mentés és a felhő-feltöltés sem írja (különben a régi app
  * csendben elhagyná, amit nem ismer — pl. a v7-es app a hivatkozást).
  */
-export const CURRENT_SCHEMA_VERSION = 9;
+export const CURRENT_SCHEMA_VERSION = 10;
 
 /** egy újabb app-verzió projektje-e (csak olvasható) */
 export function isNewerSchema(project: Pick<Project, 'schemaVersion'> | null | undefined): boolean {
@@ -236,6 +237,10 @@ export function migrateProject(project: Project): Project {
   if (next.schemaVersion < 9) {
     // v8 → v9: kép-hivatkozás (still) és szerkeszthető thumbnail — opcionálisak, csak a verzió lép
     next = { ...next, schemaVersion: 9 };
+  }
+  if (next.schemaVersion < 10) {
+    // v9 → v10: a projekt saját betűtípusai — opcionális, csak a verzió lép
+    next = { ...next, schemaVersion: 10 };
   }
   // 🔗 verzió-független backfill (ADR-012): a séma-migráció utáni úton (preset/AI/
   // hang-leválasztás) assetId NÉLKÜL hozzáadott media-klipek is kapjanak asset-linket.

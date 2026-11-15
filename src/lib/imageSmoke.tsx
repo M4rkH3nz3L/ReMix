@@ -122,6 +122,7 @@ import { applyCommand } from '@/lib/commands';
 import { linkedAssets, mixdownVersion, relinkPlan, stillVersion } from '@/lib/linkedAsset';
 import { sendMixdownToVideo, sendStillToVideo, sourceVersionOf } from '@/lib/linkedAssetClient';
 import { renderProjectVersion } from '@/lib/render';
+import { importFontFromUri } from '@/lib/projectFontsClient';
 import { useUserTemplates } from '@/store/userTemplatesStore';
 import AsyncStorageTpl from '@react-native-async-storage/async-storage';
 import { thumbnailFramesOnDevice } from '@/lib/thumbStudio';
@@ -7632,6 +7633,90 @@ async function smokeTemplateLibrary(log: Log, setHarness: (n: ReactNode) => void
   }
 }
 
+/**
+ * 🔤 IMAGE-PROD S10 (DS2): saját font — import a projektbe (tartalom-ellenőrzéssel), a telefonos és a
+ * szerveres kész kép is azzal a betűvel rajzol; mentés után is megvan.
+ */
+async function smokeFontImport(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const src = Asset.fromModule(require('../../assets/fonts/Lobster-Regular.ttf'));
+  await src.downloadAsync();
+  const res = await importFontFromUri(src.localUri ?? src.uri, 'Saját Lobster.ttf');
+  if (!res.ok) {
+    log(false, 'font-import', res.reason);
+    return;
+  }
+  const font = res.font;
+  // az import a fájl tényleges megjelenését is megvárja (a betöltés azonnal jöhet)
+  const fontFile = new File(font.uri);
+  log(/^u_SajatLobster_[A-Za-z0-9]+$/.test(font.family) && fontFile.exists, 'a font a projekt mappájába került, CSS-biztos családnévvel', `${font.family} · ${font.name} · ${fontFile.exists ? `${fontFile.size} B` : `nincs: ${font.uri}`}`);
+  // hibás fájl: a tartalom dönt (egy PNG .ttf névvel nem font)
+  const fake = alphaImage(ImageFormat.PNG, 'png');
+  const bad = await importFontFromUri(fake, 'nem-font.ttf');
+  log(!bad.ok && bad.reason === 'invalid', 'a nem-font fájl elutasítva (a tartalom alapján)', bad.ok ? 'átment' : bad.reason);
+  removeFile(fake);
+
+  const id = 'prj_smoke_fontimport';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:font-del0', caught));
+  const text = (family: string) => ({ id: 't', kind: 'text', text: 'Árvíztűrő', position: { x: 0.5, y: 0.5 }, fontSize: 16, color: '#ffffff', fontFamily: family, backgroundColor: null }) as unknown as ImageLayer;
+  const mk = (family: string) => ({ id: 'lap', name: 'f', aspectRatio: '1:1', width: 640, height: 640, layers: [{ id: 'bg', kind: 'fill', fill: '#1c1c28' }, text(family)] }) as unknown as ImageDoc;
+  const base = createEmptyProject('smoke saját font', '1:1', undefined, 'image');
+  await saveProject({ ...base, id, imageDocs: [mk(font.family)], fonts: [font] });
+  const st = useEditorStore.getState;
+  const meanDiff = (p: SkImage, q: SkImage) => {
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < 60; i++) for (let j = 0; j < 60; j++) {
+      const u = pixel(p, Math.floor(((j + 0.5) / 60) * p.width()), Math.floor(((i + 0.5) / 60) * p.height()));
+      const w = pixel(q, Math.floor(((j + 0.5) / 60) * q.width()), Math.floor(((i + 0.5) / 60) * q.height()));
+      sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+      n += 1;
+    }
+    return sum / n;
+  };
+  try {
+    router.push(`/studio/image/${id}` as Href);
+    for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+    await sleep(1500);
+    const fonts = st().project?.fonts ?? [];
+    const own = await renderOnDevice(mk(font.family), 640);
+    const builtIn = await renderOnDevice(mk('Lobster'), 640);
+    const other = await renderOnDevice(mk('Poppins'), 640);
+    if (!own || !builtIn || !other) throw new Error('nincs telefonos render');
+    const [a, b, c] = [await decode(own), await decode(builtIn), await decode(other)];
+    const dSame = meanDiff(a, b);
+    const dOther = meanDiff(a, c);
+    log(dSame < 1 && dOther > dSame * 3, 'telefonos kész kép: a saját font = ugyanaz a beépített font (ellenpróba: Poppins eltér)', `${dSame.toFixed(2)} · ellenpróba ${dOther.toFixed(2)} /255`);
+    // a szerveres kép a feltöltött fontfájllal
+    const srv = await renderImageDoc(mk(font.family), 640, { fonts });
+    const noFont = await renderImageDoc(mk(font.family), 640);
+    if (srv && noFont) {
+      const s1 = await decode(srv);
+      const dSrv = meanDiff(a, s1);
+      const dCtl = meanDiff(s1, await decode(noFont));
+      log(dSrv <= 7 && dCtl > 2, 'szerveres kész kép: a font a renderrel feltöltődik (= telefon); font nélkül tartalék-betű', `${dSrv.toFixed(2)} · ellenpróba ${dCtl.toFixed(2)} /255`);
+      removeFile(srv);
+      removeFile(noFont);
+    } else {
+      log(false, 'szerveres kész kép a saját fonttal', 'nincs render');
+    }
+    log(true, 'FOTÓZHATÓ', 'a saját fontú szöveg a vásznon');
+    await sleep(4000);
+    // mentés + újratöltés: a font a projektben marad, a fájl a projekt mappájában
+    await saveProject(st().project!);
+    const reloaded = await loadProject(id);
+    const kept = reloaded?.fonts?.[0];
+    log(kept?.family === font.family && !!kept && new File(kept.uri).exists && (reloaded?.schemaVersion ?? 0) >= 10, 'mentés után is megvan (a projekt mappájában)', `${kept?.uri.split('/').slice(-2).join('/')} · v${reloaded?.schemaVersion}`);
+    [own, builtIn, other].forEach((u) => removeFile(u));
+  } finally {
+    if (st().project?.id === id) {
+      router.back();
+      await sleep(500);
+    }
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:font-del', caught));
+  }
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -11553,6 +11638,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'fontimport') {
+    await step(phase, () => smokeFontImport(log));
     return;
   }
   if (phase === 'templib') {

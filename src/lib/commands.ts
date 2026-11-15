@@ -5,7 +5,7 @@ import { imageDocsReference, withImageDocAssets } from '@/lib/imageDocMedia';
 import { canHostClip, findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
 import type { LiveDoc } from '@/types/live';
 import type { Model3DDoc } from '@/types/model3d';
-import type { AlbumDoc, AspectRatio, Asset, AssetSource, AudioBus, TrackSidechain, AudioMaster, Chapter, Clip, ImageDoc, InstrumentDoc, Marker, ParticlesConfig, Project, TempoChange, TimelineRegion, Track, TrackType } from '@/types/project';
+import type { AlbumDoc, AspectRatio, Asset, AssetSource, AudioBus, TrackSidechain, AudioMaster, Chapter, Clip, ImageDoc, InstrumentDoc, Marker, ParticlesConfig, Project, TempoChange, TimelineRegion, Track, TrackType, ProjectFont } from '@/types/project';
 import { normalizeTempoMap } from '@/lib/audioTransport';
 import { retimeTempoDelays } from '@/lib/fxParams';
 import type { WorkflowRun } from '@/lib/workflowTemplate';
@@ -34,6 +34,8 @@ export type EditorCommand =
   | { type: 'SET_PROJECT_COVER'; asset: Asset | null }
   /** 🖼️ CORE K5: a szerkeszthető thumbnail lapja (`imageDocs` egyik eleme); null = nincs */
   | { type: 'SET_THUMBNAIL_DOC'; docId: string | null }
+  /** 🔤 IMAGE-PROD S10: a projekt saját betűtípus-listája (import / eltávolítás) */
+  | { type: 'SET_PROJECT_FONTS'; fonts: ProjectFont[] }
   | { type: 'ADD_ASSET'; asset: Asset }
   | { type: 'UPDATE_ASSET'; assetId: string; patch: Partial<Asset> }
   | { type: 'REMOVE_ASSET'; assetId: string }
@@ -293,6 +295,17 @@ function applyCommandRaw(project: Project, cmd: EditorCommand): Project | null {
       const prevId = project.coverAssetId;
       const assets = project.assets.filter((a) => a.id !== prevId && a.id !== cmd.asset!.id);
       return { ...project, coverAssetId: cmd.asset.id, assets: [...assets, cmd.asset] };
+    }
+
+    case 'SET_PROJECT_FONTS': {
+      if (JSON.stringify(cmd.fonts) === JSON.stringify(project.fonts ?? [])) {
+        return null;
+      }
+      if (cmd.fonts.length === 0) {
+        const { fonts: _gone, ...rest } = project;
+        return rest;
+      }
+      return { ...project, fonts: cmd.fonts };
     }
 
     case 'SET_THUMBNAIL_DOC': {
@@ -709,6 +722,8 @@ export function describeCommand(cmd: EditorCommand): string {
       return tr(cmd.asset ? 'lib.commands.setCover' : 'lib.commands.clearCover');
     case 'SET_THUMBNAIL_DOC':
       return tr(cmd.docId ? 'lib.commands.setThumbnail' : 'lib.commands.clearThumbnail');
+    case 'SET_PROJECT_FONTS':
+      return tr('lib.commands.setFonts', { count: cmd.fonts.length });
     case 'SET_PARTICLES':
       return cmd.particles
         ? tr('lib.commands.setParticles', {

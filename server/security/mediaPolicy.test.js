@@ -146,10 +146,11 @@ describe('mediaPolicy — validateUploads (darabszám + batch)', () => {
 });
 
 describe('mediaPolicy — profilok', () => {
-  it('minden profil kinds-e a {image,video,audio,document} részhalmaza', () => {
+  it('minden profil kinds-e a {image,video,audio,document,font} részhalmaza', () => {
     for (const p of Object.values(MEDIA_PROFILES)) {
       for (const k of p.kinds) {
-        expect(['image', 'video', 'audio', 'document']).toContain(k);
+        // 🔤 font: csak a kép-render (IMAGE-PROD S10), TTF/OTF fejléc alapján
+        expect(['image', 'video', 'audio', 'document', 'font']).toContain(k);
       }
       expect(p.maxBytes).toBeGreaterThan(0);
       expect(p.maxCount).toBeGreaterThan(0);

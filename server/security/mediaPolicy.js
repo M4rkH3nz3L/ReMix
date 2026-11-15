@@ -30,6 +30,9 @@ function detectKind(buf) {
   if (b[0] === 0x42 && b[1] === 0x4d) return 'image'; // BMP
   if (ascii(0, 4) === '8BPS') return 'image'; // Photoshop PSD/PSB (réteg-import)
 
+  // --- betűtípus (IMAGE-PROD S10: a projekt saját fontja a kép-renderhez) ---
+  if ((b[0] === 0 && b[1] === 1 && b[2] === 0 && b[3] === 0) || ascii(0, 4) === 'OTTO' || ascii(0, 4) === 'true') return 'font';
+
   // --- RIFF/WAVE audio ---
   if (ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WAVE') return 'audio'; // WAV
 
@@ -76,9 +79,10 @@ const MEDIA_PROFILES = {
   // 🖼️ kép-dokumentum render: rétegenként egy kép + a .cube LUT-ok (szöveg → nincs magic-byte);
   // réteg-kép nélküli doc is érvényes (csak szöveg/alakzat)
   imagedoc: {
-    exts: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif', 'bmp', 'cube'],
+    exts: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif', 'bmp', 'cube', 'ttf', 'otf'],
     textExts: ['cube'],
-    kinds: ['image'],
+    // 🔤 S10: a projekt saját betűtípusa (TTF/OTF fejléc alapján)
+    kinds: ['image', 'font'],
     maxBytes: 40 * MB,
     maxCount: 400,
     allowEmpty: true,

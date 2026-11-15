@@ -248,6 +248,14 @@ export interface AssetSource {
   version: string;
 }
 
+/** 🔤 egy importált betűtípus: a `family` a szöveg-rétegek `fontFamily`-je, a fájl TTF/OTF */
+export interface ProjectFont {
+  family: string;
+  /** a felületen látszó név (a fájlnévből) */
+  name: string;
+  uri: string;
+}
+
 export interface Asset {
   id: string;
   /** `model`: 3D-háló / textúra / pontfelhő (USDZ, OBJ, PLY, STL, GLB) — 3D-Studio.md §15.8 */
@@ -1870,6 +1878,8 @@ export interface Project {
   rendered?: RenderedVersion;
   /** 🖼️ CORE K5: a szerkeszthető thumbnail (`imageDocs` egyik lapja) — a projekt-előnézet és a feed-poszter forrása */
   thumbnailDocId?: string;
+  /** 🔤 IMAGE-PROD S10 · DS2: a projektbe importált saját betűtípusok (a fájl a projekt mappájában) */
+  fonts?: ProjectFont[];
   tracks: Track[];
   /** a projekt által hivatkozott médiafájlok */
   assets: Asset[];

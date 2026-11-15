@@ -81,6 +81,7 @@ import { ImageRenderRejected, imageDocContentKey, isRenderFresh } from '@/lib/im
 import { chooseImageRenderRoute } from '@/lib/imageRenderRoute';
 import { type ImageWorkspace, railGroups, type ToolKey, selectionMenu } from '@/lib/imageMenu';
 import { registerDevAction } from '@/lib/devActions';
+import { loadProjectFonts } from '@/lib/projectFontsClient';
 import { shapeToPathPoints } from '@/lib/shapeGeometry';
 import { panelState, workspaceLayout } from '@/lib/imageWorkspaceLayout';
 import { useEditorPrefs } from '@/store/editorPrefsStore';
@@ -176,6 +177,17 @@ export function ImageStudioBody({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(initialPageId ?? null);
   const [workspaceTab, setWorkspaceTab] = useState<ImageWorkspace>(initialWorkspace);
+  // 🔤 S10: a projekt saját fontjai betöltve a megnyitáskor; a betöltés után a vászon újrarajzol
+  const projectFonts = useEditorStore((st) => st.project?.fonts);
+  const [fontsVersion, setFontsVersion] = useState(0);
+  useEffect(() => {
+    if (!projectFonts?.length) return;
+    let alive = true;
+    void loadProjectFonts(projectFonts).then(() => alive && setFontsVersion((n) => n + 1));
+    return () => {
+      alive = false;
+    };
+  }, [projectFonts]);
   // 🧪 füstteszt: a munkaterület és a sín első szerszámai (a Design belépési pont mérése)
   useEffect(
     () =>
@@ -329,6 +341,7 @@ export function ImageStudioBody({
         format: opts?.format,
         quality: opts?.quality,
         signal: opts?.signal,
+        fonts: useEditorStore.getState().project?.fonts,
         onMissingLayers: (count) =>
           Alert.alert(t('studio.image.missingInExport.title'), t('studio.image.missingInExport.body', { count })),
       });
@@ -2156,6 +2169,8 @@ export function ImageStudioBody({
           {/* vászon */}
           {doc ? (
             <ImageCanvas
+              // 🔤 a saját font betöltése után újra (a már kirajzolt szöveg a tartalék-fonttal maradna)
+              key={`canvas-${fontsVersion}`}
               doc={orderPreview ? moveLayerTo(doc, orderPreview.id, orderPreview.to) : doc}
               selectedId={effectiveSelectedId}
               onSelect={onCanvasSelect}

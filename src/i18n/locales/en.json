@@ -3006,6 +3006,7 @@
       "clearCover": "cover image removed",
       "setThumbnail": "Set thumbnail",
       "clearThumbnail": "Remove thumbnail",
+      "setFonts": "Own fonts ({{count}})",
       "setParticles": "particles: {{preset}}{{beatSync}}",
       "beatSyncSuffix": " (beat-sync)",
       "particlesOff": "particles off",
@@ -3841,6 +3842,11 @@
         "image": "Image",
         "design": "Design",
         "label": "Workspace"
+      },
+      "fonts": {
+        "import": "Own font",
+        "invalid": "This is not a TTF or OTF font file.",
+        "fs": "The font could not be copied into the project."
       },
       "placeholder": {
         "pick": "Tap: add photo"

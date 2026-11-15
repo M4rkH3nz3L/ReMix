@@ -364,6 +364,8 @@ export function docMediaUris(doc: ImageDoc): string[] {
       }
     } else if (l.kind === 'shape' && l.imageUri) {
       out.push(l.imageUri);
+    } else if (l.kind === 'text' && (l as { fontUri?: string }).fontUri) {
+      out.push((l as { fontUri?: string }).fontUri!); // 🔤 S10: a saját font a render-másolaton
     }
   }
   return [...new Set(out)];

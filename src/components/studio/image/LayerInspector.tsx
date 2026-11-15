@@ -1,6 +1,7 @@
 import { GeometryFields } from '@/components/studio/image/GeometryFields';
 import { fontOptions } from '@/constants/fonts';
 import { normalizeRotation } from '@/lib/imageLayerGeometry';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -12,6 +13,9 @@ import { palette } from '@/constants/editor';
 import { getFilterAmount, hasFilter, IMAGE_FILTER_TYPES, setFilterAmount, toggleFilter } from '@/lib/imageFilters';
 import { assignLayerToGroup, createGroup, updateLayer } from '@/lib/imageDoc';
 import { makeId } from '@/lib/id';
+import { withProjectFont } from '@/lib/projectFonts';
+import { loadProjectFonts, pickAndImportFont } from '@/lib/projectFontsClient';
+import { useEditorStore } from '@/store/editorStore';
 import { pickCubeLut } from '@/lib/media';
 import { GRADES as GRADE_PRESETS } from '@/constants/grades';
 import type {
@@ -77,6 +81,33 @@ export function LayerInspector({
   onDrawMask?: (layerId: string, target: 'clip' | 'local' | 'heal' | 'paint') => void;
 }) {
   const { t } = useTranslation();
+  const projectFonts = useEditorStore((st) => st.project?.fonts);
+  // 🔤 S10: a projekt fontjai betöltve (a választó és a vászon is azzal rajzol)
+  const [, setFontsReady] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    void loadProjectFonts(projectFonts).then(() => alive && setFontsReady((n) => n + 1));
+    return () => {
+      alive = false;
+    };
+  }, [projectFonts]);
+  const importFont = async (layerId: string) => {
+    const res = await pickAndImportFont();
+    if (!res.ok) {
+      if (res.reason !== 'cancelled') Alert.alert(t('studio.image.fonts.import'), t(`studio.image.fonts.${res.reason}`));
+      return;
+    }
+    await loadProjectFonts([res.font]);
+    const st = useEditorStore.getState();
+    const fresh = st.project?.imageDocs?.find((d) => d.id === doc.id) ?? doc;
+    st.applyBatch(
+      [
+        { type: 'SET_PROJECT_FONTS', fonts: withProjectFont(st.project?.fonts, res.font) },
+        { type: 'UPSERT_IMAGE_DOC', doc: updateLayer<TextLayer>(fresh, layerId, { fontFamily: res.font.family }), label: t('studio.image.font') },
+      ],
+      'user'
+    );
+  };
 
   // 🎭 a kijelölt réteg maszkja (union-safe olvasás) + módosítás/törlés
   const curMask = (layer as { mask?: ClipMask }).mask;
@@ -151,7 +182,7 @@ export function LayerInspector({
           />
           <Text style={styles.sectionLabel}>{t('studio.image.font')}</Text>
           <View style={styles.chipRow}>
-            {fontOptions.filter((f) => f.family).map((f) => (
+            {[...(projectFonts ?? []).map((f) => ({ id: f.family, label: f.name, family: f.family })), ...fontOptions.filter((f) => f.family)].map((f) => (
               <Pressable
                 key={f.id}
                 style={[styles.fontChip, layer.fontFamily === f.family ? styles.fontChipActive : null]}
@@ -165,6 +196,16 @@ export function LayerInspector({
                 </Text>
               </Pressable>
             ))}
+            {/* 🔤 S10: saját font a Fájlokból — a projektbe kerül, és ez a réteg rögtön azt kapja (egy visszavonás) */}
+            <Pressable
+              style={styles.fontChip}
+              onPress={() => void importFont(layer.id)}
+              accessibilityRole="button"
+              accessibilityLabel={t('studio.image.fonts.import')}
+              testID="font-import"
+            >
+              <Text style={styles.fontChipText} numberOfLines={1}>{`＋ ${t('studio.image.fonts.import')}`}</Text>
+            </Pressable>
           </View>
           <Text style={styles.sectionLabel}>{t('studio.image.textAlign')}</Text>
           <View style={styles.chipRow}>

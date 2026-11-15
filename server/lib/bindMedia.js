@@ -12,7 +12,8 @@ function bindUploadedMedia(doc, files, uriMap) {
     return file || (/^https?:\/\//i.test(uri) ? uri : undefined);
   };
   for (const layer of doc.layers ?? []) {
-    for (const key of ['uri', 'imageUri', 'lut']) {
+    // 🔤 `fontUri`: a szöveg-réteg saját betűtípusa (IMAGE-PROD S10) — csak feltöltött fájl lehet
+    for (const key of ['uri', 'imageUri', 'lut', 'fontUri']) {
       if (layer[key]) {
         layer[key] = bind(layer[key]);
       }

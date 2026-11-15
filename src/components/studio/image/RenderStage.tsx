@@ -8,6 +8,8 @@ import { StageLayers } from '@/components/studio/image/StageLayers';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { stageSettleMs, stageSize } from '@/lib/imageRenderRoute';
 import { logCaught } from '@/lib/logCaught';
+import { loadProjectFonts } from '@/lib/projectFontsClient';
+import { useEditorStore } from '@/store/editorStore';
 import { registerRenderStage, renderOnDevice, type RenderStageHandle, type RenderStageOptions } from '@/lib/renderStageRegistry';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import type { ImageDoc } from '@/types/project';
@@ -63,6 +65,8 @@ export const RenderStage = forwardRef<RenderStageHandle>(function RenderStage(_p
   const handle = useRef<RenderStageHandle>({
     render(doc, heightPx, opts = {}) {
       const run = async (): Promise<string | null> => {
+        // 🔤 S10: a projekt saját fontjai betöltve (különben a rendszer-fonttal rajzolna)
+        await loadProjectFonts(useEditorStore.getState().project?.fonts);
         const size = stageSize(effectiveCanvas(doc), heightPx, PixelRatio.get());
         const mounted = new Promise<boolean>((resolve) => {
           const timer = setTimeout(() => resolve(false), MOUNT_TIMEOUT_MS);

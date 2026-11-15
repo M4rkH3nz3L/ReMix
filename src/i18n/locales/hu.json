@@ -3006,6 +3006,7 @@
       "clearCover": "borítókép eltávolítva",
       "setThumbnail": "A thumbnail beállítása",
       "clearThumbnail": "A thumbnail eltávolítása",
+      "setFonts": "Saját betűtípusok ({{count}})",
       "setParticles": "részecskék: {{preset}}{{beatSync}}",
       "beatSyncSuffix": " (beat-sync)",
       "particlesOff": "részecskék kikapcsolva",
@@ -3841,6 +3842,11 @@
         "image": "Kép",
         "design": "Design",
         "label": "Munkaterület"
+      },
+      "fonts": {
+        "import": "Saját font",
+        "invalid": "Ez nem TTF vagy OTF betűtípus-fájl.",
+        "fs": "A fontot nem sikerült a projektbe másolni."
       },
       "placeholder": {
         "pick": "Koppints: kép"

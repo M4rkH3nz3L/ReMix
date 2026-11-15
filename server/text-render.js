@@ -51,7 +51,34 @@ const { polygonFor } = require('./shapeGeometry');
 const FALLBACK_FONT = "-apple-system, 'Helvetica Neue', Arial, sans-serif";
 const fontFaceCache = {};
 
-function fontFaceCss(family) {
+/** a kliens-adott saját font-családnév: csak `u_` + betű/szám/aláhúzás (CSS-be kerül) */
+const CUSTOM_FAMILY = /^u_[A-Za-z0-9_]{1,48}$/;
+const customFaceCache = new Map();
+
+/** 🔤 S10: a projekt saját fontja (a feltöltött fájlból) — érvényes családnév és létező fájl kell */
+function customFace(family, fontPath) {
+  if (!family || !fontPath || !CUSTOM_FAMILY.test(family) || /^https?:/i.test(fontPath)) {
+    return null;
+  }
+  const key = `${family}|${fontPath}`;
+  if (!customFaceCache.has(key)) {
+    try {
+      const buf = fs.readFileSync(fontPath);
+      const otf = buf.slice(0, 4).toString('latin1') === 'OTTO';
+      customFaceCache.set(key, `@font-face{font-family:'${family}';src:url(data:font/${otf ? 'otf' : 'ttf'};base64,${buf.toString('base64')}) format('${otf ? 'opentype' : 'truetype'}');font-display:block;}`);
+    } catch (caught) {
+      logCaught('text-render.js:customFace', caught);
+      customFaceCache.set(key, '');
+    }
+  }
+  return customFaceCache.get(key) || null;
+}
+
+function fontFaceCss(family, fontPath) {
+  const custom = customFace(family, fontPath);
+  if (custom) {
+    return custom;
+  }
   if (!family || !FONT_FILES[family]) {
     return '';
   }
@@ -67,7 +94,10 @@ function fontFaceCss(family) {
   return fontFaceCache[family];
 }
 
-function fontFamilyCss(family) {
+function fontFamilyCss(family, fontPath) {
+  if (customFace(family, fontPath)) {
+    return `'${family}', ${FALLBACK_FONT}`;
+  }
   return family && FONT_FILES[family] ? `'${family}', ${FALLBACK_FONT}` : FALLBACK_FONT;
 }
 
@@ -314,7 +344,7 @@ function text3dHtml(clip, fontPx, canvasW) {
   const tiltX = Math.max(-45, Math.min(45, t3.tiltX || 0));
   const tiltY = Math.max(-45, Math.min(45, t3.tiltY || 0));
   const common = `
-    font-family: ${fontFamilyCss(clip.fontFamily)};
+    font-family: ${fontFamilyCss(clip.fontFamily, clip.fontUri)};
     font-size:${fontPx}px;
     font-weight:800;
     text-align:center;
@@ -322,7 +352,7 @@ function text3dHtml(clip, fontPx, canvasW) {
     white-space:pre-wrap;
     word-wrap:break-word;`;
   return `<!doctype html><html><body style="margin:0;background:transparent;display:inline-block;padding:${Math.round(fontPx * 0.6)}px;">
-    <style>${fontFaceCss(clip.fontFamily)}</style>
+    <style>${fontFaceCss(clip.fontFamily, clip.fontUri)}</style>
     <div id="t" style="position:relative;display:inline-block;max-width:${Math.round(canvasW * 0.86)}px;
       transform: perspective(${Math.round(fontPx * 9)}px) rotateX(${tiltX}deg) rotateY(${tiltY}deg);">
       <div class="d" style="${common} color:${mat.depth}; text-shadow:${shadows.join(',')};"></div>
@@ -394,10 +424,10 @@ function textPathHtml(clip, fontPx, canvasW) {
   const ls = clip.letterSpacing ? ` letter-spacing="${(clip.letterSpacing * fontPx).toFixed(1)}"` : '';
   const text = escapeHtmlLite(clip.text);
   const pad = Math.round(fontPx * 0.6);
-  return `<!doctype html><html><head><style>${fontFaceCss(clip.fontFamily)}</style></head>
+  return `<!doctype html><html><head><style>${fontFaceCss(clip.fontFamily, clip.fontUri)}</style></head>
     <body style="margin:0;background:transparent;">
       <svg id="t" width="${svgW}" height="${H}" viewBox="${-pad} ${-pad} ${svgW + 2 * pad} ${H + 2 * pad}"
-           style="overflow:visible;display:block;font-family:${fontFamilyCss(clip.fontFamily)};font-weight:${clip.fontWeight === 'bold' ? 700 : 400};${filterStyle}">
+           style="overflow:visible;display:block;font-family:${fontFamilyCss(clip.fontFamily, clip.fontUri)};font-weight:${clip.fontWeight === 'bold' ? 700 : 400};${filterStyle}">
         <defs>${gradDef}</defs>
         <path id="tp" d="${d}" fill="none"/>
         <text font-size="${fontPx}" fill="${fill}"${strokeAttr}${ls}>
@@ -501,11 +531,11 @@ async function renderTextPngs(textClips, canvas, outDir) {
       const html = `<!doctype html><html><body style="margin:0;background:transparent;display:flex;${
         tf ? 'align-items:center;justify-content:center;width:100vw;height:100vh;' : 'align-items:flex-start;justify-content:flex-start;'
       }">
-        <style>${fontFaceCss(clip.fontFamily)}</style>
+        <style>${fontFaceCss(clip.fontFamily, clip.fontUri)}</style>
         <div id="t" style="
           display:inline-block;
           ${clip.boxWidth > 0 ? `width:${Math.round(clip.boxWidth * canvas.w)}px;box-sizing:border-box;` : `max-width:${Math.round(canvas.w * 0.92)}px;`}
-          font-family: ${fontFamilyCss(clip.fontFamily)};
+          font-family: ${fontFamilyCss(clip.fontFamily, clip.fontUri)};
           font-size:${fontPx}px;
           font-weight:${clip.fontWeight === 'bold' ? 700 : 400};
           font-style:${clip.fontStyle === 'italic' ? 'italic' : 'normal'};
@@ -1095,6 +1125,8 @@ async function bakeTextPng(clip, canvas) {
 }
 
 module.exports = {
+  // 🧪 teszthez: a saját font @font-face-e (null = elutasítva)
+  __fontCss: customFace,
   textTransformCss,
   renderTextPngs,
   renderShapePngs,

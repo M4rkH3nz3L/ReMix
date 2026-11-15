@@ -3006,6 +3006,7 @@
       "clearCover": "Titelbild entfernt",
       "setThumbnail": "Thumbnail festlegen",
       "clearThumbnail": "Thumbnail entfernen",
+      "setFonts": "Eigene Schriften ({{count}})",
       "setParticles": "Partikel: {{preset}}{{beatSync}}",
       "beatSyncSuffix": " (Beat-Sync)",
       "particlesOff": "Partikel aus",
@@ -3874,6 +3875,11 @@
         "image": "Bild",
         "design": "Design",
         "label": "Arbeitsbereich"
+      },
+      "fonts": {
+        "import": "Eigene Schrift",
+        "invalid": "Das ist keine TTF- oder OTF-Schriftdatei.",
+        "fs": "Die Schrift konnte nicht ins Projekt kopiert werden."
       },
       "placeholder": {
         "pick": "Tippen: Foto"

@@ -9,9 +9,10 @@ import { ImageRenderRejected, imageCacheKey } from '@/lib/imageExport';
 import { isProNow } from '@/store/entitlementStore';
 import { renderServerUrl } from '@/lib/render';
 import { uploadFetch } from '@/lib/upload';
-import type { ImageDoc } from '@/types/project';
+import type { ImageDoc, ProjectFont } from '@/types/project';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { logCaught } from '@/lib/logCaught';
+import { projectFontOf } from '@/lib/projectFonts';
 
 /**
  * 🎨 Kép-dokumentum rasterizálása a workerrel.
@@ -47,6 +48,8 @@ export interface RenderImageOpts {
   onMissingLayers?: (count: number) => void;
   /** a felhasználó megszakíthatja: megszakításkor `ExportCancelled` jön */
   signal?: AbortSignal;
+  /** 🔤 S10: a projekt saját betűtípusai — a szöveg-réteg fontja a renderrel együtt feltöltődik */
+  fonts?: readonly ProjectFont[];
 }
 
 /** A felhasználó állította le az exportot: ez nem hiba, nincs tartalék-út és hibaablak. */
@@ -286,6 +289,16 @@ export async function renderImageDoc(
   const limit = docLimitProblem(doc);
   if (limit) {
     throw new ImageRenderRejected(tr(`studio.image.limits.${limit}`));
+  }
+  // 🔤 S10: a saját fontú szöveg-réteg a font fájljával megy (a szerver `@font-face`-t épít belőle)
+  if (opts.fonts?.length && doc.layers.some((l) => l.kind === 'text' && projectFontOf(opts.fonts, l.fontFamily))) {
+    doc = {
+      ...doc,
+      layers: doc.layers.map((l) => {
+        const f = l.kind === 'text' ? projectFontOf(opts.fonts, l.fontFamily) : null;
+        return f ? ({ ...l, fontUri: f.uri } as unknown as typeof l) : l;
+      }),
+    };
   }
   // 🧩 S9: a sablon üres helyőrzője a kész képből kimarad (a szerver hiányzó médiának venné)
   if (doc.layers.some((l) => l.kind === 'photo' && l.placeholder)) {

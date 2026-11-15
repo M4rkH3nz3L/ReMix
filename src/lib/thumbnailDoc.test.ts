@@ -75,8 +75,8 @@ describe('🖼️ CORE K5: szerkeszthető thumbnail', () => {
     expect(posterNeedsRefresh(undefined, d)).toBe(false);
   });
 
-  it('séma v9: a régi projekt migrálódik, a mezők opcionálisak', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(9);
-    expect(migrateProject({ ...video(), schemaVersion: 8 }).schemaVersion).toBe(9);
+  it('séma v9+: a régi projekt migrálódik, a mezők opcionálisak', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBeGreaterThanOrEqual(9);
+    expect(migrateProject({ ...video(), schemaVersion: 8 }).schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
   });
 });

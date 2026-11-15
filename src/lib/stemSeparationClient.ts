@@ -26,8 +26,12 @@ type StemNative = {
 };
 const mod = Platform.OS === 'ios' ? requireOptionalNativeModule<StemNative>('RemixRender') : null;
 
-/** 🚫 kiadásban rejtve a modell-licenc jogi megerősítéséig (dev-buildben látszik) */
-export const STEM_ON_DEVICE_ENABLED = false;
+/**
+ * ✅ kiadásban is bekapcsolva — a modell-licenc megerősítve (tulajdonosi jóváhagyás 2026-11-15): a Spleeter kódja és
+ * a vele kiadott modellek MIT alatt (a Deezer felsorolja a modelleket használó kereskedelmi szoftvereket); a
+ * közlemény az appban (`legal?doc=licenses`)
+ */
+export const STEM_ON_DEVICE_ENABLED = true;
 export const STEM_MAX_SEC = 15 * 60;
 
 export function stemOnDeviceSupported(): boolean {

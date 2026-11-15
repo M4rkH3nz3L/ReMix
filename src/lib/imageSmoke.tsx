@@ -177,7 +177,7 @@ import { HslSheet } from '@/components/studio/image/HslSheet';
 import { computeHistogram, histogramShift } from '@/lib/histogram';
 import { SelectionAnts } from '@/components/studio/image/SelectionAnts';
 import { updateLayer } from '@/lib/imageDoc';
-import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection } from '@/lib/imageSelectionOps';
+import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection, rasterSubForSelection, replaceWithSelectionRaster } from '@/lib/imageSelectionOps';
 import { applyRing, ellipseRing, invertSelection, rectRing, type Selection as ImgSelection, selectionToMask } from '@/lib/selection';
 import { DEFAULT_BRUSH, type RetouchTool, type Stroke } from '@/lib/brushEngine';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
@@ -8437,6 +8437,85 @@ async function smokeColorRange(log: Log, setHarness: (n: ReactNode) => void) {
   removeFile(f.uri);
 }
 
+/** 🔠 S17: kijelölés-művelet szövegen és formán — a telefon raszterizál, a művelet a fotón fut; telefon = szerver */
+async function smokeSelectText(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  const bg = { id: 'bg', kind: 'fill', fill: '#000000' } as unknown as ImageLayer;
+  const text = { id: 't', kind: 'text', name: 'Cím', text: 'MMMMMM', position: { x: 0.5, y: 0.5 }, fontSize: 16, color: '#ffffff', fontFamily: 'Anton', textAlign: 'center', backgroundColor: null, stylePreset: 'plain' } as unknown as ImageLayer;
+  const shape = { id: 't', kind: 'shape', name: 'Kör', shape: 'ellipse', position: { x: 0.5, y: 0.5 }, w: 0.8, h: 0.6, fill: '#ffffff' } as unknown as ImageLayer;
+  const left = applyRing(null, rectRing({ x: 0, y: 0 }, { x: 0.5, y: 1 }), 'new', 0)!;
+  // a bal és a jobb fél fehér képpontjainak aránya
+  const halves = (img: SkImage) => {
+    let [l, r, nl, nr] = [0, 0, 0, 0];
+    for (let y = 0; y < img.height(); y += 3) for (let x = 0; x < img.width(); x += 3) {
+      const on = pixel(img, x, y)[0] > 128 ? 1 : 0;
+      if (x < img.width() / 2 - 4) { l += on; nl += 1; } else if (x > img.width() / 2 + 4) { r += on; nr += 1; }
+    }
+    return { l: l / nl, r: r / nr };
+  };
+  for (const [name, layer, action] of [['szöveg: a kijelölt bal fél törlése', text, 'delete'], ['forma: maszk a bal félre', shape, 'mask']] as const) {
+    const doc = { id: 'st', name: 'st', aspectRatio: '1:1', width: 400, height: 400, layers: [bg, layer] } as unknown as ImageDoc;
+    const raster = await ref.current!.render(rasterSubForSelection(doc, 't'), 400, { format: 'png' });
+    if (!raster) {
+      log(false, name, 'nincs raszter');
+      continue;
+    }
+    const keep = new File(projectMediaDir(), `smoke_seltext_${Date.now().toString(36)}.png`);
+    new File(raster).copy(keep);
+    const rastered = replaceWithSelectionRaster(doc, 't', keep.uri, 'r');
+    const next = action === 'delete' ? deleteSelection(rastered, 'r', left) : maskFromSelection(rastered, 'r', left);
+    if (!next) {
+      log(false, name, 'a művelet nem futott');
+      continue;
+    }
+    const before = halves(await decode((await ref.current!.render(doc, 400))!));
+    const dev = await ref.current!.render(next, 400);
+    const srv = await renderImageDoc(next, 400);
+    if (!dev || !srv) {
+      log(false, name, 'nincs kép');
+      continue;
+    }
+    const [a, b] = [halves(await decode(dev)), halves(await decode(srv))];
+    const want = action === 'delete' ? (h: { l: number; r: number }) => h.l < 0.005 && h.r > 0.05 : (h: { l: number; r: number }) => h.l > 0.05 && h.r < 0.005;
+    log(want(a) && want(b) && before.l > 0.05 && before.r > 0.05, `${name} — telefon és szerver`, `előtte bal ${(before.l * 100).toFixed(1)}% jobb ${(before.r * 100).toFixed(1)}% · telefon ${(a.l * 100).toFixed(1)}/${(a.r * 100).toFixed(1)}% · szerver ${(b.l * 100).toFixed(1)}/${(b.r * 100).toFixed(1)}%`);
+    [raster, dev, srv, keep.uri].forEach((u) => removeFile(u));
+  }
+  setHarness(null);
+
+  // a valódi stúdióban, a kezelőn át: szöveg-réteg bal felének törlése → egy visszavonási lépés
+  const id = 'prj_smoke_seltext';
+  await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:seltext-del0', caught));
+  const page = { id: 'pg', name: 'pg', aspectRatio: '1:1', width: 400, height: 400, layers: [bg, text] } as unknown as ImageDoc;
+  await saveProject({ ...createEmptyProject('smoke kijelölés szövegen', '1:1', undefined, 'image'), id, imageDocs: [page] });
+  const st = useEditorStore.getState;
+  try {
+    router.push(`/studio/image/${id}` as Href);
+    for (let i = 0; i < 60 && st().project?.id !== id; i++) await sleep(200);
+    await sleep(1500);
+    const pastBefore = st().past.length;
+    await runDevAction('image.selectionAction', { action: 'delete', ring: rectRing({ x: 0, y: 0 }, { x: 0.5, y: 1 }), targetId: 't' });
+    for (let i = 0; i < 50 && st().project!.imageDocs![0].layers.some((l) => l.id === 't'); i++) await sleep(200);
+    const after = st().project!.imageDocs![0];
+    const photoNow = after.layers.find((l) => l.kind === 'photo') as PhotoLayer | undefined;
+    const r = await renderOnDevice(after, 400);
+    const h = r ? halves(await decode(r)) : { l: -1, r: -1 };
+    log(!!photoNow?.mask && photoNow.name === 'Cím' && h.l < 0.005 && h.r > 0.05 && st().past.length === pastBefore + 1, 'stúdióban: a szöveg raszterizálva, a bal fele törölve, egy visszavonási lépés', `réteg ${photoNow?.kind}/${photoNow?.name}, bal ${(h.l * 100).toFixed(1)}% jobb ${(h.r * 100).toFixed(1)}%, lépés +${st().past.length - pastBefore}`);
+    st().undo();
+    await sleep(300);
+    log(st().project!.imageDocs![0].layers.some((l) => l.id === 't' && l.kind === 'text'), 'egy visszavonás: újra szerkeszthető szöveg');
+    if (r) removeFile(r);
+  } finally {
+    if (st().project?.id === id) {
+      router.back();
+      await sleep(500);
+    }
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:seltext-del', caught));
+  }
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -12358,6 +12437,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'seltext') {
+    await step(phase, () => smokeSelectText(log, setHarness));
     return;
   }
   if (phase === 'colorrange') {

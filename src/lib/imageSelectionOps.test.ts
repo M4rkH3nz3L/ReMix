@@ -1,7 +1,7 @@
 import { docMediaUris, updateLayer } from '@/lib/imageDoc';
 import { imageDocMediaRefs, relinkImageDocs } from '@/lib/imageDocMedia';
 import { canvasToLayerBox, imageCornersOnCanvas } from '@/lib/imageLayerGeometry';
-import { adjustSelection, copySelectionToLayer, deleteSelection, followLayerMask, maskFromSelection, selectionTarget, shiftMask } from '@/lib/imageSelectionOps';
+import { adjustSelection, copySelectionToLayer, deleteSelection, followLayerMask, maskFromSelection, needsRasterForSelection, rasterSubForSelection, replaceWithSelectionRaster, selectionTarget, shiftMask } from '@/lib/imageSelectionOps';
 import { applyRing, invertSelection, rectRing, type Selection, selectionContains } from '@/lib/selection';
 import type { ClipMask, ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
 
@@ -63,10 +63,11 @@ describe('törlés, maszk, korrekció', () => {
 });
 
 describe('cél', () => {
-  it('a kijelölt fotó, különben a legfelső látható', () => {
-    const d = doc(photo('a'), photo('b'), photo('c', { hidden: true }), { kind: 'text', id: 't' } as ImageLayer);
+  it('a kijelölt fotó (S17 óta szöveg / forma is), különben a legfelső látható fotó', () => {
+    const d = doc(photo('a'), photo('b'), photo('c', { hidden: true }), { kind: 'text', id: 't' } as ImageLayer, { kind: 'fill', id: 'f' } as ImageLayer);
     expect(selectionTarget(d, 'a')).toBe('a');
-    expect(selectionTarget(d, 't')).toBe('b');
+    expect(selectionTarget(d, 't')).toBe('t');
+    expect(selectionTarget(d, 'f')).toBe('b');
     expect(selectionTarget(d, null)).toBe('b');
     expect(selectionTarget(doc(), null)).toBeNull();
   });
@@ -196,5 +197,35 @@ describe('a fotó sarkai a vásznon', () => {
   it('cover: a szélesebb kép túlnyúlik a dobozon', () => {
     const [a] = imageCornersOnCanvas(place({ fit: 'cover' }), 2, canvas);
     expect(a.x).toBeLessThan(0);
+  });
+});
+
+describe('S17: kijelölés szövegen és formán (raszterizálva)', () => {
+  const text = { kind: 'text', id: 't', name: 'Cím', text: 'Hi', position: { x: 0.5, y: 0.5 }, fontSize: 10, color: '#fff', blendMode: 'screen', groupId: 'g', opacity: 0.5 } as unknown as ImageLayer;
+  const d = { ...doc(photo('a'), text), groups: [{ id: 'g', name: 'g', opacity: 0.8 }] } as unknown as ImageDoc;
+
+  it('a kijelölt szöveg a kijelölés célja, és raszterizálandó; a fotó nem', () => {
+    expect(selectionTarget(d, 't')).toBe('t');
+    expect(needsRasterForSelection(d, 't')).toBe(true);
+    expect(needsRasterForSelection(d, 'a')).toBe(false);
+    expect(needsRasterForSelection({ ...d, layers: [{ ...text, locked: true }] } as ImageDoc, 't')).toBe(false);
+  });
+
+  it('a rész-dokumentum csak a réteget rajzolja, keverés és csoport nélkül, a saját átlátszóságával', () => {
+    const sub = rasterSubForSelection(d, 't');
+    expect(sub.layers).toHaveLength(1);
+    expect(sub.layers[0]).toMatchObject({ id: 't', opacity: 0.5, hidden: false });
+    expect(sub.layers[0].blendMode).toBeUndefined();
+    expect(sub.layers[0].groupId).toBeUndefined();
+  });
+
+  it('a helyére teljes vásznas fotó kerül: név, csoport, keverés megmarad, a sorrend is', () => {
+    const r = replaceWithSelectionRaster(d, 't', 'file:///r.png', 'r');
+    expect(r.layers.map((l) => l.id)).toEqual(['a', 'r']);
+    expect(r.layers[1]).toMatchObject({ kind: 'photo', name: 'Cím', uri: 'file:///r.png', w: 1, h: 1, groupId: 'g', blendMode: 'screen' });
+    expect((r.layers[1] as PhotoLayer).opacity).toBeUndefined();
+    // utána a fotó-műveletek működnek rajta
+    const sel = applyRing(null, rectRing(pt(0, 0), pt(0.5, 1)), 'new')!;
+    expect(deleteSelection(r, 'r', sel)).not.toBeNull();
   });
 });

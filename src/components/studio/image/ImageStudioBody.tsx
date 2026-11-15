@@ -39,7 +39,16 @@ import { EXPORT_PACK_SCALES, expectsAlpha, layerOnlyDoc, selectionOnlyDoc } from
 import { DEFAULT_GRID, GRID_SIZES } from '@/lib/imageGrid';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { layerBoxToCanvas, photoBoxFor } from '@/lib/imageLayerGeometry';
-import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection, selectionTarget } from '@/lib/imageSelectionOps';
+import {
+  adjustSelection,
+  copySelectionToLayer,
+  deleteSelection,
+  maskFromSelection,
+  needsRasterForSelection,
+  rasterSubForSelection,
+  replaceWithSelectionRaster,
+  selectionTarget,
+} from '@/lib/imageSelectionOps';
 import { applyRing, invertSelection, type Point, type Selection, type SelectionMode } from '@/lib/selection';
 import { DEFAULT_BRUSH, isPaintLayer } from '@/lib/brushEngine';
 import { ImageStudioToolbar } from '@/components/studio/image/body/ImageStudioToolbar';
@@ -1473,14 +1482,52 @@ export function ImageStudioBody({
     setSelection(null);
     closeSelectTool();
   };
-  const selectionAction = (action: SelectionAction) => {
+  // a dev-akció (füstteszt) a kijelölést és a célt közvetlenül adja; a gombok az állapotot
+  const selectionState = selection;
+  const selectTargetIdState = selectTargetId;
+  const selectionAction = (action: SelectionAction, selection: Selection | null = selectionState, selectTargetId: string | null = selectTargetIdState) => {
     if (!doc || !selection) {
       return;
     }
-    if (action === 'export') {
-      void exportPart(selectTargetId ? selectionOnlyDoc(doc, selection, selectTargetId) : null);
+    // 🔠 S17: szövegen / formán a képpont-művelet előtt a telefon fotóvá raszterizálja a réteget (egy
+    // visszavonási lépés a művelettel együtt) — a művelet utána ugyanaz, mint a fotón
+    const pixelOp = action === 'copy' || action === 'delete' || action === 'mask' || action === 'export';
+    if (pixelOp && selectTargetId && needsRasterForSelection(doc, selectTargetId)) {
+      if (busy) {
+        return;
+      }
+      const targetId = selectTargetId;
+      setBusy(true);
+      void (async () => {
+        try {
+          const rendered = await rasterize(rasterSubForSelection(doc, targetId), { format: 'png', height: effectiveCanvas(doc).height });
+          const uri = rendered ? keepRenderedInProject(rendered, `sel_${makeId('r')}`) : null;
+          if (!uri) {
+            Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.renderFailBody'));
+            return;
+          }
+          const fresh = useEditorStore.getState().project?.imageDocs?.find((d) => d.id === doc.id) ?? doc;
+          const rasterId = makeId('lyr');
+          setSelectTargetId(rasterId);
+          runSelectionAction(action, replaceWithSelectionRaster(fresh, targetId, uri, rasterId), rasterId, selection);
+        } catch (caught) {
+          logCaught('components/studio/image/ImageStudioBody.tsx:selectionRaster', caught);
+          Alert.alert(t('studio.image.renderFailTitle'), (caught as Error).message);
+        } finally {
+          setBusy(false);
+        }
+      })();
       return;
     }
+    runSelectionAction(action, doc, selectTargetId, selection);
+  };
+  const runSelectionAction = (action: SelectionAction, base: ImageDoc, targetId: string | null, selection: Selection) => {
+    if (action === 'export') {
+      void exportPart(targetId ? selectionOnlyDoc(base, selection, targetId) : null);
+      return;
+    }
+    const doc = base;
+    const selectTargetId = targetId;
     const id = makeId('lyr');
     let next: ImageDoc | null = null;
     if (action === 'copy') {
@@ -1506,6 +1553,15 @@ export function ImageStudioBody({
       setSelectedId(action === 'mask' ? selectTargetId : id);
     }
   };
+
+  // 🧪 füstteszt: kijelölés-művelet a valódi kezelőn át (a szöveg/forma raszterizálásával együtt)
+  const selectionActionRef = useRef(selectionAction);
+  selectionActionRef.current = selectionAction;
+  useEffect(() => registerDevAction('image.selectionAction', (arg) => {
+    const a = arg as { action: SelectionAction; ring: Point[]; targetId: string };
+    selectionActionRef.current(a.action, applyRing(null, a.ring, 'new', 0), a.targetId);
+    return true;
+  }), []);
 
   // 🎭 lasszó-maszk indítása a kijelölt rétegre: a következő lasszó-rajz maszkot készít
   // (target: 'clip' = vágó-maszk, 'local' = kijelölés-alapú korrekció maszkja)

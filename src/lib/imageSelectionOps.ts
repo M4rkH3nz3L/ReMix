@@ -62,9 +62,37 @@ export function adjustSelection(doc: ImageDoc, sel: Selection, newId: string): I
   return { ...doc, layers: [...doc.layers, { kind: 'adjust', id: newId, adjust: {}, mask: selectionToMask(sel) } as ImageLayer] };
 }
 
-/** A legfelső látható fotó: ha nincs kijelölt réteg, ezen dolgozik a kijelölés. */
+/** S17: a szöveg és a forma a képpont-műveletek előtt fotóvá raszterizálódik (mint a Photoshopban) */
+export function needsRasterForSelection(doc: ImageDoc, id: string | null): boolean {
+  const l = doc.layers.find((x) => x.id === id);
+  return !!l && (l.kind === 'text' || l.kind === 'shape') && !l.locked;
+}
+
+/**
+ * A raszterizálandó réteg rész-dokumentuma: csak ez a réteg, a keverési mód nélkül (az átlátszó háttéren
+ * nincs mivel keveredjen — a kész fotó-réteg kapja vissza). A réteg saját átlátszósága beleég; a csoporté
+ * nem, mert a fotó a csoportban marad, és az ott hat.
+ */
+export function rasterSubForSelection(doc: ImageDoc, id: string): ImageDoc {
+  const layers = doc.layers
+    .filter((l) => l.id === id)
+    .map((l) => ({ ...l, groupId: undefined, blendMode: undefined, hidden: false }) as ImageLayer);
+  return { ...doc, layers, groups: [], grade: undefined, adjust: undefined, vignette: 0, grain: 0, renderedUri: undefined };
+}
+
+/** a réteg helyére a raszterizált fotó (teljes vásznas, átlátszó): név, csoport, keverés és zár megmarad */
+export function replaceWithSelectionRaster(doc: ImageDoc, id: string, uri: string, newId: string): ImageDoc {
+  const layers = doc.layers.map((l) =>
+    l.id === id
+      ? ({ kind: 'photo', id: newId, name: l.name, uri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch', groupId: l.groupId, blendMode: l.blendMode, hidden: l.hidden } as PhotoLayer)
+      : l
+  );
+  return { ...doc, layers, renderedUri: undefined };
+}
+
+/** A kijelölt fotó / szöveg / forma, különben a legfelső látható fotó: ezen dolgozik a kijelölés. */
 export function selectionTarget(doc: ImageDoc, selectedId: string | null): string | null {
-  if (photoTarget(doc, selectedId)) {
+  if (photoTarget(doc, selectedId) || needsRasterForSelection(doc, selectedId)) {
     return selectedId;
   }
   const photos = doc.layers.filter((l) => l.kind === 'photo' && !l.hidden);

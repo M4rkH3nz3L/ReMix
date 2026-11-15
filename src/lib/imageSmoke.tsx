@@ -125,6 +125,7 @@ import { sendMixdownToVideo, sendStillToVideo, sourceVersionOf } from '@/lib/lin
 import { renderProjectVersion } from '@/lib/render';
 import { importFontFromUri } from '@/lib/projectFontsClient';
 import { insertBrandLogoWatermark } from '@/lib/brandLogoClient';
+import { jpegSize, jpegToPdf } from '@/lib/rasterPdf';
 import { useUserTemplates } from '@/store/userTemplatesStore';
 import AsyncStorageTpl from '@react-native-async-storage/async-storage';
 import { thumbnailFramesOnDevice } from '@/lib/thumbStudio';
@@ -7847,6 +7848,45 @@ async function smokeVariant(log: Log, setHarness: (n: ReactNode) => void) {
   removeFile(logoFile.uri);
 }
 
+/**
+ * 📄 IMAGE-PROD S14 (DS7): PDF a telefonon, szerver nélkül — a lap telefonos JPEG-je egy PDF-oldalon;
+ * a fájlból visszaolvasott kép pixelre a lap képe, a mérete a valódi JPEG-fejlécből.
+ */
+async function smokePdfOffline(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  let n = 0;
+  const doc = docFromTemplate(IMAGE_TEMPLATES.find((x) => x.key === 'posterMinimal')!, 'Plakát ő', () => `t${++n}`);
+  const t0 = Date.now();
+  const jpg = await ref.current!.render(doc, 1754, { format: 'jpg', quality: 0.92 });
+  if (!jpg) {
+    log(false, 'telefonos JPEG', 'nincs');
+    setHarness(null);
+    return;
+  }
+  const bytes = await new File(jpg).bytes();
+  const size = jpegSize(bytes);
+  const pdf = jpegToPdf(bytes, { title: 'Plakát ő' });
+  const out = new File(projectMediaDir(), `smoke_offline_${Date.now().toString(36)}.pdf`);
+  out.write(pdf);
+  const back = await out.bytes();
+  const head = String.fromCharCode(...back.slice(0, 8));
+  const text = Array.from(back.slice(0, 2000), (b) => String.fromCharCode(b)).join('');
+  const at = Array.from(back, (b) => String.fromCharCode(b)).join('').indexOf('stream\n', text.indexOf('/DCTDecode')) + 7;
+  const embedded = back.slice(at, at + bytes.length);
+  const a = await decode(jpg);
+  const tmp = new File(projectMediaDir(), `smoke_pdf_img_${Date.now().toString(36)}.jpg`);
+  tmp.write(embedded);
+  const b = await decode(tmp.uri);
+  const d = gridDiff(a, b, a.width(), a.height() - 8);
+  log(!!size && size.width === 1240 && size.height === 1754, 'a valódi telefonos JPEG mérete a fejlécből', `${size?.width}×${size?.height}`);
+  log(head.startsWith('%PDF-1.4') && text.includes('/MediaBox [0 0 595.2 841.92]') && d.bad === 0, 'PDF a telefonon: érvényes, A4-es oldal (150 dpi), a beágyazott kép pixelre a lapé', `${(back.length / 1024).toFixed(0)} KB, ${Date.now() - t0} ms, eltér ${d.bad}/${d.total}`);
+  [jpg, out.uri, tmp.uri].forEach((u) => removeFile(u));
+  setHarness(null);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -11768,6 +11808,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'pdfoffline') {
+    await step(phase, () => smokePdfOffline(log, setHarness));
     return;
   }
   if (phase === 'variant') {

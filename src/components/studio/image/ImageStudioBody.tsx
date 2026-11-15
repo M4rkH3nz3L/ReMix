@@ -78,6 +78,7 @@ import { publishImageProject } from '@/lib/feed';
 import type { ImageShareMode } from '@/lib/imageShare';
 import { ExportCancelled, exportPsd, importPdf, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
 import { ImageRenderRejected, imageDocContentKey, isRenderFresh } from '@/lib/imageExport';
+import { jpegToPdf } from '@/lib/rasterPdf';
 import { chooseImageRenderRoute } from '@/lib/imageRenderRoute';
 import { type ImageWorkspace, railGroups, type ToolKey, selectionMenu } from '@/lib/imageMenu';
 import { registerDevAction } from '@/lib/devActions';
@@ -1800,7 +1801,42 @@ export function ImageStudioBody({
    * 📄 VEKTOR-PDF export: ugyanaz az önálló SVG → a worker Chromiumja nyomdakész
    * PDF-be nyomtatja (`renderSvgPdf` → `/svg/pdf`). A lap pontosan a vászon mérete.
    */
+  // 📄 S14: PDF a TELEFONON — a kész kép (JPEG, doc-felbontáson) egy PDF-oldalon: offline, Free-ben is,
+  // pixelre a vászon, a betűk beégetve. A vektoros PDF a szerveres út (`exportVectorPdf`).
   const exportPdf = async () => {
+    if (!doc || busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const height = Math.min(4096, effectiveCanvas(doc).height);
+      const jpg = await rasterize(doc, { format: 'jpg', quality: 0.92, height });
+      if (!jpg) {
+        alertRenderFail();
+        return;
+      }
+      const pdf = jpegToPdf(await new File(jpg).bytes(), { title: doc.name || project?.name || 'ReMix' });
+      const dir = new Directory(Paths.cache, 'export');
+      if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
+      const out = new File(dir, `${(doc.name || 'image').replace(/[^\p{L}\p{N}_-]+/gu, '_')}.pdf`);
+      if (out.exists) out.delete();
+      out.write(pdf);
+      markExported();
+      const canShare = await Sharing.isAvailableAsync().catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPdf', caught); return false; });
+      if (canShare) {
+        await Sharing.shareAsync(out.uri, { mimeType: 'application/pdf', dialogTitle: t('studio.export') }).catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPdf', caught); });
+      } else {
+        Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
+      }
+    } catch (caught) {
+      logCaught('components/studio/image/ImageStudioBody.tsx:exportPdf', caught);
+      alertRenderFail();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportVectorPdf = async () => {
     if (!doc || busy) {
       return;
     }
@@ -2573,6 +2609,7 @@ export function ImageStudioBody({
             onLayerMenu={onLayerMenu}
             onSvg={() => void exportSvg()}
             onPdf={() => void exportPdf()}
+            onVectorPdf={() => void exportVectorPdf()}
             onPsd={() => void exportPsdFile()}
             canPsd={isPro}
             onVideo={() => void insertIntoVideo()}

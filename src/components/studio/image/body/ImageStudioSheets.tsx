@@ -60,6 +60,7 @@ export function ImageStudioSheets({
   onLayerMenu,
   onSvg,
   onPdf,
+  onVectorPdf,
   onPsd,
   canPsd,
   onVideo,
@@ -92,6 +93,7 @@ export function ImageStudioSheets({
   onLayerMenu: (action: LayerMenuAction) => void;
   onSvg: () => void;
   onPdf: () => void;
+  onVectorPdf: () => void;
   onPsd: () => void;
   /** 🔒 PSD-export Pro-kapu (false → letiltva + upsell) */
   canPsd: boolean;
@@ -199,6 +201,7 @@ export function ImageStudioSheets({
           onPack={onPack}
           onSvg={onSvg}
           onPdf={onPdf}
+          onVectorPdf={onVectorPdf}
           onPsd={onPsd}
           onVideo={onVideo}
           onShareSlideshow={onShareSlideshow}

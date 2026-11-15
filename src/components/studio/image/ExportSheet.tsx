@@ -28,6 +28,7 @@ export function ExportSheet({
   onPack,
   onSvg,
   onPdf,
+  onVectorPdf,
   onPsd,
   onVideo,
   onShareSlideshow,
@@ -44,6 +45,8 @@ export function ExportSheet({
   onPack: (opts: { format: Fmt; quality: number }) => void;
   onSvg: () => void;
   onPdf: () => void;
+  /** 📄 S14: vektoros PDF a szerveren (kijelölhető szöveg) — a sima PDF a telefonon készül */
+  onVectorPdf?: () => void;
   /** 🖼️ réteges .psd export (worker, réteg-megőrzés) — Pro-gated */
   onPsd: () => void;
   onVideo: () => void;
@@ -179,6 +182,20 @@ export function ExportSheet({
         <Ionicons name="document-outline" size={16} color={palette.text} />
         <Text style={styles.secondaryText}>{t('studio.image.exportPdf')}</Text>
       </Pressable>
+      {onVectorPdf ? (
+        <Pressable
+          style={[styles.secondary, busy && styles.disabled]}
+          disabled={busy}
+          onPress={() => {
+            onVectorPdf();
+            onClose();
+          }}
+          accessibilityRole="button"
+        >
+          <Ionicons name="cloud-outline" size={16} color={palette.text} />
+          <Text style={styles.secondaryText}>{t('studio.image.exportPdfVector')}</Text>
+        </Pressable>
+      ) : null}
       {/* 🖼️ réteges PSD-export (worker, réteg-megőrzés) — Pro-gated; free → letiltva + upsell */}
       <Pressable
         style={[styles.secondary, (busy || !canPsd) && styles.disabled]}

@@ -33,10 +33,10 @@ jobs:
           chromium --version
 
       - name: Függőségek (kliens)
-        run: npm ci
+        run: npm ci || (echo '⚠️ npm ci újrapróbálkozás (átmeneti regiszter-hiba?)' && sleep 20 && npm ci)
 
       - name: Függőségek (worker)
-        run: npm ci
+        run: npm ci || (echo '⚠️ npm ci újrapróbálkozás (átmeneti regiszter-hiba?)' && sleep 20 && npm ci)
         working-directory: server
 
       # Az AGENTS.md szerinti ellenőrzések. Bármelyik bukása megállítja a futást.
@@ -71,10 +71,10 @@ jobs:
           cache: npm
 
       - name: Függőségek (kliens)
-        run: npm ci
+        run: npm ci || (echo '⚠️ npm ci újrapróbálkozás (átmeneti regiszter-hiba?)' && sleep 20 && npm ci)
 
       - name: Függőségek (worker)
-        run: npm ci
+        run: npm ci || (echo '⚠️ npm ci újrapróbálkozás (átmeneti regiszter-hiba?)' && sleep 20 && npm ci)
         working-directory: server
 
       # 🔴 KAPU: KRITIKUS sérülékenység → a build bukik. Ma 0 critical (a meglévő
@@ -114,5 +114,5 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci || (echo '⚠️ npm ci újrapróbálkozás (átmeneti regiszter-hiba?)' && sleep 20 && npm ci)
       - run: npx expo-doctor

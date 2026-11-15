@@ -276,7 +276,9 @@ export function TextOverlay({
   const glowCopy = clip.text3d
     ? null
     : clip.textStyle?.glow && clip.textStyle.glow.size > 0
-      ? { color: clip.textStyle.glow.color, radius: Math.max(2, clip.textStyle.glow.size * fontSize * 0.5) }
+      ? clip.textStyle.glow.single
+        ? null
+        : { color: clip.textStyle.glow.color, radius: Math.max(2, clip.textStyle.glow.size * fontSize * 0.5) }
       : (clip.stylePreset ?? 'plain') === 'neon'
         ? { color: clip.color, radius: Math.max(16, fontSize * 0.9) }
         : null;

@@ -59,7 +59,8 @@ export function textEffectStyle(layer: TextLayer, canvas: { width: number; heigh
           },
         }
       : {}),
-    ...(glow ? { glow: { color: glow.color ?? '#7c5cff', size: ((glow.size ?? 0.02) * canvas.width * 2) / fontPx } } : {}),
+    // a réteg-ragyogást a szerver EGY sziluett-rétegként rajzolja → a vászon se tegye alá a második réteget
+    ...(glow ? { glow: { color: glow.color ?? '#7c5cff', size: ((glow.size ?? 0.02) * canvas.width * 2) / fontPx, single: true } } : {}),
   };
 }
 

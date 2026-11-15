@@ -12,6 +12,7 @@ import { GradientEditor } from '@/components/studio/image/GradientEditor';
 import { palette } from '@/constants/editor';
 import { getFilterAmount, hasFilter, IMAGE_FILTER_TYPES, setFilterAmount, toggleFilter } from '@/lib/imageFilters';
 import { clipBaseBelow } from '@/lib/imageClip';
+import { STRAIGHTEN_MAX } from '@/lib/imageStraighten';
 import { assignLayerToGroup, createGroup, updateLayer } from '@/lib/imageDoc';
 import { makeId } from '@/lib/id';
 import { withProjectFont } from '@/lib/projectFonts';
@@ -411,6 +412,18 @@ export function LayerInspector({
               commit(updateLayer<PhotoLayer>(doc, layer.id, { rotation: Math.round(v) }))
             }
             format={(v) => `${Math.round(v)}°`}
+          />
+          {/* 📐 S18: kiegyenesítés — a tartalom a dobozon belül fordul, üres sarok nélkül (0,1°-os lépés) */}
+          <Slider
+            label={t('studio.image.straighten')}
+            value={layer.straighten ?? 0}
+            min={-STRAIGHTEN_MAX}
+            max={STRAIGHTEN_MAX}
+            onChange={(v) => {
+              const deg = Math.round(v * 10) / 10;
+              commit(updateLayer<PhotoLayer>(doc, layer.id, { straighten: Math.abs(deg) < 0.05 ? undefined : deg }), 'straighten');
+            }}
+            format={(v) => `${(Math.round(v * 10) / 10).toFixed(1)}°`}
           />
           {/* 📐 perspektíva / 3D-dőlés (a render ffmpeg perspective-vel, a preview 3D rotate-tel) */}
           <Slider

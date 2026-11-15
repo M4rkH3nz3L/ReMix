@@ -959,7 +959,7 @@ export interface TextStyle {
   /** vetett árnyék: szín + eltolás (em) + életlenség (em) */
   shadow?: { color: string; dx: number; dy: number; blur: number };
   /** külső ragyogás: szín + méret az em arányában (0…1) */
-  glow?: { color: string; size: number };
+  glow?: { color: string; size: number; /** csak a vászon: egyrétegű (a réteg `outerGlow`-jából — a szerver sziluett-ragyogása egy réteg) */ single?: boolean };
   /** háttér-doboz: szín + padding (em) + lekerekítés (em) */
   background?: { color: string; padding: number; radius: number };
 }
@@ -1622,6 +1622,8 @@ export interface PhotoLayer extends ImageLayerBase {
    * (`imageClip.ts`) a forma körvonalából maszkot képez — a vászon és a szerver ugyanazt kapja.
    */
   clipTo?: string;
+  /** 📐 S18: kiegyenesítés — a tartalom elforgatása a dobozon belül (fok, −45…45), üres sarok nélkül */
+  straighten?: number;
   mask?: ClipMask;
   /** 🎯 kijelölés-alapú (lokális) korrekció: a `grade`/`adjust` CSAK a `mask` régión BELÜL hat,
    *  kívül az eredeti marad (a render `maskedmerge`-del keveri). A `mask` vászon-normalizált — a worker

@@ -348,7 +348,36 @@ function innerEffectsFilters(input, output, fx, canvasW, canvasH, tag) {
   return out;
 }
 
+/**
+ * 📐 S18: kiegyenesítés — a doboz-méretű fotó tartalma `deg` fokkal elfordul (pozitív = óramutató szerint)
+ * és középre nagyítva kitölti a dobozt. A kliens `straightenZoom` (`src/lib/imageStraighten.ts`) tükre.
+ * Vezető vesszős szűrő-füzér, vagy üres.
+ */
+function straightenZoom(w, h, deg) {
+  const a = (Math.min(45, Math.abs(Number(deg) || 0)) * Math.PI) / 180;
+  if (a === 0 || w <= 0 || h <= 0) {
+    return 1;
+  }
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return Math.max((w * c + h * s) / w, (w * s + h * c) / h);
+}
+
+function straightenChain(deg, boxW, boxH) {
+  const d = Math.max(-45, Math.min(45, Number(deg) || 0));
+  if (Math.abs(d) < 0.01) {
+    return '';
+  }
+  const k = straightenZoom(boxW, boxH, d);
+  const rad = ((d * Math.PI) / 180).toFixed(6);
+  const sw = Math.ceil(boxW * k / 2) * 2;
+  const sh = Math.ceil(boxH * k / 2) * 2;
+  return `,format=rgba,rotate=${rad}:ow=iw:oh=ih:c=none,scale=${sw}:${sh},crop=${boxW}:${boxH}`;
+}
+
 module.exports = {
+  straightenChain,
+  straightenZoom,
   innerEffectsFilters,
   filterChain,
   oneFilter,

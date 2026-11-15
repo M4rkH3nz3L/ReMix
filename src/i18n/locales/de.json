@@ -3961,6 +3961,7 @@
       "correctionsTitle": "Korrekturen",
       "adjustTitle": "Anpassen",
       "adjustTone": "Ton (PRO)",
+      "straighten": "Begradigen",
       "clipToShape": "In Form darunter beschneiden",
       "clipNeedsShape": "Lege eine Form unter das Foto, um das Foto in ihre Kontur zu schneiden.",
       "looks": {"title": "Looks", "save": "Als Look speichern", "mine": "Mein Look", "removeHint": "Lange drücken zum Löschen", "portrait": "Porträt", "food": "Essen", "landscape": "Landschaft", "bwContrast": "Schwarzweiß", "matte": "Matt", "sunny": "Sonnig", "coldMorning": "Kalter Morgen", "vintage": "Vintage", "cinematic": "Kinolook", "pop": "Pop", "step": {"tone": "Tonwerte", "warm": "Wärmer", "vibrance": "Dynamik", "exposure": "Belichtung", "contrast": "Kontrast", "mono": "Schwarzweiß", "saturation": "Sättigung", "balance": "Farbbalance", "cool": "Kühler", "vignette": "Vignette"}},

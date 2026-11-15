@@ -8779,6 +8779,65 @@ async function smokeClipMask(log: Log, setHarness: (n: ReactNode) => void) {
   removeFile(f.uri);
 }
 
+/** 📐 S18: kiegyenesítés — telefon = szerver, a doboz sarkában nincs üres rész */
+async function smokeStraighten(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  const surface = Skia.Surface.MakeOffscreen(480, 360)!;
+  const paint = Skia.Paint();
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 6; j++) {
+    paint.setColor(Skia.Color(`hsl(${(i * 40 + j * 25) % 360}, 70%, ${35 + j * 6}%)`));
+    surface.getCanvas().drawRect(Skia.XYWHRect(i * 60, j * 60, 60, 60), paint);
+  }
+  surface.flush();
+  const f = new File(projectMediaDir(), `smoke_straight_${Date.now().toString(36)}.png`);
+  f.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const meanDiff = (p: SkImage, q: SkImage) => {
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < 80; i++) for (let j = 0; j < 80; j++) {
+      const u = pixel(p, Math.floor(((j + 0.5) / 80) * p.width()), Math.floor(((i + 0.5) / 80) * p.height()));
+      const w = pixel(q, Math.floor(((j + 0.5) / 80) * q.width()), Math.floor(((i + 0.5) / 80) * q.height()));
+      sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+      n += 1;
+    }
+    return sum / n;
+  };
+  // a fotó a vászon közepén 0,8×0,8-as dobozban, rózsaszín háttér előtt: az üres sarok rózsaszín lenne
+  const doc = (extra: Record<string, unknown>) => ({ id: 'st', name: 'st', aspectRatio: '4:3', width: 480, height: 360, layers: [{ id: 'bg', kind: 'fill', fill: '#ff00ff' }, { id: 'p', kind: 'photo', uri: f.uri, position: { x: 0.5, y: 0.5 }, w: 0.8, h: 0.8, fit: 'stretch', ...extra }] }) as unknown as ImageDoc;
+  const plain = await ref.current!.render(doc({}), 360);
+  for (const deg of [3, -12, 30]) {
+    for (const [name, extra] of [['', {}], [' + korrekció és maszk', { adjust: { saturation: 0.4 }, mask: { shape: 'ellipse', x: 0.5, y: 0.5, w: 0.7, h: 0.7, feather: 0 } }]] as const) {
+      if (name && deg !== -12) continue;
+      const d = doc({ straighten: deg, ...extra });
+      const dev = await ref.current!.render(d, 360);
+      const srv = await renderImageDoc(d, 360);
+      if (!dev || !srv || !plain) {
+        log(false, `${deg}°${name}`, 'nincs kép');
+        continue;
+      }
+      const a = await decode(dev);
+      const b = await decode(srv);
+      const diff = meanDiff(a, b);
+      const ctl = meanDiff(a, await decode(plain));
+      // a doboz sarkai közvetlenül belül (2 px): nem lehet rózsaszín
+      const box = { x0: 48 + 2, y0: 36 + 2, x1: 432 - 3, y1: 324 - 3 };
+      const pink = (img: SkImage) => [[box.x0, box.y0], [box.x1, box.y0], [box.x0, box.y1], [box.x1, box.y1]].filter(([x, y]) => {
+        const p = pixel(img, x, y);
+        return p[0] > 200 && p[1] < 60 && p[2] > 200;
+      }).length;
+      const corners = name ? 0 : pink(a) + pink(b);
+      log(diff <= 6 && ctl > diff * 2 && corners === 0, `${deg}°${name} — telefon = szerver, üres sarok nélkül`, `${diff.toFixed(2)} · ellenpróba (egyenesen) ${ctl.toFixed(2)} /255 · rózsaszín sarok ${corners}`);
+      [dev, srv].forEach((u) => removeFile(u));
+    }
+  }
+  if (plain) removeFile(plain);
+  setHarness(null);
+  removeFile(f.uri);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -12700,6 +12759,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'straighten') {
+    await step(phase, () => smokeStraighten(log, setHarness));
     return;
   }
   if (phase === 'clip') {

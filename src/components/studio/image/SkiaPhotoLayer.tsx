@@ -20,13 +20,14 @@ import {
   useImage,
   vec,
 } from '@shopify/react-native-skia';
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactElement, useEffect, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { File } from 'expo-file-system';
 
 import { selectionSkPath } from '@/components/studio/image/selectionPath';
 import { canvasToLayerBox, maskOutlineInBox } from '@/lib/imageLayerGeometry';
+import { straightenZoom } from '@/lib/imageStraighten';
 import { innerEffectsOf } from '@/lib/innerEffects';
 import { type CubeLut, parseCubeLut } from '@/lib/lutImport';
 import type { ColorFields } from '@/lib/imagePixelPipeline';
@@ -84,6 +85,7 @@ export function makeLutImage(layer: PhotoLayer, after: ColorFields[] = [], n = L
 export function needsSkiaPreview(layer: PhotoLayer, after: ColorFields[] = [], maskedCount = 0): boolean {
   return (
     maskedCount > 0 ||
+    Math.abs(layer.straighten ?? 0) >= 0.01 ||
     // 👾 a pixel-art réteg éles pixelekkel (legközelebbi szomszéd) — a sima kép simítana
     !!layer.pixelArt ||
     hasColorOps(layer, after) ||
@@ -181,6 +183,19 @@ export function PhotoSkiaContent({
     ) : (
       <SkiaImage image={image} x={0} y={0} width={w} height={h} fit={fit} sampling={sampling} />
     );
+  // 📐 S18: kiegyenesítés — a tartalom a doboz közepe körül elfordul és kitöltésig nagyul (a szerver
+  // `straightenChain`-je: a teljes szín/részlet-lánc UTÁN, a lokális korrekció és a maszk ELŐTT)
+  const tilt = layer.straighten ?? 0;
+  const zoom = straightenZoom(w, h, tilt);
+  const straight = (el: ReactElement) =>
+    Math.abs(tilt) < 0.01 ? (
+      el
+    ) : (
+      <Group transform={[{ translateX: w / 2 }, { translateY: h / 2 }, { rotate: (tilt * Math.PI) / 180 }, { scale: zoom }, { translateX: -w / 2 }, { translateY: -h / 2 }]}>
+        {el}
+      </Group>
+    );
+  content = straight(content);
   const blurAmount = layer.filters?.find((f) => f.type === 'blur')?.amount ?? 0;
   if (blurAmount > 0) {
     content = (
@@ -228,12 +243,14 @@ export function PhotoSkiaContent({
         {overlays.map((o, i) =>
           o.lut ? (
             <Mask key={i} mode="luminance" mask={maskElement(o.mask)}>
-              <Rect x={0} y={0} width={w} height={h}>
-                <Shader source={runtime} uniforms={uniforms}>
-                  <ImageShader image={image} fit={fit} rect={{ x: 0, y: 0, width: w, height: h }} sampling={sampling} />
-                  <ImageShader image={o.lut} tx="clamp" ty="clamp" sampling={{ filter: FilterMode.Linear, mipmap: MipmapMode.None }} />
-                </Shader>
-              </Rect>
+              {straight(
+                <Rect x={0} y={0} width={w} height={h}>
+                  <Shader source={runtime} uniforms={uniforms}>
+                    <ImageShader image={image} fit={fit} rect={{ x: 0, y: 0, width: w, height: h }} sampling={sampling} />
+                    <ImageShader image={o.lut} tx="clamp" ty="clamp" sampling={{ filter: FilterMode.Linear, mipmap: MipmapMode.None }} />
+                  </Shader>
+                </Rect>
+              )}
             </Mask>
           ) : null
         )}

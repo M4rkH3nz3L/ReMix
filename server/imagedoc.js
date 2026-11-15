@@ -24,6 +24,7 @@ const {
   levelsFilter,
   channelMixFilter,
   innerEffectsFilters,
+  straightenChain,
 } = require('./imageFilters');
 const { maskGrayChain, maskToBox } = require('./imageMask');
 const { hslCube, isNeutralHsl } = require('./hslBands');
@@ -537,7 +538,7 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       // I18: a tartalom-lánc a réteg SAJÁT (doboz) terében fut; a geometria csak a lokális
       // korrekció UTÁN jön, így a maszk mérete mindig a doboz, nem az elforgatott befoglaló
       filters.push(
-        `[${idx}:v]${fit}${heal},format=rgba${adjustChain(layer)}${hslFrag}${gradeFilterChain(layer.grade)}${lutFrag}${tint}${gmap}${lvl}${chmix}${filterChain(layer.filters)}${dev}[${prepared}]`
+        `[${idx}:v]${fit}${heal},format=rgba${adjustChain(layer)}${hslFrag}${gradeFilterChain(layer.grade)}${lutFrag}${tint}${gmap}${lvl}${chmix}${filterChain(layer.filters)}${dev}${straightenChain(layer.straighten, boxW, boxH)}[${prepared}]`
       );
       const geomIdx = idx;
       idx += 1;

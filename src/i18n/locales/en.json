@@ -3928,6 +3928,7 @@
       "correctionsTitle": "Corrections",
       "adjustTitle": "Adjust",
       "adjustTone": "Tone (PRO)",
+      "straighten": "Straighten",
       "clipToShape": "Clip to shape below",
       "clipNeedsShape": "Put a shape below the photo to clip the photo to its outline.",
       "looks": {"title": "Looks", "save": "Save as look", "mine": "My look", "removeHint": "Long-press to delete", "portrait": "Portrait", "food": "Food", "landscape": "Landscape", "bwContrast": "Black & white", "matte": "Matte", "sunny": "Sunny", "coldMorning": "Cold morning", "vintage": "Vintage", "cinematic": "Cinematic", "pop": "Pop", "step": {"tone": "Tone", "warm": "Warm up", "vibrance": "Vibrance", "exposure": "Exposure", "contrast": "Contrast", "mono": "Black & white", "saturation": "Saturation", "balance": "Color balance", "cool": "Cool down", "vignette": "Vignette"}},

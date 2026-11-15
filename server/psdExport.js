@@ -13,6 +13,9 @@ const { logCaught } = require('./lib/caught');
 // w/h. A pozíció a `psdImport.normBox` FORDÍTOTTJA (0–1 közép+méret → PSD-pixel
 // left/top/right/bottom), a blend a `BLEND_MAP` MEGFORDÍTÁSA (modell → PSD-mód).
 
+const fs = require('fs');
+const path = require('path');
+
 const agPsd = require('ag-psd');
 const { PNG } = require('pngjs');
 
@@ -420,7 +423,25 @@ function resolveCanvas(doc) {
   return { canvasW: W, canvasH: H };
 }
 
+/**
+ * 🖨️ I29 / S15: a route rasztere — minden réteg a /imagedoc renderén megy át, átlátszó, teljes vásznas
+ * PNG-ként (a maszk, a festett maszk is, beleég az alfába); az opacity/blend/rejtettség a PSD-rétegen marad.
+ * A `renderImageDoc` injektált (a teszt és a route ugyanezt a függvényt hívja).
+ */
+function layerRasterizer(doc, workDir, renderImageDoc) {
+  let seq = 0;
+  return async (layer) => {
+    const dir = path.join(workDir, `layer${seq}`);
+    seq += 1;
+    fs.mkdirSync(dir);
+    const one = { ...layer, opacity: 1, blendMode: undefined, hidden: false, groupId: undefined };
+    const single = { ...doc, layers: [one], groups: [], grade: undefined, adjust: undefined, vignette: 0, grain: 0 };
+    return fs.readFileSync(await renderImageDoc(single, doc.height, dir));
+  };
+}
+
 module.exports = {
+  layerRasterizer,
   buildPsdFromImageDoc,
   psdBlendMode,
   docBox,

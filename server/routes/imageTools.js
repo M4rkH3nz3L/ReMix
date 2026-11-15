@@ -21,7 +21,7 @@ const { asTier } = require('../tiers');
 const { activeTier } = require('../billing');
 const { renderImageDoc, resolveRemoteMedia, imageDocGuard } = require('../imagedoc');
 const { parsePsdToImageDoc } = require('../psdImport');
-const { buildPsdFromImageDoc } = require('../psdExport');
+const { buildPsdFromImageDoc, layerRasterizer } = require('../psdExport');
 const { parsePdfToImageDocs } = require('../pdfImport');
 const { safeFetch } = require('../ssrf');
 const { mediaStoreEnabled, uploadMedia, LOCAL_DIR } = require('../mediastore');
@@ -409,15 +409,7 @@ router.post('/psd/export', ...proOnly, uploadImage.any(), mediaGuard('imagedoc')
     await resolveRemoteMedia(doc, workDir, remoteMediaOpts(req));
     // 🖨️ I29: minden réteg a /imagedoc renderén megy át, átlátszó, teljes vásznas PNG-ként —
     // az opacity/blend/rejtettség a PSD-rétegen marad, így Photoshopban is állítható
-    let seq = 0;
-    const rasterizeLayerPng = async (layer) => {
-      const dir = path.join(workDir, `layer${seq}`);
-      seq += 1;
-      fs.mkdirSync(dir);
-      const one = { ...layer, opacity: 1, blendMode: undefined, hidden: false, groupId: undefined };
-      const single = { ...doc, layers: [one], groups: [], grade: undefined, adjust: undefined, vignette: 0, grain: 0 };
-      return fs.readFileSync(await renderImageDoc(single, doc.height, dir));
-    };
+    const rasterizeLayerPng = layerRasterizer(doc, workDir, renderImageDoc);
     const fetchLayerPng = async () => null; // a rasterizáló fedi a fotókat is
 
     const psdBuf = await buildPsdFromImageDoc(doc, { fetchLayerPng, rasterizeLayerPng });

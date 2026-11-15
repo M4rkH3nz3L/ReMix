@@ -43,6 +43,7 @@ import { TemplatesSheet } from '@/components/studio/image/TemplatesSheet';
 import { docFromTemplate, IMAGE_TEMPLATES, templateFromDoc } from '@/lib/imageTemplates';
 import { addImageDocToVideo } from '@/lib/imageToVideo';
 import { variantDoc } from '@/lib/imageVariants';
+import { brandLogoLayer } from '@/lib/imageBrand';
 import { applyImageCommands, parseImageIntent } from '@/lib/imageIntent';
 import { logCaught } from '@/lib/logCaught';
 import { ExportCancelled } from '@/lib/imageDocClient';
@@ -7792,6 +7793,60 @@ async function smokeBrandLogo(log: Log) {
   }
 }
 
+/**
+ * 📐 IMAGE-PROD S12 (DS4): reszponzív változat — a YouTube-indexkép (logóval) story-ként kézi igazítás
+ * nélkül: a logó a sarokban, a szöveg nem ér a szélekhez; a telefonos kép = a szerveres.
+ */
+async function smokeVariant(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  const surface = Skia.Surface.MakeOffscreen(120, 120)!;
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color('#20d060'));
+  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, 120, 120), paint);
+  surface.flush();
+  const logoFile = new File(projectMediaDir(), `smoke_variant_logo_${Date.now().toString(36)}.png`);
+  logoFile.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  let n = 0;
+  const tpl = IMAGE_TEMPLATES.find((x) => x.key === 'youtubeThumb')!;
+  const thumb = docFromTemplate(tpl, 'yt', () => `t${++n}`);
+  const withLogo = { ...thumb, layers: [...thumb.layers, brandLogoLayer(logoFile.uri, 'logo', { width: 1280, height: 720 })] } as ImageDoc;
+  for (const [name, W, H] of [['story', 1080, 1920], ['poszt', 1080, 1080], ['banner', 1500, 500]] as const) {
+    const v = variantDoc(withLogo, W, H, name, () => `v${++n}`);
+    const h = 640;
+    const uri = await ref.current!.render(v, h);
+    if (!uri) {
+      log(false, `változat: ${name}`, 'nincs kép');
+      continue;
+    }
+    const img = await decode(uri);
+    const [w, hh] = [img.width(), img.height()];
+    // a logó: zöld a jobb alsó sarokban
+    const lg = v.layers.find((l) => l.id !== undefined && l.kind === 'photo') as PhotoLayer;
+    const p = pixel(img, Math.round(lg.position.x * w), Math.round(lg.position.y * hh));
+    const corner = 1 - (lg.position.x + lg.w / 2) < 0.06 && 1 - (lg.position.y + lg.h / 2) < 0.06;
+    // a fehér szöveg nem ér a szélekhez (2%-os sáv)
+    let edge = 0;
+    for (let x = 0; x < w; x += 2) for (const y of [1, hh - 2]) { const q = pixel(img, x, y); if (q[0] > 230 && q[1] > 230 && q[2] > 230) edge += 1; }
+    for (let y = 0; y < hh; y += 2) for (const x of [1, w - 2]) { const q = pixel(img, x, y); if (q[0] > 230 && q[1] > 230 && q[2] > 230) edge += 1; }
+    const srv = await renderImageDoc(v, h);
+    let parity = '—';
+    let parityOk = true;
+    if (srv) {
+      const d = gridDiff(img, await decode(srv), w, Math.round(hh * 0.85));
+      parity = `${d.bad}/${d.total}`;
+      parityOk = d.bad / d.total <= 0.06;
+      removeFile(srv);
+    }
+    log(corner && p[1] > 180 && p[0] < 80 && edge === 0 && parityOk, `változat ${name} ${W}×${H}: a logó a sarokban, a szöveg nem ér a szélhez, telefon = szerver`, `logó ${p.slice(0, 3).join(',')}, szélen ${edge} fehér pont, eltér ${parity}`);
+    removeFile(uri);
+  }
+  setHarness(null);
+  removeFile(logoFile.uri);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -11713,6 +11768,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'variant') {
+    await step(phase, () => smokeVariant(log, setHarness));
     return;
   }
   if (phase === 'brandlogo') {

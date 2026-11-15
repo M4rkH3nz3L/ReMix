@@ -39,7 +39,7 @@ export function healRegionFromPoints(
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 
-type Placed = Pick<PhotoLayer, 'position' | 'w' | 'h' | 'rotation' | 'flipH' | 'flipV'>;
+export type Placed = Pick<PhotoLayer, 'position' | 'w' | 'h' | 'rotation' | 'flipH' | 'flipV'>;
 
 /** A `canvasToLayerBox` inverze: a réteg saját 0–1 pontja → vászon-normalizált pont. */
 export function layerBoxToCanvas(point: { x: number; y: number }, layer: Placed, canvas: { width: number; height: number }): { x: number; y: number } {

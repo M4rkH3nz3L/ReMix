@@ -1,6 +1,8 @@
 import { effectiveCanvas, nearestAspect } from '@/lib/canvasPresets';
+import type { Placed } from '@/lib/imageLayerGeometry';
 import { textSize } from '@/lib/imageLayerLayout';
-import type { ImageDoc, ImageLayer, TextLayer } from '@/types/project';
+import { followLayerMask } from '@/lib/imageSelectionOps';
+import type { ImageDoc, ImageLayer, PhotoLayer, TextLayer } from '@/types/project';
 
 /**
  * 📐 Méretváltozat egy tervből (pure) — reszponzív átméretezés (IMAGE-PROD S12 · PRO-DESIGN DS4).
@@ -92,6 +94,19 @@ export function adaptLayer(layer: ImageLayer, from: Size, to: Size): ImageLayer 
   return { ...layer, w: nw / to.width, h: nh / to.height, position: { x: nx / to.width, y: ny / to.height } } as ImageLayer;
 }
 
+/** a réteg maszkjai az új lapon is a rétegen ugyanott (S15): a régi réteg terén át az új helyre */
+function withMasks(layer: ImageLayer, next: ImageLayer, from: Size, to: Size): ImageLayer {
+  const { mask, localAdjust } = layer as PhotoLayer;
+  if ((!mask && !localAdjust?.mask) || !('position' in layer) || !layer.position) return next;
+  const a = layer as unknown as Placed;
+  const b = next as unknown as Placed;
+  return {
+    ...next,
+    ...(mask ? { mask: followLayerMask(mask, a, b, from, to) } : {}),
+    ...(localAdjust?.mask ? { localAdjust: { ...localAdjust, mask: followLayerMask(localAdjust.mask, a, b, from, to) } } : {}),
+  } as ImageLayer;
+}
+
 /** Új lap a megadott méretben, saját azonosítókkal: az eredeti érintetlen marad. */
 export function variantDoc(doc: ImageDoc, width: number, height: number, name: string, makeId: () => string): ImageDoc {
   const from = effectiveCanvas(doc);
@@ -108,6 +123,6 @@ export function variantDoc(doc: ImageDoc, width: number, height: number, name: s
     thumbUri: undefined,
     thumbKey: undefined,
     guides: undefined,
-    layers: doc.layers.map((l) => ({ ...adaptLayer(l, from, to), id: makeId() })),
+    layers: doc.layers.map((l) => ({ ...withMasks(l, adaptLayer(l, from, to), from, to), id: makeId() })),
   };
 }

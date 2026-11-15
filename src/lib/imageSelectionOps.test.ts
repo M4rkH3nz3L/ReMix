@@ -1,7 +1,7 @@
 import { docMediaUris, updateLayer } from '@/lib/imageDoc';
 import { imageDocMediaRefs, relinkImageDocs } from '@/lib/imageDocMedia';
-import { imageCornersOnCanvas } from '@/lib/imageLayerGeometry';
-import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection, selectionTarget, shiftMask } from '@/lib/imageSelectionOps';
+import { canvasToLayerBox, imageCornersOnCanvas } from '@/lib/imageLayerGeometry';
+import { adjustSelection, copySelectionToLayer, deleteSelection, followLayerMask, maskFromSelection, selectionTarget, shiftMask } from '@/lib/imageSelectionOps';
 import { applyRing, invertSelection, rectRing, type Selection, selectionContains } from '@/lib/selection';
 import type { ClipMask, ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
 
@@ -90,6 +90,72 @@ describe('a maszk követi a réteget', () => {
   it('más módosítás nem mozdítja a maszkot', () => {
     const d = updateLayer<PhotoLayer>(doc(photo('a', { mask: m })), 'a', { opacity: 0.5 });
     expect((d.layers[0] as PhotoLayer).mask).toBe(m);
+  });
+});
+
+describe('S15: a maszk a réteg méretezését, forgatását és tükrözését is követi', () => {
+  const canvas = { width: 1000, height: 500 };
+  const base = { position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5, rotation: 0 };
+  const rect: ClipMask = { shape: 'rectangle', x: 0.6, y: 0.5, w: 0.1, h: 0.2 };
+  // a maszk a réteg saját terében ugyanott marad (ez a „követés”)
+  const local = (mask: ClipMask, layer: typeof base & { flipH?: boolean }) =>
+    (mask.points ?? [{ x: mask.x, y: mask.y }]).map((p) => canvasToLayerBox(p, layer, canvas));
+
+  it('méretezés: a téglalap téglalap marad, a réteggel arányosan nő', () => {
+    const to = { ...base, w: 1 };
+    const r = followLayerMask(rect, base, to, canvas);
+    expect(r.shape).toBe('rectangle');
+    expect(r.x).toBeCloseTo(0.7);
+    expect(r.w).toBeCloseTo(0.2);
+    expect(r.h).toBeCloseTo(0.2);
+  });
+
+  it('forgatás: a téglalap poligon lesz, a réteg terében ugyanott', () => {
+    const to = { ...base, rotation: 30 };
+    const r = followLayerMask(rect, base, to, canvas);
+    expect(r.shape).toBe('polygon');
+    expect(r.points).toHaveLength(4);
+    const before = [{ x: 0.55, y: 0.4 }].map((p) => canvasToLayerBox(p, base, canvas))[0];
+    const after = canvasToLayerBox(r.points![0], to, canvas);
+    expect(after.x).toBeCloseTo(before.x);
+    expect(after.y).toBeCloseTo(before.y);
+  });
+
+  it('az ellipszis forgatva 48 pontos poligon (mint a szerveren)', () => {
+    const r = followLayerMask({ ...rect, shape: 'ellipse' }, base, { ...base, rotation: 45 }, canvas);
+    expect(r.shape).toBe('polygon');
+    expect(r.points).toHaveLength(48);
+  });
+
+  it('poligon és kijelölés-műveletek: minden pont a réteg terében marad', () => {
+    const poly: ClipMask = { shape: 'polygon', x: 0.5, y: 0.5, w: 0.2, h: 0.2, points: [{ x: 0.45, y: 0.45 }, { x: 0.6, y: 0.4 }, { x: 0.55, y: 0.6 }], ops: [{ op: 'add', points: [{ x: 0.45, y: 0.45 }, { x: 0.6, y: 0.4 }, { x: 0.55, y: 0.6 }] }] };
+    const to = { ...base, position: { x: 0.4, y: 0.6 }, w: 0.7, rotation: -20, flipH: true };
+    const r = followLayerMask(poly, base, to, canvas);
+    const a = local(poly, base);
+    const b = local(r, to);
+    a.forEach((p, i) => {
+      expect(b[i].x).toBeCloseTo(p.x);
+      expect(b[i].y).toBeCloseTo(p.y);
+    });
+    const op = canvasToLayerBox(r.ops![0].points[1], to, canvas);
+    expect(op.x).toBeCloseTo(a[1].x);
+  });
+
+  it('a festett maszk képe megmarad; forgatásnál a középpontja és a mérete követ', () => {
+    const painted: ClipMask = { ...rect, image: 'file:///m.png' };
+    const r = followLayerMask(painted, base, { ...base, rotation: 90, w: 1 }, canvas);
+    expect(r.image).toBe('file:///m.png');
+    expect(r.shape).toBe('rectangle');
+    expect(r.w).toBeCloseTo(0.2);
+  });
+
+  it('updateLayer: forgatás és méretezés viszi a maszkot, a saját maszkot író módosítás nem', () => {
+    const d = { ...doc(photo('a', { ...base, mask: rect })), width: 1000, height: 500 } as ImageDoc;
+    const rot = updateLayer<PhotoLayer>(d, 'a', { rotation: 90 });
+    expect((rot.layers[0] as PhotoLayer).mask!.shape).toBe('polygon');
+    const own: ClipMask = { shape: 'ellipse', x: 0.5, y: 0.5, w: 0.3, h: 0.3 };
+    const set = updateLayer<PhotoLayer>(d, 'a', { rotation: 90, mask: own });
+    expect((set.layers[0] as PhotoLayer).mask).toBe(own);
   });
 });
 

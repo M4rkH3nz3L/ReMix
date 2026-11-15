@@ -1,6 +1,8 @@
 import { t as tr } from 'i18next';
 
-import { shiftMask } from '@/lib/imageSelectionOps';
+import { effectiveCanvas } from '@/lib/canvasPresets';
+import { followLayerMask } from '@/lib/imageSelectionOps';
+import type { Placed } from '@/lib/imageLayerGeometry';
 import type { AspectRatio, ImageDoc, ImageGroup, ImageLayer, PhotoLayer } from '@/types/project';
 
 /**
@@ -118,18 +120,34 @@ export function removeLayer(doc: ImageDoc, id: string): ImageDoc {
  * hívás helyén MÁR SZŰKÍTETT rétegtípusból következtethető, így a patch valódi
  * típusellenőrzést kap az assertion helyett.
  */
-/** Mozgatásnál a réteg maszkjai vele mennek, ha a módosítás nem ír saját maszkot. */
-function followMasks(layer: ImageLayer, patch: Partial<ImageLayer>): Partial<PhotoLayer> {
-  const from = (layer as { position?: { x: number; y: number } }).position;
-  const to = (patch as { position?: { x: number; y: number } }).position;
+/** a vászon arányai a maszk-követéshez (hiányos dokumentumon négyzet) */
+function maskCanvas(doc: ImageDoc): { width: number; height: number } {
+  const c = doc.aspectRatio || (doc.width && doc.height) ? effectiveCanvas(doc) : { width: 1, height: 1 };
+  return Number.isFinite(c.width) && Number.isFinite(c.height) && c.width > 0 && c.height > 0 ? c : { width: 1, height: 1 };
+}
+
+const PLACEMENT = ['position', 'w', 'h', 'rotation', 'flipH', 'flipV'] as const;
+
+/**
+ * Mozgatásnál, méretezésnél, forgatásnál és tükrözésnél a réteg maszkjai vele mennek (S15), ha a
+ * módosítás nem ír saját maszkot.
+ */
+function followMasks(layer: ImageLayer, patch: Partial<ImageLayer>, canvas: { width: number; height: number }): Partial<PhotoLayer> {
   const { mask, localAdjust } = layer as PhotoLayer;
-  if (!from || !to || (from.x === to.x && from.y === to.y) || 'mask' in patch) {
+  const from = layer as unknown as Placed;
+  if ((!mask && !localAdjust?.mask) || !from.position || 'mask' in patch) {
     return {};
   }
-  const [dx, dy] = [to.x - from.x, to.y - from.y];
+  const to = { ...from, ...(patch as Partial<Placed>) };
+  const moved = PLACEMENT.some((k) => k in patch && JSON.stringify(to[k]) !== JSON.stringify(from[k]));
+  if (!moved || !to.position) {
+    return {};
+  }
   return {
-    ...(mask ? { mask: shiftMask(mask, dx, dy) } : {}),
-    ...(localAdjust?.mask ? { localAdjust: { ...localAdjust, mask: shiftMask(localAdjust.mask, dx, dy) } } : {}),
+    ...(mask ? { mask: followLayerMask(mask, from, to, canvas) } : {}),
+    ...(localAdjust?.mask && !('localAdjust' in patch)
+      ? { localAdjust: { ...localAdjust, mask: followLayerMask(localAdjust.mask, from, to, canvas) } }
+      : {}),
   };
 }
 
@@ -144,7 +162,7 @@ export function updateLayer<L extends ImageLayer = ImageLayer>(
       return l;
     }
     changed = true;
-    return { ...l, ...followMasks(l, patch), ...patch } as ImageLayer;
+    return { ...l, ...followMasks(l, patch, maskCanvas(doc)), ...patch } as ImageLayer;
   });
   return changed ? { ...doc, layers, renderedUri: undefined } : doc;
 }

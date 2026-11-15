@@ -4,6 +4,7 @@ import { addImageDocToVideo } from '@/lib/imageToVideo';
 import { createEmptyProject } from '@/lib/projectUtils';
 import { brandLogoLayer } from '@/lib/imageBrand';
 import { textSize as textSizeOf } from '@/lib/imageLayerLayout';
+import { canvasToLayerBox } from '@/lib/imageLayerGeometry';
 import { adaptLayer, anchorOf, variantDoc } from '@/lib/imageVariants';
 import type { ImageClip, ImageDoc, ImageLayer, PhotoLayer, ShapeLayer, TextLayer } from '@/types/project';
 
@@ -120,5 +121,22 @@ describe('📐 S12: reszponzív változat (horgonyok)', () => {
     expect(l.h).toBe(1);
     expect(l.position.y).toBe(0.5);
     expect(l.position.x + l.w / 2).toBeCloseTo(1, 5); // a jobb szélhez tapadt (a margó 0 volt)
+  });
+});
+
+describe('S15: a maszk a méretváltozatban is a rétegen marad', () => {
+  it('a fotó maszkja a réteg saját terében ugyanott van az új lapon', () => {
+    const mask = { shape: 'polygon' as const, x: 0.3, y: 0.3, w: 0.1, h: 0.1, points: [{ x: 0.25, y: 0.25 }, { x: 0.35, y: 0.25 }, { x: 0.3, y: 0.35 }] };
+    const photo = { kind: 'photo', id: 'p', uri: 'a.png', position: { x: 0.3, y: 0.3 }, w: 0.3, h: 0.3, mask } as unknown as ImageLayer;
+    const doc = { id: 'd', name: 'd', aspectRatio: '1:1', width: 1080, height: 1080, layers: [photo] } as unknown as ImageDoc;
+    let n = 0;
+    const v = variantDoc(doc, 1080, 1920, 'story', () => `id${n++}`);
+    const moved = v.layers[0] as PhotoLayer;
+    mask.points.forEach((p, i) => {
+      const before = canvasToLayerBox(p, photo as PhotoLayer, from);
+      const after = canvasToLayerBox(moved.mask!.points![i], moved, to);
+      expect(after.x).toBeCloseTo(before.x);
+      expect(after.y).toBeCloseTo(before.y);
+    });
   });
 });

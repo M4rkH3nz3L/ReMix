@@ -1,3 +1,4 @@
+import { type Placed, canvasToLayerBox, layerBoxToCanvas } from '@/lib/imageLayerGeometry';
 import { type Selection, type SelectionOp, maskWithout, selectionToMask } from '@/lib/selection';
 import type { ClipMask, ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
 
@@ -68,6 +69,66 @@ export function selectionTarget(doc: ImageDoc, selectedId: string | null): strin
   }
   const photos = doc.layers.filter((l) => l.kind === 'photo' && !l.hidden);
   return photos[photos.length - 1]?.id ?? null;
+}
+
+const turn = (deg: number | undefined) => ((((deg ?? 0) % 360) + 360) % 360);
+
+/** téglalap / ellipszis körvonala (vászon-normalizált) — a szerver `outlinePoints`-ával azonos (48 pont) */
+function outline(mask: ClipMask): { x: number; y: number }[] {
+  const rx = mask.w / 2;
+  const ry = mask.h / 2;
+  if (mask.shape === 'ellipse') {
+    return Array.from({ length: 48 }, (_, i) => {
+      const a = (i / 48) * Math.PI * 2;
+      return { x: mask.x + rx * Math.cos(a), y: mask.y + ry * Math.sin(a) };
+    });
+  }
+  return [
+    { x: mask.x - rx, y: mask.y - ry },
+    { x: mask.x + rx, y: mask.y - ry },
+    { x: mask.x + rx, y: mask.y + ry },
+    { x: mask.x - rx, y: mask.y + ry },
+  ];
+}
+
+function bbox(points: { x: number; y: number }[]) {
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: x1 - x0, h: y1 - y0 };
+}
+
+/**
+ * S15: a maszk a réteggel együtt mozog, méreteződik, forog és tükröződik — a vászon-pontokat a régi
+ * réteg saját terébe, onnan az új réteg helyére vetíti. Ha a leképezés nem tengelyes (forgatás,
+ * vagy elforgatott réteg nyújtása), a téglalap / ellipszis poligon lesz (mint a szerver `maskToBox`-a).
+ * A festett maszk (kép a dobozában) forgatást nem tud: a középpontja és a mérete követ, a szöge nem.
+ * `toCanvas`: ha a réteg más méretű lapra kerül (méretváltozat), annak a vászna.
+ */
+export function followLayerMask(
+  mask: ClipMask,
+  from: Placed,
+  to: Placed,
+  canvas: { width: number; height: number },
+  toCanvas: { width: number; height: number } = canvas
+): ClipMask {
+  const map = (p: { x: number; y: number }) => layerBoxToCanvas(canvasToLayerBox(p, from, canvas), to, toCanvas);
+  const axisAligned =
+    turn(from.rotation) === turn(to.rotation) && turn(to.rotation) % 90 === 0 && !!from.flipH === !!to.flipH && !!from.flipV === !!to.flipV;
+  const ops = mask.ops?.map((o) => ({ ...o, points: o.points.map(map) }));
+  if (mask.shape === 'polygon' && mask.points?.length) {
+    const points = mask.points.map(map);
+    return { ...mask, ...bbox(points), points, ops };
+  }
+  if (axisAligned || mask.image) {
+    // tengelyes leképezés: a doboz sarkai a doboz sarkaira esnek → a paraméteres alak megmarad
+    const box = mask.image && !axisAligned
+      ? { ...map({ x: mask.x, y: mask.y }), w: mask.w * (to.w / Math.max(from.w, 1e-6)), h: mask.h * (to.h / Math.max(from.h, 1e-6)) }
+      : bbox(outline({ ...mask, shape: 'rectangle' }).map(map));
+    return { ...mask, ...box, ops };
+  }
+  const points = outline(mask).map(map);
+  return { ...mask, ...bbox(points), shape: 'polygon', points, ops };
 }
 
 /** A réteg mozgatásakor a maszkja vele megy, különben a kivágott tartalom kicsúszna belőle. */

@@ -200,7 +200,7 @@ import Constants from 'expo-constants';
 import { deleteProject, listProjects, loadProject, loadVersions, readRecovery, recoveryIsFresher, saveProjectAndEvents, saveProject, writeRecovery, clearRecovery } from '@/lib/storage';
 import { findMissingMedia } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
-import type { AudioClip, AudioFx, ImageClip, VideoClip, ImageDoc, ImageLayer, PhotoLayer, Project, ShapeLayer } from '@/types/project';
+import type { AudioClip, AudioFx, ClipMask, ImageClip, VideoClip, ImageDoc, ImageLayer, PhotoLayer, Project, ShapeLayer } from '@/types/project';
 
 type Log = (ok: boolean | null, name: string, detail?: string) => void;
 
@@ -8088,6 +8088,74 @@ async function smokeLeading(log: Log, setHarness: (n: ReactNode) => void) {
   setHarness(null);
 }
 
+/** 🎭 S15: a maszk a réteg forgatását és méretezését is követi — telefon = szerver, a látható rész a rétegen marad */
+async function smokeMaskFollow(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  const surface = Skia.Surface.MakeOffscreen(200, 200)!;
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color('#e0e0e0'));
+  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, 200, 200), paint);
+  surface.flush();
+  const f = new File(projectMediaDir(), `smoke_mfollow_${Date.now().toString(36)}.png`);
+  f.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  // a látható (világos) képpontok aránya és súlypontja
+  const lit = (img: SkImage) => {
+    let n = 0;
+    let sx = 0;
+    let sy = 0;
+    const N = 120;
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const p = pixel(img, Math.floor(((j + 0.5) / N) * img.width()), Math.floor(((i + 0.5) / N) * img.height()));
+      if (p[0] > 150) { n += 1; sx += j / N; sy += i / N; }
+    }
+    return { area: n / (N * N), cx: n ? sx / n : 0, cy: n ? sy / n : 0 };
+  };
+  const meanDiff = (p: SkImage, q: SkImage) => {
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < 80; i++) for (let j = 0; j < 80; j++) {
+      const u = pixel(p, Math.floor(((j + 0.5) / 80) * p.width()), Math.floor(((i + 0.5) / 80) * p.height()));
+      const w = pixel(q, Math.floor(((j + 0.5) / 80) * q.width()), Math.floor(((i + 0.5) / 80) * q.height()));
+      sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+      n += 1;
+    }
+    return sum / n;
+  };
+  const bg = { id: 'bg', kind: 'fill', fill: '#203040' } as unknown as ImageLayer;
+  const MASKS: [string, ClipMask][] = [
+    ['ellipszis', { shape: 'ellipse', x: 0.55, y: 0.45, w: 0.2, h: 0.12, feather: 0 }],
+    ['téglalap', { shape: 'rectangle', x: 0.45, y: 0.55, w: 0.18, h: 0.1, feather: 0 }],
+  ];
+  for (const [mname, mask] of MASKS) {
+    const base = { id: 'mf', name: 'mf', aspectRatio: '16:9', width: 640, height: 360, layers: [bg, { id: 'p', kind: 'photo', uri: f.uri, position: { x: 0.5, y: 0.5 }, w: 0.4, h: 0.5, fit: 'stretch', mask }] } as unknown as ImageDoc;
+    const before = lit(await decode((await ref.current!.render(base, 360))!));
+    const moved = updateLayer<PhotoLayer>(updateLayer<PhotoLayer>(base, 'p', { rotation: 35 }), 'p', { w: 0.6 });
+    const stuck = { ...moved, layers: [bg, { ...(moved.layers[1] as PhotoLayer), mask }] } as ImageDoc;
+    const dev = await ref.current!.render(moved, 360);
+    const srv = await renderImageDoc(moved, 360);
+    const old = await ref.current!.render(stuck, 360);
+    if (!dev || !srv || !old) {
+      log(false, mname, 'nincs kép');
+      continue;
+    }
+    const a = await decode(dev);
+    const d = meanDiff(a, await decode(srv));
+    const ctl = meanDiff(a, await decode(old));
+    log(d <= 6 && ctl > d * 2, `${mname}: forgatott + nyújtott réteg — telefon = szerver`, `${d.toFixed(2)} · ellenpróba (a maszk nem követ) ${ctl.toFixed(2)} /255`);
+    // a látható rész a réteggel nő (a szélesség 1,5×), és a réteg közepéhez képest ugyanott forog
+    const after = lit(a);
+    const ratio = after.area / Math.max(before.area, 1e-6);
+    const m2 = (moved.layers[1] as PhotoLayer).mask!;
+    log(Math.abs(ratio - 1.5) < 0.15, `${mname}: a látható rész a réteggel nő (1,5×)`, `${ratio.toFixed(2)}× · súlypont ${after.cx.toFixed(3)},${after.cy.toFixed(3)} · maszk ${m2.shape} ${m2.x.toFixed(3)},${m2.y.toFixed(3)}`);
+    [dev, srv, old].forEach((u) => removeFile(u));
+  }
+  setHarness(null);
+  removeFile(f.uri);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -12009,6 +12077,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'maskfollow') {
+    await step(phase, () => smokeMaskFollow(log, setHarness));
     return;
   }
   if (phase === 'leading') {

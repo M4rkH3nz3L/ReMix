@@ -39,7 +39,7 @@ function content(layer: ImageLayer) {
       return <Image source={{ uri: layer.uri }} style={StyleSheet.absoluteFill} contentFit={layer.fit === 'contain' ? 'contain' : 'cover'} recyclingKey={layer.uri} />;
     case 'text':
       return (
-        <Text style={[styles.text, { color: layer.color, fontFamily: layer.fontFamily }]} numberOfLines={1}>
+        <Text maxFontSizeMultiplier={1.3} style={[styles.text, { color: layer.color, fontFamily: layer.fontFamily }]} numberOfLines={1}>
           {layer.text.trim().slice(0, 2) || 'T'}
         </Text>
       );

@@ -30,7 +30,7 @@ export function LayerMenuSheet({ layer, onPick, onClose }: { layer: ImageLayer; 
         {layerMenuActions(layer).map((action) => (
           <Pressable key={action} testID={`layer-menu-${action}`} style={styles.row} onPress={() => onPick(action)} accessibilityRole="button">
             <Ionicons name={ICONS[action]} size={22} color={action === 'delete' ? palette.danger : palette.text} />
-            <Text style={[styles.label, action === 'delete' ? styles.danger : null]}>{t(`studio.image.layerMenu.${action}`)}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={[styles.label, action === 'delete' ? styles.danger : null]}>{t(`studio.image.layerMenu.${action}`)}</Text>
           </Pressable>
         ))}
       </View>

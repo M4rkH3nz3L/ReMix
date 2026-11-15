@@ -47,13 +47,13 @@ export function ImageStudioToolbar({
       >
         {groups.map((group, gi) => (
           <View key={group.labelKey} style={styles.group}>
-            <Text style={styles.groupLabel} numberOfLines={1}>
+            <Text maxFontSizeMultiplier={1.3} style={styles.groupLabel} numberOfLines={1}>
               {t(group.labelKey)}
             </Text>
             {group.tools.map((key) => (
               <Pressable key={key} style={styles.tool} onPress={() => onTool(key)} accessibilityRole="button" accessibilityLabel={t(toolLabelKey(key))}>
                 <Ionicons name={TOOL_ICONS[key] as keyof typeof Ionicons.glyphMap} size={22} color={palette.textDim} />
-                <Text style={styles.toolLabel} numberOfLines={2}>
+                <Text maxFontSizeMultiplier={1.3} style={styles.toolLabel} numberOfLines={2}>
                   {t(toolLabelKey(key))}
                 </Text>
               </Pressable>

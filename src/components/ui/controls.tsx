@@ -37,7 +37,7 @@ export function Chip({
       ]}
     >
       {leading}
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+      <Text style={[styles.chipText, active && styles.chipTextActive]} maxFontSizeMultiplier={1.3}>{label}</Text>
     </Pressable>
   );
 }

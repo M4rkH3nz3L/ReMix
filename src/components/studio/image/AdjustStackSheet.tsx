@@ -175,13 +175,13 @@ export function AdjustStackSheet({
             }
           >
             <Ionicons name="refresh-outline" size={15} color={palette.text} />
-            <Text style={styles.resetText}>{t('studio.image.adjustStack.reset')}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.resetText}>{t('studio.image.adjustStack.reset')}</Text>
           </Pressable>
         ) : undefined
       }
     >
       {/* 🎞️ S17: lookok — a verem + színenkénti HSL kész beállítása (utána minden lépése állítható) */}
-      <Text style={styles.section}>{t('studio.image.looks.title')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('studio.image.looks.title')}</Text>
       <View style={styles.chipRow}>
         {IMAGE_LOOKS.map((look) => (
           <Chip key={look.key} label={t(look.name)} active={false} onPress={() => applyLookToLayer(look)} />
@@ -198,19 +198,19 @@ export function AdjustStackSheet({
             accessibilityHint={t('studio.image.looks.removeHint')}
           >
             <Ionicons name="bookmark" size={14} color={palette.accent} />
-            <Text style={styles.addChipText}>{look.name}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.addChipText}>{look.name}</Text>
           </Pressable>
         ))}
         {stack.length > 0 || layer.hsl ? (
           <Pressable style={styles.addChip} onPress={saveLook} accessibilityRole="button">
             <Ionicons name="bookmark-outline" size={15} color={palette.accent} />
-            <Text style={styles.addChipText}>{t('studio.image.looks.save')}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.addChipText}>{t('studio.image.looks.save')}</Text>
           </Pressable>
         ) : null}
       </View>
 
       {/* 🎨 szűrők (gyors preset — a stacktől független filterId) */}
-      <Text style={styles.section}>{t('studio.image.filter')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('studio.image.filter')}</Text>
       <View style={styles.chipRow}>
         {FILTERS.map((f) => (
           <Chip
@@ -231,7 +231,7 @@ export function AdjustStackSheet({
       </View>
 
       {/* ➕ korrekció hozzáadása */}
-      <Text style={styles.section}>{t('studio.image.adjustStack.add')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('studio.image.adjustStack.add')}</Text>
       <View style={styles.chipRow}>
         {ADD_ENTRIES.map((e) => (
           <Pressable
@@ -240,14 +240,14 @@ export function AdjustStackSheet({
             onPress={() => commitStack(addAdjustment(stack, createAdjustment(e.kind, { ...e.seed }, t(e.nameKey))))}
           >
             <Ionicons name={e.icon} size={15} color={palette.accent} />
-            <Text style={styles.addChipText}>{t(e.nameKey)}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.addChipText}>{t(e.nameKey)}</Text>
           </Pressable>
         ))}
       </View>
 
       {/* 🗂️ a verem (fölül a legfölső réteg) */}
       {stack.length === 0 ? (
-        <Text style={styles.empty}>{t('studio.image.adjustStack.empty')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.empty}>{t('studio.image.adjustStack.empty')}</Text>
       ) : (
         <View style={{ gap: 10 }}>
           {[...stack]
@@ -259,7 +259,7 @@ export function AdjustStackSheet({
                 <View key={l.id} style={[styles.card, !l.enabled ? styles.cardOff : null]}>
                   <View style={styles.cardHead}>
                     <Ionicons name={KIND_ICON[l.kind] ?? 'options-outline'} size={16} color={palette.accent} />
-                    <Text style={styles.cardName} numberOfLines={1}>
+                    <Text maxFontSizeMultiplier={1.3} style={styles.cardName} numberOfLines={1}>
                       {l.name}
                     </Text>
                     <IconBtn

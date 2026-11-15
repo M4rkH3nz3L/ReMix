@@ -34,8 +34,8 @@ export function GeometryFields({
   };
   const field = (key: keyof LayerBoxPx, label: string) => (
     <View style={styles.field} key={`${key}-${box[key]}`}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
+      <Text maxFontSizeMultiplier={1.3} style={styles.label}>{label}</Text>
+      <TextInput maxFontSizeMultiplier={1.3}
         defaultValue={String(box[key])}
         onEndEditing={(e) => set(key, e.nativeEvent.text)}
         keyboardType="numbers-and-punctuation"

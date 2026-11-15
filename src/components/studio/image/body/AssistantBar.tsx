@@ -46,7 +46,7 @@ export function AssistantBar({
         <Pressable onPress={onClose} style={styles.icon} hitSlop={4} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={18} color={palette.text} />
         </Pressable>
-        <TextInput accessibilityLabel={t('studio.image.a11y.assistantInput')}
+        <TextInput maxFontSizeMultiplier={1.3} accessibilityLabel={t('studio.image.a11y.assistantInput')}
           value={text}
           onChangeText={setText}
           placeholder={t('studio.image.assistant.placeholder')}
@@ -68,23 +68,23 @@ export function AssistantBar({
           accessibilityState={{ disabled: commands.length === 0 }}
         >
           <Ionicons name="checkmark" size={16} color="#fff" />
-          <Text style={styles.applyText}>{t('studio.image.assistant.apply', { count: commands.length })}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.applyText}>{t('studio.image.assistant.apply', { count: commands.length })}</Text>
         </Pressable>
       </View>
       {typed ? (
         <ScrollView style={styles.steps} keyboardShouldPersistTaps="handled">
           {commands.map((c, i) => (
-            <Text key={i} style={styles.step}>{`${i + 1}. ${t(`studio.image.assistant.cmd.${c.type}`)}`}</Text>
+            <Text maxFontSizeMultiplier={1.3} key={i} style={styles.step}>{`${i + 1}. ${t(`studio.image.assistant.cmd.${c.type}`)}`}</Text>
           ))}
           {unknown.map((u) => (
-            <Text key={u} style={styles.unknown}>{t('studio.image.assistant.unknown', { text: u })}</Text>
+            <Text maxFontSizeMultiplier={1.3} key={u} style={styles.unknown}>{t('studio.image.assistant.unknown', { text: u })}</Text>
           ))}
         </ScrollView>
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.examples}>
           {EXAMPLES.map((key) => (
             <Pressable key={key} onPress={() => setText(t(`studio.image.assistant.${key}`))} style={styles.chip} accessibilityRole="button">
-              <Text style={styles.chipText}>{t(`studio.image.assistant.${key}`)}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.chipText}>{t(`studio.image.assistant.${key}`)}</Text>
             </Pressable>
           ))}
         </ScrollView>

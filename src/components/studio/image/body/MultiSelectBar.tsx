@@ -26,12 +26,12 @@ export function MultiSelectBar({ count, onAction, onClose }: { count: number; on
       <Pressable testID="multi-close" style={styles.icon} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('common.cancel')}>
         <Ionicons name="close" size={22} color={palette.text} />
       </Pressable>
-      <Text style={styles.count}>{t('studio.image.multi.count', { count })}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.count}>{t('studio.image.multi.count', { count })}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll} contentContainerStyle={styles.row}>
         {ACTIONS.filter((a) => count >= a.min).map((a) => (
           <Pressable key={a.key} testID={`multi-${a.key}`} style={styles.action} onPress={() => onAction(a.key)} accessibilityRole="button">
             <Ionicons name={a.icon} size={22} color={palette.text} />
-            <Text style={styles.label} numberOfLines={1}>{t(`studio.image.multi.${a.labelKey}`)}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.label} numberOfLines={1}>{t(`studio.image.multi.${a.labelKey}`)}</Text>
           </Pressable>
         ))}
       </ScrollView>

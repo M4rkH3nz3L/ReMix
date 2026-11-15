@@ -57,7 +57,7 @@ export function StudioSheet({
   const head = (
     <View style={[styles.head, frame?.inline ? styles.headInline : null]}>
       {icon ? <Ionicons name={icon} size={16} color={palette.accent} /> : null}
-      <Text style={styles.title}>{title}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.title}>{title}</Text>
       <View style={{ flex: 1 }} />
       <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={title}>
         <Ionicons name="close" size={22} color={palette.text} />

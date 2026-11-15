@@ -94,8 +94,8 @@ export function Slider({
       {/* üres címke = a hívó maga mutatja az értéket (pl. a Mixer sáv-fejléce) → nincs dupla érték */}
       {label ? (
         <View style={styles.sliderHead}>
-          <Text style={styles.sliderLabel}>{label}</Text>
-          <Text style={styles.sliderVal}>{format(value)}</Text>
+          <Text style={styles.sliderLabel} maxFontSizeMultiplier={1.3}>{label}</Text>
+          <Text style={styles.sliderVal} maxFontSizeMultiplier={1.3}>{format(value)}</Text>
         </View>
       ) : null}
       <GestureDetector gesture={pan}>
@@ -132,7 +132,7 @@ export function ToggleRow({
   return (
     <View style={styles.toggleRow}>
       <Ionicons name={icon} size={18} color={palette.textDim} />
-      <Text style={styles.toggleLabel}>{label}</Text>
+      <Text style={styles.toggleLabel} maxFontSizeMultiplier={1.3}>{label}</Text>
       <Switch
         value={value}
         onValueChange={onValueChange}

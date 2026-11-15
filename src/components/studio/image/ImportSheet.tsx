@@ -41,8 +41,8 @@ export function ImportSheet({
               accessibilityState={{ disabled: off }}
             >
               <Ionicons name={row.icon} size={20} color={palette.accent} />
-              <Text style={styles.label}>{t(`studio.image.importFrom.${row.key}`)}</Text>
-              {off ? <Text style={styles.pro}>Pro</Text> : null}
+              <Text maxFontSizeMultiplier={1.3} style={styles.label}>{t(`studio.image.importFrom.${row.key}`)}</Text>
+              {off ? <Text maxFontSizeMultiplier={1.3} style={styles.pro}>Pro</Text> : null}
             </Pressable>
           );
         })}

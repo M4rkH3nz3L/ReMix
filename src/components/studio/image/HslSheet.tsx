@@ -32,7 +32,7 @@ export function HslSheet({ doc, layer, commit, onClose }: { doc: ImageDoc; layer
       footer={
         isNeutralHsl(layer.hsl) ? undefined : (
           <Pressable onPress={() => commit(updateLayer<PhotoLayer | AdjustmentImageLayer>(doc, layer.id, { hsl: undefined }), 'hsl-bands')} style={styles.reset} accessibilityRole="button">
-            <Text style={styles.resetText}>{t('studio.image.hsl.reset')}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.resetText}>{t('studio.image.hsl.reset')}</Text>
           </Pressable>
         )
       }

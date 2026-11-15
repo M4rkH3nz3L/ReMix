@@ -89,10 +89,10 @@ export function ImageAdjustStrip({
     <View style={styles.strip}>
       <View style={styles.head}>
         <Ionicons name="contrast-outline" size={15} color={palette.accent} />
-        <Text style={styles.title}>{t('studio.imageTools.adjust')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.title}>{t('studio.imageTools.adjust')}</Text>
         <Pressable onPress={onHsl} hitSlop={8} style={styles.details} accessibilityRole="button" accessibilityLabel={t('studio.image.hsl.title')}>
           <Ionicons name="color-palette-outline" size={14} color={palette.accent} />
-          <Text style={styles.detailsText}>HSL</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.detailsText}>HSL</Text>
         </Pressable>
         <Pressable
           onPress={onDetails}
@@ -102,7 +102,7 @@ export function ImageAdjustStrip({
           accessibilityLabel={t('editor.panelHost.details')}
         >
           <Ionicons name="options-outline" size={14} color={palette.accent} />
-          <Text style={styles.detailsText}>{t('editor.panelHost.details')}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.detailsText}>{t('editor.panelHost.details')}</Text>
         </Pressable>
         <Pressable
           onPress={onClose}

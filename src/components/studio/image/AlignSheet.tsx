@@ -60,10 +60,10 @@ export function AlignSheet({
   };
   return (
     <StudioSheet title={t('studio.image.align.title')} icon="magnet" onClose={onClose}>
-      <Text style={styles.hint}>{t('studio.image.align.hint')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.hint}>{t('studio.image.align.hint')}</Text>
       {ROWS.map((row) => (
         <View key={row.titleKey} style={styles.group}>
-          <Text style={styles.groupTitle}>{t(row.titleKey)}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.groupTitle}>{t(row.titleKey)}</Text>
           <View style={styles.row}>
             {row.items.map((it) => (
               <Pressable
@@ -74,7 +74,7 @@ export function AlignSheet({
                 accessibilityLabel={t(it.labelKey)}
               >
                 <Ionicons name={it.icon} size={22} color={palette.text} />
-                <Text style={styles.btnLabel}>{t(it.labelKey)}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.btnLabel}>{t(it.labelKey)}</Text>
               </Pressable>
             ))}
           </View>
@@ -82,8 +82,8 @@ export function AlignSheet({
       ))}
 
       <View style={styles.group}>
-        <Text style={styles.groupTitle}>{t('studio.image.align.distribute')}</Text>
-        <Text style={[styles.hint, styles.distHint]}>
+        <Text maxFontSizeMultiplier={1.3} style={styles.groupTitle}>{t('studio.image.align.distribute')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={[styles.hint, styles.distHint]}>
           {canDistribute ? t('studio.image.align.distributeHint') : t('studio.image.align.distributeNeed')}
         </Text>
         <View style={styles.row}>
@@ -95,7 +95,7 @@ export function AlignSheet({
             accessibilityLabel={t('studio.image.align.distH')}
           >
             <Ionicons name="reorder-two-outline" size={22} color={canDistribute ? palette.text : palette.textDim} />
-            <Text style={[styles.btnLabel, !canDistribute && { color: palette.textDim }]}>
+            <Text maxFontSizeMultiplier={1.3} style={[styles.btnLabel, !canDistribute && { color: palette.textDim }]}>
               {t('studio.image.align.distH')}
             </Text>
           </Pressable>
@@ -112,7 +112,7 @@ export function AlignSheet({
               color={canDistribute ? palette.text : palette.textDim}
               style={{ transform: [{ rotate: '90deg' }] }}
             />
-            <Text style={[styles.btnLabel, !canDistribute && { color: palette.textDim }]}>
+            <Text maxFontSizeMultiplier={1.3} style={[styles.btnLabel, !canDistribute && { color: palette.textDim }]}>
               {t('studio.image.align.distV')}
             </Text>
           </Pressable>

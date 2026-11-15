@@ -25,7 +25,7 @@ export function SelectionActionBar({
         {menu.actions.map((key) => (
           <Pressable key={key} style={styles.action} onPress={() => onAction(key)} accessibilityRole="button" accessibilityLabel={t(toolLabelKey(key))}>
             <Ionicons name={TOOL_ICONS[key] as keyof typeof Ionicons.glyphMap} size={22} color={palette.text} />
-            <Text style={styles.label} numberOfLines={1}>
+            <Text maxFontSizeMultiplier={1.3} style={styles.label} numberOfLines={1}>
               {t(toolLabelKey(key))}
             </Text>
           </Pressable>
@@ -34,7 +34,7 @@ export function SelectionActionBar({
       {menu.canDelete ? (
         <Pressable style={styles.deleteBtn} onPress={onDelete} accessibilityRole="button" accessibilityLabel={t(toolLabelKey('delete'))}>
           <Ionicons name={TOOL_ICONS.delete as keyof typeof Ionicons.glyphMap} size={22} color={palette.danger} />
-          <Text style={[styles.label, { color: palette.danger }]} numberOfLines={1}>
+          <Text maxFontSizeMultiplier={1.3} style={[styles.label, { color: palette.danger }]} numberOfLines={1}>
             {t(toolLabelKey('delete'))}
           </Text>
         </Pressable>

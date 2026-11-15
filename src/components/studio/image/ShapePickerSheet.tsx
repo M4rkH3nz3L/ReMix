@@ -38,7 +38,7 @@ export function ShapePickerSheet({
             accessibilityLabel={t(s.labelKey)}
           >
             <Ionicons name={s.icon} size={28} color={palette.text} />
-            <Text style={styles.label}>{t(s.labelKey)}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.label}>{t(s.labelKey)}</Text>
           </Pressable>
         ))}
       </View>

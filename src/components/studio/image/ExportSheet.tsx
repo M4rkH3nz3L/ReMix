@@ -86,15 +86,15 @@ export function ExportSheet({
 
   return (
     <StudioSheet title={t('studio.export')} icon="download-outline" onClose={onClose}>
-      <Text style={styles.section}>{t('studio.image.export.formatLabel')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('studio.image.export.formatLabel')}</Text>
       <View style={styles.row}>
         <Chip label="PNG" active={format === 'png'} onPress={() => setFormat('png')} />
         <Chip label="JPG" active={format === 'jpg'} onPress={() => setFormat('jpg')} />
         <Chip label="WebP" active={format === 'webp'} onPress={() => setFormat('webp')} />
       </View>
-      <Text style={styles.hint}>{hint}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.hint}>{hint}</Text>
 
-      <Text style={styles.section}>{t('studio.image.export.resolutionLabel')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('studio.image.export.resolutionLabel')}</Text>
       <View style={styles.row}>
         <Chip label={`1× · ${size1.width}×${size1.height}`} active={scale === 1} onPress={() => setScale(1)} />
         <Chip label={`2× · ${size2.width}×${size2.height}`} active={scale === 2} onPress={() => setScale(2)} />
@@ -102,15 +102,15 @@ export function ExportSheet({
       </View>
       {scale === 'custom' ? (
         <View style={styles.customRow}>
-          <Text style={styles.hint}>{t('studio.image.export.customHeight')}</Text>
-          <TextInput
+          <Text maxFontSizeMultiplier={1.3} style={styles.hint}>{t('studio.image.export.customHeight')}</Text>
+          <TextInput maxFontSizeMultiplier={1.3}
             value={customHeight}
             onChangeText={setCustomHeight}
             keyboardType="number-pad"
             style={styles.input}
             accessibilityLabel={t('studio.image.export.customHeight')}
           />
-          <Text style={styles.hint}>{`${chosen.width}×${chosen.height}`}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.hint}>{`${chosen.width}×${chosen.height}`}</Text>
         </View>
       ) : null}
 
@@ -125,7 +125,7 @@ export function ExportSheet({
         />
       ) : null}
 
-      <Text style={styles.hint}>{t('studio.image.export.estimate', { size: estimate })}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.hint}>{t('studio.image.export.estimate', { size: estimate })}</Text>
 
       <Pressable
         style={[styles.primary, busy && styles.disabled]}
@@ -136,7 +136,7 @@ export function ExportSheet({
         }}
       >
         <Ionicons name="download-outline" size={16} color="#fff" />
-        <Text style={styles.primaryText}>{t('studio.image.export.run')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.primaryText}>{t('studio.image.export.run')}</Text>
       </Pressable>
       <Pressable
         style={[styles.secondary, busy && styles.disabled]}
@@ -147,7 +147,7 @@ export function ExportSheet({
         }}
       >
         <Ionicons name="images-outline" size={16} color={palette.text} />
-        <Text style={styles.secondaryText}>{t('studio.image.export.savePhotos')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.secondaryText}>{t('studio.image.export.savePhotos')}</Text>
       </Pressable>
       <Pressable
         style={[styles.secondary, busy && styles.disabled]}
@@ -158,7 +158,7 @@ export function ExportSheet({
         }}
       >
         <Ionicons name="albums-outline" size={16} color={palette.text} />
-        <Text style={styles.secondaryText}>{t('studio.image.export.pack')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.secondaryText}>{t('studio.image.export.pack')}</Text>
       </Pressable>
       <Pressable
         style={[styles.secondary, busy && styles.disabled]}
@@ -169,7 +169,7 @@ export function ExportSheet({
         }}
       >
         <Ionicons name="color-wand-outline" size={16} color={palette.text} />
-        <Text style={styles.secondaryText}>{t('studio.image.exportSvg')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.secondaryText}>{t('studio.image.exportSvg')}</Text>
       </Pressable>
       <Pressable
         style={[styles.secondary, busy && styles.disabled]}
@@ -180,7 +180,7 @@ export function ExportSheet({
         }}
       >
         <Ionicons name="document-outline" size={16} color={palette.text} />
-        <Text style={styles.secondaryText}>{t('studio.image.exportPdf')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.secondaryText}>{t('studio.image.exportPdf')}</Text>
       </Pressable>
       {onVectorPdf ? (
         <Pressable
@@ -193,7 +193,7 @@ export function ExportSheet({
           accessibilityRole="button"
         >
           <Ionicons name="cloud-outline" size={16} color={palette.text} />
-          <Text style={styles.secondaryText}>{t('studio.image.exportPdfVector')}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.secondaryText}>{t('studio.image.exportPdfVector')}</Text>
         </Pressable>
       ) : null}
       {/* 🖼️ réteges PSD-export (worker, réteg-megőrzés) — Pro-gated; free → letiltva + upsell */}
@@ -206,8 +206,8 @@ export function ExportSheet({
         }}
       >
         <Ionicons name="layers-outline" size={16} color={palette.text} />
-        <Text style={styles.secondaryText}>{t('studio.image.exportPsd')}</Text>
-        {!canPsd ? <Text style={styles.proBadge}>PRO</Text> : null}
+        <Text maxFontSizeMultiplier={1.3} style={styles.secondaryText}>{t('studio.image.exportPsd')}</Text>
+        {!canPsd ? <Text maxFontSizeMultiplier={1.3} style={styles.proBadge}>PRO</Text> : null}
       </Pressable>
       <Pressable
         style={[styles.secondary, busy && styles.disabled]}
@@ -218,13 +218,13 @@ export function ExportSheet({
         }}
       >
         <Ionicons name="film-outline" size={16} color={palette.text} />
-        <Text style={styles.secondaryText}>{t('studio.image.exportToVideo')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.secondaryText}>{t('studio.image.exportToVideo')}</Text>
       </Pressable>
 
       {/* 🖼️➡️📲 feed-megosztás: több lap → diavetítés-videó VAGY lapozható kép-poszt */}
       {pageCount >= 2 && (onShareSlideshow || onShareCarousel) ? (
         <>
-          <Text style={[styles.section, { marginTop: 10 }]}>
+          <Text maxFontSizeMultiplier={1.3} style={[styles.section, { marginTop: 10 }]}>
             {t('studio.image.shareFeed.label', { defaultValue: 'Megosztás a feedbe' })}
           </Text>
           {onShareSlideshow ? (
@@ -237,7 +237,7 @@ export function ExportSheet({
               }}
             >
               <Ionicons name="play-circle-outline" size={16} color={palette.text} />
-              <Text style={styles.secondaryText}>
+              <Text maxFontSizeMultiplier={1.3} style={styles.secondaryText}>
                 {t('studio.image.shareFeed.slideshow', { defaultValue: 'Diavetítésként (videó)' })}
               </Text>
             </Pressable>
@@ -252,7 +252,7 @@ export function ExportSheet({
               }}
             >
               <Ionicons name="albums-outline" size={16} color={palette.text} />
-              <Text style={styles.secondaryText}>
+              <Text maxFontSizeMultiplier={1.3} style={styles.secondaryText}>
                 {t('studio.image.shareFeed.carousel', { defaultValue: 'Lapozhatóként (carousel)' })}
               </Text>
             </Pressable>

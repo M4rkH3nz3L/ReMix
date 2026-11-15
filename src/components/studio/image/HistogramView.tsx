@@ -73,7 +73,7 @@ export function HistogramView({ layer, uri, height = 56 }: { layer: ColorFields;
         ) : null}
       </View>
       {clip && (clip.shadows > 0.005 || clip.highlights > 0.005) ? (
-        <Text style={styles.clip}>
+        <Text maxFontSizeMultiplier={1.3} style={styles.clip}>
           {t('studio.image.histogram.clip', { shadows: Math.round(clip.shadows * 100), highlights: Math.round(clip.highlights * 100) })}
         </Text>
       ) : null}

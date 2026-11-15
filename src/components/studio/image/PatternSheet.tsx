@@ -38,7 +38,7 @@ export function PatternSheet({
 
   return (
     <StudioSheet title={t('studio.image.pattern.title')} icon="grid-outline" onClose={onClose}>
-      <Text style={styles.section}>{t('studio.image.pattern.preset')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('studio.image.pattern.preset')}</Text>
       <View style={styles.chipRow}>
         <Chip label={t('studio.image.pattern.none')} active={!pat} onPress={() => setPattern(undefined)} />
         {PATTERN_PRESETS.map((preset) => (

@@ -150,7 +150,7 @@ export function LayerInspector({
 
   return (
     <>
-      <TextInput
+      <TextInput maxFontSizeMultiplier={1.3}
         style={styles.nameInput}
         defaultValue={layer.name ?? ''}
         key={`name-${layer.id}`}
@@ -168,7 +168,7 @@ export function LayerInspector({
       {layer.kind === 'photo' || layer.kind === 'shape' ? <GeometryFields doc={doc} layer={layer} commit={commit} /> : null}
       {layer.kind === 'text' ? (
         <>
-          <TextInput accessibilityLabel={t('studio.image.a11y.textContent')}
+          <TextInput maxFontSizeMultiplier={1.3} accessibilityLabel={t('studio.image.a11y.textContent')}
             style={styles.textInput}
             value={layer.text}
             onChangeText={(text) =>
@@ -183,7 +183,7 @@ export function LayerInspector({
             value={layer.color}
             onChange={(color) => commit(updateLayer<TextLayer>(doc, layer.id, { color }))}
           />
-          <Text style={styles.sectionLabel}>{t('studio.image.font')}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.font')}</Text>
           <View style={styles.chipRow}>
             {[...(projectFonts ?? []).map((f) => ({ id: f.family, label: f.name, family: f.family })), ...fontOptions.filter((f) => f.family)].map((f) => (
               <Pressable
@@ -194,7 +194,7 @@ export function LayerInspector({
                 accessibilityLabel={f.label}
                 accessibilityState={{ selected: layer.fontFamily === f.family }}
               >
-                <Text style={[styles.fontChipText, { fontFamily: f.family }]} numberOfLines={1}>
+                <Text maxFontSizeMultiplier={1.3} style={[styles.fontChipText, { fontFamily: f.family }]} numberOfLines={1}>
                   {f.label}
                 </Text>
               </Pressable>
@@ -207,10 +207,10 @@ export function LayerInspector({
               accessibilityLabel={t('studio.image.fonts.import')}
               testID="font-import"
             >
-              <Text style={styles.fontChipText} numberOfLines={1}>{`＋ ${t('studio.image.fonts.import')}`}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.fontChipText} numberOfLines={1}>{`＋ ${t('studio.image.fonts.import')}`}</Text>
             </Pressable>
           </View>
-          <Text style={styles.sectionLabel}>{t('studio.image.textAlign')}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.textAlign')}</Text>
           <View style={styles.chipRow}>
             {TEXT_ALIGNS.map((a) => (
               <Chip
@@ -335,7 +335,7 @@ export function LayerInspector({
             }
           />
           {/* 🛤️ szöveg görbe mentén (text-on-path) — a render SVG textPath-tal égeti */}
-          <Text style={styles.sectionLabel}>{t('studio.image.textPath', { defaultValue: 'Szöveg görbén' })}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.textPath', { defaultValue: 'Szöveg görbén' })}</Text>
           <View style={styles.chipRow}>
             {(['none', 'arc', 'valley', 'wave', 'circle'] as const).map((s) => (
               <Chip
@@ -400,7 +400,7 @@ export function LayerInspector({
                 />
               </View>
             ) : (
-              <Text style={styles.hintText}>{t('studio.image.clipNeedsShape')}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.hintText}>{t('studio.image.clipNeedsShape')}</Text>
             );
           })()}
           <Slider
@@ -447,7 +447,7 @@ export function LayerInspector({
             format={(v) => `${Math.round(v * 100)}%`}
           />
           {/* 🎛️ struktúra-szűrők (blur/sharpen/zaj/szürke/szépia) — a renderben (ffmpeg) */}
-          <Text style={styles.sectionLabel}>{t('studio.image.filters', { defaultValue: 'Szűrők' })}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.filters', { defaultValue: 'Szűrők' })}</Text>
           <View style={styles.chipRow}>
             {IMAGE_FILTER_TYPES.map((f) => (
               <Chip
@@ -470,7 +470,7 @@ export function LayerInspector({
             />
           ))}
           {/* 🎬 filmes look-presetek (LUT-szerű grade) — a videó grade-rétegével AZONOS térkép */}
-          <Text style={styles.sectionLabel}>{t('studio.image.filmLook', { defaultValue: 'Filmes look' })}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.filmLook', { defaultValue: 'Filmes look' })}</Text>
           <View style={styles.chipRow}>
             {GRADE_PRESETS.map((g) => (
               <Chip
@@ -488,7 +488,7 @@ export function LayerInspector({
             ))}
           </View>
           {/* 🎞️ saját 3D LUT (.cube) — a render lut3d-del égeti; a kliens parseCubeLut validál */}
-          <Text style={styles.sectionLabel}>{t('studio.image.customLut', { defaultValue: 'Saját LUT (.cube)' })}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.customLut', { defaultValue: 'Saját LUT (.cube)' })}</Text>
           <View style={styles.chipRow}>
             <Chip
               label={layer.lut ? t('studio.image.lutReplace', { defaultValue: 'LUT csere' }) : t('studio.image.lutImport', { defaultValue: 'LUT import' })}
@@ -503,9 +503,9 @@ export function LayerInspector({
               />
             ) : null}
           </View>
-          {layer.lut ? <Text style={styles.hintText}>{layer.lutName ?? 'LUT.cube'}</Text> : null}
+          {layer.lut ? <Text maxFontSizeMultiplier={1.3} style={styles.hintText}>{layer.lutName ?? 'LUT.cube'}</Text> : null}
           {/* 🎨 gradient-map (egyedi-színű duotone): sötét→shadow, világos→highlight (render geq) */}
-          <Text style={styles.sectionLabel}>{t('studio.image.gradientMap', { defaultValue: 'Gradient-map (duotone)' })}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.gradientMap', { defaultValue: 'Gradient-map (duotone)' })}</Text>
           <View style={styles.chipRow}>
             <Chip
               label={layer.gradientMap ? t('studio.image.gmapOff', { defaultValue: 'Duotone ki' }) : t('studio.image.gmapOn', { defaultValue: 'Duotone be' })}
@@ -538,7 +538,7 @@ export function LayerInspector({
             </>
           ) : null}
           {/* 📊 szintek (levels): fekete/fehér-pont + gamma — a render lutrgb-vel remapeli */}
-          <Text style={styles.sectionLabel}>{t('studio.image.levels', { defaultValue: 'Szintek' })}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.levels', { defaultValue: 'Szintek' })}</Text>
           <View style={styles.chipRow}>
             <Chip
               label={t('studio.image.maskNone', { defaultValue: 'Nincs' })}
@@ -559,7 +559,7 @@ export function LayerInspector({
             </>
           ) : null}
           {/* 🎨 csatorna-mixer: a kimeneti R/G/B csatorna a bemenetek lineáris kombinációja */}
-          <Text style={styles.sectionLabel}>{t('studio.image.channelMix', { defaultValue: 'Csatorna-mixer' })}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.channelMix', { defaultValue: 'Csatorna-mixer' })}</Text>
           <View style={styles.chipRow}>
             <Chip label={t('studio.image.maskNone', { defaultValue: 'Nincs' })} active={!layer.channelMix} onPress={() => (layer.channelMix ? commit(updateLayer<PhotoLayer>(doc, layer.id, { channelMix: undefined }), 'channel-mix') : undefined)} />
             <Chip label={t('studio.image.localOn', { defaultValue: 'Be' })} active={!!layer.channelMix} onPress={() => (layer.channelMix ? undefined : commit(updateLayer<PhotoLayer>(doc, layer.id, { channelMix: { rr: 1, gg: 1, bb: 1 } }), 'channel-mix'))} />
@@ -578,7 +578,7 @@ export function LayerInspector({
               ))
             : null}
           {/* 🎯 kijelölés-alapú (lokális) korrekció: grade/adjust CSAK a maszkon belül (maskedmerge) */}
-          <Text style={styles.sectionLabel}>{t('studio.image.localAdjust', { defaultValue: 'Kijelölés-alapú korrekció' })}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.localAdjust', { defaultValue: 'Kijelölés-alapú korrekció' })}</Text>
           <View style={styles.chipRow}>
             <Chip
               label={t('studio.image.maskNone', { defaultValue: 'Nincs' })}
@@ -622,7 +622,7 @@ export function LayerInspector({
             </>
           ) : null}
           {/* 🩹 folt-javítás / objektum-eltávolítás: lasszózd körbe a foltot → a render delogo-zza (bbox) */}
-          <Text style={styles.sectionLabel}>{t('studio.image.heal', { defaultValue: 'Folt-javítás' })}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.heal', { defaultValue: 'Folt-javítás' })}</Text>
           <View style={styles.chipRow}>
             {onDrawMask ? (
               <Chip label={t('studio.image.healAdd', { defaultValue: '✏️ Folt lasszó' })} active={false} onPress={() => onDrawMask(layer.id, 'heal')} />
@@ -632,7 +632,7 @@ export function LayerInspector({
             ) : null}
           </View>
           {layer.heal?.length ? (
-            <Text style={styles.hintText}>{t('studio.image.healCount', { defaultValue: '{{n}} folt', n: layer.heal.length })}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.hintText}>{t('studio.image.healCount', { defaultValue: '{{n}} folt', n: layer.heal.length })}</Text>
           ) : null}
         </>
       ) : null}
@@ -640,7 +640,7 @@ export function LayerInspector({
       {layer.kind === 'adjust' ? (
         <>
           {/* 🎚️ korrekció-réteg: grade + globális adjust (az ALATTA lévő kompozitra hat); a maszk-szekció alább él */}
-          <Text style={styles.sectionLabel}>{t('studio.image.filmLook', { defaultValue: 'Filmes look' })}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.filmLook', { defaultValue: 'Filmes look' })}</Text>
           <View style={styles.chipRow}>
             {GRADE_PRESETS.map((g) => (
               <Chip
@@ -657,7 +657,7 @@ export function LayerInspector({
           <View style={styles.chipRow}>
             <Chip label={t('studio.image.hsl.title')} active={!!layer.hsl} onPress={onOpenAdjust} />
           </View>
-          <Text style={styles.hintText}>{t('studio.image.adjustLayerHint', { defaultValue: 'A korrekció az ALATTA lévő rétegekre hat. Alább maszkolható.' })}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.hintText}>{t('studio.image.adjustLayerHint', { defaultValue: 'A korrekció az ALATTA lévő rétegekre hat. Alább maszkolható.' })}</Text>
         </>
       ) : null}
 
@@ -752,7 +752,7 @@ export function LayerInspector({
           ) : null}
           {(layer.borderWidth ?? 0) > 0 || layer.shape === 'path' ? (
             <>
-              <Text style={styles.sectionLabel}>{t('studio.image.stroke.style')}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.stroke.style')}</Text>
               <View style={styles.chipRow}>
                 {DASHES.map((d) => (
                   <Chip
@@ -767,13 +767,13 @@ export function LayerInspector({
           ) : null}
           {layer.shape === 'path' ? (
             <>
-              <Text style={styles.sectionLabel}>{t('studio.image.stroke.cap')}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.stroke.cap')}</Text>
               <View style={styles.chipRow}>
                 {CAPS.map((c) => (
                   <Chip key={c} label={t(`studio.image.stroke.cap_${c}`)} active={(layer.strokeCap ?? 'round') === c} onPress={() => commit(updateLayer<ShapeLayer>(doc, layer.id, { strokeCap: c }), t('studio.image.stroke.cap'))} />
                 ))}
               </View>
-              <Text style={styles.sectionLabel}>{t('studio.image.stroke.join')}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.stroke.join')}</Text>
               <View style={styles.chipRow}>
                 {JOINS.map((j) => (
                   <Chip key={j} label={t(`studio.image.stroke.join_${j}`)} active={(layer.strokeJoin ?? 'round') === j} onPress={() => commit(updateLayer<ShapeLayer>(doc, layer.id, { strokeJoin: j }), t('studio.image.stroke.join'))} />
@@ -826,7 +826,7 @@ export function LayerInspector({
         format={(v) => `${Math.round(v * 100)}%`}
       />
       {/* 🗂️ csoport (mappa) — a kijelölt réteg hozzárendelése egy csoporthoz / új csoport */}
-      <Text style={styles.sectionLabel}>{t('studio.image.group', { defaultValue: 'Csoport' })}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.group', { defaultValue: 'Csoport' })}</Text>
       <View style={styles.chipRow}>
         <Chip
           label={t('studio.image.groupNone', { defaultValue: 'Nincs' })}
@@ -855,7 +855,7 @@ export function LayerInspector({
       {/* 🎭 réteg-maszk (szelekció/alak) — nem-fill rétegre; a render geq-vel vágja (lágy él/invert/terjesztés) */}
       {layer.kind !== 'fill' ? (
         <>
-          <Text style={styles.sectionLabel}>{t('studio.image.mask', { defaultValue: 'Maszk' })}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.mask', { defaultValue: 'Maszk' })}</Text>
           <View style={styles.chipRow}>
             <Chip
               label={t('studio.image.maskNone', { defaultValue: 'Nincs' })}
@@ -916,7 +916,7 @@ export function LayerInspector({
         </>
       ) : null}
       {/* 🎨 keverési mód — MINDEN réteg-fajtára (fill/photo/shape/text); a render ffmpeg-blenddel égeti */}
-      <Text style={styles.sectionLabel}>{t('studio.image.blendMode', { defaultValue: 'Keverési mód' })}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.blendMode', { defaultValue: 'Keverési mód' })}</Text>
       <View style={styles.chipRow}>
         {BLENDS.map((b) => (
           <Chip
@@ -1042,7 +1042,7 @@ export function LayerInspector({
       ) : null}
 
       {/* 🎭 gradient-maszk: a réteg a megadott irányba fokozatosan átlátszóvá fade-el (a render geq-vel) */}
-      <Text style={styles.sectionLabel}>{t('studio.image.maskFade', { defaultValue: 'Gradient-maszk (elhalványulás)' })}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.sectionLabel}>{t('studio.image.maskFade', { defaultValue: 'Gradient-maszk (elhalványulás)' })}</Text>
       <View style={styles.chipRow}>
         {(['none', 'left', 'right', 'up', 'down'] as const).map((d) => (
           <Chip

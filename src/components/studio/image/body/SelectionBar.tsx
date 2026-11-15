@@ -81,23 +81,23 @@ export function SelectionBar({
         <View style={styles.flex} />
         <Pressable onPress={onDone} style={styles.done} hitSlop={6} accessibilityRole="button">
           <Ionicons name="checkmark" size={16} color="#fff" />
-          <Text style={styles.doneText}>{t('common.done')}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.doneText}>{t('common.done')}</Text>
         </Pressable>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         {MODES.map((m) => (
           <Pressable key={m} onPress={() => onMode(m)} style={[styles.chip, mode === m && styles.chipActive]} accessibilityRole="button" accessibilityState={{ selected: mode === m }}>
-            <Text style={[styles.chipText, mode === m && styles.chipTextActive]}>{t(`studio.image.select.mode.${m}`)}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={[styles.chipText, mode === m && styles.chipTextActive]}>{t(`studio.image.select.mode.${m}`)}</Text>
           </Pressable>
         ))}
         {selection ? (
           <Pressable onPress={onInvert} style={[styles.chip, selection.invert && styles.chipActive]} accessibilityRole="button" accessibilityState={{ selected: selection.invert }}>
-            <Text style={[styles.chipText, selection.invert && styles.chipTextActive]}>{t('studio.image.select.invert')}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={[styles.chipText, selection.invert && styles.chipTextActive]}>{t('studio.image.select.invert')}</Text>
           </Pressable>
         ) : null}
         {selection && onRefine ? (
           <Pressable onPress={onRefine} style={styles.chip} accessibilityRole="button">
-            <Text style={styles.chipText}>{t('studio.image.select.refine')}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.chipText}>{t('studio.image.select.refine')}</Text>
           </Pressable>
         ) : null}
       </ScrollView>
@@ -114,7 +114,7 @@ export function SelectionBar({
                 accessibilityState={{ disabled: !enabled(key) }}
               >
                 <Ionicons name={icon} size={16} color={palette.text} />
-                <Text style={styles.chipText}>{t(`studio.image.select.action.${key}`)}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.chipText}>{t(`studio.image.select.action.${key}`)}</Text>
               </Pressable>
             ))}
           </ScrollView>

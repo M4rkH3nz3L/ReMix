@@ -55,7 +55,7 @@ export function BooleanSheet({
   };
   return (
     <StudioSheet title={t('studio.image.boolean.title')} icon="git-merge" onClose={onClose}>
-      <Text style={styles.hint}>{t('studio.image.boolean.hint')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.hint}>{t('studio.image.boolean.hint')}</Text>
       <View style={styles.grid}>
         {OPS.map((o) => (
           <Pressable
@@ -66,7 +66,7 @@ export function BooleanSheet({
             accessibilityLabel={t(o.labelKey)}
           >
             <Ionicons name={o.icon} size={24} color={palette.text} />
-            <Text style={styles.btnLabel}>{t(o.labelKey)}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.btnLabel}>{t(o.labelKey)}</Text>
           </Pressable>
         ))}
       </View>

@@ -284,23 +284,23 @@ export function PixelStudio({
       <GestureHandlerRootView style={[styles.root, { paddingTop: Math.max(insets.top, controlsInset), paddingBottom: insets.bottom }]}>
         <View style={styles.bar}>
           {btn('close', t('common.cancel'), onClose)}
-          <Text style={styles.title}>{t('studio.image.pixel.title')}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.title}>{t('studio.image.pixel.title')}</Text>
           {size ? (
             <>
               {btn('arrow-undo', t('studio.image.pixel.undo'), undo)}
               {btn('arrow-redo', t('studio.image.pixel.redo'), redo)}
               <Pressable testID="pixel-done" style={styles.done} onPress={finish} accessibilityRole="button">
-                <Text style={styles.doneText}>{t('studio.image.pixel.done')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.doneText}>{t('studio.image.pixel.done')}</Text>
               </Pressable>
             </>
           ) : null}
         </View>
         {!size ? (
           <View style={styles.sizes}>
-            <Text style={styles.label}>{t('studio.image.pixel.size')}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.label}>{t('studio.image.pixel.size')}</Text>
             {PIXEL_SIZES.map((s) => (
               <Pressable key={s} testID={`pixel-size-${s}`} style={styles.size} onPress={() => start(s)} accessibilityRole="button">
-                <Text style={styles.sizeText}>{`${s} × ${s}`}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.sizeText}>{`${s} × ${s}`}</Text>
               </Pressable>
             ))}
           </View>
@@ -320,7 +320,7 @@ export function PixelStudio({
                 ) : null}
               </View>
             </GestureDetector>
-            <Text style={styles.coords}>{`${w} × ${h}${hover ? ` · ${hover.x}, ${hover.y}` : ''} · ${t('studio.image.pixel.frame', { n: active + 1, total: frames.length })}`}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.coords}>{`${w} × ${h}${hover ? ` · ${hover.x}, ${hover.y}` : ''} · ${t('studio.image.pixel.frame', { n: active + 1, total: frames.length })}`}</Text>
             <ScrollView horizontal style={styles.strip} contentContainerStyle={styles.row} showsHorizontalScrollIndicator={false}>
               {TOOLS.map((b) => btn(b.icon, t(`studio.image.pixel.${b.key}`), () => setTool(b.key), tool === b.key, `pixel-tool-${b.key}`))}
               {btn('swap-horizontal', t('studio.image.pixel.mirrorX'), () => setMirror((m) => ({ ...m, x: !m.x })), mirror.x, 'pixel-mirror-x')}
@@ -363,17 +363,17 @@ export function PixelStudio({
               {btn('layers-outline', t('studio.image.pixel.onion'), () => setOnion((v) => !v), onion)}
               {frames.map((_, i) => (
                 <Pressable key={i} style={[styles.frame, i === active ? styles.on : null]} onPress={() => { setPlaying(false); setActive(i); }} accessibilityRole="button">
-                  <Text style={styles.frameText}>{i + 1}</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={styles.frameText}>{i + 1}</Text>
                 </Pressable>
               ))}
               <Pressable style={styles.frame} onPress={() => setFps((f) => (f >= 24 ? 2 : f * 2))} accessibilityRole="button" accessibilityLabel={t('studio.image.pixel.speed')}>
-                <Text style={styles.frameText}>{`${fps} fps`}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.frameText}>{`${fps} fps`}</Text>
               </Pressable>
               <Pressable style={styles.frame} onPress={() => void save(() => writePixelGif(current(), EXPORT_SCALE))} accessibilityRole="button">
-                <Text style={styles.frameText}>GIF</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.frameText}>GIF</Text>
               </Pressable>
               <Pressable style={styles.frame} onPress={() => void save(() => writeSpriteSheet(current(), EXPORT_SCALE))} accessibilityRole="button">
-                <Text style={styles.frameText}>{t('studio.image.pixel.sheet')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.frameText}>{t('studio.image.pixel.sheet')}</Text>
               </Pressable>
             </ScrollView>
           </>

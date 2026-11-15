@@ -131,13 +131,13 @@ export function DevelopSheet({
             onPress={() => commit(updateLayer<PhotoLayer>(doc, layer.id, { develop: undefined }), 'develop-reset')}
           >
             <Ionicons name="refresh-outline" size={15} color={palette.text} />
-            <Text style={styles.resetText}>{t('studio.image.develop.reset')}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.resetText}>{t('studio.image.develop.reset')}</Text>
           </Pressable>
         ) : undefined
       }
     >
       {/* 📋 összegzés: az aktív (nem-neutrális) paraméterek száma */}
-      <Text style={styles.summary}>
+      <Text maxFontSizeMultiplier={1.3} style={styles.summary}>
         {active.length > 0
           ? t('studio.image.develop.activeCount', { count: active.length })
           : t('studio.image.develop.neutral')}
@@ -150,7 +150,7 @@ export function DevelopSheet({
           <View key={group} style={styles.group}>
             <View style={styles.groupHead}>
               <Ionicons name={meta.icon} size={15} color={palette.accent} />
-              <Text style={styles.groupTitle}>{t(meta.titleKey)}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.groupTitle}>{t(meta.titleKey)}</Text>
             </View>
             {fields.map((f) => (
               <View key={`${f.bucket}.${f.key}`}>
@@ -162,7 +162,7 @@ export function DevelopSheet({
                   onChange={(v) => setField(f, v)}
                   format={(v) => v.toFixed(2)}
                 />
-                {f.exportOnly ? <Text style={styles.exportOnly}>{t('studio.image.develop.exportOnly')}</Text> : null}
+                {f.exportOnly ? <Text maxFontSizeMultiplier={1.3} style={styles.exportOnly}>{t('studio.image.develop.exportOnly')}</Text> : null}
               </View>
             ))}
           </View>

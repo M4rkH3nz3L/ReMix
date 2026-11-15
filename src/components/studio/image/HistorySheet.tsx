@@ -53,7 +53,7 @@ export function HistorySheet({ onClose }: { onClose: () => void }) {
           />
         ))}
       </View>
-      <Text style={styles.hint}>{t('studio.image.historyHint', { defaultValue: 'Koppints egy lépésre az odaugráshoz.' })}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.hint}>{t('studio.image.historyHint', { defaultValue: 'Koppints egy lépésre az odaugráshoz.' })}</Text>
     </StudioSheet>
   );
 }
@@ -74,7 +74,7 @@ function Row({
   return (
     <Pressable onPress={onPress} style={[styles.row, active ? styles.rowActive : null]}>
       <Ionicons name={icon} size={15} color={active ? palette.accent : dim ? palette.textDim : palette.text} />
-      <Text style={[styles.label, active ? styles.labelActive : null, dim ? styles.labelDim : null]} numberOfLines={1}>
+      <Text maxFontSizeMultiplier={1.3} style={[styles.label, active ? styles.labelActive : null, dim ? styles.labelDim : null]} numberOfLines={1}>
         {label}
       </Text>
     </Pressable>

@@ -67,19 +67,19 @@ export function BrushBar({
         <View style={styles.flex} />
         <Pressable onPress={onDone} style={styles.done} hitSlop={6} accessibilityRole="button">
           <Ionicons name="checkmark" size={16} color="#fff" />
-          <Text style={styles.doneText}>{t('common.done')}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.doneText}>{t('common.done')}</Text>
         </Pressable>
       </View>
       {retouch ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tools}>
           {RETOUCH_TOOLS.map((tool) => (
             <Pressable key={tool} onPress={() => onChange({ tool })} style={[styles.tool, brush.tool === tool && styles.iconActive]} accessibilityRole="button" accessibilityState={{ selected: brush.tool === tool }}>
-              <Text style={[styles.toolText, brush.tool === tool && styles.toolTextActive]}>{t(`studio.image.retouch.${tool}`)}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={[styles.toolText, brush.tool === tool && styles.toolTextActive]}>{t(`studio.image.retouch.${tool}`)}</Text>
             </Pressable>
           ))}
           {needsSource(brush.tool) ? (
             <Pressable onPress={onPickSource} style={styles.tool} accessibilityRole="button">
-              <Text style={styles.toolTextActive}>{t('studio.image.retouch.pick')}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.toolTextActive}>{t('studio.image.retouch.pick')}</Text>
             </Pressable>
           ) : null}
         </ScrollView>

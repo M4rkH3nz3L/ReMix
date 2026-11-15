@@ -45,9 +45,9 @@ export function ColorField({
   }, []);
   return (
     <View style={styles.wrap}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
+      {label ? <Text maxFontSizeMultiplier={1.3} style={styles.label}>{label}</Text> : null}
       <View style={styles.row}>
-        <Text style={styles.brand}>{t('studio.image.brand.colors')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.brand}>{t('studio.image.brand.colors')}</Text>
         {brand.map((c) => (
           <Pressable
             key={c}
@@ -69,7 +69,7 @@ export function ColorField({
           accessibilityState={{ disabled: saved }}
           style={[styles.add, saved ? styles.addDone : null]}
         >
-          <Text style={styles.addText}>+</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.addText}>+</Text>
         </Pressable>
       </View>
       <View style={styles.row}>
@@ -81,8 +81,8 @@ export function ColorField({
           />
         ))}
         <View style={styles.hexWrap}>
-          <Text style={styles.hash}>#</Text>
-          <TextInput accessibilityLabel={t('studio.image.a11y.colorHex')}
+          <Text maxFontSizeMultiplier={1.3} style={styles.hash}>#</Text>
+          <TextInput maxFontSizeMultiplier={1.3} accessibilityLabel={t('studio.image.a11y.colorHex')}
             key={value}
             defaultValue={value.replace('#', '')}
             onEndEditing={(e) => {

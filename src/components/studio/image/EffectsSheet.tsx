@@ -42,7 +42,7 @@ export function EffectsSheet({
   return (
     <StudioSheet title={t('studio.image.fx.title')} icon="sparkles-outline" onClose={onClose}>
       {/* ✨ Ragyogás — szín + méret (eddig csak toggle volt a Stílus-lapon) */}
-      <Text style={styles.section}>{t('studio.image.fx.glow')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('studio.image.fx.glow')}</Text>
       <ToggleRow
         icon="sparkles-outline"
         label={t('studio.image.fx.glowOn')}
@@ -68,7 +68,7 @@ export function EffectsSheet({
       ) : null}
 
       {/* 🌑 Árnyék — a worker fix sziluett-követő drop-shadow-ja (be/ki) */}
-      <Text style={styles.section}>{t('studio.image.fx.shadow')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('studio.image.fx.shadow')}</Text>
       <ToggleRow
         icon="contrast"
         label={t('studio.image.fx.shadowOn')}
@@ -77,7 +77,7 @@ export function EffectsSheet({
       />
 
       {/* 🖊️ Körvonal — szélesség (0 = ki) + szín */}
-      <Text style={styles.section}>{t('studio.image.fx.stroke')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('studio.image.fx.stroke')}</Text>
       <Slider
         label={t('studio.image.fx.strokeWidth')}
         value={layer.borderWidth ?? 0}

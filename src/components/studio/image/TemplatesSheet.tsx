@@ -88,7 +88,7 @@ export function TemplatesSheet({
     <StudioSheet title={t('studio.image.templates.title')} icon="albums-outline" onClose={onClose}>
       {currentDoc ? (
         <View style={styles.save}>
-          <TextInput
+          <TextInput maxFontSizeMultiplier={1.3}
             value={saveName}
             onChangeText={setSaveName}
             placeholder={currentDoc.name || t('studio.image.templates.myTemplate')}
@@ -98,7 +98,7 @@ export function TemplatesSheet({
             testID="template-save-name"
           />
           <Pressable style={styles.saveBtn} onPress={saveCurrent} accessibilityRole="button" testID="template-save">
-            <Text style={styles.saveText}>{t('studio.image.templates.saveAs')}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.saveText}>{t('studio.image.templates.saveAs')}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -120,18 +120,18 @@ export function TemplatesSheet({
           >
             <TemplatePreview tpl={tpl} />
             <View style={styles.flex}>
-              <Text style={styles.label} numberOfLines={1}>{nameOf(tpl)}</Text>
-              <Text style={styles.size}>{`${t(`studio.image.templates.cat.${tpl.category}`)} · ${tpl.width}×${tpl.height}${tpl.custom ? ` · ${t('studio.image.templates.mine')}` : ''}`}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.label} numberOfLines={1}>{nameOf(tpl)}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.size}>{`${t(`studio.image.templates.cat.${tpl.category}`)} · ${tpl.width}×${tpl.height}${tpl.custom ? ` · ${t('studio.image.templates.mine')}` : ''}`}</Text>
             </View>
           </Pressable>
         ))}
       </View>
       <View style={styles.brand}>
-        <Text style={styles.label}>{t('studio.image.brand.title')}</Text>
-        <Text style={styles.size}>{t('studio.image.brand.hint')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.label}>{t('studio.image.brand.title')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.size}>{t('studio.image.brand.hint')}</Text>
         <ColorField value={color} onChange={setColor} />
         {/* 🏷️ S11: márka-logók — koppintásra a lapra, hosszú nyomásra törlés; ugyanezek a videóban is */}
-        <Text style={styles.size}>{t('studio.image.brand.logos')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.size}>{t('studio.image.brand.logos')}</Text>
         <View style={styles.logos}>
           {logos.map((uri) => (
             <Pressable
@@ -148,10 +148,10 @@ export function TemplatesSheet({
             </Pressable>
           ))}
           <Pressable style={[styles.logo, styles.logoAdd]} onPress={() => void addLogo()} accessibilityRole="button" accessibilityLabel={t('studio.image.brand.logoAdd')} testID="brand-logo-add">
-            <Text style={styles.logoAddText}>＋</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.logoAddText}>＋</Text>
           </Pressable>
         </View>
-        <Text style={styles.size}>{t('studio.image.brand.font')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.size}>{t('studio.image.brand.font')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.fonts}>
           {fontOptions.filter((f) => f.family).map((f) => {
             const on = fontFamily === f.family;
@@ -164,7 +164,7 @@ export function TemplatesSheet({
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
               >
-                <Text style={[styles.fontText, { fontFamily: f.family }]} numberOfLines={1}>{f.label}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={[styles.fontText, { fontFamily: f.family }]} numberOfLines={1}>{f.label}</Text>
               </Pressable>
             );
           })}

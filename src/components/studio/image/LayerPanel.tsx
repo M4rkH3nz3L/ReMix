@@ -106,7 +106,7 @@ export function LayerPanel({
       {/* a rétegszerkezet műveletei; az elem saját műveletei az alsó sávban vannak */}
       {layer ? (
         <View style={styles.inspector}>
-          <Text style={styles.inspectorTitle} numberOfLines={1}>{layerLabel(layer)}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.inspectorTitle} numberOfLines={1}>{layerLabel(layer)}</Text>
           <View style={styles.opsRow}>
             <OpChip icon="git-merge-outline" label={t('studio.image.mergeDown')} disabled={!mergeDownTargets(doc, layer.id)} onPress={() => onMergeDown(layer.id)} />
             {layer.kind === 'text' || layer.kind === 'shape' ? (
@@ -116,7 +116,7 @@ export function LayerPanel({
           </View>
         </View>
       ) : (
-        <Text style={styles.hint}>{t('studio.image.selectHint')}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.hint}>{t('studio.image.selectHint')}</Text>
       )}
     </StudioSheet>
   );
@@ -142,7 +142,7 @@ function OpChip({
       accessibilityState={{ disabled: !!disabled }}
     >
       <Ionicons name={icon} size={15} color={palette.accent} />
-      <Text style={styles.addChipText}>{label}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.addChipText}>{label}</Text>
     </Pressable>
   );
 }
@@ -234,7 +234,7 @@ function LayerRow({
         </View>
       </GestureDetector>
       <LayerThumb layer={l} />
-      <Text style={[styles.layerName, l.hidden ? styles.hidden : null]} numberOfLines={2}>
+      <Text maxFontSizeMultiplier={1.3} style={[styles.layerName, l.hidden ? styles.hidden : null]} numberOfLines={2}>
         {label}
       </Text>
       <IconBtn
@@ -277,7 +277,7 @@ function GroupHeader({
           onPress={() => commit(updateGroup(doc, g.id, { collapsed: !g.collapsed }), 'group-collapse')}
         />
         <Ionicons name="folder-outline" size={14} color={palette.accent} />
-        <TextInput
+        <TextInput maxFontSizeMultiplier={1.3}
           style={[styles.groupName, styles.groupNameInput, g.hidden ? styles.hidden : null]}
           defaultValue={g.name}
           key={`gname-${g.id}`}

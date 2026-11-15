@@ -2245,10 +2245,10 @@ export function ImageStudioBody({
             testID="image-workspace-toggle"
           >
             <Ionicons name={workspaceTab === 'design' ? 'color-palette' : 'image'} size={12} color={palette.accent} />
-            <Text style={styles.kindTagText}>{t(`studio.image.workspace.${workspaceTab}`)}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.kindTagText}>{t(`studio.image.workspace.${workspaceTab}`)}</Text>
             <Ionicons name="swap-horizontal" size={11} color={palette.textDim} />
           </Pressable>
-          <Text style={styles.title} numberOfLines={1}>
+          <Text maxFontSizeMultiplier={1.3} style={styles.title} numberOfLines={1}>
             {title}
           </Text>
         </View>
@@ -2272,7 +2272,7 @@ export function ImageStudioBody({
             accessibilityLabel={t('studio.image.canvasTitle')}
           >
             <Ionicons name="resize-outline" size={14} color={palette.textDim} />
-            <Text style={styles.canvasBtnText}>
+            <Text maxFontSizeMultiplier={1.3} style={styles.canvasBtnText}>
               {effectiveCanvas(doc).width}×{effectiveCanvas(doc).height}
               {doc.format === 'vector' ? ' · SVG' : ''}
             </Text>
@@ -2289,7 +2289,7 @@ export function ImageStudioBody({
           ) : (
             <Ionicons name={mode === 'scoped' ? 'checkmark' : 'share-outline'} size={16} color="#fff" />
           )}
-          <Text style={styles.exportText}>
+          <Text maxFontSizeMultiplier={1.3} style={styles.exportText}>
             {mode === 'scoped' ? t('common.done') : t('studio.export')}
           </Text>
         </Pressable>
@@ -2323,7 +2323,7 @@ export function ImageStudioBody({
                       <Ionicons name="image-outline" size={16} color={palette.textDim} />
                     </View>
                   )}
-                  <Text style={styles.pageChipNum}>{i + 1}</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={styles.pageChipNum}>{i + 1}</Text>
                 </Pressable>
               );
             })}
@@ -2446,11 +2446,11 @@ export function ImageStudioBody({
           {exporting ? (
             <View style={styles.statusRow}>
               <ActivityIndicator size="small" color={palette.accent} />
-              <Text style={styles.statusText} numberOfLines={1}>
+              <Text maxFontSizeMultiplier={1.3} style={styles.statusText} numberOfLines={1}>
                 {t('studio.image.export.exporting')}
               </Text>
               <Pressable onPress={() => exportAbort.current?.abort()} hitSlop={8} accessibilityRole="button">
-                <Text style={styles.selectLink}>{t('studio.image.export.cancel')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.selectLink}>{t('studio.image.export.cancel')}</Text>
               </Pressable>
             </View>
           ) : null}
@@ -2459,14 +2459,14 @@ export function ImageStudioBody({
             /* ✂️ a kijelölés a többi eszköz alatt is él: innen szerkeszthető vagy szüntethető meg */
             <View style={styles.statusRow}>
               <Ionicons name="scan-outline" size={12} color={palette.accent} />
-              <Text style={styles.statusText} numberOfLines={1}>
+              <Text maxFontSizeMultiplier={1.3} style={styles.statusText} numberOfLines={1}>
                 {t('studio.image.select.active')}
               </Text>
               <Pressable onPress={() => startSelect('rect')} hitSlop={6} accessibilityRole="button">
-                <Text style={styles.selectLink}>{t('studio.image.select.edit')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.selectLink}>{t('studio.image.select.edit')}</Text>
               </Pressable>
               <Pressable onPress={clearSelection} hitSlop={6} accessibilityRole="button">
-                <Text style={styles.selectLink}>{t('studio.image.select.clear')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.selectLink}>{t('studio.image.select.clear')}</Text>
               </Pressable>
             </View>
           ) : null}
@@ -2478,7 +2478,7 @@ export function ImageStudioBody({
               size={9}
               color={selectedLayer ? palette.accent : palette.textDim}
             />
-            <Text style={styles.statusText} numberOfLines={2}>
+            <Text maxFontSizeMultiplier={1.3} style={styles.statusText} numberOfLines={2}>
               {guidesActive
                 ? t('studio.image.guides.hint')
                 : brushActive
@@ -2533,7 +2533,7 @@ export function ImageStudioBody({
               </ScrollView>
               <Pressable onPress={applyCrop} style={styles.cropApply} hitSlop={6}>
                 <Ionicons name="checkmark" size={16} color="#fff" />
-                <Text style={styles.cropApplyText}>{t('common.apply')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.cropApplyText}>{t('common.apply')}</Text>
               </Pressable>
             </View>
           ) : penPoints ? (
@@ -2561,7 +2561,7 @@ export function ImageStudioBody({
                 hitSlop={6}
                 disabled={penPoints.length < 3}
               >
-                <Text style={styles.penCloseText}>{t('studio.image.pen.close')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.pen.close')}</Text>
               </Pressable>
               <Pressable
                 onPress={() => commitPen(false)}
@@ -2570,7 +2570,7 @@ export function ImageStudioBody({
                 disabled={penPoints.length < 2}
               >
                 <Ionicons name="checkmark" size={16} color="#fff" />
-                <Text style={styles.cropApplyText}>{t('common.done')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.cropApplyText}>{t('common.done')}</Text>
               </Pressable>
             </View>
           ) : pathEditId ? (
@@ -2599,7 +2599,7 @@ export function ImageStudioBody({
                     hitSlop={6}
                     disabled={pathEditNode == null}
                   >
-                    <Text style={styles.penCloseText}>{t(`studio.image.pen.${type}`)}</Text>
+                    <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t(`studio.image.pen.${type}`)}</Text>
                   </Pressable>
                 ))}
                 {ringCount > 1 ? (
@@ -2611,20 +2611,20 @@ export function ImageStudioBody({
                     style={styles.penClose}
                     hitSlop={6}
                   >
-                    <Text style={styles.penCloseText}>{t('studio.image.pen.ring', { n: (pathEditRing % ringCount) + 1, total: ringCount })}</Text>
+                    <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.pen.ring', { n: (pathEditRing % ringCount) + 1, total: ringCount })}</Text>
                   </Pressable>
                 ) : ringCount === 0 ? (
                   <Pressable onPress={togglePathClosed} style={styles.penClose} hitSlop={6}>
-                    <Text style={styles.penCloseText}>{t(pathEditShape?.closed ? 'studio.image.pen.open' : 'studio.image.pen.closePath')}</Text>
+                    <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t(pathEditShape?.closed ? 'studio.image.pen.open' : 'studio.image.pen.closePath')}</Text>
                   </Pressable>
                 ) : null}
                 <Pressable onPress={reverseEditedPath} style={styles.penClose} hitSlop={6}>
-                  <Text style={styles.penCloseText}>{t('studio.image.pen.reverse')}</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.pen.reverse')}</Text>
                 </Pressable>
               </ScrollView>
               <Pressable onPress={() => setPathEditId(null)} style={styles.cropApply} hitSlop={6}>
                 <Ionicons name="checkmark" size={16} color="#fff" />
-                <Text style={styles.cropApplyText}>{t('common.done')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.cropApplyText}>{t('common.done')}</Text>
               </Pressable>
             </View>
           ) : assistantOpen && doc ? (
@@ -2651,7 +2651,7 @@ export function ImageStudioBody({
               <Pressable accessibilityRole="button" accessibilityLabel={t('common.cancel')} onPress={cancelLasso} style={styles.cropBtn} hitSlop={6}>
                 <Ionicons name="close" size={20} color={palette.text} />
               </Pressable>
-              <Text style={styles.lassoLabel} numberOfLines={1}>
+              <Text maxFontSizeMultiplier={1.3} style={styles.lassoLabel} numberOfLines={1}>
                 {t('studio.image.lasso.hint')}
               </Text>
             </View>
@@ -2694,13 +2694,13 @@ export function ImageStudioBody({
                 hitSlop={6}
                 accessibilityRole="button"
               >
-                <Text style={styles.penCloseText}>{t('studio.image.cornerPin.reset')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.cornerPin.reset')}</Text>
               </Pressable>
-              <Text style={styles.lassoLabel} numberOfLines={1}>
+              <Text maxFontSizeMultiplier={1.3} style={styles.lassoLabel} numberOfLines={1}>
                 {t('studio.image.cornerPin.hint')}
               </Text>
               <Pressable onPress={() => setCornerPinId(null)} style={styles.penClose} hitSlop={6} accessibilityRole="button">
-                <Text style={styles.penCloseText}>{t('common.done')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('common.done')}</Text>
               </Pressable>
             </View>
           ) : guidesActive ? (
@@ -2714,25 +2714,25 @@ export function ImageStudioBody({
                 style={styles.penClose}
                 hitSlop={6}
               >
-                <Text style={styles.penCloseText}>{t('studio.image.guides.thirds')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.guides.thirds')}</Text>
               </Pressable>
               <Pressable
                 onPress={() => doc && commit({ ...doc, guides: [] }, t('studio.image.undoGuides'))}
                 style={styles.penClose}
                 hitSlop={6}
               >
-                <Text style={styles.penCloseText}>{t('studio.image.guides.clear')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.guides.clear')}</Text>
               </Pressable>
               <Pressable onPress={() => updateGrid({ show: !(doc?.grid?.show ?? false) })} style={[styles.penClose, doc?.grid?.show ? styles.toggleOn : null]} hitSlop={6} accessibilityRole="button" accessibilityState={{ selected: !!doc?.grid?.show }}>
-                <Text style={styles.penCloseText}>{t('studio.image.guides.grid')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.guides.grid')}</Text>
               </Pressable>
               <Pressable onPress={() => updateGrid({ snap: !(doc?.grid?.snap ?? false) })} style={[styles.penClose, doc?.grid?.snap ? styles.toggleOn : null]} hitSlop={6} accessibilityRole="button" accessibilityState={{ selected: !!doc?.grid?.snap }}>
-                <Text style={styles.penCloseText}>{t('studio.image.guides.snap')}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.guides.snap')}</Text>
               </Pressable>
               <Pressable onPress={() => updateGrid({ size: GRID_SIZES[(GRID_SIZES.indexOf(doc?.grid?.size ?? 32) + 1) % GRID_SIZES.length] })} style={styles.penClose} hitSlop={6} accessibilityRole="button">
-                <Text style={styles.penCloseText}>{t('studio.image.guides.gridSize', { size: doc?.grid?.size ?? DEFAULT_GRID.size })}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.guides.gridSize', { size: doc?.grid?.size ?? DEFAULT_GRID.size })}</Text>
               </Pressable>
-              <Text style={styles.lassoLabel} numberOfLines={1}>
+              <Text maxFontSizeMultiplier={1.3} style={styles.lassoLabel} numberOfLines={1}>
                 {t('studio.image.guides.hint')}
               </Text>
             </View>

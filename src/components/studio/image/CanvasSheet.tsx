@@ -112,11 +112,11 @@ export function CanvasSheet({
       footer={
         <Pressable style={styles.apply} onPress={apply}>
           <Ionicons name="checkmark" size={16} color="#fff" />
-          <Text style={styles.applyText}>{t('common.apply')}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.applyText}>{t('common.apply')}</Text>
         </Pressable>
       }
     >
-      <Text style={styles.section}>{t('studio.image.canvasTransform')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('studio.image.canvasTransform')}</Text>
       <View style={styles.row}>
         <TransformBtn icon="refresh-outline" flip label={t('studio.image.rotateLeft')} onPress={() => transform(rotateCanvasDoc(doc, -90), t('studio.image.rotateLeft'))} />
         <TransformBtn icon="refresh-outline" label={t('studio.image.rotateRight')} onPress={() => transform(rotateCanvasDoc(doc, 90), t('studio.image.rotateRight'))} />
@@ -124,7 +124,7 @@ export function CanvasSheet({
         <TransformBtn icon="swap-vertical" label={t('studio.image.flipCanvasV')} onPress={() => transform(flipCanvasDoc(doc, 'vertical'), t('studio.image.flipCanvasV'))} />
       </View>
 
-      <Text style={styles.section}>{t('home.formatLabel')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('home.formatLabel')}</Text>
       <View style={styles.row}>
         <Chip label={t('home.formatRaster')} active={format === 'raster'} onPress={() => setFormat('raster')} />
         <Chip label={t('home.formatVector')} active={format === 'vector'} onPress={() => setFormat('vector')} />
@@ -132,7 +132,7 @@ export function CanvasSheet({
 
       {onVariant ? (
         <>
-          <Text style={styles.section}>{t('studio.image.variant.title')}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('studio.image.variant.title')}</Text>
           <View style={styles.row}>
             {CANVAS_PRESETS.map((p) => (
               <Chip
@@ -149,7 +149,7 @@ export function CanvasSheet({
         </>
       ) : null}
 
-      <Text style={styles.section}>{t('home.canvasLabel')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('home.canvasLabel')}</Text>
       <View style={styles.row}>
         {CANVAS_PRESETS.map((p) => (
           <Chip
@@ -165,8 +165,8 @@ export function CanvasSheet({
       </View>
       <View style={styles.dimRow}>
         <View style={styles.dimField}>
-          <Text style={styles.dimLabel}>{t('home.widthLabel')}</Text>
-          <TextInput accessibilityLabel={t('studio.image.a11y.canvasWidth')}
+          <Text maxFontSizeMultiplier={1.3} style={styles.dimLabel}>{t('home.widthLabel')}</Text>
+          <TextInput maxFontSizeMultiplier={1.3} accessibilityLabel={t('studio.image.a11y.canvasWidth')}
             value={w}
             onChangeText={(v) => setW(v.replace(/[^0-9]/g, ''))}
             keyboardType="number-pad"
@@ -186,8 +186,8 @@ export function CanvasSheet({
           <Ionicons name="swap-horizontal" size={18} color={palette.accent} />
         </Pressable>
         <View style={styles.dimField}>
-          <Text style={styles.dimLabel}>{t('home.heightLabel')}</Text>
-          <TextInput accessibilityLabel={t('studio.image.a11y.canvasHeight')}
+          <Text maxFontSizeMultiplier={1.3} style={styles.dimLabel}>{t('home.heightLabel')}</Text>
+          <TextInput maxFontSizeMultiplier={1.3} accessibilityLabel={t('studio.image.a11y.canvasHeight')}
             value={h}
             onChangeText={(v) => setH(v.replace(/[^0-9]/g, ''))}
             keyboardType="number-pad"
@@ -196,7 +196,7 @@ export function CanvasSheet({
           />
         </View>
       </View>
-      <Text style={styles.hint}>{t('home.canvasSize', { width: clampDim(w), height: clampDim(h) })}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.hint}>{t('home.canvasSize', { width: clampDim(w), height: clampDim(h) })}</Text>
       <View style={styles.row}>
         <Chip label={t('studio.image.resizeCanvas')} active={resizeMode === 'canvas'} onPress={() => setResizeMode('canvas')} />
         <Chip label={t('studio.image.resizeImage')} active={resizeMode === 'resample'} onPress={() => setResizeMode('resample')} />
@@ -218,7 +218,7 @@ export function CanvasSheet({
         </View>
       ) : null}
 
-      <Text style={styles.section}>{t('home.backgroundLabel')}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('home.backgroundLabel')}</Text>
       <View style={styles.bgRow}>
         {BG_SWATCHES.map((c) => (
           <Pressable
@@ -238,7 +238,7 @@ export function CanvasSheet({
           <Ionicons name="ban-outline" size={18} color={palette.textDim} />
         </Pressable>
       </View>
-      <TextInput accessibilityLabel={t('studio.image.a11y.backgroundHex')}
+      <TextInput maxFontSizeMultiplier={1.3} accessibilityLabel={t('studio.image.a11y.backgroundHex')}
         value={bg === 'transparent' ? '' : bg}
         onChangeText={setBg}
         placeholder={t('home.bgHexPlaceholder')}
@@ -255,7 +255,7 @@ export function CanvasSheet({
       <Slider label={t('studio.image.vignette', { defaultValue: 'Vignetta' })} value={vignette} min={0} max={1} onChange={setVignette} format={(v) => `${Math.round(v * 100)}%`} />
 
       {/* 🎬 dokumentum-szintű GLOBÁLIS look (grade + korrekció) a TELJES képre */}
-      <Text style={styles.section}>{t('studio.image.globalLook', { defaultValue: 'Globális look' })}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.section}>{t('studio.image.globalLook', { defaultValue: 'Globális look' })}</Text>
       <View style={styles.row}>
         {GRADE_PRESETS.map((g) => (
           <Chip

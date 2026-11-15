@@ -113,7 +113,7 @@ export function PhotoLayerView({
   const plain = layer.placeholder ? (
     <View style={styles.placeholder} accessibilityRole="button" accessibilityLabel={tr('studio.image.placeholder.pick')}>
       <Ionicons name="image-outline" size={Math.max(16, Math.min(40, Math.min(w, h) / 3))} color={palette.textDim} />
-      {Math.min(w, h) > 60 ? <Text style={styles.placeholderText}>{tr('studio.image.placeholder.pick')}</Text> : null}
+      {Math.min(w, h) > 60 ? <Text maxFontSizeMultiplier={1.3} style={styles.placeholderText}>{tr('studio.image.placeholder.pick')}</Text> : null}
     </View>
   ) : (
     <Image

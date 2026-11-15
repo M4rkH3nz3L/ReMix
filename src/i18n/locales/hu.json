@@ -4122,7 +4122,8 @@
         "wide": "Tág",
         "hint": "Koppints egy fotóra a hasonló-szín kijelöléshez",
         "failTitle": "Nincs kijelölés",
-        "failBody": "Nem sikerült szín-régiót kijelölni. Koppints egy fotó-réteg belsejébe."
+        "failBody": "Nem sikerült szín-régiót kijelölni. Koppints egy fotó-réteg belsejébe.",
+        "contiguous": "Összefüggő"
       },
       "pen": {
         "ring": "Alakzat {{n}}/{{total}}",

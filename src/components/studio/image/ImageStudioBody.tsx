@@ -253,6 +253,8 @@ export function ImageStudioBody({
   const [maskTarget, setMaskTarget] = useState<{ id: string; target: 'clip' | 'local' | 'heal' | 'paint' } | null>(null);
   const [wandActive, setWandActive] = useState(false);
   const [wandTolerance, setWandTolerance] = useState(32);
+  // S17: ki = színtartomány (a kép minden hasonló színű képpontja, nem csak az összefüggő régió)
+  const [wandContiguous, setWandContiguous] = useState(true);
   const [brushActive, setBrushActive] = useState(false);
   const [pixelOpen, setPixelOpen] = useState(false);
   const [multiIds, setMultiIds] = useState<string[] | null>(null);
@@ -1167,9 +1169,18 @@ export function ImageStudioBody({
     void (async () => {
       try {
         // Skia-függő mag → lustán töltjük; ha a natív modul hiányzik, a catch kezeli
-        const { magicWandSelect } = await import('@/lib/magicWandClient');
+        const { colorRangeSelect, magicWandSelect } = await import('@/lib/magicWandClient');
         const canvas = effectiveCanvas(doc);
         const boxAspect = (source.w * canvas.width) / (source.h * canvas.height);
+        if (!wandContiguous && selectTool === 'wand') {
+          const rings = await colorRangeSelect(uri, u, v, wandTolerance, { boxAspect, fit: source.fit });
+          if (rings && rings.length > 0) {
+            applyRangeRings(rings.map((r) => ({ op: r.op, points: r.points.map((p) => layerBoxToCanvas(p, source, canvas)) })));
+          } else {
+            Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.wand.failBody'));
+          }
+          return;
+        }
         const outline = await magicWandSelect(uri, u, v, wandTolerance, { boxAspect, fit: source.fit });
         if (outline && outline.length >= 3 && selectTool === 'wand') {
           addSelectionRing(outline.map((p) => layerBoxToCanvas(p, source, canvas)));
@@ -1419,6 +1430,21 @@ export function ImageStudioBody({
 
   // ✂️ kijelölés: eszköz választása; a többi mód bezárul, a meglévő kijelölés megmarad
   const addSelectionRing = (ring: Point[]) => setSelection((sel) => applyRing(sel, ring, selectMode));
+  // 🎯 S17: a színtartomány gyűrűi — új kijelölésként pontosan (régió + lyuk + sziget); a meglévőhöz
+  // adva / kivonva / metszve a régiók körvonalaival (a lyukak ilyenkor nem számítanak)
+  const applyRangeRings = (rings: { op: 'add' | 'subtract'; points: Point[] }[]) =>
+    setSelection((sel) => {
+      const fresh = selectMode === 'new' || !sel;
+      let next: Selection | null = fresh ? null : sel;
+      rings.forEach((r, i) => {
+        if (fresh) {
+          next = applyRing(i === 0 ? null : next, r.points, i === 0 ? 'new' : r.op);
+        } else if (r.op === 'add') {
+          next = applyRing(next, r.points, selectMode);
+        }
+      });
+      return next;
+    });
   const openSelectTool = (tool: SelectTool) => {
     setSelectTool(tool);
     setLassoActive(tool === 'lasso');
@@ -2513,6 +2539,9 @@ export function ImageStudioBody({
                 {WAND_TOLERANCES.map((w) => (
                   <Chip key={w.value} label={t(w.labelKey)} active={wandTolerance === w.value} onPress={() => setWandTolerance(w.value)} />
                 ))}
+                {selectTool === 'wand' ? (
+                  <Chip label={t('studio.image.wand.contiguous')} active={wandContiguous} onPress={() => setWandContiguous((c) => !c)} />
+                ) : null}
               </View>
             </View>
           ) : brushActive ? (

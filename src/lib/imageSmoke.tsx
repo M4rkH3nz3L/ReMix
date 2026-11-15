@@ -178,7 +178,7 @@ import { computeHistogram, histogramShift } from '@/lib/histogram';
 import { SelectionAnts } from '@/components/studio/image/SelectionAnts';
 import { updateLayer } from '@/lib/imageDoc';
 import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelection } from '@/lib/imageSelectionOps';
-import { applyRing, ellipseRing, invertSelection, rectRing, selectionToMask } from '@/lib/selection';
+import { applyRing, ellipseRing, invertSelection, rectRing, type Selection as ImgSelection, selectionToMask } from '@/lib/selection';
 import { DEFAULT_BRUSH, type RetouchTool, type Stroke } from '@/lib/brushEngine';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import { keepRenderedInProject, RenderStage, type RenderStageHandle } from '@/components/studio/image/RenderStage';
@@ -191,7 +191,7 @@ import { renderImageDoc } from '@/lib/imageDocClient';
 import { LUT_DRAFT_SIZE, LUT_SIZE } from '@/lib/imagePreviewLut';
 import { exportSize } from '@/lib/imageExport';
 import { makeId } from '@/lib/id';
-import { magicWandSelect } from '@/lib/magicWandClient';
+import { colorRangeSelect, magicWandSelect } from '@/lib/magicWandClient';
 import { normalizePickedImage } from '@/lib/media';
 import { toSrgbIfNeeded } from '@/lib/colorIntakeClient';
 import { projectMediaDir } from '@/lib/projectFolderClient';
@@ -8369,6 +8369,74 @@ async function smokeColorIntake(log: Log, setHarness: (n: ReactNode) => void) {
   setHarness(null);
 }
 
+/** 🎯 S17: színtartomány-kijelölés a valódi fotón (Skia-olvasás) → maszk; telefon = szerver, ellenpróba a pálcával */
+async function smokeColorRange(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  // kék alapon két külön piros folt; a nagyobbikban kék lyuk, a lyukban piros sziget
+  const surface = Skia.Surface.MakeOffscreen(400, 400)!;
+  const c = surface.getCanvas();
+  const paint = Skia.Paint();
+  const rect = (col: string, x: number, y: number, w: number, h: number) => {
+    paint.setColor(Skia.Color(col));
+    c.drawRect(Skia.XYWHRect(x, y, w, h), paint);
+  };
+  rect('#2030d0', 0, 0, 400, 400);
+  rect('#d02020', 30, 30, 200, 200);
+  rect('#2030d0', 80, 80, 100, 100);
+  rect('#d02020', 115, 115, 30, 30);
+  rect('#d02020', 280, 280, 80, 80);
+  surface.flush();
+  const f = new File(projectMediaDir(), `smoke_crange_${Date.now().toString(36)}.png`);
+  f.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const photo = { id: 'p', kind: 'photo', uri: f.uri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch' } as unknown as PhotoLayer;
+  const base = { id: 'cr', name: 'cr', aspectRatio: '1:1', width: 400, height: 400, layers: [{ id: 'bg', kind: 'fill', fill: '#000000' }, photo] } as unknown as ImageDoc;
+  const t0 = Date.now();
+  const rings = await colorRangeSelect(f.uri, 40 / 400, 40 / 400, 40, { boxAspect: 1, fit: 'stretch' });
+  const ms = Date.now() - t0;
+  log(!!rings && rings.map((r) => r.op).join(',') === 'add,subtract,add,add', 'színtartomány: két régió, egy lyuk, egy sziget', `${rings?.map((r) => r.op).join(',')} · ${ms} ms`);
+  if (!rings) {
+    setHarness(null);
+    removeFile(f.uri);
+    return;
+  }
+  let sel: ImgSelection | null = null;
+  rings.forEach((r, i) => {
+    sel = applyRing(i === 0 ? null : sel, r.points, i === 0 ? 'new' : r.op);
+  });
+  const masked = maskFromSelection(base, 'p', sel!)!;
+  const dev = await ref.current!.render(masked, 400);
+  const srv = await renderImageDoc(masked, 400);
+  if (!dev || !srv) {
+    log(false, 'színtartomány-maszk', 'nincs kép');
+  } else {
+    const [a, b] = [await decode(dev), await decode(srv)];
+    // látszik: a nagy folt kerete, a sziget, a kis folt; rejtett (fekete): a lyuk és a kék alap
+    const probes: [string, number, number, boolean][] = [['keret', 50, 130, true], ['sziget', 130, 130, true], ['kis folt', 320, 320, true], ['lyuk', 95, 130, false], ['alap', 260, 60, false]];
+    for (const [img, who] of [[a, 'telefon'], [b, 'szerver']] as const) {
+      const ok = probes.every(([, x, y, on]) => (pixel(img, x, y)[0] > 150) === on);
+      log(ok, `${who}: a maszk a színtartományt mutatja`, probes.map(([n, x, y]) => `${n} ${pixel(img, x, y)[0]}`).join(' · '));
+    }
+  }
+  // ellenpróba: az összefüggő pálca csak a koppintott foltot adja
+  const wand = await magicWandSelect(f.uri, 40 / 400, 40 / 400, 40, { boxAspect: 1, fit: 'stretch' });
+  const inWand = (x: number, y: number) => {
+    if (!wand) return false;
+    let inside = false;
+    for (let i = 0, j = wand.length - 1; i < wand.length; j = i++) {
+      const [p, q] = [wand[i], wand[j]];
+      if (p.y > y !== q.y > y && x < ((q.x - p.x) * (y - p.y)) / (q.y - p.y) + p.x) inside = !inside;
+    }
+    return inside;
+  };
+  log(inWand(0.12, 0.3) && !inWand(0.8, 0.8), 'ellenpróba: az összefüggő pálca a kis foltot nem jelöli ki', `kis folt a pálcában: ${inWand(0.8, 0.8)}`);
+  [dev, srv].forEach((u) => u && removeFile(u));
+  setHarness(null);
+  removeFile(f.uri);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -12290,6 +12358,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'colorrange') {
+    await step(phase, () => smokeColorRange(log, setHarness));
     return;
   }
   if (phase === 'intake') {

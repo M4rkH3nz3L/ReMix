@@ -4127,7 +4127,8 @@
         "wide": "Weit",
         "hint": "Tippe ein Foto an, um einen ähnlichen Farbbereich auszuwählen",
         "failTitle": "Keine Auswahl",
-        "failBody": "Konnte keinen Farbbereich auswählen. Tippe in eine Foto-Ebene."
+        "failBody": "Konnte keinen Farbbereich auswählen. Tippe in eine Foto-Ebene.",
+        "contiguous": "Benachbart"
       },
       "pen": {
         "ring": "Pfad {{n}}/{{total}}",

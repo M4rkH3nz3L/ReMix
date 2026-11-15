@@ -4122,7 +4122,8 @@
         "wide": "Wide",
         "hint": "Tap a photo to select a similar-color region",
         "failTitle": "No selection",
-        "failBody": "Couldn't select a color region. Tap inside a photo layer."
+        "failBody": "Couldn't select a color region. Tap inside a photo layer.",
+        "contiguous": "Contiguous"
       },
       "pen": {
         "ring": "Path {{n}}/{{total}}",

@@ -1,5 +1,6 @@
 import { AlphaType, ColorType, Skia } from '@shopify/react-native-skia';
 
+import { colorRangeRings, type RangeRing } from '@/lib/colorRange';
 import { magicWandOutline } from '@/lib/magicWand';
 import type { CanvasPoint } from '@/lib/penPath';
 import { boxToImage, imageToBox, type LayerFit } from '@/lib/wandMapping';
@@ -68,6 +69,52 @@ export async function magicWandSelect(
     return outline ? outline.map((p) => imageToBox(p, imageAspect, placement.boxAspect, placement.fit)) : null;
   } catch (caught) {
     logCaught('lib/magicWandClient.ts:magicWandSelect', caught);
+    return null;
+  }
+}
+
+/**
+ * 🎯 S17: színtartomány — a koppintott szín MINDEN hasonló képpontja (nem csak az összefüggő régió),
+ * a lyukakkal; a gyűrűk a fotó-doboz 0–1 terében, a kijelölés műveleteinek sorrendjében.
+ */
+export async function colorRangeSelect(
+  uri: string,
+  u: number,
+  v: number,
+  tolerance = 32,
+  placement: { boxAspect: number; fit: LayerFit } = { boxAspect: 1, fit: 'stretch' }
+): Promise<RangeRing[] | null> {
+  try {
+    const src = Skia.Image.MakeImageFromEncoded(await Skia.Data.fromURI(uri));
+    if (!src || !src.width() || !src.height()) {
+      return null;
+    }
+    const [ow, oh] = [src.width(), src.height()];
+    const scale = Math.min(1, MAX_DIM / Math.max(ow, oh));
+    const [w, h] = [Math.max(1, Math.round(ow * scale)), Math.max(1, Math.round(oh * scale))];
+    let img = src;
+    if (scale < 1) {
+      const surface = Skia.Surface.MakeOffscreen(w, h);
+      if (surface) {
+        surface.getCanvas().drawImageRect(src, Skia.XYWHRect(0, 0, ow, oh), Skia.XYWHRect(0, 0, w, h), Skia.Paint());
+        img = surface.makeImageSnapshot();
+      }
+    }
+    const px = img.readPixels(0, 0, { width: w, height: h, colorType: ColorType.RGBA_8888, alphaType: AlphaType.Unpremul });
+    if (!px || !(px instanceof Uint8Array)) {
+      return null;
+    }
+    const imageAspect = ow / oh;
+    const seed = boxToImage({ x: u, y: v }, imageAspect, placement.boxAspect, placement.fit);
+    if (!seed) {
+      return null;
+    }
+    const sx = Math.max(0, Math.min(w - 1, Math.round(seed.x * (w - 1))));
+    const sy = Math.max(0, Math.min(h - 1, Math.round(seed.y * (h - 1))));
+    const rings = colorRangeRings(px, w, h, sx, sy, tolerance);
+    return rings.map((r) => ({ op: r.op, points: r.points.map((p) => imageToBox(p, imageAspect, placement.boxAspect, placement.fit)) }));
+  } catch (caught) {
+    logCaught('lib/magicWandClient.ts:colorRangeSelect', caught);
     return null;
   }
 }

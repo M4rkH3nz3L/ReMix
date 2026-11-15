@@ -29,6 +29,7 @@ import { useEntitlement } from '@/store/entitlementStore';
 import type { Project, RenderedVersion } from '@/types/project';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { logCaught } from '@/lib/logCaught';
+import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 
 /**
  * Render-kliens. Két út:
@@ -410,6 +411,8 @@ export async function renderProjectVersion(
   opts?: RenderOptions
 ): Promise<RenderedVersion> {
   const file = await renderMp4(project, onProgress, settings, opts);
+  // 📊 CSWCR (CORE K4): a kész videó befejezi a láncot
+  logCswcr({ type: 'export', projectId: project.id, kind: studioKindOf(project.kind) });
   const dir = new Directory(Paths.document, 'renders');
   try {
     if (!dir.exists) {
@@ -1080,6 +1083,8 @@ export async function renderAndShareMp4(
     return;
   }
   const file = await renderMp4(project, onProgress, settings, opts);
+  // 📊 CSWCR (CORE K4): a kész videó befejezi a láncot
+  logCswcr({ type: 'export', projectId: project.id, kind: studioKindOf(project.kind) });
 
   // ide már csak NATÍVON jutunk (weben fentebb visszatértünk) → mentés a Fotókba
   let savedToPhotos = false;
@@ -1132,6 +1137,8 @@ export async function renderAndPost(
   opts?: RenderOptions
 ): Promise<void> {
   const file = await renderMp4(project, onProgress, settings, opts);
+  // 📊 CSWCR (CORE K4): a kész videó befejezi a láncot
+  logCswcr({ type: 'export', projectId: project.id, kind: studioKindOf(project.kind) });
 
   // Fotókba mentés — minden platform a galériából tudja betölteni a videót
   let assetId: string | null = null;

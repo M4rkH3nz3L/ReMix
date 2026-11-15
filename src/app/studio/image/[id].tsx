@@ -11,6 +11,7 @@ import { palette } from '@/constants/editor';
 import { flushProjectSave } from '@/hooks/useProjectAutosave';
 import { useStudioSession } from '@/hooks/useStudioSession';
 import { StudioStatusBanners } from '@/components/studio/StudioStatusBanners';
+import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { loadEvents, loadProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
 import { logCaught } from '@/lib/logCaught';
@@ -49,6 +50,8 @@ export default function ImageStudioScreen() {
           return;
         }
         useEditorStore.getState().loadProject(loaded, events);
+        // 📊 CSWCR (CORE K4): a Kép Stúdió szerkeszti a projektet (a lánc egyik stúdiója)
+        logCswcr({ type: 'edit', projectId: loaded.id, kind: studioKindOf(loaded.kind) });
         setLoading(false);
       })
       .catch((caught) => { logCaught('app/studio/image/[id].tsx:ImageStudioScreen', caught); return alive && setLoading(false); });

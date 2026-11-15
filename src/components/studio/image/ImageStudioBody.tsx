@@ -95,6 +95,7 @@ import { listProjects, loadProject } from '@/lib/storage';
 import { sendStillToVideo } from '@/lib/linkedAssetClient';
 import { flushProjectSave } from '@/hooks/useProjectAutosave';
 import { useActionMenu } from '@/store/actionMenuStore';
+import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { useEditorStore } from '@/store/editorStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
@@ -1520,7 +1521,12 @@ export function ImageStudioBody({
   };
 
   /** ✅ minőségkapu: a kész fájlt visszaolvassuk, a hibát a felhasználó is látja */
+  /** 📊 CSWCR (CORE K4): a Kép Stúdió exportja befejezi a láncot (export / poszt / csomag) */
+  const markExported = () => {
+    if (project) logCswcr({ type: 'export', projectId: project.id, kind: studioKindOf(project.kind) });
+  };
   const reportProblems = async (uri: string, target: ImageDoc, height: number, format: 'png' | 'jpg' | 'webp') => {
+    markExported();
     const { verifyExport } = await import('@/components/studio/image/exportVerify');
     const problems = await verifyExport(uri, { ...customExportSize(target, height), format, wantsAlpha: expectsAlpha(target, format) });
     if (problems.length > 0) {
@@ -1695,6 +1701,7 @@ export function ImageStudioBody({
         // a write úgyis felülírja
       }
       file.write(svg);
+      markExported();
       const canShare = await Sharing.isAvailableAsync().catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportSvg', caught); return false; });
       if (canShare) {
         await Sharing.shareAsync(file.uri, { mimeType: 'image/svg+xml', dialogTitle: t('studio.export') }).catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportSvg', caught); });
@@ -1723,6 +1730,7 @@ export function ImageStudioBody({
         Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.renderFailBody'));
         return;
       }
+      markExported();
       const canShare = await Sharing.isAvailableAsync().catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPdf', caught); return false; });
       if (canShare) {
         await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: t('studio.export') }).catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPdf', caught); });
@@ -1753,6 +1761,7 @@ export function ImageStudioBody({
       if (!uri) {
         return; // lemondás / Pro-paywall / hiba (a guardPro már jelzett)
       }
+      markExported();
       const canShare = await Sharing.isAvailableAsync().catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPsdFile', caught); return false; });
       if (canShare) {
         await Sharing.shareAsync(uri, {

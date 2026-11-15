@@ -121,6 +121,7 @@ import { emptySampler } from '@/lib/sampler';
 import { applyCommand } from '@/lib/commands';
 import { linkedAssets, mixdownVersion, relinkPlan, stillVersion } from '@/lib/linkedAsset';
 import { sendMixdownToVideo, sendStillToVideo, sourceVersionOf } from '@/lib/linkedAssetClient';
+import { renderProjectVersion } from '@/lib/render';
 import { clearCswcrLog, logCswcr, type CswcrStats } from '@/lib/cswcrClient';
 import { USER_PRESETS_KEY, useUserPresets } from '@/store/userPresetStore';
 import { useAudioEditMode } from '@/store/audioEditModeStore';
@@ -6183,6 +6184,13 @@ async function smokeLinkedImage(log: Log, setHarness: (n: ReactNode) => void) {
     return pixel(img, Math.round(img.width() / 2), Math.round(img.height() / 2)).slice(0, 3);
   };
   try {
+    // 📊 CORE K4: tiszta napló; a Kép Stúdió valódi megnyitása = a lánc 1. stúdiója (az útvonal naplózza)
+    await clearCswcrLog();
+    router.push(`/studio/image/${imageId}` as Href);
+    for (let i = 0; i < 60 && st().project?.id !== imageId; i++) await sleep(200);
+    await sleep(800);
+    router.back();
+    await sleep(600);
     // 1) küldés hivatkozással egy ÚJ videó-projektbe (a telefonos render-színpad képével)
     const uri0 = await ref.current!.render(doc0, 320);
     if (!uri0) throw new Error('nincs telefonos render');
@@ -6233,6 +6241,18 @@ async function smokeLinkedImage(log: Log, setHarness: (n: ReactNode) => void) {
     const asset2 = st().project!.assets.find((a) => a.source?.docId === 'lap1');
     const fill2 = (st().project!.imageDocs?.find((d) => d.id === 'lap1')?.layers[1] as { fill?: string } | undefined)?.fill;
     log(clipOf().uri === loadedUri && asset2?.source?.version === v0 && fill2 === '#ff0000', 'egy visszavonás: a régi kép, verzió és rétegek', `${asset2?.source?.version} · ${fill2}`);
+    st().redo();
+    await sleep(300);
+    // 📊 CORE K4: a videó VALÓDI renderje (a telefonon) befejezi a láncot → a mérőszám
+    const t0 = Date.now();
+    const rendered = await renderProjectVersion(st().project!).catch((caught) => {
+      logCaught('lib/imageSmoke.tsx:linkimg-render', caught);
+      return null;
+    });
+    const stats = (await runDevAction('cswcr.stats')) as CswcrStats;
+    log(!!rendered && stats.link.link >= 1 && stats.link.copy === 0, 'CSWCR: a kép → videó átadás hivatkozás volt (link-arány 1)', `render ${Date.now() - t0} ms · link ${stats.link.link}, másolat ${stats.link.copy}`);
+    log(stats.flow.multiStudio >= 1 && stats.flow.started >= 1 && stats.flow.completed >= 1 && stats.flow.relinks >= 1, 'CSWCR: a kép → videó lánc többstúdiós, elkezdett és a videó-exporttal befejezett; a frissítés elfogadva', `láncok ${stats.flow.chains}, többstúdiós ${stats.flow.multiStudio}, elkezdett ${stats.flow.started}, befejezett ${stats.flow.completed}, relink ${stats.flow.relinks}, CSWCR ${stats.flow.cswcr?.toFixed(2)}`);
+    if (rendered?.uri) removeFile(rendered.uri);
     router.back();
     await sleep(600);
     // 6) MEGLÉVŐ videó-projektbe: a klip a meglévők után, hivatkozással

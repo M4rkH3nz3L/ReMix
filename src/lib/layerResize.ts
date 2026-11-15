@@ -56,3 +56,44 @@ export function resizeFromCorner(
   const shift = diagLen * (factor - 1);
   return { factor, cx: start.cx + ux * shift, cy: start.cy + uy * shift };
 }
+
+/** S18: oldal-fogó — a keret egyik oldala, a szemközti oldal áll (nem arányos méretezés) */
+export type ResizeEdge = 'l' | 'r' | 't' | 'b';
+
+const EDGE_SIGNS: Record<ResizeEdge, { x: number; y: number }> = {
+  l: { x: -1, y: 0 },
+  r: { x: 1, y: 0 },
+  t: { x: 0, y: -1 },
+  b: { x: 0, y: 1 },
+};
+
+/**
+ * Az új fél-szélesség/-magasság és keret-közép az oldal-fogó húzásából: az elmozdulás a forgatott keret
+ * oldal-normálisára vetül, csak az a tengely változik, a szemközti oldal a helyén marad; a méret a
+ * `minSide`…`maxSide` közé esik (az oldal nem fordulhat át a másik oldalra).
+ */
+export function resizeFromEdge(
+  start: ResizeStart,
+  edge: ResizeEdge,
+  dx: number,
+  dy: number,
+  limits: ResizeLimits
+): { halfW: number; halfH: number; cx: number; cy: number } {
+  const rad = (start.rotation * Math.PI) / 180;
+  const sign = EDGE_SIGNS[edge];
+  // az oldal kifelé mutató normálisa a forgatott keretben
+  const nx = sign.x * Math.cos(rad) - sign.y * Math.sin(rad);
+  const ny = sign.x * Math.sin(rad) + sign.y * Math.cos(rad);
+  const along = dx * nx + dy * ny;
+  const horizontal = sign.x !== 0;
+  const from = 2 * (horizontal ? start.halfW : start.halfH);
+  const size = Math.max(limits.minSide, Math.min(limits.maxSide, from + along));
+  const grow = size - from;
+  // a közép a növekmény felével mozdul az oldal felé: a szemközti oldal áll
+  return {
+    halfW: horizontal ? size / 2 : start.halfW,
+    halfH: horizontal ? start.halfH : size / 2,
+    cx: start.cx + (nx * grow) / 2,
+    cy: start.cy + (ny * grow) / 2,
+  };
+}

@@ -5,7 +5,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { palette } from '@/constants/editor';
 import type { LivePatch } from '@/lib/imageLayerClip';
 import { textSize } from '@/lib/imageLayerLayout';
-import { resizeFromCorner, type ResizeCorner, type ResizeStart } from '@/lib/layerResize';
+import { resizeFromCorner, resizeFromEdge, type ResizeCorner, type ResizeEdge, type ResizeStart } from '@/lib/layerResize';
 import type { ImageLayer } from '@/types/project';
 
 const round4 = (v: number) => Math.round(v * 1e4) / 1e4;
@@ -25,6 +25,13 @@ const CORNER_STYLE: Record<ResizeCorner, object> = {
   tr: { right: -22, top: -22 },
   bl: { left: -22, bottom: -22 },
   br: { right: -22, bottom: -22 },
+};
+/** S18: oldal-fogók (nem arányos méretezés); a szövegnek csak bal/jobb (a tördelési szélesség) */
+const EDGE_STYLE: Record<ResizeEdge, object> = {
+  l: { left: -22, top: '50%', marginTop: -22 },
+  r: { right: -22, top: '50%', marginTop: -22 },
+  t: { top: -22, left: '50%', marginLeft: -22 },
+  b: { bottom: -22, left: '50%', marginLeft: -22 },
 };
 
 /**
@@ -123,6 +130,47 @@ export function SelectionFrame({
         }
       });
 
+  // ── S18: oldal-fogó — csak az egyik tengely nő/fogy, a szemközti oldal áll; a szöveg tördelési szélessége ──
+  const updateEdge = (edge: ResizeEdge, tx: number, ty: number) => {
+    const start = resizeStart.current;
+    if (!start || start.layer.kind === 'fill' || start.layer.kind === 'adjust') {
+      return;
+    }
+    const limits = { minSide: MIN_SIDE_PX * s, maxSide: MAX_CANVAS_MULTIPLE * Math.max(box.w, box.h) };
+    const r = resizeFromEdge(start.geom, edge, tx * s, ty * s, limits);
+    const position = { x: r.cx / box.w, y: r.cy / box.h };
+    const patch: LivePatch =
+      start.layer.kind === 'text'
+        ? { boxWidth: round4(Math.min(1, (2 * r.halfW) / box.w)), position }
+        : { w: round4((2 * r.halfW) / box.w), h: round4((2 * r.halfH) / box.h), position };
+    pending.current = patch;
+    onLive(patch);
+  };
+  const edgeGesture = (edge: ResizeEdge) =>
+    Gesture.Pan()
+      .withTestId(`edge-${edge}`)
+      .runOnJS(true)
+      .maxPointers(1)
+      .minDistance(0)
+      .hitSlop(8)
+      .onStart(startResize)
+      .onUpdate((e) => updateEdge(edge, e.translationX, e.translationY))
+      .onEnd(() => {
+        if (Object.keys(pending.current).length > 0) {
+          onCommit(pending.current);
+        }
+        pending.current = {};
+        resizeStart.current = null;
+      })
+      .onFinalize((_e, success) => {
+        if (!success) {
+          pending.current = {};
+          resizeStart.current = null;
+          onLive({});
+        }
+      });
+  const edges: ResizeEdge[] = layer.kind === 'text' ? ['l', 'r'] : ['l', 'r', 't', 'b'];
+
   // ── Forgatás (fej-fogó): a keret középpontja köré, abszolút képernyő-koordinátából ──
   const rotateGesture = Gesture.Pan()
     .runOnJS(true)
@@ -185,6 +233,13 @@ export function SelectionFrame({
           <View style={styles.rotDot} />
         </View>
       </GestureDetector>
+      {edges.map((edge) => (
+        <GestureDetector key={edge} gesture={edgeGesture(edge)}>
+          <View style={[styles.scaleHandle, EDGE_STYLE[edge], { transform: [{ scale: s }] }]}>
+            <View style={edge === 'l' || edge === 'r' ? styles.edgeBarV : styles.edgeBarH} />
+          </View>
+        </GestureDetector>
+      ))}
       {CORNERS.map((corner) => (
         <GestureDetector key={corner} gesture={scaleGesture(corner)}>
           <View style={[styles.scaleHandle, CORNER_STYLE[corner], { transform: [{ scale: s }] }]}>
@@ -207,6 +262,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scaleDot: { width: 14, height: 14, borderRadius: 3, backgroundColor: '#fff', borderWidth: 2, borderColor: palette.accent },
+  edgeBarV: { width: 8, height: 20, borderRadius: 4, backgroundColor: '#fff', borderWidth: 2, borderColor: palette.accent },
+  edgeBarH: { width: 20, height: 8, borderRadius: 4, backgroundColor: '#fff', borderWidth: 2, borderColor: palette.accent },
   rotStem: { position: 'absolute', left: '50%', backgroundColor: palette.accent },
   rotHandle: {
     position: 'absolute',

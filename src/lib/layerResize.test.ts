@@ -1,4 +1,4 @@
-import { resizeFromCorner, type ResizeStart } from '@/lib/layerResize';
+import { resizeFromCorner, resizeFromEdge, type ResizeStart } from '@/lib/layerResize';
 
 const start: ResizeStart = { cx: 100, cy: 100, halfW: 50, halfH: 50, rotation: 0 };
 const limits = { minSide: 24, maxSide: 2000 };
@@ -40,5 +40,42 @@ describe('resizeFromCorner', () => {
       last = resizeFromCorner(start, 'br', d, d, limits).factor;
     }
     expect(last).toBeCloseTo(resizeFromCorner(start, 'br', 40, 40, limits).factor);
+  });
+});
+
+describe('S18: oldal-fogó (nem arányos méretezés)', () => {
+  const start = { cx: 100, cy: 100, halfW: 50, halfH: 25, rotation: 0 };
+  const limits = { minSide: 10, maxSide: 1000 };
+
+  it('a jobb oldal húzása csak a szélességet változtatja, a bal oldal áll', () => {
+    const r = resizeFromEdge(start, 'r', 30, 40, limits);
+    expect(r.halfW).toBeCloseTo(65);
+    expect(r.halfH).toBe(25);
+    expect(r.cx - r.halfW).toBeCloseTo(50); // a bal oldal
+    expect(r.cy).toBe(100);
+  });
+
+  it('a felső oldal felfelé húzva magasabb, az alsó oldal áll', () => {
+    const r = resizeFromEdge(start, 't', 5, -20, limits);
+    expect(r.halfH).toBeCloseTo(35);
+    expect(r.halfW).toBe(50);
+    expect(r.cy + r.halfH).toBeCloseTo(125); // az alsó oldal
+  });
+
+  it('forgatott keretnél az oldal normálisára vetít, a szemközti oldal közepe áll', () => {
+    const rot = { ...start, rotation: 90 };
+    // 90°-nál a „jobb” oldal lefelé néz: lefelé húzva szélesebb, oldalra húzva nem
+    const r = resizeFromEdge(rot, 'r', 0, 20, limits);
+    expect(r.halfW).toBeCloseTo(60);
+    expect(resizeFromEdge(rot, 'r', 20, 0, limits).halfW).toBeCloseTo(50);
+    // a bal oldal közepe (a középtől −halfW a normális mentén) a helyén
+    expect(r.cx).toBeCloseTo(100);
+    expect(r.cy - r.halfW).toBeCloseTo(100 - 50);
+  });
+
+  it('nem fordul át: a méret a minimumon áll meg', () => {
+    const r = resizeFromEdge(start, 'l', 500, 0, limits);
+    expect(r.halfW).toBeCloseTo(5);
+    expect(r.cx + r.halfW).toBeCloseTo(150); // a jobb oldal áll
   });
 });

@@ -138,6 +138,45 @@ describe('méretezés a kijelölő keretben', () => {
       expect(getByGestureTestId(`scale-${c}`)).toBeTruthy();
     }
   });
+
+  // S18: oldal-fogó — csak egy tengely, a szemközti oldal áll
+  const dragEdge = async (edge: string, dx: number, dy: number) => {
+    type Handlers = { onStart: (e: object) => void; onUpdate: (e: object) => void; onEnd: (e: object, ok: boolean) => void; onFinalize: (e: object, ok: boolean) => void };
+    const handlers = () => (getByGestureTestId(`edge-${edge}`) as unknown as { handlers: Handlers }).handlers;
+    const step = (fn: () => void) => act(async () => { fn(); await Promise.resolve(); });
+    await step(() => handlers().onStart({}));
+    await step(() => handlers().onUpdate({ translationX: dx / 2, translationY: dy / 2 }));
+    await step(() => handlers().onUpdate({ translationX: dx, translationY: dy }));
+    await step(() => handlers().onEnd({ translationX: dx, translationY: dy }, true));
+    await step(() => handlers().onFinalize({}, true));
+  };
+  it('a jobb oldal-fogó csak szélesít, a bal oldal és a magasság marad', async () => {
+    const onCommit = jest.fn();
+    render(<Harness onCommit={onCommit} />);
+    await dragEdge('r', 50, 30);
+    const p = onCommit.mock.calls[0][0] as LivePatch;
+    expect(p.h).toBeCloseTo(0.5, 3);
+    expect(p.w).toBeGreaterThan(0.5);
+    expect(p.position!.x - p.w! / 2).toBeCloseTo(0.25, 2);
+  });
+  it('a felső oldal-fogó csak magasít, az alsó oldal marad', async () => {
+    const onCommit = jest.fn();
+    render(<Harness onCommit={onCommit} />);
+    await dragEdge('t', 20, -40);
+    const p = onCommit.mock.calls[0][0] as LivePatch;
+    expect(p.w).toBeCloseTo(0.5, 3);
+    expect(p.h).toBeGreaterThan(0.5);
+    expect(p.position!.y + p.h! / 2).toBeCloseTo(0.75, 2);
+  });
+  it('szövegen az oldal-fogó a tördelési szélességet állítja (a betűméret marad)', async () => {
+    const onCommit = jest.fn();
+    const text = { kind: 'text', id: 't', text: 'Hello világ', position: { x: 0.5, y: 0.5 }, fontSize: 8, color: '#fff' } as unknown as ImageLayer;
+    render(<SelectionFrame layer={text} box={box} onLive={() => {}} onCommit={onCommit} />);
+    await dragEdge('r', 30, 0);
+    const p = onCommit.mock.calls[0][0] as LivePatch;
+    expect(p.boxWidth).toBeGreaterThan(0);
+    expect(p.fontSize).toBeUndefined();
+  });
 });
 
 describe('réteg-sorrend húzással', () => {

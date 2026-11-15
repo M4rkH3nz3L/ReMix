@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Chip, PanelSection, PrimaryButton } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
@@ -19,6 +20,10 @@ import {
 import type { IntroTemplate, OutroTemplate } from '@/lib/brandIntro';
 import { loadBrandKit, saveBrandKit } from '@/lib/brandStore';
 import { makeId } from '@/lib/id';
+import { fontOptions } from '@/constants/fonts';
+import { useBrandStyle } from '@/store/brandStyleStore';
+import { insertBrandLogoWatermark } from '@/lib/brandLogoClient';
+import type { TextClip } from '@/types/project';
 import { projectDuration } from '@/lib/projectUtils';
 import { useEditorStore } from '@/store/editorStore';
 import { logCaught } from '@/lib/logCaught';
@@ -33,6 +38,30 @@ export function BrandKitSection() {
   const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
   const [intro, setIntro] = useState<IntroTemplate | null>(null);
   const [outro, setOutro] = useState<OutroTemplate | null>(null);
+  const logos = useBrandStyle((s) => s.logos ?? []);
+  const brandFont = useBrandStyle((s) => s.fontFamily);
+  const brandFontLabel = fontOptions.find((f) => f.family === brandFont)?.label ?? brandFont ?? '';
+  useEffect(() => {
+    void useBrandStyle.getState().hydrate();
+  }, []);
+
+  // 🏷️ S11: a márka-logó vízjelként (jobb alsó sarok, az egész videón) — a projektbe másolva, egy lépés
+  const addLogoWatermark = (uri: string) => {
+    if (!insertBrandLogoWatermark(uri, t('panels.assistant.watermarkName'))) {
+      Alert.alert(t('studio.image.brand.logos'), t('studio.image.brand.logoMissing'));
+    }
+  };
+  // 🔤 S11: a márka-fontja a feliratokra (egy lépés)
+  const applyBrandFont = () => {
+    const state = useEditorStore.getState();
+    const track = state.project?.tracks.find((tr) => tr.type === 'captions');
+    if (!brandFont || !track || track.clips.length === 0) {
+      Alert.alert(t('panels.assistant.brandKitTitle'), t('panels.assistant.brandNothingToApply'));
+      return;
+    }
+    const clips = track.clips.map((c) => (c.kind === 'text' && !c.text3d ? ({ ...c, fontFamily: brandFont } as TextClip) : c));
+    state.dispatch({ type: 'REPLACE_TRACK_CLIPS', trackType: 'captions', clips }, 'user');
+  };
 
   useEffect(() => {
     let alive = true;
@@ -62,6 +91,10 @@ export function BrandKitSection() {
     }
     await saveBrandKit(kit);
     setBrandKit(kit);
+    // 🏷️ S11: a projekt vízjel-logója a közös márkába is (a Kép Stúdióban is elérhető)
+    if (kit.watermark?.imageUri && !(useBrandStyle.getState().logos ?? []).length) {
+      await useBrandStyle.getState().addLogo(kit.watermark.imageUri);
+    }
     Alert.alert(t('panels.assistant.brandKitSaved'), describeBrandKit(kit));
   };
 
@@ -214,6 +247,20 @@ export function BrandKitSection() {
           : t('panels.assistant.brandNoSavedHint')}
       </Text>
 
+      {/* 🏷️ S11: a közös márka (a Kép Stúdióval azonos) — logó vízjelként egy koppintással, márka-font a feliratokra */}
+      <Text style={styles.subLabel}>{t('studio.image.brand.logos')}</Text>
+      <View style={styles.row}>
+        {logos.map((uri) => (
+          <Pressable key={uri} style={styles.logo} onPress={() => addLogoWatermark(uri)} accessibilityRole="button" accessibilityLabel={t('studio.image.brand.logoInsert')} testID="video-brand-logo">
+            <Image source={{ uri }} style={styles.logoImg} contentFit="contain" />
+          </Pressable>
+        ))}
+        {logos.length === 0 ? <Text style={styles.note}>{t('panels.assistant.brandNoLogos')}</Text> : null}
+      </View>
+      {brandFont ? (
+        <PrimaryButton icon="text-outline" label={t('panels.assistant.brandFontCaptions', { font: brandFontLabel })} onPress={applyBrandFont} />
+      ) : null}
+
       <Text style={styles.subLabel}>{t('panels.assistant.introLabel')}</Text>
       <View style={styles.row}>
         {INTRO_TEMPLATES.map((tpl) => (
@@ -251,6 +298,8 @@ export function BrandKitSection() {
 }
 
 const styles = StyleSheet.create({
+  logo: { width: 52, height: 52, borderRadius: 10, borderWidth: 1, borderColor: palette.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  logoImg: { width: 44, height: 44 },
   row: {
     flexDirection: 'row',
     flexWrap: 'wrap',

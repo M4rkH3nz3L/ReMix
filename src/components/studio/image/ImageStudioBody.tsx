@@ -97,6 +97,8 @@ import { listProjects, loadProject } from '@/lib/storage';
 import { sendStillToVideo } from '@/lib/linkedAssetClient';
 import { flushProjectSave } from '@/hooks/useProjectAutosave';
 import { useActionMenu } from '@/store/actionMenuStore';
+import { copyBrandLogoInto } from '@/store/brandStyleStore';
+import { brandLogoLayer } from '@/lib/imageBrand';
 import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { useEditorStore } from '@/store/editorStore';
 import { useEntitlement } from '@/store/entitlementStore';
@@ -472,6 +474,25 @@ export function ImageStudioBody({
     setActivePageId(nd.id);
     setSelectedId(null);
   };
+  // 🏷️ S11: a márka-logó a lapra — a projektbe MÁSOLVA (a márka-fájl a helyén marad), egy visszavonás
+  const insertBrandLogo = (uri: string) => {
+    if (!doc) return;
+    const copy = copyBrandLogoInto(projectMediaDir(), uri);
+    if (!copy) {
+      Alert.alert(t('studio.image.brand.logos'), t('studio.image.brand.logoMissing'));
+      return;
+    }
+    const id = makeId('lyr');
+    commit(addLayer(doc, brandLogoLayer(copy, id, effectiveCanvas(doc), t('studio.image.brand.logoName'))), t('studio.image.brand.logoInsert'));
+    setSelectedId(id);
+  };
+  // 🧪 füstteszt: ugyanaz a beszúrás, a lap nélkül
+  const insertBrandLogoRef = useRef(insertBrandLogo);
+  insertBrandLogoRef.current = insertBrandLogo;
+  useEffect(() => registerDevAction('image.insertBrandLogo', (arg) => {
+    insertBrandLogoRef.current(String(arg));
+    return true;
+  }), []);
   const addTemplatePage = (tpl: ImageTemplate) => addDocPage(docFromTemplate(tpl, t(`studio.image.templates.${tpl.key}`), () => makeId('lyr'), useBrandStyle.getState()));
   const addVariantPage = (width: number, height: number, label: string) => {
     if (doc) {
@@ -2547,6 +2568,7 @@ export function ImageStudioBody({
             onRaster={(o) => void exportImage(o)}
             onPack={(o) => void exportPack(o)}
             onTemplate={addTemplatePage}
+            onBrandLogo={insertBrandLogo}
             onVariant={addVariantPage}
             onLayerMenu={onLayerMenu}
             onSvg={() => void exportSvg()}

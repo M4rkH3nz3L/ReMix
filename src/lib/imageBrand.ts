@@ -4,6 +4,11 @@ import type { ImageDoc, ImageLayer, ShapeLayer, TextLayer } from '@/types/projec
 export interface BrandStyle {
   colors: string[];
   fontFamily?: string;
+  /**
+   * 🏷️ márka-logók (IMAGE-PROD S11 · DS3): a fájl a telefon márka-mappájában (projekteken kívül);
+   * beszúráskor a projektbe MÁSOLÓDIK (a mentés a projekten kívüli fájlt a projektbe költöztetné)
+   */
+  logos?: string[];
 }
 
 export const EMPTY_BRAND: BrandStyle = { colors: [] };
@@ -41,6 +46,38 @@ export function contrast(a: string, b: string): number {
 export function addBrandColor(style: BrandStyle, color: string): BrandStyle {
   const c = color.toLowerCase();
   return { ...style, colors: [c, ...style.colors.filter((x) => x !== c)].slice(0, MAX_BRAND_COLORS) };
+}
+
+export const MAX_BRAND_LOGOS = 4;
+
+/** az új logó előre kerül; a limit fölött a legrégebbi esik ki */
+export function addBrandLogo(style: BrandStyle, uri: string): BrandStyle {
+  return { ...style, logos: [uri, ...(style.logos ?? []).filter((x) => x !== uri)].slice(0, MAX_BRAND_LOGOS) };
+}
+
+export function removeBrandLogo(style: BrandStyle, uri: string): BrandStyle {
+  return { ...style, logos: (style.logos ?? []).filter((x) => x !== uri) };
+}
+
+/**
+ * a logó mint kép-réteg: a jobb alsó sarokban, a rövidebb oldal ~18%-án, a teljes logó látszik
+ * (`contain`); a vászon arányától függetlenül négyzetes doboz
+ */
+export function brandLogoLayer(uri: string, id: string, canvas: { width: number; height: number }, name = 'Logó'): ImageLayer {
+  const short = Math.min(canvas.width, canvas.height);
+  const w = (short * 0.18) / canvas.width;
+  const h = (short * 0.18) / canvas.height;
+  const margin = (short * 0.04);
+  return {
+    kind: 'photo',
+    id,
+    name,
+    uri,
+    position: { x: 1 - margin / canvas.width - w / 2, y: 1 - margin / canvas.height - h / 2 },
+    w,
+    h,
+    fit: 'contain',
+  } as ImageLayer;
 }
 
 export function removeBrandColor(style: BrandStyle, color: string): BrandStyle {

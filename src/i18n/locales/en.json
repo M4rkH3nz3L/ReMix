@@ -1392,6 +1392,8 @@
       "makeProductAdBtn": "🛍️ Make product video (10 s)",
       "productAdNote": "The AI picks the best-looking moments (sharpness, contrast, faces), arranges them in a Product look, and writes a title plus a closing call to action.",
       "brandKitTitle": "Brand Kit",
+      "brandNoLogos": "No brand logo yet (add one on the Image Studio templates sheet).",
+      "brandFontCaptions": "Brand font on captions ({{font}})",
       "brandKitNoStyle": "No style can be read from this project — it needs captions or a logo watermark.",
       "brandKitSaved": "Brand Kit saved",
       "brandKitNoSaved": "No saved brand yet — save one from a project first.",
@@ -3486,6 +3488,12 @@
         "points": "Vector content is too complex to export. Simplify the shapes."
       },
       "brand": {
+        "logos": "Brand logos",
+        "logoAdd": "Add logo",
+        "logoInsert": "Logo onto the page",
+        "logoRemove": "Remove logo from brand",
+        "logoMissing": "The logo file was not found.",
+        "logoName": "Logo",
         "title": "My brand",
         "hint": "Templates open with these, and they appear in every colour picker.",
         "colors": "Brand",

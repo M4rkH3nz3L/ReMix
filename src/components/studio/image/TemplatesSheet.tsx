@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -9,6 +10,7 @@ import { Chip } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { fontOptions } from '@/constants/fonts';
 import { makeId } from '@/lib/id';
+import { pickImage } from '@/lib/media';
 import { docFromTemplate, TEMPLATE_CATEGORIES, templateFromDoc, templatesIn, type ImageTemplate, type TemplateCategory } from '@/lib/imageTemplates';
 import { useBrandStyle } from '@/store/brandStyleStore';
 import { useUserTemplates } from '@/store/userTemplatesStore';
@@ -36,16 +38,38 @@ function TemplatePreview({ tpl }: { tpl: ImageTemplate }) {
  * mindegyik új lapot nyit szerkeszthető rétegekkel; a helyőrzőbe koppintva kép a galériából. A
  * „Mentés sablonként” az aktuális lapot teszi a saját sablonok közé (a telefonon, offline).
  */
-export function TemplatesSheet({ onPick, onClose, currentDoc }: { onPick: (tpl: ImageTemplate) => void; onClose: () => void; currentDoc?: ImageDoc | null }) {
+export function TemplatesSheet({
+  onPick,
+  onClose,
+  currentDoc,
+  onBrandLogo,
+}: {
+  onPick: (tpl: ImageTemplate) => void;
+  onClose: () => void;
+  currentDoc?: ImageDoc | null;
+  /** 🏷️ S11: a márka-logó a lapra (a hívó a projektbe másolja) */
+  onBrandLogo?: (uri: string) => void;
+}) {
   const { t } = useTranslation();
   const fontFamily = useBrandStyle((s) => s.fontFamily);
   const custom = useUserTemplates((s) => s.templates);
+  const logos = useBrandStyle((s) => s.logos ?? []);
   const [color, setColor] = useState('#ff2d95');
   const [category, setCategory] = useState<TemplateCategory | 'all'>('all');
   const [saveName, setSaveName] = useState('');
   useEffect(() => {
     void useUserTemplates.getState().hydrate();
+    void useBrandStyle.getState().hydrate();
   }, []);
+  const addLogo = async () => {
+    const picked = await pickImage();
+    if (picked) await useBrandStyle.getState().addLogo(picked.uri);
+  };
+  const askRemoveLogo = (uri: string) =>
+    Alert.alert(t('studio.image.brand.logoRemove'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: () => void useBrandStyle.getState().removeLogo(uri) },
+    ]);
   const list = templatesIn(category, custom);
   const nameOf = (tpl: ImageTemplate) => tpl.name ?? t(`studio.image.templates.${tpl.key}`);
   const saveCurrent = () => {
@@ -106,6 +130,27 @@ export function TemplatesSheet({ onPick, onClose, currentDoc }: { onPick: (tpl: 
         <Text style={styles.label}>{t('studio.image.brand.title')}</Text>
         <Text style={styles.size}>{t('studio.image.brand.hint')}</Text>
         <ColorField value={color} onChange={setColor} />
+        {/* 🏷️ S11: márka-logók — koppintásra a lapra, hosszú nyomásra törlés; ugyanezek a videóban is */}
+        <Text style={styles.size}>{t('studio.image.brand.logos')}</Text>
+        <View style={styles.logos}>
+          {logos.map((uri) => (
+            <Pressable
+              key={uri}
+              style={styles.logo}
+              onPress={() => onBrandLogo?.(uri)}
+              onLongPress={() => askRemoveLogo(uri)}
+              accessibilityRole="button"
+              accessibilityLabel={t('studio.image.brand.logoInsert')}
+              accessibilityHint={t('studio.image.brand.logoRemove')}
+              testID="brand-logo"
+            >
+              <Image source={{ uri }} style={styles.logoImg} contentFit="contain" />
+            </Pressable>
+          ))}
+          <Pressable style={[styles.logo, styles.logoAdd]} onPress={() => void addLogo()} accessibilityRole="button" accessibilityLabel={t('studio.image.brand.logoAdd')} testID="brand-logo-add">
+            <Text style={styles.logoAddText}>＋</Text>
+          </Pressable>
+        </View>
         <Text style={styles.size}>{t('studio.image.brand.font')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.fonts}>
           {fontOptions.filter((f) => f.family).map((f) => {
@@ -137,6 +182,11 @@ const styles = StyleSheet.create({
   cats: { gap: 6, paddingBottom: 10 },
   brand: { gap: 8, marginTop: 16 },
   fonts: { gap: 6 },
+  logos: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  logo: { width: 56, height: 56, borderRadius: 10, borderWidth: 1, borderColor: palette.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  logoImg: { width: 48, height: 48 },
+  logoAdd: { borderStyle: 'dashed' },
+  logoAddText: { color: palette.textDim, fontSize: 22, fontWeight: '700' },
   font: { minHeight: 40, paddingHorizontal: 12, justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: palette.border },
   fontOn: { borderColor: palette.text, borderWidth: 2 },
   fontText: { color: palette.text, fontSize: 14 },

@@ -1392,6 +1392,8 @@
       "makeProductAdBtn": "🛍️ Produktvideo erstellen (10 s)",
       "productAdNote": "Die KI wählt die am besten aussehenden Momente (Schärfe, Kontrast, Gesicht), ordnet sie im Product-Look an und schreibt Titel plus abschließenden Call-to-Action.",
       "brandKitTitle": "Brand Kit",
+      "brandNoLogos": "Noch kein Marken-Logo (im Bild-Studio auf dem Vorlagen-Blatt hinzufügen).",
+      "brandFontCaptions": "Markenschrift für Untertitel ({{font}})",
       "brandKitNoStyle": "Aus diesem Projekt lässt sich kein Stil lesen — es braucht Untertitel oder ein Logo-Wasserzeichen.",
       "brandKitSaved": "Brand Kit gespeichert",
       "brandKitNoSaved": "Noch keine gespeicherte Marke — speichere zuerst eine aus einem Projekt.",
@@ -3486,6 +3488,12 @@
         "points": "Vektorinhalt ist zu komplex für den Export. Formen vereinfachen."
       },
       "brand": {
+        "logos": "Marken-Logos",
+        "logoAdd": "Logo hinzufügen",
+        "logoInsert": "Logo auf die Seite",
+        "logoRemove": "Logo aus der Marke entfernen",
+        "logoMissing": "Die Logodatei wurde nicht gefunden.",
+        "logoName": "Logo",
         "title": "Meine Marke",
         "hint": "Vorlagen öffnen sich damit, und sie stehen in jeder Farbauswahl.",
         "colors": "Marke",

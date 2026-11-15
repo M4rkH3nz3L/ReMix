@@ -172,6 +172,20 @@ export function buildWatermarkClip(
   };
 }
 
+/**
+ * 🏷️ S11: a márka-logó vízjelként a videóba — ugyanaz a hely és méret, mint a kép-oldali logó-réteg
+ * (jobb alsó sarok, a rövidebb oldal ~18%-a), az egész videó hosszán
+ */
+export function brandLogoWatermark(uri: string, aspect: number): BrandWatermark {
+  const a = aspect > 0 ? aspect : 9 / 16;
+  const short = Math.min(1, 1 / a); // a rövidebb oldal a szélesség arányában (szélesség = 1)
+  const w = 0.18 * short;
+  const h = w * a;
+  const mx = 0.04 * short;
+  const my = mx * a;
+  return { imageUri: uri, position: { x: 1 - mx - w / 2, y: 1 - my - h / 2 }, w, h, opacity: 0.95 };
+}
+
 /** rövid összefoglaló a panel státusz-sorába */
 export function describeBrandKit(kit: BrandKit): string {
   const parts: string[] = [];

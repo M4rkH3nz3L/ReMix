@@ -123,6 +123,7 @@ import { linkedAssets, mixdownVersion, relinkPlan, stillVersion } from '@/lib/li
 import { sendMixdownToVideo, sendStillToVideo, sourceVersionOf } from '@/lib/linkedAssetClient';
 import { renderProjectVersion } from '@/lib/render';
 import { importFontFromUri } from '@/lib/projectFontsClient';
+import { insertBrandLogoWatermark } from '@/lib/brandLogoClient';
 import { useUserTemplates } from '@/store/userTemplatesStore';
 import AsyncStorageTpl from '@react-native-async-storage/async-storage';
 import { thumbnailFramesOnDevice } from '@/lib/thumbStudio';
@@ -7717,6 +7718,80 @@ async function smokeFontImport(log: Log) {
   }
 }
 
+/**
+ * 🏷️ IMAGE-PROD S11 (DS3): a közös márka-logó egy koppintással a képre és a videóra — mindkettő a
+ * projektbe MÁSOLT fájllal, ugyanott és ugyanakkora; a márka-fájl a projekt mentése után is megvan.
+ */
+async function smokeBrandLogo(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const mine = await loadBrandStyle();
+  const surface = Skia.Surface.MakeOffscreen(200, 200)!;
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color('#e0102a'));
+  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, 200, 200), paint);
+  surface.flush();
+  const src = new File(projectMediaDir(), `smoke_logo_src_${Date.now().toString(36)}.png`);
+  src.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const brandUri = await useBrandStyle.getState().addLogo(src.uri);
+  for (let i = 0; i < 40 && brandUri && !new File(brandUri).exists; i++) await sleep(50);
+  const stored = await loadBrandStyle();
+  log(!!brandUri && brandUri.includes('/brand/') && (stored.logos ?? []).includes(brandUri), 'a logó a közös márkában (a telefon márka-mappájában, tárolva)', brandUri?.split('/').slice(-2).join('/') ?? 'nincs');
+  if (!brandUri) return;
+  const st = useEditorStore.getState;
+  const imgId = 'prj_smoke_brandlogo_img';
+  const vidId = 'prj_smoke_brandlogo_vid';
+  try {
+    // 1) a képre (Kép Stúdió)
+    await deleteProject(imgId).catch((caught) => logCaught('lib/imageSmoke.tsx:brandlogo-del0', caught));
+    const page = { id: 'lap', name: 'l', aspectRatio: '16:9', width: 1280, height: 720, layers: [{ id: 'bg', kind: 'fill', fill: '#1c1c28' }] } as unknown as ImageDoc;
+    await saveProject({ ...createEmptyProject('smoke márka-logó kép', '16:9', undefined, 'image'), id: imgId, imageDocs: [page] });
+    router.push(`/studio/image/${imgId}` as Href);
+    for (let i = 0; i < 60 && st().project?.id !== imgId; i++) await sleep(200);
+    await sleep(1200);
+    runDevAction('image.insertBrandLogo', brandUri);
+    await sleep(500);
+    const doc = st().project!.imageDocs![0];
+    const logo = doc.layers.find((l) => l.kind === 'photo') as PhotoLayer | undefined;
+    const r = await renderOnDevice(doc, 720);
+    const img = r ? await decode(r) : null;
+    const px = img && logo ? pixel(img, Math.round(logo.position.x * img.width()), Math.round(logo.position.y * img.height())).slice(0, 3) : [];
+    log(!!logo && logo.uri !== brandUri && !logo.uri.includes('/brand/') && px[0] > 180 && px[1] < 60, 'képre: a logó a jobb alsó sarokban, a projektbe másolt fájllal (a kész képen is)', `${logo?.w.toFixed(3)}×${logo?.h.toFixed(3)} @ ${logo?.position.x.toFixed(3)},${logo?.position.y.toFixed(3)} · szín ${px.join(',')}`);
+    log(true, 'FOTÓZHATÓ', 'a márka-logó a lapon');
+    await sleep(3500);
+    st().undo();
+    log(!st().project!.imageDocs![0].layers.some((l) => l.kind === 'photo'), 'egy visszavonás: a logó lekerül a lapról');
+    st().redo();
+    await saveProject(st().project!);
+    router.back();
+    await sleep(800);
+    // 2) a videóra (ugyanaz a függvény, amit a márka-szekció hív)
+    await deleteProject(vidId).catch((caught) => logCaught('lib/imageSmoke.tsx:brandlogo-del1', caught));
+    await saveProject({ ...createEmptyProject('smoke márka-logó videó', '16:9', undefined, 'video'), id: vidId });
+    router.push(`/editor/${vidId}` as Href);
+    for (let i = 0; i < 60 && st().project?.id !== vidId; i++) await sleep(200);
+    await sleep(1200);
+    const added = insertBrandLogoWatermark(brandUri, 'Vízjel');
+    const wm = st().project!.tracks.find((t) => t.type === 'overlay')?.clips.find((c) => c.kind === 'shape') as ShapeLayer & { imageUri?: string } | undefined;
+    log(added && !!wm && wm.imageUri !== brandUri && !String(wm.imageUri).includes('/brand/') && !!logo && Math.abs(wm.w - logo.w) < 1e-6 && Math.abs(wm.position.x - logo.position.x) < 1e-6, 'videóra: vízjel-klip ugyanott és ugyanakkora, a projektbe másolt fájllal', `${wm?.w.toFixed(3)}×${wm?.h.toFixed(3)} @ ${wm?.position.x.toFixed(3)},${wm?.position.y.toFixed(3)}`);
+    await saveProject(st().project!);
+    // 3) a márka-fájl a két projekt mentése után is a helyén (nem költözött a projektbe)
+    log(new File(brandUri).exists, 'a márka-logó fájlja a mentések után is a márka-mappában');
+    if (r) removeFile(r);
+  } finally {
+    if (st().project?.id === vidId || st().project?.id === imgId) {
+      router.back();
+      await sleep(500);
+    }
+    await deleteProject(imgId).catch((caught) => logCaught('lib/imageSmoke.tsx:brandlogo-del2', caught));
+    await deleteProject(vidId).catch((caught) => logCaught('lib/imageSmoke.tsx:brandlogo-del3', caught));
+    await useBrandStyle.getState().removeLogo(brandUri);
+    // a felhasználó márkája visszaírva
+    await saveBrandStyle(mine);
+    useBrandStyle.setState({ colors: mine.colors, fontFamily: mine.fontFamily, logos: mine.logos ?? [] });
+    removeFile(src.uri);
+  }
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -11638,6 +11713,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'brandlogo') {
+    await step(phase, () => smokeBrandLogo(log));
     return;
   }
   if (phase === 'fontimport') {

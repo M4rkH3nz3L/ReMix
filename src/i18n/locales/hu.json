@@ -1392,6 +1392,8 @@
       "makeProductAdBtn": "🛍️ Termékvideó készítése (10 mp)",
       "productAdNote": "Az AI kiválogatja a legjobban kinéző pillanatokat (élesség, kontraszt, arc), Product-lookba rendezi őket, és címet + záró felhívást is ír.",
       "brandKitTitle": "Brand Kit",
+      "brandNoLogos": "Még nincs márka-logó (a Kép Stúdió sablon-lapján vehetsz fel).",
+      "brandFontCaptions": "Márka-font a feliratokra ({{font}})",
       "brandKitNoStyle": "Ebből a projektből nem olvasható ki stílus — kell hozzá felirat vagy logó-vízjel.",
       "brandKitSaved": "Brand Kit mentve",
       "brandKitNoSaved": "Még nincs mentett márka — előbb mentsd el egy projektből.",
@@ -3486,6 +3488,12 @@
         "points": "Túl összetett vektor-tartalom az exporthoz. Egyszerűsítsd a formákat."
       },
       "brand": {
+        "logos": "Márka-logók",
+        "logoAdd": "Logó hozzáadása",
+        "logoInsert": "Logó a lapra",
+        "logoRemove": "Logó törlése a márkából",
+        "logoMissing": "A logó fájlja nem található.",
+        "logoName": "Logó",
         "title": "Márkám",
         "hint": "A sablonok ezekkel nyílnak, és minden színválasztóban ott vannak.",
         "colors": "Márka",

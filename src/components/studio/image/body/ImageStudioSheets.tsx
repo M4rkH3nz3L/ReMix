@@ -55,6 +55,7 @@ export function ImageStudioSheets({
   onRaster,
   onPack,
   onTemplate,
+  onBrandLogo,
   onVariant,
   onLayerMenu,
   onSvg,
@@ -85,6 +86,8 @@ export function ImageStudioSheets({
   onRaster: (opts: { format: 'png' | 'jpg' | 'webp'; height: number; quality: number }) => void;
   onPack: (opts: { format: 'png' | 'jpg' | 'webp'; quality: number }) => void;
   onTemplate: (tpl: ImageTemplate) => void;
+  /** 🏷️ S11: a márka-logó a lapra */
+  onBrandLogo: (uri: string) => void;
   onVariant: (width: number, height: number, label: string) => void;
   onLayerMenu: (action: LayerMenuAction) => void;
   onSvg: () => void;
@@ -129,6 +132,10 @@ export function ImageStudioSheets({
       {sheet === 'templates' ? (
         <TemplatesSheet
           currentDoc={doc}
+          onBrandLogo={(uri) => {
+            onBrandLogo(uri);
+            setSheet(null);
+          }}
           onPick={(tpl) => {
             onTemplate(tpl);
             setSheet(null);

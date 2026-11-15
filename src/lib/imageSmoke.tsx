@@ -3322,6 +3322,60 @@ async function smokePerfMatrix(log: Log) {
 }
 
 /**
+ * 🎵 V8: dúdolásból dallam — szintetikus „dúdolás” (felharmonikusok, vibrátó, kis szünetek: C4 E4 G4 C5, 120 BPM,
+ * negyedenként) egy klipben a 2. mp-nél → a telefon hangjegyekre bontja: szinti-minta a dúdolás kezdeténél,
+ * szabad sávon, a hangok és a rács pontosak; egy undo.
+ */
+async function smokeHumMelody(log: Log) {
+  const SR = 44100;
+  const midis = [60, 64, 67, 72];
+  const len = 2.2 * SR;
+  const x = new Float32Array(len);
+  // a vibrátós frekvencia FÁZISA összegezve (a sin(2π·f(t)·t) alak az idővel növekvő hamis eltolást adna)
+  let ph = 0;
+  for (let i = 0; i < len; i++) {
+    const tSec = i / SR;
+    const k = Math.floor(tSec / 0.5);
+    const inNote = tSec - k * 0.5;
+    const f = 440 * Math.pow(2, (midis[Math.min(k, midis.length - 1)] - 69) / 12) * (1 + 0.004 * Math.sin(2 * Math.PI * 5.5 * tSec));
+    ph += (2 * Math.PI * f) / SR;
+    if (k >= midis.length || inNote > 0.44) continue;
+    const env = Math.min(1, inNote / 0.02, (0.44 - inNote) / 0.02);
+    x[i] = env * 0.25 * (Math.sin(ph) + 0.5 * Math.sin(2 * ph) + 0.25 * Math.sin(3 * ph));
+  }
+  const f = new File(Paths.document, 'smoke_hum.wav');
+  if (f.exists) f.delete();
+  f.create();
+  f.write(encodeWav16([x, x], SR, () => 0.5));
+  const id = `prj_smoke_hum_${Date.now().toString(36)}`;
+  const base = createEmptyProject('smoke dúdolás', '9:16', undefined, 'audio');
+  const hum: AudioClip = { kind: 'audio', id: 'hum', uri: f.uri, label: 'dúdolás', start: 2, duration: 2.2, trimIn: 0, sourceDuration: 2.2, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, bpm: 120, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [hum] } : t)) });
+  const st = useEditorStore.getState;
+  try {
+    router.push(`/studio/audio/${id}` as Href);
+    for (let i = 0; i < 150 && (st().project?.id !== id || runDevAction('audio.studioMode') === undefined); i++) await sleep(200);
+    await sleep(800);
+    const undoBefore = st().past?.length ?? 0;
+    const t0 = Date.now();
+    const cid = (await runDevAction('hum.melody', { clipId: 'hum', root: 0, minor: false })) as string | null;
+    const ms = Date.now() - t0;
+    const p = st().project!;
+    const tr = p.tracks.find((t) => t.clips.some((c) => c.id === cid));
+    const c = tr?.clips.find((x2) => x2.id === cid) as AudioClip | undefined;
+    const doc = c ? p.instrumentDocs?.find((d) => d.id === c.instrumentDocId) : undefined;
+    const notes = doc?.synth?.notes ?? [];
+    log(!!c && Math.abs(c.start - 2) < 0.02 && tr?.type === 'music', 'a dallam a dúdolás kezdeténél, a szabad zene-sávon', `${tr?.type}, ${c?.start.toFixed(2)} s, ${ms} ms`);
+    log(notes.map((n) => n.midi).join(',') === midis.join(',') && notes.map((n) => n.startBeat).join(',') === '0,1,2,3', 'a hangok és a rács pontosak (C4 E4 G4 C5, negyedenként)', notes.map((n) => `${n.midi}@${n.startBeat}/${n.lengthBeats}`).join(' '));
+    log((st().past?.length ?? 0) - undoBefore === 1, 'egy undo-lépés');
+    router.back();
+    await sleep(500);
+  } finally {
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:hum', caught));
+  }
+}
+
+/**
  * 🔀 C3 e2e a VALÓDI feeden (prod — engedéllyel, 2026-11-15): egy teszt-alkotó nem listázott hang-posztja
  * sáv-leírással (a Mac-ről, azonosító a fájlszerveren); az iPad a valódi úton olvassa (RLS, ellenőrző) és
  * remixeli: a fájl az R2-ről letöltve, a remix szerkeszthető sávokkal.
@@ -10792,6 +10846,10 @@ export async function runImageSmoke(
   }
   if (phase === 'crossfade') {
     await step(phase, () => smokeCrossfade(log));
+    return;
+  }
+  if (phase === 'hummelody') {
+    await step(phase, () => smokeHumMelody(log));
     return;
   }
   if (phase === 'remixtracksprod') {

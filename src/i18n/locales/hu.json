@@ -4091,7 +4091,7 @@
           "thirdDown": "Terc alatta",
           "fifthUp": "Kvint fölötte"
         },
-        "apply": "Hangolás alkalmazása",
+        "humMelody": "Dallam a dúdolásból", "humNone": "A dúdolásban nem találtam hangot — próbáld tisztábban, csendesebb helyen.", "apply": "Hangolás alkalmazása",
         "reset": "Eredeti",
         "working": "Ének hangolása…",
         "failed": "A hangolás nem sikerült (túl hosszú vagy olvashatatlan felvétel).",

@@ -4096,7 +4096,7 @@
           "thirdDown": "Terz darunter",
           "fifthUp": "Quinte darüber"
         },
-        "apply": "Tuning anwenden",
+        "humMelody": "Melodie aus Summen", "humNone": "Im Summen wurden keine Töne erkannt — versuch es deutlicher an einem ruhigeren Ort.", "apply": "Tuning anwenden",
         "reset": "Original",
         "working": "Gesang wird gestimmt…",
         "failed": "Tuning fehlgeschlagen (Aufnahme zu lang oder nicht lesbar).",

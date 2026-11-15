@@ -85,6 +85,8 @@ import { mixForExport } from '@/lib/audioExportMix';
 import { guardPro } from '@/store/paywallStore';
 import { withCancellableProgress, withProgress } from '@/store/progressStore';
 import { renderSynthToClip } from '@/lib/synthClient';
+import { melodyBars } from '@/lib/humToMelody';
+import { humClipToNotes } from '@/lib/humToMelodyClient';
 import type { SynthNote, SynthWave } from '@/lib/synth';
 import { renderDrumsToClip } from '@/lib/drumsClient';
 import { patternHits, type DrumHit } from '@/lib/drums';
@@ -312,6 +314,7 @@ export function AudioStudioBody({
   const [chordsOpen, setChordsOpen] = useState(false);
   const [chordBusy, setChordBusy] = useState(false);
   const chordBusyRef = useRef(false);
+  const humMelodyRef = useRef<(id: string, k: { root: number; minor: boolean }) => Promise<string | null>>(async () => null);
   const applyTuneRef = useRef<(id: string, s: { root: number; minor: boolean; strength: number; harmonySteps?: number }) => Promise<unknown>>(async () => null);
   const placeChordsRef = useRef<(arg: { key: MusicKey; prog: ChordProgressionId; parts: ChordPart[] }) => Promise<string[]>>(async () => []);
   // 🎛️ V2.3: a sampler Dallam módja (a piano roll a minta hangjával)
@@ -441,6 +444,10 @@ export function AudioStudioBody({
       registerDevAction('audio.loops', () => setLoopsOpen(true)),
       registerDevAction('loops.place', (id) => placeLoopRef.current(String(id))),
       registerDevAction('audio.chords', () => setChordsOpen(true)),
+      registerDevAction('hum.melody', (arg) => {
+        const a = arg as { clipId: string; root: number; minor: boolean };
+        return humMelodyRef.current(a.clipId, a);
+      }),
       registerDevAction('tune.apply', (arg) => {
         const a = arg as { clipId: string; root: number; minor: boolean; strength: number; harmonySteps?: number };
         return applyTuneRef.current(a.clipId, a);
@@ -920,7 +927,7 @@ export function AudioStudioBody({
    * 🎹🥁 a sütött minta a sávra: új minta → a minta (`InstrumentDoc`) + egy új klip a playheadnél;
    * újraszerkesztés → a minta + minden rá hivatkozó klip új hangja. Mindkettő egy kötegben (egy undo).
    */
-  const placeInstrument = (doc: InstrumentDoc, res: { uri: string; durationSec: number }, label: string) => {
+  const placeInstrument = (doc: InstrumentDoc, res: { uri: string; durationSec: number }, label: string, at?: { start: number; trackType: TrackType; newTrackName?: string }) => {
     const store = useEditorStore.getState();
     const asset: Asset = { id: makeId('ast'), kind: 'audio', uri: res.uri, provider: 'local', name: label, duration: res.durationSec };
     const cur = store.project;
@@ -932,7 +939,7 @@ export function AudioStudioBody({
       kind: 'audio',
       id: makeId('clip'),
       // a hívás pillanatának lejátszófeje (a sütés aszinkron — a render-kori érték addigra elavulhat)
-      start: snapToFrame(store.playhead, grid),
+      start: snapToFrame(at?.start ?? store.playhead, grid),
       duration: res.durationSec,
       trimIn: 0,
       sourceDuration: res.durationSec,
@@ -943,7 +950,9 @@ export function AudioStudioBody({
       fadeOut: 0,
       source: 'imported',
     };
-    if (store.applyBatch(bakeNewCommands(doc, 'music', clip, asset), 'user') > 0) {
+    // a hiányzó sávot ugyanaz a köteg hozza létre (egy undo)
+    const addTrack: EditorCommand[] = at?.newTrackName ? [{ type: 'ADD_TRACK', track: { id: makeId('trk'), type: at.trackType, name: at.newTrackName, clips: [] } }] : [];
+    if (store.applyBatch([...addTrack, ...bakeNewCommands(doc, at?.trackType ?? 'music', clip, asset)], 'user') > 0) {
       store.selectClip(clip.id);
     }
   };
@@ -1195,6 +1204,41 @@ export function AudioStudioBody({
     return { notes: res.notes, shifted: res.shifted, harmonyClipId, timings: res.timings };
   };
   applyTuneRef.current = applyTune;
+
+  /**
+   * 🎵 V8: dúdolásból dallam — a klip hangjai (YIN, a telefonon) a választott hangnemre húzva szinti-mintába, a
+   * dúdolás kezdetéhez, az első szabad hang-sávra (ahol a tartományban nincs klip); szerkeszthető, egy undo.
+   */
+  const humMelody = async (clipId: string, k: { root: number; minor: boolean }): Promise<string | null> => {
+    const st0 = useEditorStore.getState();
+    const clip = st0.project?.tracks.flatMap((tr) => tr.clips).find((c): c is AudioClip => c.id === clipId && c.kind === 'audio');
+    if (!clip) return null;
+    const key: MusicKey = { root: k.root, scale: k.minor ? 'naturalMinor' : 'major' };
+    const notes = await withProgress(t('studio.audio.tune.working'), () => humClipToNotes(clip, { bpm, key }));
+    if (!notes || notes.length === 0) {
+      Alert.alert(t('studio.audio.tune.humMelody'), t('studio.audio.tune.humNone'));
+      return null;
+    }
+    const res = await renderSynthToClip(notes, { bpm, wave: 'triangle' });
+    if (!res) return null;
+    const cur = useEditorStore.getState().project;
+    const free = (type: TrackType) =>
+      !(cur?.tracks.find((tr) => tr.type === type)?.clips ?? []).some((c) => c.start < clip.start + res.durationSec && c.start + c.duration > clip.start);
+    const lanes = ['music', 'aux1', 'aux2', 'aux3', 'aux4', 'aux5'] as const;
+    const exists = (type: TrackType) => !!cur?.tracks.some((tr) => tr.type === type);
+    const existing = lanes.find((l) => exists(l) && free(l));
+    const fresh = existing ? undefined : lanes.find((l) => !exists(l));
+    const trackType = existing ?? fresh ?? 'aux5';
+    const before = new Set(cur?.tracks.flatMap((tr) => tr.clips.map((c) => c.id)) ?? []);
+    placeInstrument(synthDoc(makeId('inst'), bpm, melodyBars(notes), 'triangle', notes), res, t('studio.audio.tune.humMelody'), {
+      start: clip.start,
+      trackType,
+      ...(fresh ? { newTrackName: t('studio.audio.tune.humMelody') } : {}),
+    });
+    setEditing(false);
+    return useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).find((c) => !before.has(c.id))?.id ?? null;
+  };
+  humMelodyRef.current = humMelody;
   /** 🎤 az eredeti forrás vissza (a hangolás nélkül), egy undo */
   const resetTune = (clipId: string) => {
     const clip = useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).find((c) => c.id === clipId) as AudioClip | undefined;
@@ -1413,6 +1457,7 @@ export function AudioStudioBody({
         setEditing(false);
         void applyTune(id, s);
       }}
+      onHumMelody={(id, k) => void humMelody(id, k)}
       onResetTune={(id) => {
         setEditing(false);
         resetTune(id);

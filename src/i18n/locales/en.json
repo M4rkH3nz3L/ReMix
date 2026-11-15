@@ -4091,7 +4091,7 @@
           "thirdDown": "Third below",
           "fifthUp": "Fifth above"
         },
-        "apply": "Apply tuning",
+        "humMelody": "Melody from humming", "humNone": "No notes found in the humming — try a clearer take in a quieter place.", "apply": "Apply tuning",
         "reset": "Original",
         "working": "Tuning vocal…",
         "failed": "Tuning failed (recording too long or unreadable).",

@@ -67,6 +67,7 @@ export function ClipEditSheet({
   onEditInstrument,
   onTune,
   onResetTune,
+  onHumMelody,
 }: {
   clip: AudioClip;
   fps: number;
@@ -74,6 +75,8 @@ export function ClipEditSheet({
   /** 🎤 V3.2: ének-hangolás (a stúdió végzi; a lap előbb bezárul és ment) */
   onTune?: (clipId: string, s: { root: number; minor: boolean; strength: number; harmonySteps?: number }) => void;
   onResetTune?: (clipId: string) => void;
+  /** 🎵 V8: dúdolásból dallam — a klip hangjai szerkeszthető szinti-mintába, a választott hangnemre húzva */
+  onHumMelody?: (clipId: string, key: { root: number; minor: boolean }) => void;
   /** 🎹🥁 a sütött hangszer-klip mintájának újraszerkesztése (a dobgép / piano roll nyílik) */
   onEditInstrument?: (docId: string) => void;
 }) {
@@ -523,6 +526,12 @@ export function ClipEditSheet({
                 <Ionicons name="mic-outline" size={16} color="#fff" />
                 <Text style={styles.tuneBtnText}>{t('studio.audio.tune.apply')}</Text>
               </Pressable>
+              {onHumMelody ? (
+                <Pressable onPress={() => onHumMelody(clip.id, { root: tuneRoot, minor: tuneMinor })} style={styles.tuneReset} accessibilityRole="button" testID="hum-melody">
+                  <Ionicons name="musical-notes-outline" size={15} color={palette.textDim} />
+                  <Text style={styles.tuneResetText}>{t('studio.audio.tune.humMelody')}</Text>
+                </Pressable>
+              ) : null}
               {clip.tune && onResetTune ? (
                 <Pressable onPress={() => onResetTune(clip.id)} style={styles.tuneReset} accessibilityRole="button" testID="tune-reset">
                   <Ionicons name="refresh-outline" size={15} color={palette.textDim} />

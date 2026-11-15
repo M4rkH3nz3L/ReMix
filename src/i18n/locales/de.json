@@ -4475,6 +4475,13 @@
         "apply": "Schneiden",
         "hint": "Tippe auf eine Stelle, um sie zu behalten. Die Musikspur wird nicht geschnitten, nur verschoben."
       },
+      "stemsOnDevice": "Gesang und Begleitung trennen",
+      "stemsOnDeviceHint": "Läuft auf deinem Telefon (kostenlos, offline): zwei neue Spuren — Gesang und Begleitung —, das Original wird stummgeschaltet. Beim ersten Mal wird ein 39-MB-Modell geladen.",
+      "stemsModel": "Modell wird geladen…",
+      "stemsFailed": "Die Trennung ist fehlgeschlagen.",
+      "stemsVocals": "Gesang",
+      "stemsAccomp": "Begleitung",
+      "stemsNoLanes": "Es gibt keine zwei freien Spuren für die Stems — lösche eine leere Spur.",
       "stemsHint": "Teilt den Clip in Vocals / Drums / Bass / Other; das Original wird stummgeschaltet.",
       "stemsWorking": "Stems werden getrennt…",
       "title": "Sound-Studio",

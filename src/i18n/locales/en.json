@@ -4470,6 +4470,13 @@
         "apply": "Cut",
         "hint": "Tap a silence to keep it. The music track is not cut, only shifted."
       },
+      "stemsOnDevice": "Separate vocals and accompaniment",
+      "stemsOnDeviceHint": "Runs on your phone (free, offline): two new tracks — vocals and accompaniment — and the original is muted. The first use downloads a 39 MB model.",
+      "stemsModel": "Loading the model…",
+      "stemsFailed": "Separation failed.",
+      "stemsVocals": "Vocals",
+      "stemsAccomp": "Accompaniment",
+      "stemsNoLanes": "There are no two free tracks for the stems — delete an empty track.",
       "stemsHint": "Splits the clip into vocals / drums / bass / other; the original is muted.",
       "stemsWorking": "Separating stems…",
       "title": "Sound Studio",

@@ -62,6 +62,7 @@ export function AudioStudioSheets({
   onTune,
   onResetTune,
   onHumMelody,
+  onStemsOnDevice,
   frame = null,
 }: {
   selClip: AudioClip | null;
@@ -105,6 +106,7 @@ export function AudioStudioSheets({
   onTune?: (clipId: string, s: { root: number; minor: boolean; strength: number; harmonySteps?: number }) => void;
   onResetTune?: (clipId: string) => void;
   onHumMelody?: (clipId: string, key: { root: number; minor: boolean }) => void;
+  onStemsOnDevice?: (clipId: string) => void;
   onBakeSampler: (uri: string, pattern: SamplerPattern, bars: number, sampleName?: string) => void;
   onInsertSource: (asset: Asset) => void;
   onShareAlbum: () => void;
@@ -113,7 +115,7 @@ export function AudioStudioSheets({
 }) {
   return (
     <AudioSheetFrameContext.Provider value={frame}>
-      {editing && selClip ? <ClipEditSheet key={`${selClip.id}:${selClip.kind === 'audio' ? `${selClip.activeTake ?? ''}:${selClip.speed ?? 1}:${selClip.uri}` : ''}`} clip={selClip} fps={fps} onClose={() => setEditing(false)} onEditInstrument={onEditInstrument} onTune={onTune} onResetTune={onResetTune} onHumMelody={onHumMelody} /> : null}
+      {editing && selClip ? <ClipEditSheet key={`${selClip.id}:${selClip.kind === 'audio' ? `${selClip.activeTake ?? ''}:${selClip.speed ?? 1}:${selClip.uri}` : ''}`} clip={selClip} fps={fps} onClose={() => setEditing(false)} onEditInstrument={onEditInstrument} onTune={onTune} onResetTune={onResetTune} onHumMelody={onHumMelody} onStemsOnDevice={onStemsOnDevice} /> : null}
       {mastering ? <MasterSheet onClose={() => setMastering(false)} /> : null}
       {mixerOpen ? (
         <MixerSheet

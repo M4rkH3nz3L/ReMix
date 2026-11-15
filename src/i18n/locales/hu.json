@@ -4470,6 +4470,13 @@
         "apply": "Kivágás",
         "hint": "Koppints egy csendre, hogy megtartsd. A zene-sáv nem vágódik, csak tolódik."
       },
+      "stemsOnDevice": "Ének és kíséret szétválasztása",
+      "stemsOnDeviceHint": "A telefonon fut (ingyenes, offline): két új sáv — ének és kíséret —, az eredeti elnémul. Első használatkor 39 MB modell töltődik le.",
+      "stemsModel": "A modell betöltése…",
+      "stemsFailed": "A szétválasztás nem sikerült.",
+      "stemsVocals": "Ének",
+      "stemsAccomp": "Kíséret",
+      "stemsNoLanes": "Nincs két szabad sáv a stemeknek — törölj egy üres sávot.",
       "stemsHint": "A klipet vocals / drums / bass / other stemekre bontja; az eredeti elnémul.",
       "stemsWorking": "Stem-szeparáció…",
       "title": "Hang Stúdió",

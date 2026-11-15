@@ -87,6 +87,8 @@ import { withCancellableProgress, withProgress } from '@/store/progressStore';
 import { renderSynthToClip } from '@/lib/synthClient';
 import { melodyBars } from '@/lib/humToMelody';
 import { humClipToNotes } from '@/lib/humToMelodyClient';
+import { ensureStemModel, separateOnDevice, STEM_MODEL_URL } from '@/lib/stemSeparationClient';
+import { onDeviceStemCommands } from '@/lib/stemClips';
 import type { SynthNote, SynthWave } from '@/lib/synth';
 import { renderDrumsToClip } from '@/lib/drumsClient';
 import { patternHits, type DrumHit } from '@/lib/drums';
@@ -314,6 +316,7 @@ export function AudioStudioBody({
   const [chordsOpen, setChordsOpen] = useState(false);
   const [chordBusy, setChordBusy] = useState(false);
   const chordBusyRef = useRef(false);
+  const stemsRef = useRef<(id: string) => Promise<string[] | null>>(async () => null);
   const humMelodyRef = useRef<(id: string, k: { root: number; minor: boolean }) => Promise<string | null>>(async () => null);
   const applyTuneRef = useRef<(id: string, s: { root: number; minor: boolean; strength: number; harmonySteps?: number }) => Promise<unknown>>(async () => null);
   const placeChordsRef = useRef<(arg: { key: MusicKey; prog: ChordProgressionId; parts: ChordPart[] }) => Promise<string[]>>(async () => []);
@@ -444,6 +447,7 @@ export function AudioStudioBody({
       registerDevAction('audio.loops', () => setLoopsOpen(true)),
       registerDevAction('loops.place', (id) => placeLoopRef.current(String(id))),
       registerDevAction('audio.chords', () => setChordsOpen(true)),
+      registerDevAction('stems.onDevice', (arg) => stemsRef.current(String(arg))),
       registerDevAction('hum.melody', (arg) => {
         const a = arg as { clipId: string; root: number; minor: boolean };
         return humMelodyRef.current(a.clipId, a);
@@ -1239,6 +1243,35 @@ export function AudioStudioBody({
     return useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).find((c) => !before.has(c.id))?.id ?? null;
   };
   humMelodyRef.current = humMelody;
+
+  /**
+   * 🎚️ V5: ének + kíséret a telefonon (ingyenes) — a modell egyszer letöltve, a szétválasztás a telefonon, a két stem
+   * két új sávra a klip vágásával, az eredeti elnémítva; egy undo. Visszaadja az új klipek azonosítóit.
+   */
+  const stemsOnDevice = async (clipId: string): Promise<string[] | null> => {
+    const clip = useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).find((c): c is AudioClip => c.id === clipId && c.kind === 'audio');
+    if (!clip) return null;
+    const res = await withProgress(t('studio.audio.stemsWorking'), async (report) => {
+      report({ phase: t('studio.audio.stemsModel'), ratio: 0 });
+      if (!(await ensureStemModel(STEM_MODEL_URL))) return null;
+      return separateOnDevice(clip.uri, (r) => report({ phase: t('studio.audio.stemsWorking'), ratio: r }));
+    });
+    if (!res) {
+      Alert.alert(t('studio.audio.stemsOnDevice'), t('studio.audio.stemsFailed'));
+      return null;
+    }
+    const st = useEditorStore.getState();
+    const cmds = st.project ? onDeviceStemCommands(st.project, clip, res, { vocals: t('studio.audio.stemsVocals'), accompaniment: t('studio.audio.stemsAccomp') }, makeId) : null;
+    if (!cmds) {
+      Alert.alert(t('studio.audio.stemsOnDevice'), t('studio.audio.stemsNoLanes'));
+      return null;
+    }
+    const before = new Set(st.project?.tracks.flatMap((tr) => tr.clips.map((c) => c.id)) ?? []);
+    st.applyBatch(cmds, 'user');
+    setEditing(false);
+    return useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).filter((c) => !before.has(c.id)).map((c) => c.id) ?? null;
+  };
+  stemsRef.current = stemsOnDevice;
   /** 🎤 az eredeti forrás vissza (a hangolás nélkül), egy undo */
   const resetTune = (clipId: string) => {
     const clip = useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).find((c) => c.id === clipId) as AudioClip | undefined;
@@ -1458,6 +1491,7 @@ export function AudioStudioBody({
         void applyTune(id, s);
       }}
       onHumMelody={(id, k) => void humMelody(id, k)}
+      onStemsOnDevice={(id) => void stemsOnDevice(id)}
       onResetTune={(id) => {
         setEditing(false);
         resetTune(id);

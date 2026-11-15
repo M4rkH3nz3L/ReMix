@@ -25,10 +25,19 @@ type StemNative = {
 const mod = Platform.OS === 'ios' ? requireOptionalNativeModule<StemNative>('RemixRender') : null;
 
 export const STEM_MODEL_FILE = 'spleeter2.mlmodel';
+/** a modell a ReMix R2-tárában (Spleeter 2stems → Core ML, fp16, 39 MB; sha256 98843607dafd9801…) */
+export const STEM_MODEL_URL = 'https://pub-2f81d92f651d4a40bb304fd5319ad82d.r2.dev/models/stems/spleeter2-v1.mlmodel';
+/** 🚫 kiadásban rejtve a modell-licenc jogi megerősítéséig (dev-buildben látszik) */
+export const STEM_ON_DEVICE_ENABLED = false;
 export const STEM_MAX_SEC = 15 * 60;
 
 export function stemOnDeviceSupported(): boolean {
   return !!mod && typeof mod.stemLoad === 'function' && typeof mod.stemRun === 'function';
+}
+
+/** látszik-e a gomb: a build tudja, és (kiadásban) a kapcsoló be van kapcsolva */
+export function stemOnDeviceVisible(): boolean {
+  return stemOnDeviceSupported() && (STEM_ON_DEVICE_ENABLED || __DEV__);
 }
 
 function modelFile(): File {

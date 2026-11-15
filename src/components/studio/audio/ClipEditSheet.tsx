@@ -22,6 +22,7 @@ import { Chip } from '@/components/ui/controls';
 import { makeId } from '@/lib/id';
 import { stemClipsFrom } from '@/lib/stemClips';
 import { separateStems, STEM_SEPARATION_ENABLED } from '@/lib/stems';
+import { stemOnDeviceVisible } from '@/lib/stemSeparationClient';
 import { selectTakeCommand } from '@/lib/punchRecord';
 import { tempoMatchPatch, tempoResetPatch } from '@/lib/tempoMatch';
 import { fxStageOrder, moveStage, type FxStage } from '@/lib/fxOrder';
@@ -68,6 +69,7 @@ export function ClipEditSheet({
   onTune,
   onResetTune,
   onHumMelody,
+  onStemsOnDevice,
 }: {
   clip: AudioClip;
   fps: number;
@@ -77,6 +79,8 @@ export function ClipEditSheet({
   onResetTune?: (clipId: string) => void;
   /** 🎵 V8: dúdolásból dallam — a klip hangjai szerkeszthető szinti-mintába, a választott hangnemre húzva */
   onHumMelody?: (clipId: string, key: { root: number; minor: boolean }) => void;
+  /** 🎚️ V5: ének + kíséret szétválasztása a telefonon (ingyenes) */
+  onStemsOnDevice?: (clipId: string) => void;
   /** 🎹🥁 a sütött hangszer-klip mintájának újraszerkesztése (a dobgép / piano roll nyílik) */
   onEditInstrument?: (docId: string) => void;
 }) {
@@ -731,6 +735,17 @@ export function ClipEditSheet({
         </Pressable>
         <Text style={styles.hint}>{t('studio.audio.sync.openHint', { sec: 30 })}</Text>
 
+        {/* 🎚️ V5: ének + kíséret a telefonon (ingyenes) — a licenc-megerősítésig csak dev-buildben */}
+        {onStemsOnDevice && stemOnDeviceVisible() ? (
+          <>
+            <View style={styles.divider} />
+            <Pressable onPress={() => onStemsOnDevice(clip.id)} style={styles.stemsBtn} accessibilityRole="button" testID="stems-ondevice">
+              <Ionicons name="git-branch-outline" size={16} color={palette.accent} />
+              <Text style={styles.stemsText}>{t('studio.audio.stemsOnDevice')}</Text>
+            </Pressable>
+            <Text style={styles.hint}>{t('studio.audio.stemsOnDeviceHint')}</Text>
+          </>
+        ) : null}
         {/* 🎚️ AI stem-szeparáció (Pro) — kiadásból elrejtve, lásd STEM_SEPARATION_ENABLED */}
         {STEM_SEPARATION_ENABLED ? (
           <>

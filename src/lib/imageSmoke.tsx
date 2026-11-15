@@ -2,7 +2,7 @@ import * as Device from 'expo-device';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { AlphaType, ColorType, drawAsImage, Group, ImageFormat, Skia, type SkImage } from '@shopify/react-native-skia';
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import type { ReactNode, RefObject } from 'react';
 import { createRef, Profiler, useEffect, useRef } from 'react';
 import { createAudioPlayer, getRecordingPermissionsAsync, RecordingPresets, useAudioRecorder, type AudioRecorder } from 'expo-audio';
@@ -3321,6 +3321,54 @@ async function smokePerfMatrix(log: Log) {
   await noteThermal();
   const row = matrixRow({ date: new Date().toISOString().slice(0, 10), device, os, engine, exportRun: { tracks: 8, sec: SEC, ms: exportMs }, longSourceMs, denoise60Ms, formant10Ms, maxThermal });
   log(null, 'MATRIX', row);
+}
+
+/**
+ * 🎚️ V5: a felhasználói út — a modell a VALÓDI R2-címről (a helyi példány törölve), a stúdió-művelet a klipből két
+ * új sávot csinál (ének, kíséret) a klip vágásával, az eredeti elnémul; egy undo.
+ */
+async function smokeStemsUi(log: Log) {
+  const SR = 44100;
+  const old = new File(new Directory(Paths.document, 'models'), 'spleeter2.mlmodel');
+  if (old.exists) old.delete();
+  const sp = new File(Paths.document, 'smoke_stem_speech.wav');
+  if (!sp.exists) await File.downloadFileAsync(`${smokeFileHost()}/speech_hu.wav`, sp);
+  const api = (await loadAudioApi())!;
+  const speech = (await api.decodeAudioData(sp.uri, SR)).getChannelData(0);
+  const n = 30 * SR;
+  const mix = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const tt = i / SR;
+    mix[i] = speech[i % speech.length] + 0.08 * Math.sign(Math.sin(2 * Math.PI * 110 * tt)) + 0.3 * Math.exp(-((tt % 0.5) * 30)) * Math.sin(2 * Math.PI * 55 * tt);
+  }
+  const f = new File(Paths.document, 'smoke_stemsui_mix.wav');
+  if (f.exists) f.delete();
+  f.create();
+  f.write(encodeWav16([mix, mix], SR));
+  const id = `prj_smoke_stemsui_${Date.now().toString(36)}`;
+  const base = createEmptyProject('smoke stem', '9:16', undefined, 'audio');
+  const clip: AudioClip = { kind: 'audio', id: 'mix', uri: f.uri, label: 'dal', start: 1, duration: 20, trimIn: 5, sourceDuration: 30, volume: 0.9, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [clip] } : t)) });
+  const st = useEditorStore.getState;
+  try {
+    router.push(`/studio/audio/${id}` as Href);
+    for (let i = 0; i < 150 && (st().project?.id !== id || runDevAction('audio.studioMode') === undefined); i++) await sleep(200);
+    await sleep(800);
+    const undo0 = st().past?.length ?? 0;
+    const t0 = Date.now();
+    const ids = (await runDevAction('stems.onDevice', 'mix')) as string[] | null;
+    const ms = Date.now() - t0;
+    log(new File(new Directory(Paths.document, 'models'), 'spleeter2.mlmodel').exists, 'a modell az R2-ről letöltve', `${ms} ms összesen (letöltés + szétválasztás)`);
+    const p = st().project!;
+    const added = p.tracks.flatMap((t) => t.clips.map((c) => ({ t, c: c as AudioClip }))).filter((x) => ids?.includes(x.c.id));
+    log(added.length === 2 && added.every((x) => x.t.type.startsWith('aux') && x.c.start === 1 && x.c.trimIn === 5 && x.c.duration === 20), 'két új sáv (ének, kíséret) a klip vágásával', added.map((x) => `${x.t.type}:${x.t.name}`).join(', '));
+    const orig = p.tracks.flatMap((t) => t.clips).find((c) => c.id === 'mix') as AudioClip | undefined;
+    log(orig?.volume === 0 && (st().past?.length ?? 0) - undo0 === 1, 'az eredeti néma, egy undo-lépés');
+    router.back();
+    await sleep(500);
+  } finally {
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:stemsui', caught));
+  }
 }
 
 /**
@@ -10928,6 +10976,10 @@ export async function runImageSmoke(
   }
   if (phase === 'crossfade') {
     await step(phase, () => smokeCrossfade(log));
+    return;
+  }
+  if (phase === 'stemsui') {
+    await step(phase, () => smokeStemsUi(log));
     return;
   }
   if (phase === 'stemdevice') {

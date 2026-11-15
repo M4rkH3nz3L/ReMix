@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system';
 import { SaveFormat, ImageManipulator } from 'expo-image-manipulator';
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { PixelRatio, StyleSheet, View } from 'react-native';
@@ -10,6 +11,7 @@ import { effectiveLayerOpacity, visibleLayers } from '@/lib/imageDoc';
 import { correctionContext, docVignetteAngles, NO_CORRECTIONS } from '@/lib/imagePixelPipeline';
 import { stageSettleMs, stageSize } from '@/lib/imageRenderRoute';
 import { logCaught } from '@/lib/logCaught';
+import { projectMediaDir } from '@/lib/projectFolderClient';
 import type { ClipMask, ImageDoc, ImageLayer } from '@/types/project';
 
 /**
@@ -71,6 +73,28 @@ function StageLayers({ doc, w, h }: { doc: ImageDoc; w: number; h: number }) {
       <DocGrain grain={doc.grain ?? 0} cell={w / (doc.width || w)} />
     </>
   );
+}
+
+/**
+ * A telefonos render ideiglenes fájlt ad; ami a projektben marad (réteg, bélyegkép), az a
+ * projekt média-mappájába kerül. A már ott lévő (pl. worker-) fájlt nem mozgatja.
+ */
+export function keepRenderedInProject(uri: string, base: string): string {
+  const dir = projectMediaDir();
+  if (uri.startsWith(dir.uri)) {
+    return uri;
+  }
+  if (!dir.exists) {
+    dir.create();
+  }
+  const source = new File(uri);
+  const target = new File(dir, `${base}.${uri.split('.').pop() || 'png'}`);
+  if (target.exists) {
+    target.delete();
+  }
+  source.move(target);
+  // a cél útvonala a mérvadó (a forrás-objektum uri-ja platformonként másként frissül)
+  return target.uri;
 }
 
 export const RenderStage = forwardRef<RenderStageHandle>(function RenderStage(_props, ref) {

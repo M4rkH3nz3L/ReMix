@@ -9,7 +9,7 @@ import { ActivityIndicator, Alert, Image, PixelRatio, Pressable, ScrollView, Sty
 import { captureRef } from 'react-native-view-shot';
 
 import { NewerSchemaBanner } from '@/components/NewerSchemaBanner';
-import { RenderStage, type RenderStageHandle } from '@/components/studio/image/RenderStage';
+import { keepRenderedInProject, RenderStage, type RenderStageHandle } from '@/components/studio/image/RenderStage';
 import { Chip } from '@/components/ui/controls';
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { ImageAdjustStrip } from '@/components/studio/image/ImageAdjustStrip';
@@ -411,11 +411,13 @@ export function ImageStudioBody({
       return;
     }
     const timer = setTimeout(() => {
-      void renderImageDoc(doc, 256)
-        .then((uri) => {
-          if (!uri) {
+      // offline first: a bélyegkép is a telefonon készül (CORE K1)
+      void (renderStageRef.current?.render(doc, 256) ?? Promise.resolve(null))
+        .then((rendered) => {
+          if (!rendered) {
             return;
           }
+          const uri = keepRenderedInProject(rendered, `thumb_${doc.id}_${activeThumbKey}`);
           const previous = doc.thumbUri;
           useEditorStore.getState().setDocThumb(doc.id, uri, activeThumbKey);
           if (previous && previous !== uri) {
@@ -1118,23 +1120,26 @@ export function ImageStudioBody({
   };
 
   /**
-   * 🧱 Rétegek egyesítése / raszterizálása a valódi renderrel (a preview-nál pontosabb).
-   * Pro: a Free render vízjeles, az a réteg pixeleibe égne; a vízjelet pedig kliens nem
-   * kapcsolhatja ki. Szerver nélkül nem megy, ezt megmondjuk.
+   * 🧱 Rétegek egyesítése / raszterizálása. Offline first (CORE K1): a telefon rendereli,
+   * vízjel nélkül, minden szinten (ami a telefonon fut, ingyenes). Csak ha a rétegeken
+   * telefonon nem rajzolható effekt van, kell a worker — annak Free-renderje vízjeles, és
+   * az a réteg pixeleibe égne, ezért az az eset marad Pro.
    */
   const mergeLayers = async (ids: string[], label: string) => {
     if (!doc || busy || ids.length === 0) {
       return;
     }
-    if (!isPro) {
+    const sub = rasterSubDoc(doc, ids);
+    if (!isPro && chooseImageRenderRoute(sub, true) === 'worker') {
       usePaywall.getState().open();
       return;
     }
     setBusy(true);
     try {
-      const uri = await renderImageDoc(rasterSubDoc(doc, ids), effectiveCanvas(doc).height);
+      const rendered = await rasterize(sub, { format: 'png', height: effectiveCanvas(doc).height });
+      const uri = rendered ? keepRenderedInProject(rendered, `merge_${makeId('r')}`) : null;
       if (!uri) {
-        Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.mergeNeedsServer'));
+        Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.renderFailBody'));
         return;
       }
       const fresh = useEditorStore.getState().project?.imageDocs?.find((d) => d.id === doc.id) ?? doc;

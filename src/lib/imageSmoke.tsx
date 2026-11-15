@@ -170,11 +170,11 @@ import { adjustSelection, copySelectionToLayer, deleteSelection, maskFromSelecti
 import { applyRing, ellipseRing, invertSelection, rectRing, selectionToMask } from '@/lib/selection';
 import { DEFAULT_BRUSH, type RetouchTool, type Stroke } from '@/lib/brushEngine';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
-import { RenderStage, type RenderStageHandle } from '@/components/studio/image/RenderStage';
+import { keepRenderedInProject, RenderStage, type RenderStageHandle } from '@/components/studio/image/RenderStage';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { PhotoSkiaContent, makeLutImage } from '@/components/studio/image/SkiaPhotoLayer';
 import { flushProjectSave, useProjectAutosave } from '@/hooks/useProjectAutosave';
-import { rotateCanvasDoc } from '@/lib/imageCanvasOps';
+import { rasterSubDoc, replaceWithRaster, rotateCanvasDoc } from '@/lib/imageCanvasOps';
 import { addLayer, createImageDoc } from '@/lib/imageDoc';
 import { renderImageDoc } from '@/lib/imageDocClient';
 import { LUT_DRAFT_SIZE, LUT_SIZE } from '@/lib/imagePreviewLut';
@@ -602,6 +602,29 @@ async function smokeOfflineImg(log: Log, setHarness: (n: ReactNode) => void) {
     removeFile(webp);
   } else {
     log(false, 'WebP alfával', 'nincs kép');
+  }
+
+  // egyesítés a telefonon (Free is, vízjel nélkül): a két felső réteg egy fotó-réteggé, a kép = az eredeti
+  const page1 = pages[0][1];
+  const sub = rasterSubDoc(page1, ['s', 't']);
+  const merged = await stage.render(sub, 320, { format: 'png' });
+  if (merged) {
+    const kept = keepRenderedInProject(merged, `smoke_merge_${Date.now().toString(36)}`);
+    const inProject = kept.startsWith(projectMediaDir().uri) && new File(kept).exists;
+    const after = replaceWithRaster(page1, ['s', 't'], kept, 'm', 'merged');
+    const before = await stage.render(page1, 320);
+    const now = await stage.render(after, 320);
+    if (before && now) {
+      const d = gridDiff(await decode(before), await decode(now), 320, 280);
+      log(inProject && after.layers.length === 2 && d.bad / d.total <= 0.06, 'egyesítés a telefonon', `${after.layers.length} réteg maradt, a projekt-mappában: ${inProject}, előtte = utána ${d.bad}/${d.total} rácspont`);
+      removeFile(before);
+      removeFile(now);
+    } else {
+      log(false, 'egyesítés a telefonon', 'nincs összevető kép');
+    }
+    removeFile(kept);
+  } else {
+    log(false, 'egyesítés a telefonon', 'nincs kép');
   }
 
   setHarness(null);

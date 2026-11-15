@@ -3759,7 +3759,6 @@
       "mergeDown": "Egyesítés lefelé",
       "rasterize": "Raszterizálás",
       "flatten": "Lapítás",
-      "mergeNeedsServer": "Az egyesítéshez a renderelő szerver kell, ami most nem érhető el.",
       "reorderHandle": "Húzd a sorrend módosításához",
       "canvasTransform": "Teljes vászon",
       "rotateLeft": "Forgatás balra",

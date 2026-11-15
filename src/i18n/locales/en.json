@@ -3759,7 +3759,6 @@
       "mergeDown": "Merge down",
       "rasterize": "Rasterize",
       "flatten": "Flatten",
-      "mergeNeedsServer": "Merging needs the render server, which isn't reachable right now.",
       "reorderHandle": "Drag to reorder",
       "canvasTransform": "Whole canvas",
       "rotateLeft": "Rotate left",

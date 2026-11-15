@@ -3792,7 +3792,6 @@
       "mergeDown": "Nach unten vereinen",
       "rasterize": "Rastern",
       "flatten": "Reduzieren",
-      "mergeNeedsServer": "Zum Vereinen wird der Render-Server benötigt, der gerade nicht erreichbar ist.",
       "reorderHandle": "Zum Sortieren ziehen",
       "canvasTransform": "Gesamte Leinwand",
       "rotateLeft": "Nach links drehen",

@@ -19,7 +19,8 @@ import type { ModelManifestEntry } from '@/lib/modelRegistry';
 
 export type CatalogWhere = 'device' | 'system' | 'worker';
 /** `js` = tiszta JS heurisztika/sablon-motor — minden buildben jelen van */
-export type CatalogEngine = 'whisper-rn' | 'executorch' | 'system' | 'worker' | 'js';
+/** `native` = a ReMix saját C-magja (RemixRender, iOS + Android); `coreml` = Core ML (csak iOS) */
+export type CatalogEngine = 'whisper-rn' | 'executorch' | 'system' | 'worker' | 'js' | 'native' | 'coreml';
 
 export interface CatalogEntry {
   id: string;
@@ -172,6 +173,63 @@ export const MODEL_CATALOG: CatalogEntry[] = [
     tasks: [],
   },
   {
+    // 🔇 V8: AI-zajszűrés a telefonon — RNNoise v0.2 (xiph, BSD-3), a C-mag a buildben, a súly-blob letöltve
+    id: 'rnnoise-v02',
+    label: 'AI-zajszűrő (RNNoise)',
+    emoji: '🔇',
+    where: 'device',
+    engine: 'native',
+    modalities: ['audio'],
+    tasks: [],
+    manifest: {
+      id: 'rnnoise-v02',
+      version: '0.2.0',
+      url: 'https://pub-2f81d92f651d4a40bb304fd5319ad82d.r2.dev/models/denoise/rnnoise-v0.2.bin',
+      sha256: '1b99898350e75656c77d068162fea402afe51eff15dc751989b1e9f53b98bf91',
+      sizeBytes: 14_751_424,
+      kind: 'audio',
+      modalities: ['audio'],
+    },
+  },
+  {
+    // 🥁 V8: AI-dob — Magenta Drums RNN (drum_kit_rnn, Google Magenta, Apache-2.0), tiszta JS-futtatás
+    id: 'magenta-drums',
+    label: 'AI-dob (Magenta Drums RNN)',
+    emoji: '🥁',
+    where: 'device',
+    engine: 'js',
+    modalities: ['audio'],
+    tasks: [],
+    manifest: {
+      id: 'magenta-drums',
+      version: '1.0.0',
+      url: 'https://pub-2f81d92f651d4a40bb304fd5319ad82d.r2.dev/models/drums/magenta-drums-v1.bin',
+      sha256: 'c446a4bfc0d81d04c41cce7cc0833179a3fae50d2c5bb33b830fbdae783e5f93',
+      sizeBytes: 11_872_984,
+      kind: 'audio',
+      modalities: ['audio'],
+    },
+  },
+  {
+    // 🎚️ V5: ének + kíséret — Spleeter 2stems (deezer, MIT) Core ML-re alakítva; csak iOS
+    id: 'spleeter-2stems',
+    label: 'Stem-szétválasztó (Spleeter)',
+    emoji: '🎚️',
+    where: 'device',
+    engine: 'coreml',
+    modalities: ['audio'],
+    tasks: [],
+    manifest: {
+      id: 'spleeter-2stems',
+      version: '1.0.0',
+      url: 'https://pub-2f81d92f651d4a40bb304fd5319ad82d.r2.dev/models/stems/spleeter2-v1.mlmodel',
+      sha256: '98843607dafd9801d519857f7e6a00ad051f57e473cbe7eedcadc2f5f93a556d',
+      sizeBytes: 39_306_406,
+      kind: 'audio',
+      modalities: ['audio'],
+    },
+  },
+  {
     // Fázis D: on-device SLM (intent→parancs, caption-tisztítás) — csak A-tier
     id: 'slm-small',
     label: 'Helyi asszisztens (SLM)',
@@ -220,6 +278,8 @@ export const BUILD_ENGINES: Readonly<Partial<Record<CatalogEngine, boolean>>> = 
   system: false,
   'whisper-rn': false, // runtime-detektálás írja felül (catalogRuntime)
   executorch: false,
+  native: false, // runtime-detektálás (a RemixRender modul RNNoise-függvényei)
+  coreml: false, // runtime-detektálás (iOS + a RemixRender stem-függvényei)
 };
 
 export type CatalogAvailability =

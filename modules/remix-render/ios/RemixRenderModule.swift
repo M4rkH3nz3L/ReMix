@@ -165,6 +165,54 @@ public class RemixRenderModule: Module {
     Constant("supportsDecodeWindow") { true }
     Constant("supportsDenoiseRun") { true }
 
+    // 🔇 V8: AI-zajszűrés (RNNoise v0.2, C) — a súly-blob a katalógusból; csatornánként egy állapot (fogantyú)
+    AsyncFunction("rnnoiseLoad") { (path: String) -> Bool in
+      let url = path.hasPrefix("file://") ? (URL(string: path) ?? URL(fileURLWithPath: path)) : URL(fileURLWithPath: path)
+      let data = try Data(contentsOf: url)
+      let rc = data.withUnsafeBytes { remix_rnnoise_load($0.baseAddress, Int32(data.count)) }
+      return rc == 0
+    }
+    Function("rnnoiseCreate") { () -> Int in
+      guard let st = remix_rnnoise_create() else { return -1 }
+      RNNoiseStates.next += 1
+      RNNoiseStates.all[RNNoiseStates.next] = st
+      return RNNoiseStates.next
+    }
+    /// a bemenet 480-as keretei (48 kHz, ±1); a visszatérés az átlagos beszéd-valószínűség
+    Function("rnnoiseRun") { (handle: Int, input: Float32Array, output: Float32Array) -> Double in
+      guard let st = RNNoiseStates.all[handle] else { return -1 }
+      let n = Int(remix_rnnoise_frame_size())
+      let frames = min(input.length, output.length) / n
+      let inp = input.rawPointer.bindMemory(to: Float.self, capacity: input.length)
+      let out = output.rawPointer.bindMemory(to: Float.self, capacity: output.length)
+      return Double(remix_rnnoise_process(st, inp, out, Int32(frames)))
+    }
+    // ⚡ a folyamatos átmintavételező natívan (a JS StreamResampler bitre azonos tükre; a táblát a JS adja)
+    Function("resamplerCreate") { (up: Int, down: Int, half: Int, table: Float32Array) -> Int in
+      let tp = table.rawPointer.bindMemory(to: Float.self, capacity: table.length)
+      guard let r = remix_resampler_create(Int32(up), Int32(down), Int32(half), tp) else { return -1 }
+      RNNoiseStates.next += 1
+      RNNoiseStates.resamplers[RNNoiseStates.next] = r
+      return RNNoiseStates.next
+    }
+    Function("resamplerProcess") { (handle: Int, input: Float32Array, output: Float32Array) -> Int in
+      guard let r = RNNoiseStates.resamplers[handle] else { return -1 }
+      let ip = input.rawPointer.bindMemory(to: Float.self, capacity: max(1, input.length))
+      let op = output.rawPointer.bindMemory(to: Float.self, capacity: max(1, output.length))
+      return Int(remix_resampler_process(r, ip, Int32(input.length), op, Int32(output.length)))
+    }
+    Function("resamplerFlush") { (handle: Int, output: Float32Array) -> Int in
+      guard let r = RNNoiseStates.resamplers[handle] else { return -1 }
+      let op = output.rawPointer.bindMemory(to: Float.self, capacity: max(1, output.length))
+      return Int(remix_resampler_flush(r, op, Int32(output.length)))
+    }
+    Function("resamplerDestroy") { (handle: Int) in
+      if let r = RNNoiseStates.resamplers.removeValue(forKey: handle) { remix_resampler_destroy(r) }
+    }
+    Function("rnnoiseDestroy") { (handle: Int) in
+      if let st = RNNoiseStates.all.removeValue(forKey: handle) { remix_rnnoise_destroy(st) }
+    }
+
     // 🎚️ V5 (prototípus): stem-szétválasztás Core ML-lel (Spleeter 2stems, MIT) — a bemenet/kimenet szinkron
     // másolással natív pufferbe (a JS-tömb nem megy át másik szálra), a futtatás háttérszálon
     AsyncFunction("stemLoad") { (path: String) -> Bool in
@@ -1403,4 +1451,11 @@ enum StemDSP {
       }
     }
   }
+}
+
+/// 🔇 V8: a futó RNNoise-állapotok (fogantyú → C-állapot)
+enum RNNoiseStates {
+  static var next = 0
+  static var all: [Int: UnsafeMutableRawPointer] = [:]
+  static var resamplers: [Int: UnsafeMutableRawPointer] = [:]
 }

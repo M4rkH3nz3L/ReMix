@@ -12,7 +12,7 @@
 import type { AiModality } from '@/lib/aiRouting';
 import type { AiTask } from '@/lib/aiProviders'; // type-only → nem húzza be a supabase-réteget
 
-export type ModelKind = 'whisper' | 'embedding' | 'slm' | 'onnx' | 'vision';
+export type ModelKind = 'whisper' | 'embedding' | 'slm' | 'onnx' | 'vision' | 'audio';
 
 export interface ModelManifestEntry {
   id: string;

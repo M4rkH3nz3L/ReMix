@@ -1,5 +1,7 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
+
+import { ensureAudioModel } from '@/lib/audioModels';
 import { Platform } from 'react-native';
 
 import { decodeSample } from '@/lib/instrumentClient';
@@ -24,9 +26,6 @@ type StemNative = {
 };
 const mod = Platform.OS === 'ios' ? requireOptionalNativeModule<StemNative>('RemixRender') : null;
 
-export const STEM_MODEL_FILE = 'spleeter2.mlmodel';
-/** a modell a ReMix R2-tárában (Spleeter 2stems → Core ML, fp16, 39 MB; sha256 98843607dafd9801…) */
-export const STEM_MODEL_URL = 'https://pub-2f81d92f651d4a40bb304fd5319ad82d.r2.dev/models/stems/spleeter2-v1.mlmodel';
 /** 🚫 kiadásban rejtve a modell-licenc jogi megerősítéséig (dev-buildben látszik) */
 export const STEM_ON_DEVICE_ENABLED = false;
 export const STEM_MAX_SEC = 15 * 60;
@@ -38,12 +37,6 @@ export function stemOnDeviceSupported(): boolean {
 /** látszik-e a gomb: a build tudja, és (kiadásban) a kapcsoló be van kapcsolva */
 export function stemOnDeviceVisible(): boolean {
   return stemOnDeviceSupported() && (STEM_ON_DEVICE_ENABLED || __DEV__);
-}
-
-function modelFile(): File {
-  const dir = new Directory(Paths.document, 'models');
-  if (!dir.exists) dir.create();
-  return new File(dir, STEM_MODEL_FILE);
 }
 
 let loaded = false;
@@ -58,22 +51,11 @@ export function stemKernels(): StemKernels {
   return jsStemKernels;
 }
 
-/** a modell a telefonon (ha kell, letöltve `url`-ről) és betöltve; `false`, ha nem sikerült */
-export async function ensureStemModel(url: string): Promise<boolean> {
+/** a modell a telefonon a gyári katalógusból (`spleeter-2stems`: letöltés sha256-tal + önellenőrzés), betöltve */
+export async function ensureStemModel(): Promise<boolean> {
   if (!stemOnDeviceSupported()) return false;
-  if (loaded) return true;
-  try {
-    const f = modelFile();
-    if (!f.exists || (f.size ?? 0) < 1_000_000) {
-      if (f.exists) f.delete();
-      await File.downloadFileAsync(url, f);
-    }
-    loaded = (await mod!.stemLoad!(f.uri)) === true;
-    return loaded;
-  } catch (caught) {
-    logCaught('lib/stemSeparationClient.ts:ensureStemModel', caught);
-    return false;
-  }
+  loaded = await ensureAudioModel('spleeter-2stems');
+  return loaded;
 }
 
 export interface StemResult {

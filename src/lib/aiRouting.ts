@@ -13,7 +13,8 @@
  * míg online nem lesz), nincs crash.
  */
 
-export type AiModality = 'transcribe' | 'embed' | 'vision' | 'text' | 'smallText';
+/** `audio`: hang-AI (zajszűrés, stem, zene-generálás) — csak eszközön, nem LLM-feladat */
+export type AiModality = 'transcribe' | 'embed' | 'vision' | 'text' | 'smallText' | 'audio';
 export type AiTarget = 'device' | 'server' | 'hybrid';
 export type NetworkState = 'online' | 'offline';
 export type SizeHint = 'small' | 'medium' | 'large';

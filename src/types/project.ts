@@ -1264,6 +1264,11 @@ export interface AudioClip extends ClipBase {
    */
   tune?: { sourceUri: string; sourceAssetId?: string; root: number; minor: boolean; strength: number; harmonySteps?: number };
   /**
+   * 🔇 V8: AI-zajszűrés (RNNoise a telefonon) — a klip a tisztított fájlra mutat, az eredeti itt marad
+   * (újra-alkalmazás az eredetiből, visszaállítás). Hiányzó = nincs AI-zajszűrve.
+   */
+  aiDenoise?: { sourceUri: string; sourceAssetId?: string; strength: number };
+  /**
    * 🎹🥁 a hangszer-minta (`project.instrumentDocs`), amiből a klip hangja sütve lett — a minta
    * újraszerkeszthető, az újrasütés minden rá hivatkozó klipet frissít. Hiányzó = sima hangfájl.
    */

@@ -2,7 +2,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { BUILD_ENGINES, type CatalogRuntime } from '@/lib/modelCatalog';
-import { executorchEngineAvailable, whisperEngineAvailable } from '@/lib/nativeEngines';
+import { coremlEngineAvailable, executorchEngineAvailable, nativeAudioEngineAvailable, whisperEngineAvailable } from '@/lib/nativeEngines';
 import {
   planModelEviction,
   verifyChecksum,
@@ -277,6 +277,8 @@ export function catalogRuntime(): CatalogRuntime {
       ...BUILD_ENGINES,
       'whisper-rn': whisperEngineAvailable(),
       executorch: executorchEngineAvailable(),
+      native: nativeAudioEngineAvailable(),
+      coreml: coremlEngineAvailable(),
     },
     downloaded: records.map((r) => r.id),
     smoke,

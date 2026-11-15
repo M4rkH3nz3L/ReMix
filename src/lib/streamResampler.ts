@@ -8,6 +8,34 @@
 
 const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
 
+/** a fázistábla (a natív átmintavételező is ezt kapja → bitre azonos kimenet): `up` fázis × `2·half` súly */
+export function resamplerTable(inRate: number, outRate: number, halfTaps?: number): { up: number; down: number; half: number; table: Float32Array[] } {
+  const g = gcd(inRate, outRate);
+  const up = outRate / g; // ennyi fázis
+  const down = inRate / g; // bemeneti lépés fázisonként
+  // lefelé az átlapolódás ellen hosszabb szűrő és lejjebb vágás (a kimeneti Nyquist 90 %-a)
+  const downsampling = outRate < inRate;
+  const half = halfTaps ?? (downsampling ? 48 : 16);
+  const cutoff = downsampling ? (outRate / inRate) * 0.9 : 0.97;
+  const table: Float32Array[] = [];
+  for (let p = 0; p < up; p++) {
+    const frac = (p * down) / up - Math.floor((p * down) / up);
+    const w = new Float32Array(2 * half);
+    let sum = 0;
+    for (let k = 0; k < 2 * half; k++) {
+      const x = k - (half - 1) - frac; // a minta távolsága a kimeneti pozíciótól
+      const s = x === 0 ? 1 : Math.sin(Math.PI * cutoff * x) / (Math.PI * cutoff * x);
+      const n = (x + half) / (2 * half); // 0…1 az ablakban
+      const blackman = 0.42 - 0.5 * Math.cos(2 * Math.PI * n) + 0.08 * Math.cos(4 * Math.PI * n);
+      w[k] = s * Math.max(0, blackman);
+      sum += w[k];
+    }
+    for (let k = 0; k < w.length; k++) w[k] /= sum; // egységnyi DC-erősítés
+    table.push(w);
+  }
+  return { up, down, half, table };
+}
+
 export class StreamResampler {
   readonly up: number;
   readonly down: number;
@@ -27,30 +55,11 @@ export class StreamResampler {
     private readonly channels: number,
     halfTaps?: number
   ) {
-    const g = gcd(inRate, outRate);
-    this.up = outRate / g; // ennyi fázis
-    this.down = inRate / g; // bemeneti lépés fázisonként
-    // lefelé az átlapolódás ellen hosszabb szűrő és lejjebb vágás (a kimeneti Nyquist 90 %-a)
-    const downsampling = outRate < inRate;
-    halfTaps = halfTaps ?? (downsampling ? 48 : 16);
-    this.half = halfTaps;
-    const cutoff = downsampling ? (outRate / inRate) * 0.9 : 0.97;
-    this.table = [];
-    for (let p = 0; p < this.up; p++) {
-      const frac = (p * this.down) / this.up - Math.floor((p * this.down) / this.up);
-      const w = new Float32Array(2 * halfTaps);
-      let sum = 0;
-      for (let k = 0; k < 2 * halfTaps; k++) {
-        const x = k - (halfTaps - 1) - frac; // a minta távolsága a kimeneti pozíciótól
-        const s = x === 0 ? 1 : Math.sin(Math.PI * cutoff * x) / (Math.PI * cutoff * x);
-        const n = (x + halfTaps) / (2 * halfTaps); // 0…1 az ablakban
-        const blackman = 0.42 - 0.5 * Math.cos(2 * Math.PI * n) + 0.08 * Math.cos(4 * Math.PI * n);
-        w[k] = s * Math.max(0, blackman);
-        sum += w[k];
-      }
-      for (let k = 0; k < w.length; k++) w[k] /= sum; // egységnyi DC-erősítés
-      this.table.push(w);
-    }
+    const t = resamplerTable(inRate, outRate, halfTaps);
+    this.up = t.up;
+    this.down = t.down;
+    this.half = t.half;
+    this.table = t.table;
     this.buf = Array.from({ length: channels }, () => new Float32Array(4096));
   }
 

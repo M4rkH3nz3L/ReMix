@@ -94,3 +94,6 @@ server/.env.bak*
 # devs/ — belső fejlesztői jegyzetek/tervek/taszkok: fejlesztéshez, LOKÁLIS.
 # A teljes mappa ignorált (nem kerül a repóba), a fájlok a lemezen maradnak.
 devs/
+
+# 🔇 V8: az Android natív (CMake) build-gyorsítótára
+.cxx/

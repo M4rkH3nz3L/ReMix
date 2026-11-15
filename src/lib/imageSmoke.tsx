@@ -2,7 +2,7 @@ import * as Device from 'expo-device';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { AlphaType, ColorType, drawAsImage, Group, ImageFormat, Skia, type SkImage } from '@shopify/react-native-skia';
-import { Directory, File, Paths } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import type { ReactNode, RefObject } from 'react';
 import { createRef, Profiler, useEffect, useRef } from 'react';
 import { createAudioPlayer, getRecordingPermissionsAsync, RecordingPresets, useAudioRecorder, type AudioRecorder } from 'expo-audio';
@@ -69,6 +69,10 @@ import { readPowerState } from '@/lib/powerStateClient';
 import { matrixRow } from '@/lib/perfMatrix';
 import { packFromProject } from '@/lib/soundPack';
 import { ensureStemModel, separateOnDevice, stemKernels, stemOnDeviceSupported } from '@/lib/stemSeparationClient';
+import { audioModelDownloads, ensureAudioModel, runAudioModelSmoke } from '@/lib/audioModels';
+import { measureDelay } from '@/lib/aiDenoise';
+import { aiDenoiseFile } from '@/lib/aiDenoiseClient';
+import { jsResampler, makeResampler, nativeResamplerAvailable } from '@/lib/nativeResampler';
 import { jsStemKernels, separateTwoStems } from '@/lib/stemSeparation';
 import { getPayload, listShopItems, purchaseItem, storeSoundPack, syncOwnedSoundPacks } from '@/lib/shop';
 import { useSoundPacks } from '@/store/soundPackStore';
@@ -132,9 +136,9 @@ import { crc32, localDataOffset, parseCentralDirectory, parseEocd } from '@/lib/
 import { t as i18nT, type TFunction } from 'i18next';
 import { canSegment, LongSource, setLongThresholdForTest } from '@/lib/longSource';
 import { whisperEngineAvailable } from '@/lib/nativeEngines';
-import { catalogRuntime, downloadModel, listCachedModels, removeModel } from '@/lib/modelRegistryClient';
+import { catalogRuntime, downloadModel, listCachedModels, modelFileUri, removeModel } from '@/lib/modelRegistryClient';
 import { bestUsableWhisperModelId, lastRawTokens, runWhisperSmokeTest, transcribeMediaOnDevice, transcribeWordsOnDevice } from '@/lib/whisperClient';
-import { catalogAvailability, catalogEntry } from '@/lib/modelCatalog';
+import { catalogAvailability, catalogEntry, catalogUsable } from '@/lib/modelCatalog';
 import { decodeToMono16k } from '@/lib/audioDecode';
 import { findClipSilences } from '@/lib/audioSilenceClient';
 import { LiveLoudness } from '@/lib/liveLoudness';
@@ -142,7 +146,7 @@ import { integratedLoudness } from '@/lib/loudness';
 import { getStretchProxySync, stretchProxyKey } from '@/lib/stretchProxy';
 import { trimAudioRight } from '@/lib/audioTrim';
 import type { RenderSettings } from '@/lib/render';
-import { encodeWav16, wavHeader16 } from '@/lib/offlineMix';
+import { encodeWav16, pcm16, wavHeader16 } from '@/lib/offlineMix';
 import { detectBeats, lastBeatPath } from '@/lib/beats';
 import { canDetachAudio, detachAudioCommands } from '@/lib/audioExtract';
 import { freeDiskBytes, setFreeDiskOverride } from '@/lib/diskSpaceClient';
@@ -3323,14 +3327,282 @@ async function smokePerfMatrix(log: Log) {
   log(null, 'MATRIX', row);
 }
 
+/** 📸 V8 fotózható állapotok: a dobgép AI-sora (20 s), utána a klip-szerkesztő AI-zajszűrés része (20 s) */
+async function smokeAiShot(log: Log) {
+  const st = useEditorStore.getState;
+  const id = `prj_smoke_aishot_${Date.now().toString(36)}`;
+  const f = new File(Paths.document, 'smoke_aidenoise_in.wav');
+  const base = createEmptyProject('AI-próba', '9:16', undefined, 'audio');
+  const clip: AudioClip = { kind: 'audio', id: 'v', uri: f.uri, label: 'beszéd', start: 0, duration: 20, trimIn: 0, sourceDuration: 20, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: f.exists ? [clip] : [] } : t)) });
+  try {
+    router.push(`/studio/audio/${id}` as Href);
+    for (let i = 0; i < 150 && (st().project?.id !== id || runDevAction('audio.studioMode') === undefined); i++) await sleep(200);
+    await sleep(800);
+    runDevAction('audio.openDrums');
+    await sleep(800);
+    runDevAction('drums.demo');
+    await runDevAction('drums.ai', { mode: 'continue', temp: 'creative', seed: 3 });
+    log(true, 'FOTÓZHATÓ-1', 'a dobgép az AI-sorral');
+    await sleep(20_000);
+    runDevAction('audio.closeDrums');
+    await sleep(600);
+    st().selectClip('v');
+    runDevAction('audio.editClip');
+    log(true, 'FOTÓZHATÓ-2', 'a klip-szerkesztő AI-zajszűréssel');
+    await sleep(20_000);
+    router.back();
+    await sleep(500);
+  } finally {
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:aishot', caught));
+  }
+}
+
+/**
+ * 🤖 V8: a telefonos hang-AI modellek a gyári katalógusból — törölve → letöltés (sha256) + önellenőrzés (PASS);
+ * a második használat NEM tölt le (letöltés után hálózat nélkül, repülő módban is megy).
+ */
+async function smokeAiModels(log: Log) {
+  log(null, 'eszköz', `${Device.modelName ?? Platform.OS}`);
+  const ids = ['rnnoise-v02', 'magenta-drums', 'spleeter-2stems'] as const;
+  for (const id of ids) removeModel(id);
+  const d0 = audioModelDownloads();
+  for (const id of ids) {
+    const t0 = Date.now();
+    const ok = await ensureAudioModel(id);
+    const rt = catalogRuntime();
+    log(ok && rt.smoke?.[id] === 'pass' && catalogUsable(catalogEntry(id)!, rt), `${id}: letöltve (sha256), ellenőrizve, használható`, `${Date.now() - t0} ms`);
+  }
+  const d1 = audioModelDownloads();
+  for (const id of ids) await ensureAudioModel(id);
+  log(d1 - d0 === 3 && audioModelDownloads() === d1, 'a második használat letöltés nélkül (offline / repülő módban is)', `${d1 - d0} letöltés, utána ${audioModelDownloads() - d1}`);
+  const card = await runAudioModelSmoke('rnnoise-v02');
+  log(card, 'a Profil-kártya önellenőrzése (ugyanaz a függvény) PASS');
+}
+
+/** a próbabeszéd (a Mac fájlszerveréről) 44,1 kHz-en */
+async function smokeSpeech(): Promise<Float32Array> {
+  const sp = new File(Paths.document, 'smoke_stem_speech.wav');
+  if (!sp.exists) await File.downloadFileAsync(`${smokeFileHost()}/speech_hu.wav`, sp);
+  const api = (await loadAudioApi())!;
+  return (await api.decodeAudioData(sp.uri, 44100)).getChannelData(0);
+}
+
+/**
+ * 🔇 V8: AI-zajszűrés — valódi beszéd + zaj (fehér, 50 Hz-es búgás, „ventilátor”) → a klip műveletével: a jel/zaj
+ * javul, a szünetekben a zaj lemegy, a kimenet időben a helyén (késés-kiegyenlítés), egy undo, visszaállítás,
+ * újra-alkalmazás az eredetiből; 5 perces fájl sebessége (folyamatos feldolgozás).
+ */
+async function smokeAiDenoise(log: Log) {
+  const SR = 44100;
+  {
+    // ⚡ a natív átmintavételező = a JS (bitre), fel és le, változó darabolással
+    let sd = 5;
+    const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647) * 2 - 1;
+    const x = Float32Array.from({ length: 3 * SR }, () => rnd() * 0.5);
+    let worst = 0;
+    let lens = '';
+    for (const [a, b] of [[44100, 48000], [48000, 44100]] as const) {
+      const js = jsResampler(a, b, 1);
+      const nat = makeResampler(a, b, 1);
+      const take = (r: typeof js) => {
+        const parts: Float32Array[] = [];
+        for (let at = 0, k = 0; at < x.length; k++) {
+          const n = [1000, 4410, 7, 30000][k % 4];
+          parts.push(r.process([x.subarray(at, Math.min(x.length, at + n))])[0]);
+          at += n;
+        }
+        parts.push(r.flush()[0]);
+        const out = new Float32Array(parts.reduce((s2, p2) => s2 + p2.length, 0));
+        let o = 0;
+        for (const p2 of parts) {
+          out.set(p2, o);
+          o += p2.length;
+        }
+        return out;
+      };
+      const y1 = take(js);
+      const y2 = take(nat);
+      lens += `${y1.length}/${y2.length} `;
+      if (y1.length !== y2.length) worst = Infinity;
+      for (let i = 0; i < Math.min(y1.length, y2.length); i++) worst = Math.max(worst, Math.abs(y1[i] - y2[i]));
+    }
+    log(nativeResamplerAvailable() && worst === 0, 'a natív átmintavételező bitre = a JS (44,1 ↔ 48 kHz)', `max eltérés ${worst}, hosszak ${lens}`);
+  }
+  const speech = await smokeSpeech();
+  const n = 20 * SR;
+  const clean = new Float32Array(n);
+  for (let i = 0; i < n; i++) clean[i] = speech[i % speech.length] * 0.8;
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
+  let fan = 0;
+  const noise = Float32Array.from({ length: n }, (_, i) => {
+    fan = fan * 0.995 + rnd() * 0.02;
+    return 0.02 * rnd() + 0.04 * Math.sin((2 * Math.PI * 50 * i) / SR) + 0.5 * fan;
+  });
+  const noisy = Float32Array.from(clean, (x, i) => x + noise[i]);
+  const f = new File(Paths.document, 'smoke_aidenoise_in.wav');
+  if (f.exists) f.delete();
+  f.create();
+  f.write(encodeWav16([noisy, noisy], SR));
+  const id = `prj_smoke_aidn_${Date.now().toString(36)}`;
+  const base = createEmptyProject('smoke AI-zajszűrés', '9:16', undefined, 'audio');
+  const clip: AudioClip = { kind: 'audio', id: 'v', uri: f.uri, label: 'beszéd', start: 0, duration: 20, trimIn: 0, sourceDuration: 20, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported' };
+  await saveProject({ ...base, id, tracks: base.tracks.map((t) => (t.type === 'voiceover' ? { ...t, clips: [clip] } : t)) });
+  const st = useEditorStore.getState;
+  try {
+    router.push(`/studio/audio/${id}` as Href);
+    for (let i = 0; i < 150 && (st().project?.id !== id || runDevAction('audio.studioMode') === undefined); i++) await sleep(200);
+    await sleep(800);
+    const undo0 = st().past?.length ?? 0;
+    const r = (await runDevAction('aiDenoise.apply', { clipId: 'v', strength: 1 })) as { vad: number; ms: number } | null;
+    const c1 = st().project?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'v') as AudioClip | undefined;
+    log(!!r && !!c1?.aiDenoise && c1.uri !== f.uri && c1.aiDenoise.sourceUri === f.uri && (st().past?.length ?? 0) - undo0 === 1, 'a klip a tisztított fájlra mutat, az eredeti megőrizve, egy undo', r ? `${r.ms} ms (20 s → ${(20000 / r.ms).toFixed(1)}× valós idő), VAD ${r.vad.toFixed(2)}` : 'nincs eredmény');
+    if (!c1?.aiDenoise) return;
+    const api = (await loadAudioApi())!;
+    const out = (await api.decodeAudioData(c1.uri, SR)).getChannelData(0);
+    const lag = measureDelay(clean.subarray(0, 5 * SR), out.subarray(0, 5 * SR + 4096), 4096);
+    log(Math.abs(out.length - n) <= 1 && lag <= 2, 'a kimenet időben a helyén (késés-kiegyenlítés), a hossz pontos', `eltolás ${lag} minta, hossz ${out.length}/${n}`);
+    let ce = 0;
+    let ne = 0;
+    let ee = 0;
+    for (let i = 0; i < n; i++) {
+      ce += clean[i] ** 2;
+      ne += noise[i] ** 2;
+      ee += (out[i] - clean[i]) ** 2;
+    }
+    const snrIn = 10 * Math.log10(ce / ne);
+    const snrOut = 10 * Math.log10(ce / ee);
+    log(snrOut > snrIn + 6, 'a jel/zaj viszony javul (≥ 6 dB)', `${snrIn.toFixed(1)} → ${snrOut.toFixed(1)} dB`);
+    // a beszéd-szünetek (a tiszta jel 50 ms-os ablakban csendes) zaja
+    const W = 2205;
+    let pin = 0;
+    let pout = 0;
+    let cnt = 0;
+    for (let a = 0; a + W < n; a += W) {
+      let e = 0;
+      for (let i = a; i < a + W; i++) e += clean[i] ** 2;
+      if (e / W < 1e-6) {
+        for (let i = a; i < a + W; i++) {
+          pin += noisy[i] ** 2;
+          pout += out[i] ** 2;
+        }
+        cnt++;
+      }
+    }
+    log(cnt > 0 && 10 * Math.log10(pin / Math.max(pout, 1e-12)) > 15, 'a szünetekben a zaj ≥ 15 dB-lel lemegy', `${cnt} szünet-ablak, −${(10 * Math.log10(pin / Math.max(pout, 1e-12))).toFixed(1)} dB`);
+    runDevAction('audio.resetAiDenoise', 'v');
+    await sleep(200);
+    const c2 = st().project?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'v') as AudioClip | undefined;
+    log(c2?.uri === f.uri && !c2.aiDenoise, 'visszaállítás: az eredeti fájl');
+    const r2 = (await runDevAction('aiDenoise.apply', { clipId: 'v', strength: 0.5 })) as { ms: number } | null;
+    const c3 = st().project?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'v') as AudioClip | undefined;
+    log(!!r2 && c3?.aiDenoise?.strength === 0.5 && c3.aiDenoise.sourceUri === f.uri, 'újra 50%-on — az eredetiből');
+    // az asszisztens: „AI-zajszűrés a beszédre” → a beszéd klipje (az eredetiből, 100%), egy undo
+    runDevAction('audio.resetAiDenoise', 'v');
+    await sleep(200);
+    const u0 = st().past?.length ?? 0;
+    runDevAction('audio.assistant');
+    await sleep(400);
+    devTypeAssistant('AI-zajszűrés a beszédre');
+    await sleep(400);
+    runDevAction('assistant.apply');
+    for (let i = 0; i < 100 && (st().past?.length ?? 0) === u0; i++) await sleep(200);
+    const c4 = st().project?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'v') as AudioClip | undefined;
+    log(c4?.aiDenoise?.strength === 1 && c4.aiDenoise.sourceUri === f.uri && (st().past?.length ?? 0) - u0 === 1, 'asszisztens: „AI-zajszűrés a beszédre” — a beszéd klipjén, egy undo');
+    devTypeAssistant('');
+    // folyamatos feldolgozás: 5 perces fájl
+    const long = new File(Paths.document, 'smoke_aidenoise_long.wav');
+    if (long.exists) long.delete();
+    long.create();
+    const h = long.open();
+    h.writeBytes(wavHeader16(300 * SR, 1, SR));
+    for (let k = 0; k < 15; k++) h.writeBytes(pcm16([noisy]));
+    h.close();
+    const t0 = Date.now();
+    const lr = await aiDenoiseFile(long.uri, 1);
+    const ms = Date.now() - t0;
+    log(!!lr && Math.abs(lr.durationSec - 300) < 0.01, '5 perces fájl folyamatosan (a memória a darabbal arányos)', `${(ms / 1000).toFixed(1)} s = ${(300 / (ms / 1000)).toFixed(1)}× valós idő · ${JSON.stringify(lr?.timings)}`);
+    if (lr) new File(lr.uri).delete();
+    long.delete();
+    router.back();
+    await sleep(500);
+  } finally {
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:aidenoise', caught));
+  }
+}
+
+/**
+ * 🥁 V8: AI-dob — a dobgépben (folytatás / variáció / új groove, a megtartott rész változatlan), a lejátszófejnél az
+ * asszisztens („tegyél alá 2 ütem AI-dobot”): szerkeszthető dob-minta szabad sávon, egy undo.
+ */
+async function smokeAiDrums(log: Log) {
+  const id = `prj_smoke_aidr_${Date.now().toString(36)}`;
+  await saveProject({ ...createEmptyProject('smoke AI-dob', '9:16', undefined, 'audio'), id, bpm: 100 });
+  const st = useEditorStore.getState;
+  try {
+    router.push(`/studio/audio/${id}` as Href);
+    for (let i = 0; i < 150 && (st().project?.id !== id || runDevAction('audio.studioMode') === undefined); i++) await sleep(200);
+    await sleep(800);
+    // a dobgépben
+    runDevAction('audio.openDrums');
+    await sleep(800);
+    runDevAction('drums.demo');
+    await sleep(200);
+    const before = String(runDevAction('drums.hits'));
+    const t0 = Date.now();
+    const n1 = (await runDevAction('drums.ai', { mode: 'continue', temp: 'safe', seed: 3 })) as number;
+    const ms = Date.now() - t0;
+    await sleep(300);
+    const after = String(runDevAction('drums.hits'));
+    const firstBarSame = before.split(',').every((h) => after.split(',').includes(h));
+    const second = after.split(',').filter((h) => Number(h.replace(/^[a-z]+/, '').split('v')[0]) >= 16);
+    log(n1 > 0 && firstBarSame && second.length > 0, 'folytatás: az első ütem változatlan, a második a modellé', `${ms} ms, ${second.length} új ütés (pl. ${second.slice(0, 6).join(',')})`);
+    const n2 = (await runDevAction('drums.ai', { mode: 'vary', temp: 'creative', seed: 5 })) as number;
+    await sleep(300);
+    const vary = String(runDevAction('drums.hits'));
+    log(n2 > 0 && before.split(',').every((h) => vary.split(',').includes(h)), 'variáció: az első ütem marad');
+    const n3 = (await runDevAction('drums.ai', { mode: 'groove', temp: 'bold', seed: 9 })) as number;
+    await sleep(300);
+    const groove = String(runDevAction('drums.hits'));
+    log(n3 > 0 && groove.includes('kick0'), 'új groove: lábdobbal indul', groove.split(',').slice(0, 8).join(','));
+    const undoBake = st().past?.length ?? 0;
+    runDevAction('drums.bake');
+    for (let i = 0; i < 40 && (st().past?.length ?? 0) === undoBake; i++) await sleep(200);
+    log((st().past?.length ?? 0) - undoBake === 1, 'a „Sávra” egy undo-lépés');
+    runDevAction('audio.closeDrums');
+    await sleep(400);
+    // az asszisztens: AI-dob a lejátszófejnél
+    // a lejátszófej a projekt hosszán belül (az üres részre nem állítható) — a tényleges értékhez mérünk
+    st().setPlayhead(2);
+    const ph = st().playhead;
+    const undo0 = st().past?.length ?? 0;
+    runDevAction('audio.assistant');
+    await sleep(400);
+    devTypeAssistant('tegyél alá 2 ütem AI-dobot');
+    await sleep(400);
+    runDevAction('assistant.apply');
+    for (let i = 0; i < 60 && (st().past?.length ?? 0) === undo0; i++) await sleep(200);
+    const p = st().project!;
+    const clip = p.tracks.flatMap((t) => t.clips.map((c) => ({ t, c: c as AudioClip }))).find((x) => Math.abs(x.c.start - ph) < 0.05 && x.c.label === 'AI-dob');
+    const doc = clip ? p.instrumentDocs?.find((d) => d.id === clip.c.instrumentDocId) : undefined;
+    log(!!doc?.drums && doc.bars === 2 && Math.abs((clip?.c.duration ?? 0) - 4.8) < 0.05 && (st().past?.length ?? 0) - undo0 === 1, 'asszisztens: 2 ütem AI-dob a lejátszófejnél (100 BPM = 4,8 s), szerkeszthető minta, egy undo', `${clip?.t.type} @ ${ph.toFixed(2)} s, ${clip?.c.duration.toFixed(2)} s, ${doc?.drums ? Object.values(doc.drums.pattern).reduce((s, r) => s + r.filter(Boolean).length, 0) : 0} ütés`);
+    devTypeAssistant('');
+    router.back();
+    await sleep(500);
+  } finally {
+    await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:aidrums', caught));
+  }
+}
+
 /**
  * 🎚️ V5: a felhasználói út — a modell a VALÓDI R2-címről (a helyi példány törölve), a stúdió-művelet a klipből két
  * új sávot csinál (ének, kíséret) a klip vágásával, az eredeti elnémul; egy undo.
  */
 async function smokeStemsUi(log: Log) {
   const SR = 44100;
-  const old = new File(new Directory(Paths.document, 'models'), 'spleeter2.mlmodel');
-  if (old.exists) old.delete();
+  // a modell a katalógusból: előbb törölve → a művelet tölti le (sha256) és ellenőrzi
+  removeModel('spleeter-2stems');
   const sp = new File(Paths.document, 'smoke_stem_speech.wav');
   if (!sp.exists) await File.downloadFileAsync(`${smokeFileHost()}/speech_hu.wav`, sp);
   const api = (await loadAudioApi())!;
@@ -3358,7 +3630,7 @@ async function smokeStemsUi(log: Log) {
     const t0 = Date.now();
     const ids = (await runDevAction('stems.onDevice', 'mix')) as string[] | null;
     const ms = Date.now() - t0;
-    log(new File(new Directory(Paths.document, 'models'), 'spleeter2.mlmodel').exists, 'a modell az R2-ről letöltve', `${ms} ms összesen (letöltés + szétválasztás)`);
+    log(modelFileUri('spleeter-2stems') !== null && catalogRuntime().smoke?.['spleeter-2stems'] === 'pass', 'a modell a katalógusból letöltve (sha256) és ellenőrizve', `${ms} ms összesen (letöltés + ellenőrzés + szétválasztás)`);
     const p = st().project!;
     const added = p.tracks.flatMap((t) => t.clips.map((c) => ({ t, c: c as AudioClip }))).filter((x) => ids?.includes(x.c.id));
     log(added.length === 2 && added.every((x) => x.t.type.startsWith('aux') && x.c.start === 1 && x.c.trimIn === 5 && x.c.duration === 20), 'két új sáv (ének, kíséret) a klip vágásával', added.map((x) => `${x.t.type}:${x.t.name}`).join(', '));
@@ -3398,7 +3670,7 @@ async function smokeStemDevice(log: Log) {
     log(stemKernels() !== jsStemKernels && worst < 1e-4, 'a natív jelút = a JS jelút (20 s)', `max eltérés ${worst.toExponential(1)} · JS ${jsMs} ms, natív ${natMs} ms`);
   }
   const t0 = Date.now();
-  const ok = await ensureStemModel(`${smokeFileHost()}/spleeter2.mlmodel`);
+  const ok = await ensureStemModel();
   log(ok, 'a modell letöltve és betöltve (Core ML)', `${Date.now() - t0} ms`);
   if (!ok) return;
   const SR = 44100;
@@ -10976,6 +11248,22 @@ export async function runImageSmoke(
   }
   if (phase === 'crossfade') {
     await step(phase, () => smokeCrossfade(log));
+    return;
+  }
+  if (phase === 'aishot') {
+    await step(phase, () => smokeAiShot(log));
+    return;
+  }
+  if (phase === 'aimodels') {
+    await step(phase, () => smokeAiModels(log));
+    return;
+  }
+  if (phase === 'aidenoise') {
+    await step(phase, () => smokeAiDenoise(log));
+    return;
+  }
+  if (phase === 'aidrums') {
+    await step(phase, () => smokeAiDrums(log));
     return;
   }
   if (phase === 'stemsui') {

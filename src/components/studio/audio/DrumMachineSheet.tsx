@@ -1,11 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { UserPresetRow } from '@/components/studio/audio/UserPresetRow';
 import { PreviewPlayButton } from '@/components/studio/audio/PreviewPlayButton';
 import { registerDevAction } from '@/lib/devActions';
+import { drumModel, ensureAudioModel } from '@/lib/audioModels';
+import { aiDrumGrid, DRUM_AI_TEMPS, type DrumAiMode, type DrumAiTemp } from '@/lib/drumAi';
+import { seededRandom } from '@/lib/drumRnn';
 import { auditionDrum } from '@/lib/instrumentPreview';
 import { renderDrumsPcm } from '@/lib/instrumentRender';
 import { AudioSheetFrame } from '@/components/studio/audio/AudioSheetFrame';
@@ -126,6 +129,41 @@ export function DrumMachineSheet({
   );
   useEffect(() => registerDevAction('drums.hits', () => hitsRef.current().map((h) => `${h.voice}${h.step}${h.velocity ? `v${h.velocity}` : ''}`).join(',')), []);
 
+  // 🥁 V8: AI-dob (Magenta Drums RNN a telefonon) — folytatás / variáció / új groove a rácson
+  const [aiTemp, setAiTemp] = useState<DrumAiTemp>('creative');
+  const [aiBusy, setAiBusy] = useState<DrumAiMode | null>(null);
+  const gridRef = useRef({ bars, pattern, velocity });
+  gridRef.current = { bars, pattern, velocity };
+  const runAi = async (mode: DrumAiMode, temp: DrumAiTemp = aiTemp, seed?: number): Promise<number> => {
+    if (aiBusy) return -1;
+    setAiBusy(mode);
+    try {
+      if (!(await ensureAudioModel('magenta-drums')) || !drumModel()) {
+        Alert.alert(t('studio.drums.ai.title'), t('studio.drums.ai.failed'));
+        return -1;
+      }
+      // a forgó jelző megjelenhet, mielőtt a modell számol
+      await new Promise((resolve) => setTimeout(resolve, 16));
+      const g = aiDrumGrid(drumModel()!, gridRef.current, mode, DRUM_AI_TEMPS[temp], seededRandom(seed ?? Date.now()));
+      setBars(g.bars);
+      setPattern(g.pattern);
+      setVelocity(g.velocity);
+      return patternHits(g.pattern, g.velocity).length;
+    } finally {
+      setAiBusy(null);
+    }
+  };
+  const runAiRef = useRef(runAi);
+  runAiRef.current = runAi;
+  useEffect(
+    () =>
+      registerDevAction('drums.ai', (arg) => {
+        const a = arg as { mode: DrumAiMode; temp?: DrumAiTemp; seed?: number };
+        return runAiRef.current(a.mode, a.temp ?? 'creative', a.seed);
+      }),
+    []
+  );
+
   const steps = stepCount(bars);
   const cols = Array.from({ length: steps }, (_, i) => i);
   const durSec = patternDurationSec(bars, bpm);
@@ -200,6 +238,22 @@ export function DrumMachineSheet({
         {DRUM_KITS.map((kit) => (
           <Pressable key={kit} testID={`drums-kit-${kit}`} onPress={() => applyKit(kit)} style={styles.kitBtn} accessibilityRole="button" accessibilityLabel={`${t('studio.drums.kit')}: ${t(`studio.drums.kit_${kit}`)}`} accessibilityHint={t('studio.drums.kitHint')}>
             <Text style={styles.kitText}>{t(`studio.drums.kit_${kit}`)}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {/* 🥁 V8: AI-dob — a telefonon (ingyenes, offline); az eredmény a rácson szerkeszthető, a „Sávra” egy undo */}
+      <View style={styles.controls}>
+        <Ionicons name="sparkles-outline" size={14} color={palette.accent} />
+        <Text style={styles.info}>{t('studio.drums.ai.title')}</Text>
+        {(['continue', 'vary', 'groove'] as const).map((mode) => (
+          <Pressable key={mode} testID={`drums-ai-${mode}`} onPress={() => void runAi(mode)} disabled={aiBusy !== null} style={[styles.kitBtn, aiBusy !== null && aiBusy !== mode && styles.disabled]} accessibilityRole="button" accessibilityHint={t(`studio.drums.ai.${mode}Hint`)}>
+            {aiBusy === mode ? <ActivityIndicator size="small" color={palette.accent} /> : <Text style={styles.kitText}>{t(`studio.drums.ai.${mode}`)}</Text>}
+          </Pressable>
+        ))}
+        {(Object.keys(DRUM_AI_TEMPS) as DrumAiTemp[]).map((k) => (
+          <Pressable key={k} testID={`drums-ai-temp-${k}`} onPress={() => setAiTemp(k)} style={[styles.tempChip, aiTemp === k && styles.tempChipOn]} accessibilityRole="radio" accessibilityState={{ selected: aiTemp === k }}>
+            <Text style={[styles.tempText, aiTemp === k && styles.tempTextOn]}>{t(`studio.drums.ai.temp_${k}`)}</Text>
           </Pressable>
         ))}
       </View>
@@ -290,6 +344,10 @@ const styles = StyleSheet.create({
   info: { color: palette.textDim, fontSize: 12, fontWeight: '600' },
   kitBtn: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.surfaceHigh },
   kitText: { color: palette.text, fontSize: 12, fontWeight: '700' },
+  tempChip: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 18, borderWidth: 1, borderColor: palette.border },
+  tempChipOn: { backgroundColor: palette.accent, borderColor: palette.accent },
+  tempText: { color: palette.textDim, fontSize: 12, fontWeight: '700' },
+  tempTextOn: { color: '#fff' },
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   rowLabel: { width: 52 },
   rowLabelText: { color: palette.text, fontSize: 12, fontWeight: '700' },

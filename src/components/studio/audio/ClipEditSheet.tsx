@@ -70,6 +70,8 @@ export function ClipEditSheet({
   onResetTune,
   onHumMelody,
   onStemsOnDevice,
+  onAiDenoise,
+  onResetAiDenoise,
 }: {
   clip: AudioClip;
   fps: number;
@@ -81,6 +83,9 @@ export function ClipEditSheet({
   onHumMelody?: (clipId: string, key: { root: number; minor: boolean }) => void;
   /** 🎚️ V5: ének + kíséret szétválasztása a telefonon (ingyenes) */
   onStemsOnDevice?: (clipId: string) => void;
+  /** 🔇 V8: AI-zajszűrés a telefonon (RNNoise), erősséggel; visszaállítható */
+  onAiDenoise?: (clipId: string, strength: number) => void;
+  onResetAiDenoise?: (clipId: string) => void;
   /** 🎹🥁 a sütött hangszer-klip mintájának újraszerkesztése (a dobgép / piano roll nyílik) */
   onEditInstrument?: (docId: string) => void;
 }) {
@@ -100,6 +105,7 @@ export function ClipEditSheet({
   const [tuneMinor, setTuneMinor] = useState(() => clip.tune?.minor ?? false);
   const [tuneStrength, setTuneStrength] = useState(() => clip.tune?.strength ?? 1);
   const [tuneHarmony, setTuneHarmony] = useState<number>(() => clip.tune?.harmonySteps ?? 0);
+  const [aiStrength, setAiStrength] = useState<number>(() => clip.aiDenoise?.strength ?? 1);
 
   // 🎚️ AI stem-szeparáció (Pro): a klip hangját vocals/drums/bass/other klipekre
   // bontja (voiceover/sfx sávra), és az eredetit elnémítja — EGY undo.
@@ -500,6 +506,30 @@ export function ClipEditSheet({
         </ScrollView>
         {/* ⭐ saját presetek: a mostani effektek mentése, egy koppintással vissza */}
         <UserPresetRow kind="clipFx" getValue={() => fx} onApply={(v) => proFx(() => setFx(JSON.parse(JSON.stringify(v))))} />
+        {/* 🔇 V8: AI-zajszűrés (neurális, a telefonon, ingyenes) — az eredetiből új fájl, visszaállítható */}
+        {onAiDenoise ? (
+          <View style={styles.tuneBox}>
+            <Text style={styles.autoLabel}>{t('studio.audio.aiDenoise.title')}</Text>
+            <Text style={styles.hint}>{t('studio.audio.aiDenoise.hint')}</Text>
+            <View style={styles.autoChips}>
+              {[0.5, 0.75, 1].map((v) => (
+                <Chip key={v} label={`${Math.round(v * 100)}%`} active={aiStrength === v} onPress={() => setAiStrength(v)} />
+              ))}
+            </View>
+            <View style={styles.tuneRow}>
+              <Pressable onPress={() => onAiDenoise(clip.id, aiStrength)} style={styles.tuneBtn} accessibilityRole="button" testID="ai-denoise-apply">
+                <Ionicons name="sparkles-outline" size={16} color="#fff" />
+                <Text style={styles.tuneBtnText}>{t('studio.audio.aiDenoise.apply')}</Text>
+              </Pressable>
+              {clip.aiDenoise && onResetAiDenoise ? (
+                <Pressable onPress={() => onResetAiDenoise(clip.id)} style={styles.tuneReset} accessibilityRole="button" testID="ai-denoise-reset">
+                  <Ionicons name="refresh-outline" size={15} color={palette.textDim} />
+                  <Text style={styles.tuneResetText}>{t('studio.audio.aiDenoise.reset')}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
         {/* 🎤 V3.2: ének-hangolás hangonként (a skálára) + dallamkövető harmónia — a telefon új fájlt készít */}
         {onTune ? (
           <View style={styles.tuneBox}>

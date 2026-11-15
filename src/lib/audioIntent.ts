@@ -26,7 +26,11 @@ export type AudioAction =
   | { kind: 'mute' | 'unmute' | 'solo'; track: TrackType }
   | { kind: 'silence' | 'beatSplitBars' | 'beatSplitBeats' | 'check' | 'sync' | 'transcript' | 'mixSuggest' | 'masterAssist' }
   /** 🔗 C7: a hang-projekt mixdownja HIVATKOZÁSKÉNT a videóba (C2): új videó, a legutóbbi videó, vagy választás */
-  | { kind: 'toVideo'; target: 'new' | 'latest' | 'pick' };
+  | { kind: 'toVideo'; target: 'new' | 'latest' | 'pick' }
+  /** 🥁 V8: AI-dob (Magenta, a telefonon) — új groove a lejátszófejnél, szerkeszthető dob-mintaként */
+  | { kind: 'aiDrums'; bars: number }
+  /** 🔇 V8: AI-zajszűrés (RNNoise, a telefonon) a megnevezett sávok klipjein (alap: a beszéd / a kijelölt) */
+  | { kind: 'aiDenoise'; tracks: TrackType[] };
 
 export interface AudioIntentResult {
   steps: AudioStep[];
@@ -284,6 +288,22 @@ function clause(raw: string, ctx: AudioIntentContext, out: AudioIntentResult): b
   if (/\b(video\w*|klip\w*)\b/.test(t) && (/\b(ala|under|unter|ins?|to|into)\b/.test(t) || /\b(tedd|tegyed|rakd|kuld\w*|vidd|put|send|add|schick\w*|leg\w*)\b/.test(t))) {
     const target = /\b(uj|new|neue?s?|neuen)\b/.test(t) ? 'new' : /\b(valaszt\w*|melyik\w*|choose|pick|auswahl|auswahlen|wahl\w*)\b/.test(t) ? 'pick' : 'latest';
     return out.actions.push({ kind: 'toVideo', target }) > 0;
+  }
+
+  // 🔇 V8: AI-zajszűrés — „AI-zajszűrés a beszédre”, „tisztítsd meg AI-val a hangot”, „AI denoise” (az
+  // effekt-zajszűrés elé: az „AI”/„neurális” szó dönt)
+  // (a „ki” csak a német „KI”-ként — a magyar „kapcsold ki a zajszűrést” NEM AI-parancs)
+  const aiWord = /\b(ai|mi|neuralis\w*|neural\w*)\b/.test(t) || (/\bki\b/.test(t) && /\b(rausch\w*|entrausch\w*)\b/.test(t));
+  if (aiWord && /\b(zaj\w*|noise|denoise\w*|rausch\w*|entrausch\w*|tisztit\w*|clean\w*)\b/.test(t)) {
+    const sel = ctx.selectedClipId ? ctx.project.tracks.find((tr) => tr.clips.some((c) => c.id === ctx.selectedClipId))?.type : undefined;
+    const target = tracks.length > 0 ? tracks : sel ? [sel] : ['voiceover' as TrackType];
+    return out.actions.push({ kind: 'aiDenoise', tracks: target }) > 0;
+  }
+  // 🥁 V8: AI-dob — „tegyél alá 4 ütem AI-dobot”, „generálj dobot”, „make an AI drum beat”
+  if (/\b(dob\w*|drum\w*|schlagzeug\w*|beat)\b/.test(t) && /\b(ai|mi|general\w*|irj|keszits\w*|tegyel|rakj|adj|add|make|create|erstell\w*|generier\w*)\b/.test(t)) {
+    const m = t.match(/\b(\d)\s*(?:utem\w*|bars?|takt\w*)\b/);
+    const bars = m ? Math.max(1, Math.min(4, Number(m[1]))) : 4;
+    return out.actions.push({ kind: 'aiDrums', bars }) > 0;
   }
 
   // folyamatok (a meglévő eszközök)

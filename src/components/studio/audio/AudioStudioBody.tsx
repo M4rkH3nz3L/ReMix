@@ -87,11 +87,15 @@ import { withCancellableProgress, withProgress } from '@/store/progressStore';
 import { renderSynthToClip } from '@/lib/synthClient';
 import { melodyBars } from '@/lib/humToMelody';
 import { humClipToNotes } from '@/lib/humToMelodyClient';
-import { ensureStemModel, separateOnDevice, STEM_MODEL_URL } from '@/lib/stemSeparationClient';
+import { ensureStemModel, separateOnDevice } from '@/lib/stemSeparationClient';
 import { onDeviceStemCommands } from '@/lib/stemClips';
+import { aiDenoiseFile } from '@/lib/aiDenoiseClient';
+import { drumModel, ensureAudioModel } from '@/lib/audioModels';
+import { aiDrumGrid, DRUM_AI_MAX_BARS, DRUM_AI_TEMPS, type DrumAiTemp } from '@/lib/drumAi';
+import { seededRandom } from '@/lib/drumRnn';
 import type { SynthNote, SynthWave } from '@/lib/synth';
 import { renderDrumsToClip } from '@/lib/drumsClient';
-import { patternHits, type DrumHit } from '@/lib/drums';
+import { emptyPattern, patternHits, type DrumHit } from '@/lib/drums';
 import { BUILTIN_LOOPS, LOOP_BARS, LOOP_CATEGORIES, loopDrums, loopNotes, type BuiltinLoop } from '@/lib/loopLibrary';
 import { LoopLibrarySheet } from '@/components/studio/audio/LoopLibrarySheet';
 import { CHORD_PARTS, ChordSheet, type ChordPart } from '@/components/studio/audio/ChordSheet';
@@ -316,6 +320,10 @@ export function AudioStudioBody({
   const [chordsOpen, setChordsOpen] = useState(false);
   const [chordBusy, setChordBusy] = useState(false);
   const chordBusyRef = useRef(false);
+  const resetAiDenoiseRef = useRef<(id: string) => void>(() => undefined);
+  const aiDenoiseManyRef = useRef<(ids: string[], strength?: number) => Promise<number>>(async () => 0);
+  const aiDrumsRef = useRef<(bars: number, temp?: DrumAiTemp, seed?: number) => Promise<string | null>>(async () => null);
+  const aiDenoiseRef = useRef<(id: string, strength: number) => Promise<{ vad: number; ms: number } | null>>(async () => null);
   const stemsRef = useRef<(id: string) => Promise<string[] | null>>(async () => null);
   const humMelodyRef = useRef<(id: string, k: { root: number; minor: boolean }) => Promise<string | null>>(async () => null);
   const applyTuneRef = useRef<(id: string, s: { root: number; minor: boolean; strength: number; harmonySteps?: number }) => Promise<unknown>>(async () => null);
@@ -448,6 +456,19 @@ export function AudioStudioBody({
       registerDevAction('loops.place', (id) => placeLoopRef.current(String(id))),
       registerDevAction('audio.chords', () => setChordsOpen(true)),
       registerDevAction('stems.onDevice', (arg) => stemsRef.current(String(arg))),
+      registerDevAction('ai.drumsAt', (arg) => {
+        const a = arg as { bars: number; temp?: DrumAiTemp; seed?: number };
+        return aiDrumsRef.current(a.bars, a.temp, a.seed);
+      }),
+      registerDevAction('aiDenoise.many', (arg) => {
+        const a = arg as { clipIds: string[]; strength?: number };
+        return aiDenoiseManyRef.current(a.clipIds, a.strength);
+      }),
+      registerDevAction('audio.resetAiDenoise', (arg) => resetAiDenoiseRef.current(String(arg))),
+      registerDevAction('aiDenoise.apply', (arg) => {
+        const a = arg as { clipId: string; strength: number };
+        return aiDenoiseRef.current(a.clipId, a.strength);
+      }),
       registerDevAction('hum.melody', (arg) => {
         const a = arg as { clipId: string; root: number; minor: boolean };
         return humMelodyRef.current(a.clipId, a);
@@ -629,7 +650,11 @@ export function AudioStudioBody({
       else if (a.kind === 'mixSuggest') useMixAssist.getState().show('mix');
       else if (a.kind === 'masterAssist') useMixAssist.getState().show('master');
       else if (a.kind === 'sync') sel && startAudioSync(sel, grid, t);
-      else if (a.kind === 'transcript') {
+      else if (a.kind === 'aiDrums') void aiDrumsRef.current(a.bars);
+      else if (a.kind === 'aiDenoise') {
+        const ids = (st.project?.tracks ?? []).filter((tr) => a.tracks.includes(tr.type)).flatMap((tr) => tr.clips).filter((c) => c.kind === 'audio').map((c) => c.id);
+        void aiDenoiseManyRef.current(sel && a.tracks.includes(trackOf(sel.id) as TrackType) && ids.length > 1 ? [sel.id] : ids);
+      } else if (a.kind === 'transcript') {
         const tt = trackOf((sel ?? voice)?.id);
         if (tt) void startSpeechEdit(tt, t);
       }
@@ -1210,6 +1235,20 @@ export function AudioStudioBody({
   applyTuneRef.current = applyTune;
 
   /**
+   * az első zene-/aux-sáv, ahol a `[start, start+dur)` tartományban nincs klip; ha nincs ilyen, a következő még nem
+   * létező aux sáv (a köteg hozza létre, `newTrackName` néven) — a hangszer-minták (dallam, AI-dob) helye
+   */
+  const freeLaneAt = (start: number, dur: number, newTrackName: string): { start: number; trackType: TrackType; newTrackName?: string } => {
+    const cur = useEditorStore.getState().project;
+    const free = (type: TrackType) => !(cur?.tracks.find((tr) => tr.type === type)?.clips ?? []).some((c) => c.start < start + dur && c.start + c.duration > start);
+    const lanes = ['music', 'aux1', 'aux2', 'aux3', 'aux4', 'aux5'] as const;
+    const exists = (type: TrackType) => !!cur?.tracks.some((tr) => tr.type === type);
+    const existing = lanes.find((l) => exists(l) && free(l));
+    const fresh = existing ? undefined : lanes.find((l) => !exists(l));
+    return { start, trackType: existing ?? fresh ?? 'aux5', ...(fresh ? { newTrackName } : {}) };
+  };
+
+  /**
    * 🎵 V8: dúdolásból dallam — a klip hangjai (YIN, a telefonon) a választott hangnemre húzva szinti-mintába, a
    * dúdolás kezdetéhez, az első szabad hang-sávra (ahol a tartományban nincs klip); szerkeszthető, egy undo.
    */
@@ -1226,19 +1265,8 @@ export function AudioStudioBody({
     const res = await renderSynthToClip(notes, { bpm, wave: 'triangle' });
     if (!res) return null;
     const cur = useEditorStore.getState().project;
-    const free = (type: TrackType) =>
-      !(cur?.tracks.find((tr) => tr.type === type)?.clips ?? []).some((c) => c.start < clip.start + res.durationSec && c.start + c.duration > clip.start);
-    const lanes = ['music', 'aux1', 'aux2', 'aux3', 'aux4', 'aux5'] as const;
-    const exists = (type: TrackType) => !!cur?.tracks.some((tr) => tr.type === type);
-    const existing = lanes.find((l) => exists(l) && free(l));
-    const fresh = existing ? undefined : lanes.find((l) => !exists(l));
-    const trackType = existing ?? fresh ?? 'aux5';
     const before = new Set(cur?.tracks.flatMap((tr) => tr.clips.map((c) => c.id)) ?? []);
-    placeInstrument(synthDoc(makeId('inst'), bpm, melodyBars(notes), 'triangle', notes), res, t('studio.audio.tune.humMelody'), {
-      start: clip.start,
-      trackType,
-      ...(fresh ? { newTrackName: t('studio.audio.tune.humMelody') } : {}),
-    });
+    placeInstrument(synthDoc(makeId('inst'), bpm, melodyBars(notes), 'triangle', notes), res, t('studio.audio.tune.humMelody'), freeLaneAt(clip.start, res.durationSec, t('studio.audio.tune.humMelody')));
     setEditing(false);
     return useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).find((c) => !before.has(c.id))?.id ?? null;
   };
@@ -1253,7 +1281,7 @@ export function AudioStudioBody({
     if (!clip) return null;
     const res = await withProgress(t('studio.audio.stemsWorking'), async (report) => {
       report({ phase: t('studio.audio.stemsModel'), ratio: 0 });
-      if (!(await ensureStemModel(STEM_MODEL_URL))) return null;
+      if (!(await ensureStemModel())) return null;
       return separateOnDevice(clip.uri, (r) => report({ phase: t('studio.audio.stemsWorking'), ratio: r }));
     });
     if (!res) {
@@ -1272,6 +1300,86 @@ export function AudioStudioBody({
     return useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).filter((c) => !before.has(c.id)).map((c) => c.id) ?? null;
   };
   stemsRef.current = stemsOnDevice;
+
+  /**
+   * 🔇 V8: AI-zajszűrés (RNNoise a telefonon, ingyenes) — az eredetiből (ha már szűrt: annak forrásából) új fájl,
+   * a klip arra mutat, az eredeti megmarad; egy undo. Visszaadja a feldolgozás adatait (mérés).
+   */
+  const applyAiDenoise = async (clipId: string, strength: number): Promise<{ vad: number; ms: number } | null> => {
+    const clip = useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).find((c): c is AudioClip => c.id === clipId && c.kind === 'audio');
+    if (!clip) return null;
+    const sourceUri = clip.aiDenoise?.sourceUri ?? clip.uri;
+    const sourceAssetId = clip.aiDenoise?.sourceAssetId ?? clip.assetId;
+    const res = await withProgress(t('studio.audio.aiDenoise.working'), (report) =>
+      aiDenoiseFile(sourceUri, strength, (r) => report({ phase: t('studio.audio.aiDenoise.working'), ratio: r }))
+    );
+    if (!res) {
+      Alert.alert(t('studio.audio.aiDenoise.title'), t('studio.audio.aiDenoise.failed'));
+      return null;
+    }
+    const asset: Asset = { id: makeId('ast'), kind: 'audio', uri: res.uri, provider: 'local', name: `${clip.label ?? ''} (AI)`.trim(), duration: res.durationSec };
+    useEditorStore.getState().applyBatch(
+      [
+        { type: 'ADD_ASSET', asset },
+        { type: 'UPDATE_CLIP', clipId, patch: { uri: res.uri, assetId: asset.id, aiDenoise: { sourceUri, ...(sourceAssetId ? { sourceAssetId } : {}), strength } } },
+      ],
+      'user'
+    );
+    return { vad: res.vad, ms: res.ms };
+  };
+  aiDenoiseRef.current = applyAiDenoise;
+
+  /** 🔇 V8: AI-zajszűrés több klipre (az asszisztens) — egymás után a telefonon, a végén EGY undo */
+  const aiDenoiseClips = async (clipIds: string[], strength = 1): Promise<number> => {
+    const cmds: EditorCommand[] = [];
+    for (const clipId of clipIds) {
+      const clip = useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).find((c): c is AudioClip => c.id === clipId && c.kind === 'audio');
+      if (!clip) continue;
+      const sourceUri = clip.aiDenoise?.sourceUri ?? clip.uri;
+      const sourceAssetId = clip.aiDenoise?.sourceAssetId ?? clip.assetId;
+      const res = await withProgress(t('studio.audio.aiDenoise.working'), (report) =>
+        aiDenoiseFile(sourceUri, strength, (r) => report({ phase: t('studio.audio.aiDenoise.working'), ratio: r }))
+      );
+      if (!res) continue;
+      const asset: Asset = { id: makeId('ast'), kind: 'audio', uri: res.uri, provider: 'local', name: `${clip.label ?? ''} (AI)`.trim(), duration: res.durationSec };
+      cmds.push({ type: 'ADD_ASSET', asset });
+      cmds.push({ type: 'UPDATE_CLIP', clipId, patch: { uri: res.uri, assetId: asset.id, aiDenoise: { sourceUri, ...(sourceAssetId ? { sourceAssetId } : {}), strength } } });
+    }
+    if (cmds.length === 0) {
+      if (clipIds.length > 0) Alert.alert(t('studio.audio.aiDenoise.title'), t('studio.audio.aiDenoise.failed'));
+      return 0;
+    }
+    useEditorStore.getState().applyBatch(cmds, 'user');
+    return cmds.length / 2;
+  };
+  aiDenoiseManyRef.current = aiDenoiseClips;
+
+  /**
+   * 🥁 V8: AI-dob a lejátszófejnél (az asszisztens) — új groove a modellből, a telefonon sütve, szerkeszthető
+   * dob-mintaként egy szabad sávon; egy undo. Visszaadja az új klip azonosítóját.
+   */
+  const aiDrumsAt = async (bars: number, temp: DrumAiTemp = 'creative', seed?: number): Promise<string | null> => {
+    if (!(await withProgress(t('studio.drums.ai.title'), () => ensureAudioModel('magenta-drums'))) || !drumModel()) {
+      Alert.alert(t('studio.drums.ai.title'), t('studio.drums.ai.failed'));
+      return null;
+    }
+    const n = Math.max(1, Math.min(DRUM_AI_MAX_BARS, bars));
+    const g = aiDrumGrid(drumModel()!, { bars: n, pattern: emptyPattern(n), velocity: {} }, 'groove', DRUM_AI_TEMPS[temp], seededRandom(seed ?? Date.now()));
+    const res = await renderDrumsToClip(patternHits(g.pattern, g.velocity), { bpm, bars: g.bars });
+    if (!res) return null;
+    const start = useEditorStore.getState().playhead;
+    const before = new Set(useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips.map((c) => c.id)) ?? []);
+    placeInstrument(drumsDoc(makeId('inst'), bpm, g.bars, g.pattern, g.velocity), res, t('studio.drums.ai.title'), freeLaneAt(start, res.durationSec, t('studio.drums.ai.title')));
+    return useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).find((c) => !before.has(c.id))?.id ?? null;
+  };
+  aiDrumsRef.current = aiDrumsAt;
+
+  const resetAiDenoise = (clipId: string) => {
+    const clip = useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).find((c) => c.id === clipId) as AudioClip | undefined;
+    if (!clip?.aiDenoise) return;
+    useEditorStore.getState().dispatch({ type: 'UPDATE_CLIP', clipId, patch: { uri: clip.aiDenoise.sourceUri, ...(clip.aiDenoise.sourceAssetId ? { assetId: clip.aiDenoise.sourceAssetId } : {}), aiDenoise: undefined } }, 'user');
+  };
+  resetAiDenoiseRef.current = resetAiDenoise;
   /** 🎤 az eredeti forrás vissza (a hangolás nélkül), egy undo */
   const resetTune = (clipId: string) => {
     const clip = useEditorStore.getState().project?.tracks.flatMap((tr) => tr.clips).find((c) => c.id === clipId) as AudioClip | undefined;
@@ -1492,6 +1600,8 @@ export function AudioStudioBody({
       }}
       onHumMelody={(id, k) => void humMelody(id, k)}
       onStemsOnDevice={(id) => void stemsOnDevice(id)}
+      onAiDenoise={(id, strength) => void applyAiDenoise(id, strength)}
+      onResetAiDenoise={resetAiDenoise}
       onResetTune={(id) => {
         setEditing(false);
         resetTune(id);

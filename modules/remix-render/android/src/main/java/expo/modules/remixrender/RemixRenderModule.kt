@@ -21,6 +21,11 @@ import java.io.File
  * hibával a felhő-render (Pro) felé esik.
  */
 class RemixRenderModule : Module() {
+  // 🔇 V8: a futó RNNoise-állapotok (fogantyú → C-állapot)
+  private val rnnoiseStates = HashMap<Int, Long>()
+  private val resamplers = HashMap<Int, Long>()
+  private var rnnoiseNext = 0
+
   // A folyamatban lévő render megszakítás-jele (a JS `cancel()` állítja, a motor-loopok figyelik).
   @Volatile
   private var cancelRequested = false
@@ -45,6 +50,69 @@ class RemixRenderModule : Module() {
     // 44,1 kHz float32, összefésülve a kimeneti fájlba
     Constant("supportsDecodeWindow") { true }
     Constant("supportsDenoiseRun") { true }
+
+    // 🔇 V8: AI-zajszűrés (RNNoise v0.2, C/JNI) — a súly-blob a katalógusból; csatornánként egy állapot (fogantyú)
+    AsyncFunction("rnnoiseLoad") { path: String ->
+      val f = java.io.File(if (path.startsWith("file://")) java.net.URI(path).path else path)
+      RNNoiseNative.load(f.readBytes()) == 0
+    }
+    Function("rnnoiseCreate") {
+      val st = RNNoiseNative.create()
+      if (st == 0L) -1 else synchronized(rnnoiseStates) {
+        rnnoiseNext += 1
+        rnnoiseStates[rnnoiseNext] = st
+        rnnoiseNext
+      }
+    }
+    Function("rnnoiseRun") { handle: Int, input: expo.modules.kotlin.typedarray.Float32Array, output: expo.modules.kotlin.typedarray.Float32Array ->
+      val st = synchronized(rnnoiseStates) { rnnoiseStates[handle] } ?: return@Function -1.0
+      val n = RNNoiseNative.frameSize()
+      val frames = minOf(input.length, output.length) / n
+      val o = java.nio.ByteOrder.nativeOrder()
+      val ia = FloatArray(frames * n).also { input.toDirectBuffer().order(o).asFloatBuffer().get(it) }
+      val oa = FloatArray(frames * n)
+      val vad = RNNoiseNative.process(st, ia, oa, frames)
+      val ob = output.toDirectBuffer().order(o).asFloatBuffer()
+      ob.rewind(); ob.put(oa)
+      vad.toDouble()
+    }
+    // ⚡ a folyamatos átmintavételező natívan (a JS StreamResampler bitre azonos tükre; a táblát a JS adja)
+    Function("resamplerCreate") { up: Int, down: Int, half: Int, table: expo.modules.kotlin.typedarray.Float32Array ->
+      val o = java.nio.ByteOrder.nativeOrder()
+      val ta = FloatArray(table.length).also { table.toDirectBuffer().order(o).asFloatBuffer().get(it) }
+      val r = RNNoiseNative.resamplerCreate(up, down, half, ta)
+      if (r == 0L) -1 else synchronized(rnnoiseStates) {
+        rnnoiseNext += 1
+        resamplers[rnnoiseNext] = r
+        rnnoiseNext
+      }
+    }
+    Function("resamplerProcess") { handle: Int, input: expo.modules.kotlin.typedarray.Float32Array, output: expo.modules.kotlin.typedarray.Float32Array ->
+      val r = synchronized(rnnoiseStates) { resamplers[handle] } ?: return@Function -1
+      val o = java.nio.ByteOrder.nativeOrder()
+      val ia = FloatArray(input.length).also { input.toDirectBuffer().order(o).asFloatBuffer().get(it) }
+      val oa = FloatArray(output.length)
+      val w = RNNoiseNative.resamplerProcess(r, ia, ia.size, oa)
+      val ob = output.toDirectBuffer().order(o).asFloatBuffer()
+      ob.rewind(); ob.put(oa, 0, maxOf(0, w))
+      w
+    }
+    Function("resamplerFlush") { handle: Int, output: expo.modules.kotlin.typedarray.Float32Array ->
+      val r = synchronized(rnnoiseStates) { resamplers[handle] } ?: return@Function -1
+      val oa = FloatArray(output.length)
+      val w = RNNoiseNative.resamplerFlush(r, oa)
+      val ob = output.toDirectBuffer().order(java.nio.ByteOrder.nativeOrder()).asFloatBuffer()
+      ob.rewind(); ob.put(oa, 0, maxOf(0, w))
+      w
+    }
+    Function("resamplerDestroy") { handle: Int ->
+      synchronized(rnnoiseStates) { resamplers.remove(handle) }?.let { RNNoiseNative.resamplerDestroy(it) }
+      Unit
+    }
+    Function("rnnoiseDestroy") { handle: Int ->
+      synchronized(rnnoiseStates) { rnnoiseStates.remove(handle) }?.let { RNNoiseNative.destroy(it) }
+      Unit
+    }
 
     // 🌡️ S19: hőállapot és akkumulátor (a hosszú export alkalmazkodásához és naplózásához)
     // thermal: 0 névleges · 1 emelkedett · 2 súlyos · 3 kritikus (az Android 7 szintje erre vetítve)

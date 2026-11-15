@@ -21,6 +21,13 @@ android {
   lintOptions {
     abortOnError false
   }
+  // 🔇 V8: az RNNoise C-mag (CMakeLists.txt → libremixrnnoise)
+  ndkVersion safeExtGet("ndkVersion", "27.1.12297006")
+  externalNativeBuild {
+    cmake {
+      path "CMakeLists.txt"
+    }
+  }
 }
 
 dependencies {

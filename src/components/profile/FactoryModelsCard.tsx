@@ -20,6 +20,7 @@ import {
   removeModel,
 } from '@/lib/modelRegistryClient';
 import { runWhisperSmokeTest } from '@/lib/whisperClient';
+import { runAudioModelSmoke, type AudioModelId } from '@/lib/audioModels';
 import { profileStyles as styles } from './styles';
 
 /**
@@ -57,6 +58,10 @@ export function FactoryModelsCard() {
   const runSmoke = (entry: CatalogEntry): Promise<unknown> => {
     if (entry.manifest?.kind === 'whisper') {
       return runWhisperSmokeTest(entry.id);
+    }
+    // 🤖 V8 / V5: a hang-AI modellek valódi futtatással ellenőrizve (zajszűrő, AI-dob, stem)
+    if (entry.manifest?.kind === 'audio') {
+      return runAudioModelSmoke(entry.id as AudioModelId);
     }
     return Promise.resolve();
   };

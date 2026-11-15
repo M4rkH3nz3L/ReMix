@@ -168,3 +168,24 @@ describe('🔗 C7: stúdiók közti átadás (videóba hivatkozással)', () => {
     expect(r.unknown).toEqual([]);
   });
 });
+
+describe('🤖 V8 AI-parancsok (a telefonos modellekkel)', () => {
+  test('AI-dob: ütemszám a mondatból (alap 4, plafon 4), több nyelven', () => {
+    expect(parseAudioIntent('tegyél alá 2 ütem AI-dobot', ctx()).actions).toEqual([{ kind: 'aiDrums', bars: 2 }]);
+    expect(parseAudioIntent('generálj dobot', ctx()).actions).toEqual([{ kind: 'aiDrums', bars: 4 }]);
+    expect(parseAudioIntent('make an AI drum beat 9 bars', ctx()).actions).toEqual([{ kind: 'aiDrums', bars: 4 }]);
+    expect(parseAudioIntent('erstelle KI Schlagzeug', ctx()).actions).toEqual([{ kind: 'aiDrums', bars: 4 }]);
+  });
+
+  test('AI-zajszűrés: a megnevezett sáv, különben a kijelölt klip sávja, különben a beszéd; az effekt-zajszűrés marad', () => {
+    expect(parseAudioIntent('AI-zajszűrés a zenére', ctx()).actions).toEqual([{ kind: 'aiDenoise', tracks: ['music'] }]);
+    expect(parseAudioIntent('tisztítsd meg AI-val a hangot', ctx()).actions).toEqual([{ kind: 'aiDenoise', tracks: ['voiceover'] }]);
+    expect(parseAudioIntent('AI denoise', ctx({ selectedClipId: 'm1' })).actions[0]).toMatchObject({ kind: 'aiDenoise' });
+    const plain = parseAudioIntent('zajszűrést a beszédre', ctx());
+    expect(plain.actions.some((a) => a.kind === 'aiDenoise')).toBe(false);
+    expect(plain.steps.length).toBeGreaterThan(0);
+    // a magyar „ki” nem AI: kikapcsolás marad
+    expect(parseAudioIntent('kapcsold ki a zajszűrést a beszéden', ctx()).actions.some((a) => a.kind === 'aiDenoise')).toBe(false);
+    expect(parseAudioIntent('KI Rauschentfernung auf Sprache', ctx()).actions[0]).toMatchObject({ kind: 'aiDenoise' });
+  });
+});

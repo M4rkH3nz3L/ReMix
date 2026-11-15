@@ -20,4 +20,7 @@ Pod::Spec.new do |s|
   }
 
   s.source_files = "**/*.{h,m,mm,swift,hpp,cpp}"
+  # 🔇 V8: az RNNoise C-mag előre fordítva (scripts/build-rnnoise-ios.sh) — a pod React Native-fejléc-környezete
+  # a sima C-t nem fordítja (folly `Stdlib.h` ↔ `stdlib.h`); a Swift a RemixRNNoise.h felületet látja
+  s.vendored_frameworks = "RemixRNNoise.xcframework"
 end

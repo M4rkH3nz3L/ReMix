@@ -8205,6 +8205,88 @@ async function smokeTextFx(log: Log, setHarness: (n: ReactNode) => void) {
   setHarness(null);
 }
 
+/** 👾 S15: a pixel-art réteg a dokumentum-exportban is éles (legközelebbi szomszéd), telefon = szerver */
+async function smokePixelSharp(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  // 16×16-os sakktábla, cellánként 64 px (mint a `pixelLayerScale` 1024-es rétegképe)
+  const surface = Skia.Surface.MakeOffscreen(1024, 1024)!;
+  const paint = Skia.Paint();
+  for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) {
+    paint.setColor(Skia.Color((i + j) % 2 ? '#ff2040' : '#20e0ff'));
+    surface.getCanvas().drawRect(Skia.XYWHRect(i * 64, j * 64, 64, 64), paint);
+  }
+  surface.flush();
+  const f = new File(projectMediaDir(), `smoke_pixel_${Date.now().toString(36)}.png`);
+  f.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  // a réteg dobozán belül a „vegyes” (egyik cellaszínhez sem közeli) képpontok aránya — elmosott él = sok
+  const mixed = (img: SkImage, box: { x0: number; y0: number; x1: number; y1: number }) => {
+    let n = 0;
+    let bad = 0;
+    for (let y = Math.ceil(box.y0) + 2; y < box.y1 - 2; y += 1) for (let x = Math.ceil(box.x0) + 2; x < box.x1 - 2; x += 1) {
+      const p = pixel(img, x, y);
+      const dA = Math.abs(p[0] - 0xff) + Math.abs(p[1] - 0x20) + Math.abs(p[2] - 0x40);
+      const dB = Math.abs(p[0] - 0x20) + Math.abs(p[1] - 0xe0) + Math.abs(p[2] - 0xff);
+      if (Math.min(dA, dB) > 60) bad += 1;
+      n += 1;
+    }
+    return bad / Math.max(n, 1);
+  };
+  // az él szélessége: a sorokban a cellahatárokon átlépő vegyes képpontok száma határonként (éles ≤ 1 px)
+  const edge = (img: SkImage) => {
+    let bad = 0;
+    let rows = 0;
+    for (let k = 0; k < 16; k++) {
+      const y = Math.round(box.y0 + (k + 0.5) * ((box.y1 - box.y0) / 16));
+      rows += 1;
+      for (let x = Math.ceil(box.x0) + 2; x < box.x1 - 2; x += 1) {
+        const p = pixel(img, x, y);
+        const dA = Math.abs(p[0] - 0xff) + Math.abs(p[1] - 0x20) + Math.abs(p[2] - 0x40);
+        const dB = Math.abs(p[0] - 0x20) + Math.abs(p[1] - 0xe0) + Math.abs(p[2] - 0xff);
+        if (Math.min(dA, dB) > 60) bad += 1;
+      }
+    }
+    return bad / (rows * 15);
+  };
+  const meanDiff = (p: SkImage, q: SkImage) => {
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < 100; i++) for (let j = 0; j < 100; j++) {
+      const u = pixel(p, Math.floor(((j + 0.5) / 100) * p.width()), Math.floor(((i + 0.5) / 100) * p.height()));
+      const w = pixel(q, Math.floor(((j + 0.5) / 100) * q.width()), Math.floor(((i + 0.5) / 100) * q.height()));
+      sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+      n += 1;
+    }
+    return sum / n;
+  };
+  const bg = { id: 'bg', kind: 'fill', fill: '#000000' } as unknown as ImageLayer;
+  // nem egész szorzó: 600 × 0,77 = 462 px a 16 cellára (28,9 px/cella)
+  const layer = (pixelArt: unknown) => ({ id: 'px', kind: 'photo', uri: f.uri, position: { x: 0.5, y: 0.5 }, w: 0.77, h: 0.77, fit: 'stretch', ...(pixelArt ? { pixelArt } : {}) });
+  const art = { width: 16, height: 16, palette: ['#000000'], frames: [] };
+  const doc = (pa: unknown) => ({ id: 'pxd', name: 'pxd', aspectRatio: '1:1', width: 600, height: 600, layers: [bg, layer(pa)] }) as unknown as ImageDoc;
+  const box = { x0: 300 - 231, y0: 300 - 231, x1: 300 + 231, y1: 300 + 231 };
+  const dev = await ref.current!.render(doc(art), 600);
+  const srv = await renderImageDoc(doc(art), 600);
+  const devSoft = await ref.current!.render(doc(null), 600);
+  const srvSoft = await renderImageDoc(doc(null), 600);
+  if (!dev || !srv || !devSoft || !srvSoft) {
+    log(false, 'pixel art', 'nincs kép');
+  } else {
+    const [a, b, c, d] = [await decode(dev), await decode(srv), await decode(devSoft), await decode(srvSoft)];
+    const [ma, mb, mc, md] = [mixed(a, box), mixed(b, box), mixed(c, box), mixed(d, box)];
+    const [ea, eb, ec, ed] = [edge(a), edge(b), edge(c), edge(d)];
+    log(ea <= 1 && ec > ea * 1.5, 'telefon: a pixel-art réteg éles (él-szélesség határonként)', `${ea.toFixed(2)} px · ellenpróba (sima fotóként) ${ec.toFixed(2)} px · vegyes képpont ${(ma * 100).toFixed(2)}% (${(mc * 100).toFixed(2)}%)`);
+    log(eb <= 1 && ed > eb * 1.5, 'szerver: a pixel-art réteg éles (él-szélesség határonként)', `${eb.toFixed(2)} px · ellenpróba (sima fotóként) ${ed.toFixed(2)} px · vegyes képpont ${(mb * 100).toFixed(2)}% (${(md * 100).toFixed(2)}%)`);
+    const diff = meanDiff(a, b);
+    log(diff <= 6, 'pixel art: telefon = szerver', `${diff.toFixed(2)}/255`);
+  }
+  [dev, srv, devSoft, srvSoft].forEach((u) => u && removeFile(u));
+  setHarness(null);
+  removeFile(f.uri);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -12126,6 +12208,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'pixelsharp') {
+    await step(phase, () => smokePixelSharp(log, setHarness));
     return;
   }
   if (phase === 'textfx') {

@@ -317,8 +317,9 @@ export async function renderImageDoc(
 
     const form = new FormData();
     const uriMap = appendDocMedia(form, doc);
-    // a pixel-rácsot a szerver nem használja: a réteg képe a `uri`
-    form.append('doc', JSON.stringify(doc, (key, value) => (key === 'pixelArt' ? undefined : value)));
+    // a pixel-rácsot a szerver nem kapja meg (a réteg képe a `uri`), csak a jelzést: a pixel-art réteget
+    // legközelebbi szomszéddal skálázza (S15), különben a kész képen elmosódik
+    form.append('doc', JSON.stringify(doc, (key, value) => (key === 'pixelArt' ? (value ? 1 : undefined) : value)));
     form.append('uriMap', JSON.stringify(uriMap));
     form.append('height', String(height));
     if (opts.format) {

@@ -84,6 +84,8 @@ export function makeLutImage(layer: PhotoLayer, after: ColorFields[] = [], n = L
 export function needsSkiaPreview(layer: PhotoLayer, after: ColorFields[] = [], maskedCount = 0): boolean {
   return (
     maskedCount > 0 ||
+    // 👾 a pixel-art réteg éles pixelekkel (legközelebbi szomszéd) — a sima kép simítana
+    !!layer.pixelArt ||
     hasColorOps(layer, after) ||
     !!layer.lut ||
     hasDetail(layerDetail(layer, 1)) ||
@@ -146,6 +148,8 @@ export function PhotoSkiaContent({
   canvas: Canvas2D;
 }) {
   const fit = FIT[layer.fit ?? 'cover'];
+  // 👾 a pixel-art réteg legközelebbi szomszéddal (a szerver `flags=neighbor`-jével azonos), különben simítva
+  const sampling = layer.pixelArt ? { filter: FilterMode.Nearest, mipmap: MipmapMode.None } : undefined;
   const runtime = lut ? effect() : null;
   const detail = layerDetail(layer, scale);
   const heal = [0, 1, 2, 3].map((i) => detail.heal[i] ?? [0, 0, 1, 1]);
@@ -170,12 +174,12 @@ export function PhotoSkiaContent({
     runtime && lut ? (
       <Rect x={0} y={0} width={w} height={h}>
         <Shader source={runtime} uniforms={uniforms}>
-          <ImageShader image={image} fit={fit} rect={{ x: 0, y: 0, width: w, height: h }} />
+          <ImageShader image={image} fit={fit} rect={{ x: 0, y: 0, width: w, height: h }} sampling={sampling} />
           <ImageShader image={lut} tx="clamp" ty="clamp" sampling={{ filter: FilterMode.Linear, mipmap: MipmapMode.None }} />
         </Shader>
       </Rect>
     ) : (
-      <SkiaImage image={image} x={0} y={0} width={w} height={h} fit={fit} />
+      <SkiaImage image={image} x={0} y={0} width={w} height={h} fit={fit} sampling={sampling} />
     );
   const blurAmount = layer.filters?.find((f) => f.type === 'blur')?.amount ?? 0;
   if (blurAmount > 0) {
@@ -226,7 +230,7 @@ export function PhotoSkiaContent({
             <Mask key={i} mode="luminance" mask={maskElement(o.mask)}>
               <Rect x={0} y={0} width={w} height={h}>
                 <Shader source={runtime} uniforms={uniforms}>
-                  <ImageShader image={image} fit={fit} rect={{ x: 0, y: 0, width: w, height: h }} />
+                  <ImageShader image={image} fit={fit} rect={{ x: 0, y: 0, width: w, height: h }} sampling={sampling} />
                   <ImageShader image={o.lut} tx="clamp" ty="clamp" sampling={{ filter: FilterMode.Linear, mipmap: MipmapMode.None }} />
                 </Shader>
               </Rect>

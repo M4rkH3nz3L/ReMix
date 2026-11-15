@@ -475,13 +475,16 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
       const boxH = Math.max(2, Math.round((layer.h ?? 1) * canvas.h));
       // 'cover' kitölti a keretet (a túllógó rész levágódik), 'contain' belefér,
       // 'stretch' NEM-arányosan a keretre nyújt (szabad transzform — torzíthat)
+      // 👾 S15: a pixel-art réteg (a kliens csak a jelzést küldi, a rácsot nem) legközelebbi szomszéddal
+      // skálázódik, mint a vásznon — különben a kész képen a pixelek széle elmosódik
+      const sf = layer.pixelArt ? ':flags=neighbor' : '';
       const fit =
         layer.fit === 'contain'
-          ? `format=rgba,scale=${boxW}:${boxH}:force_original_aspect_ratio=decrease,` +
+          ? `format=rgba,scale=${boxW}:${boxH}:force_original_aspect_ratio=decrease${sf},` +
             `pad=${boxW}:${boxH}:(ow-iw)/2:(oh-ih)/2:color=black@0`
           : layer.fit === 'stretch'
-            ? `scale=${boxW}:${boxH}`
-            : `scale=${boxW}:${boxH}:force_original_aspect_ratio=increase,` +
+            ? `scale=${boxW}:${boxH}${sf}`
+            : `scale=${boxW}:${boxH}:force_original_aspect_ratio=increase${sf},` +
               `crop=${boxW}:${boxH}`;
       // 🔁 tükrözés a forgatás ELŐTT (helyi tér) — a preview scaleX/Y-nal egyezik
       const flip = `${layer.flipH ? ',hflip' : ''}${layer.flipV ? ',vflip' : ''}`;

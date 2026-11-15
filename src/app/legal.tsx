@@ -16,8 +16,8 @@ import { legalText, type LegalDoc } from '@/constants/legal';
 export default function LegalScreen() {
   const { t } = useTranslation();
   const params = useLocalSearchParams<{ doc?: string }>();
-  const doc: LegalDoc = params.doc === 'terms' ? 'terms' : 'privacy';
-  const title = doc === 'terms' ? t('legal.termsTitle') : t('legal.privacyTitle');
+  const doc: LegalDoc = params.doc === 'terms' ? 'terms' : params.doc === 'licenses' ? 'licenses' : 'privacy';
+  const title = doc === 'terms' ? t('legal.termsTitle') : doc === 'licenses' ? t('legal.licensesTitle') : t('legal.privacyTitle');
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>

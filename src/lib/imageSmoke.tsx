@@ -11250,6 +11250,13 @@ export async function runImageSmoke(
     await step(phase, () => smokeCrossfade(log));
     return;
   }
+  if (phase === 'licshot') {
+    router.push('/legal?doc=licenses' as Href);
+    log(true, 'FOTÓZHATÓ', 'a nyílt forrású licencek oldala');
+    await sleep(15_000);
+    router.back();
+    return;
+  }
   if (phase === 'aishot') {
     await step(phase, () => smokeAiShot(log));
     return;

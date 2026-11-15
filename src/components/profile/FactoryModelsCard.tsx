@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { router } from 'expo-router';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
@@ -168,6 +169,10 @@ export function FactoryModelsCard() {
             max: mb(MODEL_CACHE_MAX_BYTES),
           })}
         </Text>
+        {/* 📜 a telefonos modellek licencei (RNNoise, Magenta, Spleeter) */}
+        <Pressable onPress={() => router.push('/legal?doc=licenses')} hitSlop={8} accessibilityRole="link" testID="factory-licenses">
+          <Text style={[styles.sectionHint, { color: palette.accent }]}>{t('legal.licensesTitle')}</Text>
+        </Pressable>
       </View>
     </>
   );

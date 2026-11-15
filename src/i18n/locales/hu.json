@@ -5233,7 +5233,7 @@
     }
   },
   "legal": {
-    "privacyTitle": "Adatkezelési tájékoztató",
+    "licensesTitle": "Nyílt forrású licencek", "privacyTitle": "Adatkezelési tájékoztató",
     "termsTitle": "Felhasználási feltételek"
   },
   "gdpr": {

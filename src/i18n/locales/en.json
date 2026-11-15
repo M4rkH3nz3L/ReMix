@@ -5233,7 +5233,7 @@
     }
   },
   "legal": {
-    "privacyTitle": "Privacy Policy",
+    "licensesTitle": "Open source licenses", "privacyTitle": "Privacy Policy",
     "termsTitle": "Terms of Service"
   },
   "gdpr": {

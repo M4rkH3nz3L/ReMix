@@ -5238,7 +5238,7 @@
     }
   },
   "legal": {
-    "privacyTitle": "Datenschutzerklärung",
+    "licensesTitle": "Open-Source-Lizenzen", "privacyTitle": "Datenschutzerklärung",
     "termsTitle": "Nutzungsbedingungen"
   },
   "gdpr": {

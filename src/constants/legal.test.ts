@@ -35,3 +35,11 @@ describe('legal — tartalom-tulajdon (anti-CapCut, TECH-TOP §0)', () => {
     expect(PRIVACY_POLICY.length).toBeGreaterThan(100);
   });
 });
+
+describe('📜 nyílt forrású közlemények (V8 / V5)', () => {
+  test('a három telefonos modell közleménye és licence benne van', () => {
+    const txt = legalText('licenses');
+    for (const s of ['RNNoise', 'Jean-Marc Valin', 'BSD', 'Magenta', 'Apache License, Version 2.0', 'Spleeter', 'Deezer SA', 'MIT License']) expect(txt).toContain(s);
+  });
+});
+

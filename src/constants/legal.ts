@@ -17,7 +17,7 @@ export const CONSENT_VERSION = '2026-11-15.1';
 /** Utolsó tartalmi frissítés (a szövegben megjelenik). */
 export const LEGAL_UPDATED = '2026. november 15.';
 
-export type LegalDoc = 'privacy' | 'terms';
+export type LegalDoc = 'privacy' | 'terms' | 'licenses';
 
 export const PRIVACY_POLICY = `ADATKEZELÉSI TÁJÉKOZTATÓ
 ReMix — interaktív videószerkesztő és közösségi platform
@@ -211,6 +211,94 @@ Irányadó jog: «IRÁNYADÓ JOG / ORSZÁG (pl. Magyarország)».
 11. KAPCSOLAT
 Kérdésekben: «KAPCSOLAT / ADATVÉDELMI E-MAIL».`;
 
+
+/**
+ * 📜 V8 / V5: a telefonon futó, harmadik féltől származó modellek és kódok közleményei (a licencek megkövetelik a
+ * szerzői jogi közlemény és a licencszöveg megjelenítését). A modellek a ReMix tárából töltődnek le.
+ */
+export const THIRD_PARTY_NOTICES = `NYÍLT FORRÁSÚ MODELLEK ÉS KÓDOK
+A ReMix telefonos hang-AI funkciói az alábbi, szabad licencű munkákat használják.
+
+────────────────────────────────────────
+AI-zajszűrés — RNNoise v0.2 (kód és modell-súlyok)
+https://github.com/xiph/rnnoise — BSD 3-Clause License
+
+Copyright (c) 2007-2017, 2024 Jean-Marc Valin
+Copyright (c) 2023 Amazon
+Copyright (c) 2017, Mozilla
+Copyright (c) 2005-2017, Xiph.Org Foundation
+Copyright (c) 2003-2004, Mark Borgerding
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+- Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+- Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+- Neither the name of the Xiph.Org Foundation nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+\`\`AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION
+OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+────────────────────────────────────────
+AI-dob — Magenta „Drums RNN” (drum_kit_rnn) modell-súlyok
+https://github.com/magenta/magenta-js — Apache License, Version 2.0
+Copyright 2018 The Magenta Team. All rights reserved.
+A súlyokat a ReMix egyetlen fájlba csomagolta (a tartalmuk változatlan), és saját
+JavaScript-futtatóval használja. A licenc teljes szövege:
+https://www.apache.org/licenses/LICENSE-2.0
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. Unless required by applicable law
+or agreed to in writing, software distributed under the License is distributed on
+an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+implied. See the License for the specific language governing permissions and
+limitations under the License.
+
+────────────────────────────────────────
+Ének és kíséret szétválasztása — Spleeter 2stems (kód és modell)
+https://github.com/deezer/spleeter — MIT License
+A modellt a ReMix Core ML formátumra alakította (16 bites súlyok).
+
+MIT License
+
+Copyright (c) 2019-present, Deezer SA.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+`;
+
 export function legalText(doc: LegalDoc): string {
-  return doc === 'terms' ? TERMS : PRIVACY_POLICY;
+  return doc === 'terms' ? TERMS : doc === 'licenses' ? THIRD_PARTY_NOTICES : PRIVACY_POLICY;
 }

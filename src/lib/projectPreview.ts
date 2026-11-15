@@ -24,6 +24,10 @@ function imageDocPicture(project: Project, docId?: string): string | null {
   if (doc.renderedUri) {
     return doc.renderedUri;
   }
+  // a szerkesztés közbeni élő bélyegkép (a telefonon készül) — fotó nélküli lapnál (pl. sablon) is van kép
+  if (doc.thumbUri) {
+    return doc.thumbUri;
+  }
   const photo = doc.layers.find((l) => l.kind === 'photo');
   return photo && photo.kind === 'photo' && photo.uri ? photo.uri : null;
 }
@@ -49,7 +53,7 @@ export function projectPreviewSource(project: Project): PreviewSource {
     const poster = project.model3d?.poster;
     return poster ? { type: 'image', uri: poster } : null;
   }
-  if (kind === 'image') {
+  if (kind === 'image' || kind === 'design') {
     const pic = imageDocPicture(project);
     return pic ? { type: 'image', uri: pic } : null;
   }

@@ -102,7 +102,7 @@ export function createEmptyProject(
     // 🎨 a képstúdió a réteg-fát szerkeszti → egy üres kép-dokumentum előre,
     // hogy a stúdiónak legyen mivel indulnia (a kirasterizált PNG lesz a média).
     // A vászonméret + háttér a létrehozó-űrlapból (config.image).
-    ...(kind === 'image'
+    ...(kind === 'image' || kind === 'design'
       ? { imageDocs: [createImageDoc(name, aspectRatio, () => makeId('lyr'), config?.image)] }
       : {}),
     // 🎚️ a hang-projekt alap master-célja (az első beállítás): a loudness/plafon

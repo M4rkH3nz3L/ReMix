@@ -27,6 +27,7 @@ import type { Layout } from '@/hooks/useLayout';
 import type { AspectRatio, Asset, AudioMasterTarget, ProjectKind } from '@/types/project';
 import type { MeshFormat } from '@/types/model3d';
 import { AUDIO_TEMPLATES, type AudioTemplate } from '@/lib/audioTemplates';
+import { IMAGE_TEMPLATES } from '@/lib/imageTemplates';
 
 /** 🎚️ a hang-projekt választható master-céljai (a 'custom' nem induló-beállítás). */
 const AUDIO_TARGETS = AUDIO_MASTER_TARGETS.filter((tg) => tg !== 'custom');
@@ -80,6 +81,9 @@ export function CreateProjectModal(props: {
   setAudioTarget: (tg: AudioMasterTarget) => void;
   audioTemplate: AudioTemplate;
   setAudioTemplate: (tpl: AudioTemplate) => void;
+  /** 🎨 S8: a Design-projekt induló sablonja */
+  designTemplate: string;
+  setDesignTemplate: (key: string) => void;
   // 3D
   model3dFormat: MeshFormat;
   setModel3dFormat: (f: MeshFormat) => void;
@@ -122,6 +126,8 @@ export function CreateProjectModal(props: {
     setAudioTarget,
     audioTemplate,
     setAudioTemplate,
+    designTemplate,
+    setDesignTemplate,
     model3dFormat,
     setModel3dFormat,
     sources,
@@ -251,6 +257,23 @@ export function CreateProjectModal(props: {
                       label={t(option.label)}
                       active={aspect === option.id}
                       onPress={() => setAspect(option.id)}
+                    />
+                  ))}
+                </View>
+              </>
+            ) : null}
+
+            {/* 🎨 DESIGN-projekt (S8): a sablon adja a vásznat és a rétegeket — a Kép Stúdió Design munkaterületén nyílik */}
+            {kind === 'design' ? (
+              <>
+                <Text style={styles.fieldLabel}>{t('studio.image.templates.title')}</Text>
+                <View style={styles.aspectRow}>
+                  {IMAGE_TEMPLATES.map((tpl) => (
+                    <Chip
+                      key={tpl.key}
+                      label={`${t(`studio.image.templates.${tpl.key}`)} · ${tpl.width}×${tpl.height}`}
+                      active={designTemplate === tpl.key}
+                      onPress={() => setDesignTemplate(tpl.key)}
                     />
                   ))}
                 </View>

@@ -3370,6 +3370,7 @@
       "live": "Live"
     },
     "kindDesc": {
+      "design": "Thumbnail, poster, cover — from templates, on-brand",
       "model3d": "LiDAR scan to 3D model",
       "video": "Timeline video editor",
       "image": "Layer-based image editor",
@@ -3383,6 +3384,8 @@
     "comingSoonBody": "This editor is being built next. The project already exists — soon you'll edit it right here.",
     "comingSoonInline": "This studio is under construction — the editor is coming soon.",
     "imageTools": {
+      "templates": "Templates",
+      "size": "Size",
       "pixel": "Pixel art",
       "assistant": "Assistant",
       "exportLayer": "Export layer",
@@ -3430,6 +3433,7 @@
       "duplicate": "Duplicate"
     },
     "imageGroups": {
+      "design": "Design",
       "draw": "Draw",
       "select": "Select",
       "canvas": "Canvas",
@@ -3794,6 +3798,11 @@
       "undoReorder": "Layer order",
       "svgPartialTitle": "Partial SVG import",
       "svgPartialBody": "These elements couldn't be imported and were left out: {{items}}",
+      "workspace": {
+        "image": "Image",
+        "design": "Design",
+        "label": "Workspace"
+      },
       "a11y": {
         "pagePrev": "Move page back",
         "pageNext": "Move page forward",

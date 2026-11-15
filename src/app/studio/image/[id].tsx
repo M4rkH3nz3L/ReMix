@@ -25,7 +25,8 @@ import { logCaught } from '@/lib/logCaught';
  */
 export default function ImageStudioScreen() {
   // `doc` = a nyitandó lap (pl. az album-borító ImageDoc-ja) — különben az első lap
-  const { id, doc } = useLocalSearchParams<{ id: string; doc?: string }>();
+  // `ws` = a nyitó munkaterület (a Design belépési pont `?ws=design`-nel érkezik)
+  const { id, doc, ws } = useLocalSearchParams<{ id: string; doc?: string; ws?: string }>();
   const { t } = useTranslation();
   const project = useEditorStore((s) => s.project);
   // 🎵 I7: ha a projekt MÁR a store-ban van (pl. az Audio Stúdió borító-szerkesztéséből
@@ -87,7 +88,13 @@ export default function ImageStudioScreen() {
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
       <StudioStatusBanners saveFailed={saveFailed} missingCount={missing.length} relinking={relinking} onRelink={() => void relink()} />
-      <ImageStudioBody mode="project" title={project.name} initialPageId={doc} onExit={exit} />
+      <ImageStudioBody
+        mode="project"
+        title={project.name}
+        initialPageId={doc}
+        initialWorkspace={ws === 'design' || project.kind === 'design' ? 'design' : 'image'}
+        onExit={exit}
+      />
     </SafeAreaView>
   );
 }

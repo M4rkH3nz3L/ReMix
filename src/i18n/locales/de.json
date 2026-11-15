@@ -3370,6 +3370,7 @@
       "live": "Live"
     },
     "kindDesc": {
+      "design": "Thumbnail, Poster, Cover — aus Vorlagen, mit Marke",
       "model3d": "LiDAR-Scan zum 3D-Modell",
       "video": "Zeitleisten-Videoeditor",
       "image": "Ebenenbasierter Bildeditor",
@@ -3383,6 +3384,8 @@
     "comingSoonBody": "Dieser Editor wird als Nächstes gebaut. Das Projekt existiert bereits — bald bearbeitest du es direkt hier.",
     "comingSoonInline": "Dieses Studio ist in Arbeit — der Editor kommt bald.",
     "imageTools": {
+      "templates": "Vorlagen",
+      "size": "Größe",
       "pixel": "Pixel-Art",
       "assistant": "Assistent",
       "exportLayer": "Ebene exportieren",
@@ -3430,6 +3433,7 @@
       "duplicate": "Duplizieren"
     },
     "imageGroups": {
+      "design": "Design",
       "draw": "Zeichnen",
       "select": "Auswahl",
       "canvas": "Leinwand",
@@ -3827,6 +3831,11 @@
       "undoReorder": "Ebenenreihenfolge",
       "svgPartialTitle": "SVG teilweise importiert",
       "svgPartialBody": "Diese Elemente konnten nicht importiert werden und fehlen: {{items}}",
+      "workspace": {
+        "image": "Bild",
+        "design": "Design",
+        "label": "Arbeitsbereich"
+      },
       "a11y": {
         "pagePrev": "Seite nach vorne",
         "pageNext": "Seite nach hinten",

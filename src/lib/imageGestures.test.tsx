@@ -18,7 +18,7 @@ import type { LivePatch } from '@/lib/imageLayerClip';
 import de from '@/i18n/locales/de.json';
 import en from '@/i18n/locales/en.json';
 import hu from '@/i18n/locales/hu.json';
-import { RAIL_GROUPS, selectionMenu, TOOL_ICONS } from '@/lib/imageMenu';
+import { DESIGN_RAIL_GROUPS, RAIL_GROUPS, selectionMenu, TOOL_ICONS } from '@/lib/imageMenu';
 import { boxToImage, imageToBox } from '@/lib/wandMapping';
 import { layerRowLabels, moveLayerTo, removeLayer, reorderLayer, toggleLayerLocked } from '@/lib/imageDoc';
 import { applyLayerBoxPx, layerBoxPx, normalizeRotation } from '@/lib/imageLayerGeometry';
@@ -285,7 +285,8 @@ describe('menüszerkezet', () => {
   const shape = { kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5, fill: '#000' } as unknown as ImageLayer;
   const text = { kind: 'text', id: 't', text: 'A', fontSize: 8, position: { x: 0.5, y: 0.5 } } as unknown as ImageLayer;
   const fill = { kind: 'fill', id: 'f', fill: '#000' } as unknown as ImageLayer;
-  const rail = RAIL_GROUPS.flatMap((g) => g.tools) as string[];
+  // 🎨 a Design munkaterület sínje ugyanezeknek a szabályoknak felel meg
+  const rail = [...RAIL_GROUPS, ...DESIGN_RAIL_GROUPS].flatMap((g) => g.tools) as string[];
 
   it('a bal sínen csak szerszám van: semmi, ami kijelölt elemre hat', () => {
     for (const l of [layer, shape, text, fill]) {
@@ -319,6 +320,8 @@ describe('menüszerkezet', () => {
     expect(selectionMenu(fill, ctx).actions).not.toContain('rotate');
   });
   it('minden sín-szerszámnak és műveletnek van felirata és ikonja', () => {
+    // minden szerszám mindkét munkaterületen elérhető (a Design csak átrendez, nem rejt el)
+    expect(new Set(DESIGN_RAIL_GROUPS.flatMap((g) => g.tools))).toEqual(new Set([...RAIL_GROUPS.flatMap((g) => g.tools), 'templates', 'size']));
     const all = [...rail, ...selectionMenu({ ...shape, shape: 'path', points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] } as unknown as ImageLayer, { canAlign: true, canBoolean: true }).actions, 'adjust', 'develop', 'unlock', 'delete'];
     for (const key of all) {
       expect(TOOL_ICONS[key as keyof typeof TOOL_ICONS]).toBeTruthy();

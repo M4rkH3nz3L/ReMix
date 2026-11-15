@@ -15,8 +15,11 @@ export function ImageStudioToolbar({
   onTool,
   width,
   onCollapse,
+  groups = RAIL_GROUPS,
 }: {
   onTool: (key: RailTool) => void;
+  /** a munkaterület sín-csoportjai (Kép / Design) */
+  groups?: { labelKey: string; tools: RailTool[] }[];
   width: number;
   onCollapse: () => void;
 }) {
@@ -42,7 +45,7 @@ export function ImageStudioToolbar({
         onContentSizeChange={(_, content) => update({ content })}
         onScroll={(e) => update({ offset: e.nativeEvent.contentOffset.y })}
       >
-        {RAIL_GROUPS.map((group, gi) => (
+        {groups.map((group, gi) => (
           <View key={group.labelKey} style={styles.group}>
             <Text style={styles.groupLabel} numberOfLines={1}>
               {t(group.labelKey)}
@@ -55,7 +58,7 @@ export function ImageStudioToolbar({
                 </Text>
               </Pressable>
             ))}
-            {gi < RAIL_GROUPS.length - 1 ? <View style={styles.groupDivider} /> : null}
+            {gi < groups.length - 1 ? <View style={styles.groupDivider} /> : null}
           </View>
         ))}
       </ScrollView>

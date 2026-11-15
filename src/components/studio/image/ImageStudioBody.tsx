@@ -79,7 +79,8 @@ import type { ImageShareMode } from '@/lib/imageShare';
 import { ExportCancelled, exportPsd, importPdf, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
 import { ImageRenderRejected, imageDocContentKey, isRenderFresh } from '@/lib/imageExport';
 import { chooseImageRenderRoute } from '@/lib/imageRenderRoute';
-import { type ToolKey, selectionMenu } from '@/lib/imageMenu';
+import { type ImageWorkspace, railGroups, type ToolKey, selectionMenu } from '@/lib/imageMenu';
+import { registerDevAction } from '@/lib/devActions';
 import { shapeToPathPoints } from '@/lib/shapeGeometry';
 import { panelState, workspaceLayout } from '@/lib/imageWorkspaceLayout';
 import { useEditorPrefs } from '@/store/editorPrefsStore';
@@ -154,6 +155,7 @@ export function ImageStudioBody({
   title,
   docId,
   initialPageId,
+  initialWorkspace = 'image',
   onExit,
   onSave,
 }: {
@@ -162,6 +164,8 @@ export function ImageStudioBody({
   docId?: string;
   /** project mód: az induló lap (pl. album-borító) — érvénytelen id → első lap */
   initialPageId?: string;
+  /** 🎨 a nyitó munkaterület (Design-projektnél / `?ws=design`): sablon, méret, tipográfia elöl */
+  initialWorkspace?: ImageWorkspace;
   onExit: () => void;
   onSave?: (doc: ImageDoc, renderedUri: string | null) => Promise<void>;
 }) {
@@ -171,6 +175,16 @@ export function ImageStudioBody({
   const isPro = useEntitlement((s) => s.isPro());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(initialPageId ?? null);
+  const [workspaceTab, setWorkspaceTab] = useState<ImageWorkspace>(initialWorkspace);
+  // 🧪 füstteszt: a munkaterület és a sín első szerszámai (a Design belépési pont mérése)
+  useEffect(
+    () =>
+      registerDevAction('image.workspace', (arg) => {
+        if (arg === 'image' || arg === 'design') setWorkspaceTab(arg);
+        return { ws: workspaceTab, tools: railGroups(workspaceTab)[0].tools };
+      }),
+    [workspaceTab]
+  );
   const [sheet, setSheetRaw] = useState<SheetKind>(null);
   // 📐 MOBILE-UI §6.6: az inline lap detentje + a felhasználó utolsó választása laponként
   const [sheetDetent, setSheetDetent] = useState<Detent>('peek');
@@ -765,6 +779,12 @@ export function ImageStudioBody({
       return;
     }
     switch (key) {
+      case 'templates':
+        setSheet('templates');
+        break;
+      case 'size':
+        setSheet('canvas');
+        break;
       case 'import':
         setSheet('import');
         break;
@@ -1928,6 +1948,7 @@ export function ImageStudioBody({
   const rail = (
     <ImageStudioToolbar
       onTool={onTool}
+      groups={railGroups(workspaceTab)}
       width={workspace.railWidth}
       onCollapse={() => setRailOpen(false)}
     />
@@ -1964,10 +1985,19 @@ export function ImageStudioBody({
           <Ionicons name={mode === 'scoped' ? 'close' : 'chevron-back'} size={26} color={palette.text} />
         </Pressable>
         <View style={styles.titleWrap}>
-          <View style={styles.kindTag}>
-            <Ionicons name="image" size={12} color={palette.accent} />
-            <Text style={styles.kindTagText}>{t('studio.kind.image')}</Text>
-          </View>
+          {/* 🎨 munkaterület-váltó (IMAGE-PROD S8): Kép ↔ Design — ugyanaz a dokumentum, más szerszám-sorrend */}
+          <Pressable
+            style={styles.kindTag}
+            onPress={() => setWorkspaceTab((w) => (w === 'design' ? 'image' : 'design'))}
+            hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('studio.image.workspace.label')}: ${t(`studio.image.workspace.${workspaceTab}`)}`}
+            testID="image-workspace-toggle"
+          >
+            <Ionicons name={workspaceTab === 'design' ? 'color-palette' : 'image'} size={12} color={palette.accent} />
+            <Text style={styles.kindTagText}>{t(`studio.image.workspace.${workspaceTab}`)}</Text>
+            <Ionicons name="swap-horizontal" size={11} color={palette.textDim} />
+          </Pressable>
           <Text style={styles.title} numberOfLines={1}>
             {title}
           </Text>

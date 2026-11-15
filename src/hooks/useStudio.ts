@@ -14,6 +14,8 @@ import { listSharedWithMe, type SharedProject } from '@/lib/collab';
 import { backupProjectToCloud, deleteCloudProject, syncProjectsFromCloud } from '@/lib/cloudSync';
 import { deletePostsForProject, publishRenderedProject } from '@/lib/feed';
 import { makeId } from '@/lib/id';
+import { docFromTemplate, IMAGE_TEMPLATES } from '@/lib/imageTemplates';
+import { useBrandStyle } from '@/store/brandStyleStore';
 import { PODCAST_EPISODE, startRunning } from '@/lib/workflowTemplate';
 import { pickSourceAsset, type SourceKind } from '@/lib/projectSource';
 import { fileKindOf, studioForKind } from '@/lib/remixFiles';
@@ -67,6 +69,8 @@ export function useStudio() {
   const [audioTarget, setAudioTarget] = useState<AudioMasterTarget>('music');
   // 🧩 hang-projekt indító-sablon (a választás a hangosság-célt is beállítja)
   const [audioTemplate, setAudioTemplateRaw] = useState<AudioTemplate>('blank');
+  // 🎨 S8: a Design-projekt induló sablonja (a sablon-könyvtár kulcsa)
+  const [designTemplate, setDesignTemplate] = useState<string>(IMAGE_TEMPLATES[0].key);
   const setAudioTemplate = (tpl: AudioTemplate) => {
     setAudioTemplateRaw(tpl);
     const tg = templateTarget(tpl);
@@ -141,6 +145,7 @@ export function useStudio() {
     setBg(BG_SWATCHES[0]);
     setAudioTarget('music');
     setAudioTemplateRaw('blank');
+    setDesignTemplate(IMAGE_TEMPLATES[0].key);
     setModel3dFormat(DEFAULT_STORAGE_FORMAT);
     setSources([]);
   };
@@ -221,7 +226,12 @@ export function useStudio() {
     const config: CreateProjectConfig = {};
     // a projekt-szintű aspectRatio: képnél a megadott W×H-ból a legközelebbi enum
     let projectAspect = aspect;
-    if (kind === 'image') {
+    const tpl = kind === 'design' ? IMAGE_TEMPLATES.find((x) => x.key === designTemplate) ?? IMAGE_TEMPLATES[0] : null;
+    if (tpl) {
+      // 🎨 S8: a Design-projekt a választott sablon vásznán indul
+      projectAspect = nearestAspect(tpl.width, tpl.height);
+      config.image = { width: tpl.width, height: tpl.height, format: 'vector', background: tpl.background };
+    } else if (kind === 'image') {
       const w = clampDim(imgW);
       const h = clampDim(imgH);
       projectAspect = nearestAspect(w, h);
@@ -245,6 +255,8 @@ export function useStudio() {
       kind,
       config
     );
+    // 🎨 a „Design" belépési pont (S8): az első lap a sablon szerkeszthető rétegeivel, márkára színezve
+    const designed = tpl ? { ...created, imageDocs: [docFromTemplate(tpl, title, () => makeId('lyr'), useBrandStyle.getState())] } : created;
     // 🎵 a „Zene" belépési pont (S10): ugyanaz a hang-projekt, a Zene-sablonnal (ha a felhasználó nem választott mást)
     const base =
       kind === 'audio' || kind === 'music'
@@ -254,7 +266,7 @@ export function useStudio() {
             sfx: t('studio.audio.template.trackSfx'),
             sections: [t('studio.audio.template.intro'), t('studio.audio.template.verse'), t('studio.audio.template.chorus'), t('studio.audio.template.outro')],
           })
-        : created;
+        : designed;
     // ▶️ C4: a Podcast-sablon a Podcast-epizód munkafolyamatot is elindítja (a Hang Stúdió sávja vezet végig)
     const withRun = (kind === 'audio' || kind === 'music') && audioTemplate === 'podcast' ? { ...base, workflowRun: startRunning(PODCAST_EPISODE, () => makeId('wf'), new Date().toISOString()) } : base;
     // 🗂️ a létrehozáskor hozzáadott források a projekt forrás-mappájába (assets)
@@ -461,13 +473,14 @@ export function useStudio() {
   useEffect(() => {
     const offs = [
       registerDevAction('studio.fillCreate', (arg) => {
-        const a = arg as { name: string; kind: ProjectKind; audioTemplate?: AudioTemplate };
+        const a = arg as { name: string; kind: ProjectKind; audioTemplate?: AudioTemplate; designTemplate?: string };
         setName(a.name);
         setSeoDescription('smoke');
         setSeoHashtags('#smoke');
         setSeoKeywords('smoke');
         setKind(a.kind);
         if (a.audioTemplate) setAudioTemplate(a.audioTemplate);
+        if (a.designTemplate) setDesignTemplate(a.designTemplate);
         return true;
       }),
       registerDevAction('studio.create', () => createRef.current()),
@@ -512,6 +525,8 @@ export function useStudio() {
     setAudioTarget,
     audioTemplate,
     setAudioTemplate,
+    designTemplate,
+    setDesignTemplate,
     model3dFormat,
     setModel3dFormat,
     sources,

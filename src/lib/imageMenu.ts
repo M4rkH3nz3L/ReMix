@@ -9,6 +9,8 @@ import type { ImageLayer } from '@/types/project';
  *  • jobb panel = a rétegek szerkezete (sorrend, láthatóság, zárolás, egyesítés).
  */
 export type RailTool =
+  | 'templates'
+  | 'size'
   | 'photo'
   | 'text'
   | 'shape'
@@ -60,7 +62,27 @@ export const RAIL_GROUPS: { labelKey: string; tools: RailTool[] }[] = [
   { labelKey: 'studio.imageGroups.canvas', tools: ['crop', 'guides', 'assistant'] },
 ];
 
+/** 🎨 a Kép Stúdió két munkaterülete: Kép (retus, pixel) és Design (sablon, tipográfia, márka) — ugyanaz a dokumentum */
+export type ImageWorkspace = 'image' | 'design';
+
+/**
+ * 🎨 Design munkaterület (IMAGE-PROD S8 · PRO-DESIGN DS0): ugyanazok a szerszámok, de a sablon, a
+ * méret (platform-presetek, változatok) és a tipográfia elöl; a pixel-eszközök hátrébb, nem tűnnek el.
+ */
+export const DESIGN_RAIL_GROUPS: { labelKey: string; tools: RailTool[] }[] = [
+  { labelKey: 'studio.imageGroups.design', tools: ['templates', 'size', 'text', 'shape', 'photo', 'addFill'] },
+  { labelKey: 'studio.imageGroups.draw', tools: ['pen', 'brush'] },
+  { labelKey: 'studio.imageGroups.select', tools: ['marquee', 'lasso', 'wand'] },
+  { labelKey: 'studio.imageGroups.canvas', tools: ['crop', 'guides', 'assistant', 'import', 'addAdjust', 'retouch', 'pixel'] },
+];
+
+export function railGroups(ws: ImageWorkspace): { labelKey: string; tools: RailTool[] }[] {
+  return ws === 'design' ? DESIGN_RAIL_GROUPS : RAIL_GROUPS;
+}
+
 export const TOOL_ICONS: Record<RailTool | LayerAction | 'delete', string> = {
+  templates: 'albums-outline',
+  size: 'resize-outline',
   photo: 'image-outline',
   text: 'text-outline',
   shape: 'shapes-outline',

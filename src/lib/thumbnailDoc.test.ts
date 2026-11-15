@@ -56,6 +56,14 @@ describe('🖼️ CORE K5: szerkeszthető thumbnail', () => {
     expect(projectPreviewSource(noRender)).toEqual({ type: 'image', uri: 'file:///f.jpg' });
   });
 
+  it('a fotó nélküli kép- és design-lapnak is van előnézete (az élő bélyegkép)', () => {
+    const doc = { id: 'd', name: 'd', aspectRatio: '16:9', width: 1280, height: 720, layers: [{ id: 't', kind: 'text', text: 'A' }], thumbUri: 'file:///t.png' } as unknown as ImageDoc;
+    for (const kind of ['image', 'design'] as const) {
+      const p = { ...createEmptyProject('x', '16:9', undefined, kind), imageDocs: [doc] };
+      expect(projectPreviewSource(p)).toEqual({ type: 'image', uri: 'file:///t.png' });
+    }
+  });
+
   it('a feed-poszter akkor frissül, ha a lap változott (a poszter a lap verziójával mentődik)', () => {
     const d = thumbnailDoc({ id: 'th', name: 't', frameUri: 'file:///f.jpg', headline: 'A', aspect: 1, aspectRatio: '1:1', layerId: ids });
     const v = stillVersion(d);

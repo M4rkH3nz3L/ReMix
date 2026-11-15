@@ -37,7 +37,9 @@ export const PROJECT_KINDS: Record<ProjectKind, ProjectKindMeta> = {
   // 🎵 Music = az Audio Stúdió zenei MUNKATERÜLETE (K1, AUDIO-PROD S10): ugyanaz a projekt-modell,
   //    az útvonal a Hang Stúdiót nyitja a Zene munkaterületre állítva (`?ws=music`)
   music: { id: 'music', emoji: '🎵', icon: 'musical-note', label: 'studio.kind.music', editable: true, route: (id) => `/studio/music/${id}` },
-  design: { id: 'design', emoji: '🎨', icon: 'color-palette', label: 'studio.kind.design', editable: false, route: (id) => `/studio/design/${id}` },
+  // 🎨 Design = a Kép Stúdió sablon/tipográfia/márka MUNKATERÜLETE (K2, IMAGE-PROD S8): ugyanaz az
+  //    `ImageDoc`-modell, az útvonal a Kép Stúdiót nyitja a Design munkaterületre állítva (`?ws=design`)
+  design: { id: 'design', emoji: '🎨', icon: 'color-palette', label: 'studio.kind.design', editable: true, route: (id) => `/studio/design/${id}` },
   // ── 🎥 Live Studio — van stúdiója (/live/studio/[id]), de a Live-hubból
   //    („Go live") jön létre, ezért `editable: false` → kimarad a generikus
   //    „Új projekt" választóból (creatableKinds). A route a lista-megnyitáshoz él.

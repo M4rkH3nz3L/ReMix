@@ -7466,6 +7466,51 @@ async function smokeQuickVolume(log: Log) {
 }
 
 /** 🧩 AP7: az „Új projekt” űrlap hang-sablonnal (a valódi létrehozási út): zene és podcast. */
+/**
+ * 🎨 IMAGE-PROD S8 (DS0): a „+ Új projekt → Design" a VALÓDI létrehozási úton a választott sablonnal
+ * (márkára színezve) a Kép Stúdió Design munkaterületén nyílik; a munkaterület váltható, offline.
+ */
+async function smokeDesignEntry(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const st = useEditorStore.getState;
+  const created: string[] = [];
+  const name = 'smoke design thumbnail';
+  try {
+    router.replace('/studio' as Href);
+    await sleep(1500);
+    runDevAction('studio.fillCreate', { name, kind: 'design', designTemplate: 'youtubeThumb' });
+    await sleep(400);
+    const t0 = Date.now();
+    await runDevAction('studio.create');
+    for (let i = 0; i < 60 && st().project?.name !== name; i++) await sleep(200);
+    await sleep(1500);
+    const p = st().project;
+    if (p?.name === name) created.push(p.id);
+    const doc = p?.imageDocs?.[0];
+    const kinds = (doc?.layers ?? []).map((l) => l.kind).join('+');
+    log(p?.kind === 'design' && doc?.width === 1280 && doc.height === 720 && (doc.layers.length ?? 0) >= 3, 'a Design-projekt a sablon vásznán és szerkeszthető rétegeivel indul', p ? `${p.kind}, ${doc?.width}×${doc?.height}, rétegek: ${kinds}, ${Date.now() - t0} ms` : 'nincs projekt');
+    const ws = (await runDevAction('image.workspace')) as { ws: string; tools: string[] } | undefined;
+    log(ws?.ws === 'design' && ws.tools[0] === 'templates' && ws.tools[1] === 'size', 'a Kép Stúdió a Design munkaterületen nyílik: sablon és méret elöl', `${ws?.ws}: ${ws?.tools.join(', ')}`);
+    log(true, 'FOTÓZHATÓ', 'a Design munkaterület (sablonból nyílt lap, Design-sín)');
+    await sleep(6000);
+    const back = (await runDevAction('image.workspace', 'image')) as { ws: string } | undefined;
+    await sleep(300);
+    const now = (await runDevAction('image.workspace')) as { ws: string; tools: string[] } | undefined;
+    log(back !== undefined && now?.ws === 'image' && now.tools[0] === 'photo' && st().project?.id === p?.id, 'a munkaterület váltható (ugyanaz a dokumentum)', `${now?.ws}: ${now?.tools.slice(0, 3).join(', ')}…`);
+  } finally {
+    router.replace('/studio' as Href);
+    await sleep(500);
+    const { deleteCloudProject, listCloudProjectMetas } = await import('@/lib/cloudSync');
+    const leftovers = (await listCloudProjectMetas().catch(() => [])).filter((m) => m.name.startsWith('smoke design ')).map((m) => m.id);
+    for (const id of new Set([...created, ...leftovers])) {
+      await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:design-del', caught));
+      await deleteCloudProject(id);
+    }
+    const remain = (await listCloudProjectMetas().catch(() => [])).filter((m) => m.name.startsWith('smoke design ')).length;
+    log(remain === 0, 'takarítás: a teszt-projekt a felhőből is törölve', `maradt ${remain}`);
+  }
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -11387,6 +11432,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'designentry') {
+    await step(phase, () => smokeDesignEntry(log));
     return;
   }
   if (phase === 'linkimg') {

@@ -3370,6 +3370,7 @@
       "live": "Élő"
     },
     "kindDesc": {
+      "design": "Thumbnail, poszter, borító — sablonból, márkával",
       "model3d": "LiDAR-szken 3D-modellé",
       "video": "Idővonalas videószerkesztő",
       "image": "Réteg-alapú képszerkesztő",
@@ -3383,6 +3384,8 @@
     "comingSoonBody": "Ez a szerkesztő hamarosan elkészül. A projekt már létezik — nemsokára itt tudod szerkeszteni.",
     "comingSoonInline": "Ez a stúdió fejlesztés alatt — a szerkesztő hamarosan jön.",
     "imageTools": {
+      "templates": "Sablonok",
+      "size": "Méret",
       "pixel": "Pixel art",
       "assistant": "Asszisztens",
       "exportLayer": "Réteg exportja",
@@ -3430,6 +3433,7 @@
       "duplicate": "Duplikálás"
     },
     "imageGroups": {
+      "design": "Design",
       "draw": "Rajz",
       "select": "Kijelölés",
       "canvas": "Vászon",
@@ -3794,6 +3798,11 @@
       "undoReorder": "Réteg sorrendje",
       "svgPartialTitle": "Részleges SVG-import",
       "svgPartialBody": "Ezeket az elemeket nem tudtuk beolvasni, ezért kimaradtak: {{items}}",
+      "workspace": {
+        "image": "Kép",
+        "design": "Design",
+        "label": "Munkaterület"
+      },
       "a11y": {
         "pagePrev": "Lap előre",
         "pageNext": "Lap hátra",

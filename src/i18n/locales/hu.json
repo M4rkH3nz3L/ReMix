@@ -3790,6 +3790,13 @@
       "undoReorder": "Réteg sorrendje",
       "svgPartialTitle": "Részleges SVG-import",
       "svgPartialBody": "Ezeket az elemeket nem tudtuk beolvasni, ezért kimaradtak: {{items}}",
+      "toVideo": {
+        "title": "Videóba",
+        "newLinked": "Új videó — hivatkozással",
+        "existing": "Meglévő videóba…",
+        "pickTitle": "Melyik videóba?",
+        "noVideos": "Még nincs videó-projekted."
+      },
       "deviceRenderGaps": {
         "title": "Néhány effekt kimaradt",
         "body": "A zajcsökkentés, a kromatikus aberráció és a lencsetorzítás csak a felhős renderben készül el. A kép most a telefonon készült, ezek nélkül."

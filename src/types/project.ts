@@ -242,8 +242,9 @@ export interface AssetSource {
   name?: string;
   /** a projekten belüli dokumentum (SC1); hiányzó = a projekt egésze */
   docId?: string;
-  output: 'mixdown';
-  /** a forrás kimenet-verziója, amiből ez a fájl készült (`mixdownVersion`) */
+  /** `mixdown`: a hang-projekt keverése · `still`: egy kép-dokumentum (`docId`) képe (CORE K2) */
+  output: 'mixdown' | 'still';
+  /** a forrás kimenet-verziója, amiből ez a fájl készült (`mixdownVersion` / `stillVersion`) */
   version: string;
 }
 

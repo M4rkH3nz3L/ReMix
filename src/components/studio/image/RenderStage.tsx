@@ -1,6 +1,6 @@
 import { File } from 'expo-file-system';
 import { SaveFormat, ImageManipulator } from 'expo-image-manipulator';
-import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { PixelRatio, StyleSheet, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
@@ -97,6 +97,18 @@ export function keepRenderedInProject(uri: string, base: string): string {
   return target.uri;
 }
 
+/**
+ * A felcsatolt színpadok (a legutóbbi az aktív): így a stúdión kívülről (pl. a videó-szerkesztő
+ * „Frissítés elérhető” sávjából) is a telefonon renderelhető egy kép-dokumentum.
+ */
+const mounted: RenderStageHandle[] = [];
+
+/** a dokumentum képe a telefonon; `null`, ha nincs felcsatolt színpad vagy nem sikerült */
+export function renderOnDevice(doc: ImageDoc, heightPx: number, opts?: RenderStageOptions): Promise<string | null> {
+  const stage = mounted[mounted.length - 1];
+  return stage ? stage.render(doc, heightPx, opts) : Promise.resolve(null);
+}
+
 export const RenderStage = forwardRef<RenderStageHandle>(function RenderStage(_props, ref) {
   const [job, setJob] = useState<{ doc: ImageDoc; w: number; h: number; seq: number } | null>(null);
   const viewRef = useRef<View>(null);
@@ -104,7 +116,7 @@ export const RenderStage = forwardRef<RenderStageHandle>(function RenderStage(_p
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const seq = useRef(0);
 
-  useImperativeHandle(ref, () => ({
+  const handle = useRef<RenderStageHandle>({
     render(doc, heightPx, opts = {}) {
       const run = async (): Promise<string | null> => {
         const size = stageSize(effectiveCanvas(doc), heightPx, PixelRatio.get());
@@ -149,7 +161,15 @@ export const RenderStage = forwardRef<RenderStageHandle>(function RenderStage(_p
       queue.current = result;
       return result;
     },
-  }));
+  }).current;
+  useImperativeHandle(ref, () => handle, [handle]);
+  useEffect(() => {
+    mounted.push(handle);
+    return () => {
+      const i = mounted.lastIndexOf(handle);
+      if (i >= 0) mounted.splice(i, 1);
+    };
+  }, [handle]);
 
   if (!job) {
     return null;

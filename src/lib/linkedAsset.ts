@@ -1,7 +1,7 @@
 import type { EditorCommand } from '@/lib/commands';
 import { snapToFrame } from '@/lib/frames';
 import { logCaught } from '@/lib/logCaught';
-import type { Asset, AssetSource, AudioClip, Clip, Project, TrackType } from '@/types/project';
+import type { Asset, AssetSource, AudioClip, Clip, ImageDoc, Project, TrackType } from '@/types/project';
 
 /**
  * 🔗 Linked asset (ReMix.md 5.3 · PRO-SHARED-CORE SC2 · AUDIO-PROD C2) — pure mag.
@@ -75,6 +75,50 @@ export function mixdownVersion(
   );
 }
 
+// ── 🖼️ CORE K2 (IMAGE-PROD C2): kép-dokumentum képe (still) mint hivatkozott kimenet ─────────────
+
+export const STILL_OUTPUT = 'still' as const;
+
+/**
+ * Egy kép-dokumentum KIMENET-VERZIÓJA: a rétegek, a csoportok, a vászon és a finish (minden, ami a
+ * képet adja). A nézet-/gyorsítótár-mezők (bélyegkép, kész render és kulcsaik) és a név nem
+ * számítanak, a fájl-útvonal csak a nevével (a mentés mappába-vétele nem ad hamis frissítést).
+ */
+export function stillVersion(doc: ImageDoc): string {
+  const rest: Record<string, unknown> = { ...doc };
+  for (const key of ['name', 'thumbUri', 'thumbKey', 'renderedUri', 'renderedKey']) delete rest[key];
+  return fnv(JSON.stringify(rest, contentReplacer));
+}
+
+/** a forrás-projekt mostani kimenet-verziója a hivatkozás szerint; null = a kimenet nincs meg (pl. törölt lap) */
+export function outputVersion(source: Project, link: Pick<AssetSource, 'output' | 'docId'>): string | null {
+  if (link.output === STILL_OUTPUT) {
+    const doc = source.imageDocs?.find((d) => d.id === link.docId);
+    return doc ? stillVersion(doc) : null;
+  }
+  return mixdownVersion(source);
+}
+
+/** a hivatkozás egy kép-projekt lapjára (a videó assetjén) */
+export function stillSourceFor(project: Pick<Project, 'id' | 'name'>, doc: ImageDoc): AssetSource {
+  return { projectId: project.id, name: doc.name || project.name, docId: doc.id, output: STILL_OUTPUT, version: stillVersion(doc) };
+}
+
+/**
+ * Frissítés a kép új verziójára: az asset új képe + verziója, és a videóba ágyazott rétegdokumentum
+ * (`ImageClip.docId`) a forrás mostani rétegeire — így a videóból újranyitva is a friss lap jön.
+ * Egy köteg = egy visszavonás. A kép-klip hossza nem függ a forrástól, nem vágódik.
+ */
+export function stillRelinkCommands(project: Project, assetId: string, next: { uri: string; version: string }, doc: ImageDoc): EditorCommand[] {
+  const asset = project.assets.find((a) => a.id === assetId);
+  if (!asset || asset.source?.output !== STILL_OUTPUT) return [];
+  const { thumbUri: _t, thumbKey: _k, renderedUri: _r, renderedKey: _rk, ...plain } = doc;
+  return [
+    { type: 'RELINK_ASSET', assetId, newUri: next.uri, source: { ...asset.source, version: next.version } },
+    { type: 'UPSERT_IMAGE_DOC', doc: plain as ImageDoc },
+  ];
+}
+
 /** a projekt hivatkozott (linkelt) assetjei */
 export function linkedAssets(project: Pick<Project, 'assets'>): Asset[] {
   return project.assets.filter((a) => !!a.source);
@@ -91,10 +135,10 @@ export interface StaleLink {
  * verzióját adja (a hívó tölti be a projektet — helyben, felhő nélkül); `null` = a forrás nincs
  * meg (társnál, törölve) → nem jelzünk, a link a meglévő kimenetre mutat tovább.
  */
-export function staleLinks(project: Pick<Project, 'assets'>, versionOf: (projectId: string) => string | null): StaleLink[] {
+export function staleLinks(project: Pick<Project, 'assets'>, versionOf: (projectId: string, source: AssetSource) => string | null): StaleLink[] {
   const out: StaleLink[] = [];
   for (const asset of linkedAssets(project)) {
-    const cur = versionOf(asset.source!.projectId);
+    const cur = versionOf(asset.source!.projectId, asset.source!);
     if (cur && cur !== asset.source!.version) out.push({ asset, currentVersion: cur });
   }
   return out;

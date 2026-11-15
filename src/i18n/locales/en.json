@@ -3790,6 +3790,13 @@
       "undoReorder": "Layer order",
       "svgPartialTitle": "Partial SVG import",
       "svgPartialBody": "These elements couldn't be imported and were left out: {{items}}",
+      "toVideo": {
+        "title": "To video",
+        "newLinked": "New video — linked",
+        "existing": "Into an existing video…",
+        "pickTitle": "Which video?",
+        "noVideos": "You have no video projects yet."
+      },
       "deviceRenderGaps": {
         "title": "Some effects were left out",
         "body": "Noise reduction, chromatic aberration and lens distortion are only rendered in the cloud. The image was made on your phone without them."

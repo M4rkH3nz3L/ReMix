@@ -7,7 +7,9 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { palette } from '@/constants/editor';
 import { clearCswcrLog, cswcrStats, logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { registerDevAction } from '@/lib/devActions';
-import { linkedAssets, relinkPlan, staleLinks, type StaleLink } from '@/lib/linkedAsset';
+import { RenderStage, renderOnDevice } from '@/components/studio/image/RenderStage';
+import { effectiveCanvas } from '@/lib/canvasPresets';
+import { linkedAssets, relinkPlan, staleLinks, stillRelinkCommands, STILL_OUTPUT, type AssetSource, type StaleLink } from '@/lib/linkedAsset';
 import { loadSourceProject, renderMixdown, sourceVersionOf } from '@/lib/linkedAssetClient';
 import { logCaught } from '@/lib/logCaught';
 import { isRenderCancelledError } from '@/lib/render';
@@ -36,14 +38,16 @@ export function LinkedUpdateBanner() {
       await Promise.resolve();
       const project = useEditorStore.getState().project;
       const linked = project ? linkedAssets(project) : [];
+      // a kép-hivatkozás lapra pontos (egy kép-projektnek több lapja lehet)
+      const keyOf = (src: Pick<AssetSource, 'projectId' | 'output' | 'docId'>) => `${src.projectId}|${src.output}|${src.docId ?? ''}`;
       const versions = new Map<string, string | null>();
       for (const a of linked) {
-        const pid = a.source!.projectId;
-        if (!versions.has(pid)) versions.set(pid, await sourceVersionOf(pid));
+        const key = keyOf(a.source!);
+        if (!versions.has(key)) versions.set(key, await sourceVersionOf(a.source!.projectId, a.source!));
       }
       if (run !== checkRef.current) return;
       const cur = useEditorStore.getState().project;
-      setStale(cur && linked.length > 0 ? staleLinks(cur, (pid) => versions.get(pid) ?? null) : []);
+      setStale(cur && linked.length > 0 ? staleLinks(cur, (_pid, src) => versions.get(keyOf(src)) ?? null) : []);
     })();
   }, []);
 
@@ -57,6 +61,10 @@ export function LinkedUpdateBanner() {
     if (!source) return;
     setBusy(true);
     try {
+      if (link.asset.source!.output === STILL_OUTPUT) {
+        await updateStill(link, source);
+        return;
+      }
       const file = await withCancellableProgress(t('editor.linked.rendering', { name: source.name }), (report, signal) => renderMixdown(source, report, signal));
       const st = useEditorStore.getState();
       if (!file || !st.project) return;
@@ -75,6 +83,22 @@ export function LinkedUpdateBanner() {
       setBusy(false);
       check();
     }
+  };
+
+  /** 🖼️ CORE K2: a kép-lap új képe a telefonon (render-színpad), és a videóba ágyazott rétegek is */
+  const updateStill = async (link: StaleLink, source: NonNullable<Awaited<ReturnType<typeof loadSourceProject>>>) => {
+    const doc = source.imageDocs?.find((d) => d.id === link.asset.source!.docId);
+    if (!doc) return;
+    const uri = await renderOnDevice(doc, effectiveCanvas(doc).height, { format: 'png' });
+    const st = useEditorStore.getState();
+    if (!uri || !st.project) {
+      Alert.alert(t('editor.linked.title'), t('studio.image.renderFailBody'));
+      return;
+    }
+    const commands = stillRelinkCommands(st.project, link.asset.id, { uri, version: link.currentVersion }, doc);
+    if (commands.length === 0) return;
+    st.applyBatch(commands, 'user');
+    logCswcr({ type: 'relink', projectId: st.project.id, kind: studioKindOf(st.project.kind) });
   };
 
   // 🧪 füstteszt: a sáv állapota és a frissítés gombja
@@ -102,10 +126,14 @@ export function LinkedUpdateBanner() {
     return () => offs.forEach((off) => off());
   }, [check]);
 
-  if (stale.length === 0) return null;
+  // a kép-frissítés telefonos render-színpada (rejtett; a szerkesztő eltakarja)
+  const stage = linkedAssets({ assets: assets ?? [] }).some((a) => a.source?.output === STILL_OUTPUT) ? <RenderStage /> : null;
+  if (stale.length === 0) return stage;
   const first = stale[0];
   const name = first.asset.source?.name ?? first.asset.name ?? '';
   return (
+    <>
+    {stage}
     <View style={styles.bar} accessibilityRole="alert" testID="linked-update-banner">
       <Ionicons name="link" size={14} color="#fff" />
       <Text style={styles.text} maxFontSizeMultiplier={1.4} numberOfLines={2}>
@@ -123,6 +151,7 @@ export function LinkedUpdateBanner() {
         <Text style={styles.btnText}>{busy ? '…' : t('editor.linked.update')}</Text>
       </Pressable>
     </View>
+    </>
   );
 }
 

@@ -1,7 +1,7 @@
 import { createEmptyProject } from '@/lib/projectUtils';
-import { linkedAssets, mixdownClipCommands, mixdownInsertAt, mixdownVersion, relinkPlan, staleLinks, usagesOf } from '@/lib/linkedAsset';
+import { linkedAssets, mixdownClipCommands, mixdownInsertAt, mixdownVersion, outputVersion, relinkPlan, staleLinks, stillRelinkCommands, stillSourceFor, stillVersion, usagesOf } from '@/lib/linkedAsset';
 import { useEditorStore } from '@/store/editorStore';
-import type { AudioClip, Project } from '@/types/project';
+import type { AudioClip, ImageDoc, Project } from '@/types/project';
 
 /** 🔗 C2 (ReMix.md 5.3): a videó a hang-projekt mixdownjára hivatkozik, a változás egy koppintással frissül. */
 const audioClip = (over: Partial<AudioClip> = {}): AudioClip => ({
@@ -117,5 +117,60 @@ describe('🔍 C6: „Hol használom?"', () => {
       { projectId: 'v2', name: 'Zebra klip', links: 1, stale: true },
     ]);
     expect(usagesOf(projects, 'nincs')).toEqual([]);
+  });
+});
+
+describe('🖼️ CORE K2: kép-lap mint hivatkozott kimenet (still)', () => {
+  const doc = {
+    id: 'doc1',
+    name: 'Borító',
+    aspectRatio: '1:1',
+    width: 1080,
+    height: 1080,
+    layers: [{ id: 'p', kind: 'photo', uri: 'file:///a/media/kep.png', position: { x: 0.5, y: 0.5 }, w: 1, h: 1 }],
+  } as unknown as ImageDoc;
+
+  it('a verzió a tartalomból: név, bélyegkép, kész render és mappa-útvonal nem számít', () => {
+    const v = stillVersion(doc);
+    expect(stillVersion({ ...doc, name: 'Más', thumbUri: 'file:///t.png', thumbKey: 'k', renderedUri: 'file:///r.png', renderedKey: 'r' })).toBe(v);
+    const moved = { ...doc, layers: [{ ...doc.layers[0], uri: 'file:///b/Projektek/x/kep.png' }] } as ImageDoc;
+    expect(stillVersion(moved)).toBe(v);
+    const changed = { ...doc, layers: [{ ...doc.layers[0], opacity: 0.5 }] } as ImageDoc;
+    expect(stillVersion(changed)).not.toBe(v);
+  });
+
+  it('a forrás verziója lapra pontos; törölt lapnál nincs verzió', () => {
+    const source = { id: 'img', name: 'Kép', imageDocs: [doc] } as unknown as Project;
+    expect(outputVersion(source, { output: 'still', docId: 'doc1' })).toBe(stillVersion(doc));
+    expect(outputVersion(source, { output: 'still', docId: 'nincs' })).toBeNull();
+    const link = stillSourceFor(source, doc);
+    expect(link).toEqual({ projectId: 'img', name: 'Borító', docId: 'doc1', output: 'still', version: stillVersion(doc) });
+  });
+
+  it('a frissítés egy köteg: új kép + verzió, és a videóba ágyazott rétegek (gyorsítótár nélkül)', () => {
+    const video = {
+      id: 'v',
+      assets: [{ id: 'a1', kind: 'image', uri: 'file:///old.png', provider: 'local', source: { projectId: 'img', docId: 'doc1', output: 'still', version: 'v0' } }],
+      tracks: [],
+    } as unknown as Project;
+    const cmds = stillRelinkCommands(video, 'a1', { uri: 'file:///new.png', version: 'v1' }, { ...doc, thumbUri: 'file:///t.png' });
+    expect(cmds).toHaveLength(2);
+    expect(cmds[0]).toMatchObject({ type: 'RELINK_ASSET', assetId: 'a1', newUri: 'file:///new.png', source: { version: 'v1', docId: 'doc1' } });
+    expect(cmds[1]).toMatchObject({ type: 'UPSERT_IMAGE_DOC', doc: { id: 'doc1' } });
+    expect((cmds[1] as { doc: ImageDoc }).doc.thumbUri).toBeUndefined();
+    // hang-hivatkozásra nem ad kép-köteget
+    const mix = { ...video, assets: [{ ...video.assets[0], source: { projectId: 'a', output: 'mixdown', version: 'x' } }] } as Project;
+    expect(stillRelinkCommands(mix, 'a1', { uri: 'u', version: 'v' }, doc)).toEqual([]);
+  });
+
+  it('a lejárt hivatkozás a lap szerint dől el (egy projekt, két lap)', () => {
+    const video = {
+      assets: [
+        { id: 'a1', kind: 'image', uri: 'u1', provider: 'local', source: { projectId: 'img', docId: 'doc1', output: 'still', version: 'v1' } },
+        { id: 'a2', kind: 'image', uri: 'u2', provider: 'local', source: { projectId: 'img', docId: 'doc2', output: 'still', version: 'w1' } },
+      ],
+    } as unknown as Project;
+    const now: Record<string, string> = { doc1: 'v1', doc2: 'w2' };
+    expect(staleLinks(video, (_pid, src) => now[src.docId!] ?? null).map((s) => s.asset.id)).toEqual(['a2']);
   });
 });

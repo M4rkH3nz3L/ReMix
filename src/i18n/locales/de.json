@@ -3823,6 +3823,13 @@
       "undoReorder": "Ebenenreihenfolge",
       "svgPartialTitle": "SVG teilweise importiert",
       "svgPartialBody": "Diese Elemente konnten nicht importiert werden und fehlen: {{items}}",
+      "toVideo": {
+        "title": "Ins Video",
+        "newLinked": "Neues Video — verknüpft",
+        "existing": "In ein vorhandenes Video …",
+        "pickTitle": "Welches Video?",
+        "noVideos": "Du hast noch keine Videoprojekte."
+      },
       "deviceRenderGaps": {
         "title": "Einige Effekte fehlen",
         "body": "Rauschreduzierung, chromatische Aberration und Objektivverzeichnung werden nur in der Cloud gerendert. Das Bild wurde ohne sie auf dem Gerät erstellt."

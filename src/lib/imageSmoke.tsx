@@ -119,8 +119,8 @@ import { decodeSample } from '@/lib/instrumentClient';
 import { instrumentDocOf } from '@/lib/instrumentDoc';
 import { emptySampler } from '@/lib/sampler';
 import { applyCommand } from '@/lib/commands';
-import { linkedAssets, mixdownVersion, relinkPlan } from '@/lib/linkedAsset';
-import { sendMixdownToVideo, sourceVersionOf } from '@/lib/linkedAssetClient';
+import { linkedAssets, mixdownVersion, relinkPlan, stillVersion } from '@/lib/linkedAsset';
+import { sendMixdownToVideo, sendStillToVideo, sourceVersionOf } from '@/lib/linkedAssetClient';
 import { clearCswcrLog, logCswcr, type CswcrStats } from '@/lib/cswcrClient';
 import { USER_PRESETS_KEY, useUserPresets } from '@/store/userPresetStore';
 import { useAudioEditMode } from '@/store/audioEditModeStore';
@@ -6143,6 +6143,126 @@ async function smokeA11y(log: Log) {
  * „Frissítés elérhető”, egy koppintás = az új mixdown (egy köteg), egy visszavonás; a hossz-szabály.
  * Újraimport és kézi szinkron nélkül, felhő nélkül.
  */
+/**
+ * 🖼️→🎬 CORE K2 (IMAGE-PROD C2): a kép-lap HIVATKOZÁSKÉNT a videóban — a lap módosítása után a
+ * videóban „Frissítés elérhető”, egy koppintás a telefonon rendereli az új képet, egy visszavonás.
+ */
+async function smokeLinkedImage(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}, pixelarány ${PixelRatio.get()}`);
+  const imageId = 'prj_smoke_linked_image';
+  const videoIds: string[] = [];
+  await deleteProject(imageId).catch((caught) => logCaught('lib/imageSmoke.tsx:linkimg', caught));
+  const doc0 = {
+    id: 'lap1',
+    name: 'Borító',
+    aspectRatio: '1:1',
+    width: 320,
+    height: 320,
+    layers: [
+      { kind: 'fill', id: 'bg', fill: '#3070d0' },
+      { kind: 'shape', id: 'r', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5, fill: '#ff0000' },
+    ],
+  } as unknown as ImageDoc;
+  const base = createEmptyProject('smoke borító', '1:1', undefined, 'image');
+  const image: Project = { ...base, id: imageId, imageDocs: [doc0] };
+  await saveProject(image);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(
+    <View style={{ width: 1, height: 1 }}>
+      <RenderStage ref={ref} />
+    </View>
+  );
+  await sleep(300);
+  const st = useEditorStore.getState;
+  const waitFor = async (cond: () => boolean, ms: number) => {
+    for (let i = 0; i < ms / 100 && !cond(); i++) await sleep(100);
+    return cond();
+  };
+  const center = async (uri: string) => {
+    const img = await decode(uri);
+    return pixel(img, Math.round(img.width() / 2), Math.round(img.height() / 2)).slice(0, 3);
+  };
+  try {
+    // 1) küldés hivatkozással egy ÚJ videó-projektbe (a telefonos render-színpad képével)
+    const uri0 = await ref.current!.render(doc0, 320);
+    if (!uri0) throw new Error('nincs telefonos render');
+    const video = await sendStillToVideo(image, doc0, uri0, null, { newName: 'smoke kép-videó' });
+    videoIds.push(video.id);
+    const asset = linkedAssets(video)[0];
+    const v0 = stillVersion(doc0);
+    const vClip = video.tracks.find((t) => t.type === 'video')!.clips[0] as ImageClip;
+    log(
+      asset?.source?.output === 'still' && asset.source.docId === 'lap1' && asset.source.version === v0 && vClip.docId === 'lap1',
+      'a videó a kép-lapra hivatkozik (verzióval), a klip a rétegeket is hordozza',
+      `${asset?.source?.output} ${asset?.source?.docId} ${asset?.source?.version}`
+    );
+    // 2) a lap módosul a Kép Stúdióban (piros → zöld) és mentődik
+    const doc1 = { ...doc0, layers: [doc0.layers[0], { ...doc0.layers[1], fill: '#00c000' }] } as ImageDoc;
+    await saveProject({ ...image, imageDocs: [doc1] });
+    const stored = await sourceVersionOf(imageId, { output: 'still', docId: 'lap1' });
+    log(stored === stillVersion(doc1) && stored !== v0, 'a lap módosítása új kimenet-verziót ad (a tárolt = a tartalomé)', `${v0} → ${stored}`);
+    // 3) a videó megnyitása → „Frissítés elérhető”
+    setHarness(null);
+    router.push(`/editor/${video.id}` as Href);
+    for (let i = 0; i < 60 && st().project?.id !== video.id; i++) await sleep(200);
+    await sleep(1500);
+    const stale = await waitFor(() => ((runDevAction('linked.stale') as string[] | undefined)?.length ?? 0) === 1, 10000);
+    log(stale, '„Frissítés elérhető”: a videó észleli a lap új verzióját', JSON.stringify(runDevAction('linked.stale')));
+    log(true, 'FOTÓZHATÓ', 'a „Frissítés elérhető” sáv a videó-szerkesztő tetején');
+    await sleep(1500);
+    // 4) egy koppintás: a telefon rendereli az új képet, a klip és a beágyazott rétegek is frissülnek
+    const clipOf = () => st().project!.tracks.find((t) => t.type === 'video')!.clips[0] as ImageClip;
+    const loadedUri = clipOf().uri;
+    const before = await center(loadedUri);
+    await runDevAction('linked.update');
+    const updated = await waitFor(() => clipOf().uri !== loadedUri, 20000);
+    const after = await center(clipOf().uri);
+    const asset1 = st().project!.assets.find((a) => a.source?.docId === 'lap1');
+    const embedded = st().project!.imageDocs?.find((d) => d.id === 'lap1');
+    const embeddedFill = (embedded?.layers[1] as { fill?: string } | undefined)?.fill;
+    log(
+      updated && after[1] > 150 && after[0] < 60 && before[0] > 200 && asset1?.source?.version === stored && embeddedFill === '#00c000',
+      'egy koppintás: az új kép (zöld) a telefonon, a verzió a forrásé, a beágyazott rétegek is frissek',
+      `közép ${before.join(',')} → ${after.join(',')}, verzió ${asset1?.source?.version}, réteg ${embeddedFill}`
+    );
+    const cleared = await waitFor(() => ((runDevAction('linked.stale') as string[] | undefined)?.length ?? 0) === 0, 8000);
+    log(cleared, 'a sáv eltűnik a frissítés után');
+    // 5) egy visszavonás: a régi kép, verzió és rétegek
+    st().undo();
+    await sleep(300);
+    const asset2 = st().project!.assets.find((a) => a.source?.docId === 'lap1');
+    const fill2 = (st().project!.imageDocs?.find((d) => d.id === 'lap1')?.layers[1] as { fill?: string } | undefined)?.fill;
+    log(clipOf().uri === loadedUri && asset2?.source?.version === v0 && fill2 === '#ff0000', 'egy visszavonás: a régi kép, verzió és rétegek', `${asset2?.source?.version} · ${fill2}`);
+    router.back();
+    await sleep(600);
+    // 6) MEGLÉVŐ videó-projektbe: a klip a meglévők után, hivatkozással
+    const existing = await loadProject(video.id);
+    if (existing) {
+      const n0 = existing.tracks.find((t) => t.type === 'video')!.clips.length;
+      const stage2 = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+      setHarness(
+        <View style={{ width: 1, height: 1 }}>
+          <RenderStage ref={stage2} />
+        </View>
+      );
+      await sleep(300);
+      const uri2 = await stage2.current!.render(doc1, 320);
+      const v2 = uri2 ? await sendStillToVideo(image, doc1, uri2, existing, { newName: '-' }) : null;
+      const n1 = v2?.tracks.find((t) => t.type === 'video')!.clips.length ?? 0;
+      log(!!v2 && v2.id === video.id && n1 === n0 + 1 && linkedAssets(v2).length >= 2, 'küldés meglévő videóba: a klip a meglévők után, hivatkozással', `${n0} → ${n1} klip`);
+      setHarness(null);
+    }
+  } finally {
+    setHarness(null);
+    if (st().project && videoIds.includes(st().project!.id)) {
+      router.back();
+      await sleep(500);
+    }
+    await deleteProject(imageId).catch((caught) => logCaught('lib/imageSmoke.tsx:linkimg-del', caught));
+    for (const id of videoIds) await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:linkimg-del2', caught));
+  }
+}
+
 async function smokeLinkedMix(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const SR = 44100;
@@ -11162,6 +11282,10 @@ export async function runImageSmoke(
   }
   if (phase === 'a11y') {
     await step(phase, () => smokeA11y(log));
+    return;
+  }
+  if (phase === 'linkimg') {
+    await step(phase, () => smokeLinkedImage(log, setHarness));
     return;
   }
   if (phase === 'linkedmix') {

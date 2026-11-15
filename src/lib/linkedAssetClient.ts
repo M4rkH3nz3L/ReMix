@@ -4,14 +4,15 @@ import { mixForExport } from '@/lib/audioExportMix';
 import { applyCommand } from '@/lib/commands';
 import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { makeId } from '@/lib/id';
-import { mixdownClipCommands, mixdownInsertAt, mixdownVersion, usagesOf, type AssetSource, type LinkUsage, type MixdownFile } from '@/lib/linkedAsset';
+import { addImageDocToVideo } from '@/lib/imageToVideo';
+import { mixdownClipCommands, mixdownInsertAt, mixdownVersion, outputVersion, stillSourceFor, usagesOf, type AssetSource, type LinkUsage, type MixdownFile } from '@/lib/linkedAsset';
 import { logCaught } from '@/lib/logCaught';
 import { exportOfflineWav } from '@/lib/offlineMixClient';
 import type { ProgressUpdate } from '@/lib/progress';
 import { projectMediaDir } from '@/lib/projectFolderClient';
 import { createEmptyProject } from '@/lib/projectUtils';
 import { listProjects, loadProject, saveProject } from '@/lib/storage';
-import type { Project } from '@/types/project';
+import type { ImageDoc, Project } from '@/types/project';
 
 /**
  * 🔗 Linked asset — a HÁLÓZATI/ESZKÖZ réteg a pure `linkedAsset.ts` magjához (AUDIO-PROD C2).
@@ -33,10 +34,40 @@ export async function loadSourceProject(projectId: string): Promise<Project | nu
   }
 }
 
-/** a forrás mostani kimenet-verziója, vagy null, ha a forrás nincs meg */
-export async function sourceVersionOf(projectId: string): Promise<string | null> {
+/**
+ * a forrás mostani kimenet-verziója, vagy null, ha a forrás (vagy a hivatkozott lapja) nincs meg;
+ * `link` nélkül a hang-projekt mixdownja
+ */
+export async function sourceVersionOf(projectId: string, link?: Pick<AssetSource, 'output' | 'docId'>): Promise<string | null> {
   const p = await loadSourceProject(projectId);
-  return p ? mixdownVersion(p) : null;
+  if (!p) return null;
+  return link ? outputVersion(p, link) : mixdownVersion(p);
+}
+
+/**
+ * 🖼️→🎬 CORE K2 (IMAGE-PROD C2): egy kép-lap HIVATKOZÁSKÉNT egy videó-projektbe. A lap képét a
+ * hívó adja (`renderedUri`, a telefonos render-színpadról); a klip a rétegdokumentumot is hordozza
+ * (`docId`), az assete a kép-projekt lapjára mutat verzióval → a lap későbbi módosítása a videóban
+ * „Frissítés elérhető”. `target` = meglévő videó-projekt, null = új. A hívó navigál.
+ */
+export async function sendStillToVideo(
+  image: Pick<Project, 'id' | 'name' | 'aspectRatio' | 'kind'>,
+  doc: ImageDoc,
+  renderedUri: string,
+  target: Project | null,
+  opts: { newName: string }
+): Promise<Project> {
+  const base = target ?? createEmptyProject(opts.newName, image.aspectRatio, undefined, 'video');
+  const { thumbUri: _t, thumbKey: _k, renderedUri: _r, renderedKey: _rk, ...plain } = doc;
+  const withClip = addImageDocToVideo(base, plain as ImageDoc, renderedUri);
+  const source = stillSourceFor(image, doc);
+  const video: Project = {
+    ...withClip,
+    assets: withClip.assets.map((a) => (a.uri === renderedUri && a.kind === 'image' && !a.source ? { ...a, source } : a)),
+  };
+  await saveProject(video);
+  logCswcr({ type: 'handoff', via: 'link', projectId: image.id, kind: studioKindOf(image.kind), toProjectId: video.id });
+  return video;
 }
 
 /** a hang-projekt mixdownja WAV-ként a projekt-mappába; a verzió a tartalomból */

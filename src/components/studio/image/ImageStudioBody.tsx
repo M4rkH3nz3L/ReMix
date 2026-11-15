@@ -25,7 +25,6 @@ import { applyImageCommands, type ImageCommand } from '@/lib/imageIntent';
 import { type SelectionAction, SelectionBar, type SelectTool } from '@/components/studio/image/body/SelectionBar';
 import { requestCutout } from '@/lib/bgremove';
 import { foregroundMask } from '@/lib/foregroundMask';
-import { addImageDocToVideo } from '@/lib/imageToVideo';
 import { docFromTemplate, type ImageTemplate } from '@/lib/imageTemplates';
 import { useBrandStyle } from '@/store/brandStyleStore';
 import { haptics } from '@/design';
@@ -92,8 +91,10 @@ import { makeId } from '@/lib/id';
 import { pickImage, pickImageFile, pickPdf, pickPsd, pickSvg, saveImageToPhotos } from '@/lib/media';
 import { imageDocToSvg, svgDocSize } from '@/lib/svgExport';
 import { parseSvg } from '@/lib/svgImport';
-import { createEmptyProject } from '@/lib/projectUtils';
-import { saveProject } from '@/lib/storage';
+import { listProjects, loadProject } from '@/lib/storage';
+import { sendStillToVideo } from '@/lib/linkedAssetClient';
+import { flushProjectSave } from '@/hooks/useProjectAutosave';
+import { useActionMenu } from '@/store/actionMenuStore';
 import { useEditorStore } from '@/store/editorStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
@@ -1769,26 +1770,54 @@ export function ImageStudioBody({
     }
   };
 
-  // 🖼️→🎬 a kirasterizált kép ÚJ videó-projektbe (ReMix cél: „kép → videó")
-  const insertIntoVideo = async () => {
+  // 🖼️→🎬 CORE K2 (IMAGE-PROD C2): a lap HIVATKOZÁSKÉNT egy új vagy meglévő videó-projektbe. A kép a
+  // telefonon készül, a klip a rétegeket is hordozza; a lap későbbi módosítása a videóban
+  // „Frissítés elérhető” → egy koppintás, egy visszavonás.
+  const sendToVideo = async (target: Awaited<ReturnType<typeof loadProject>>) => {
     if (!doc || !project || busy) {
       return;
     }
     setBusy(true);
     try {
-      const uri = await rasterize(doc);
+      // előbb a kép-projekt mentése: a hivatkozás verziója a TÁROLT laphoz igazodjon
+      await flushProjectSave();
+      const fresh = useEditorStore.getState().project?.imageDocs?.find((d) => d.id === doc.id) ?? doc;
+      const uri = await rasterize(fresh);
       if (!uri) {
         alertRenderFail();
         return;
       }
-      const vid = createEmptyProject(t('studio.image.videoName', { name: project.name }), project.aspectRatio, undefined, 'video');
-      // a rétegek megmaradnak: a videó-szerkesztőből a kép tovább szerkeszthető
-      const withClip = addImageDocToVideo(vid, doc, uri);
-      await saveProject(withClip);
-      router.replace(`/editor/${withClip.id}`);
+      const vid = await sendStillToVideo(project, fresh, uri, target, { newName: t('studio.image.videoName', { name: project.name }) });
+      router.replace(`/editor/${vid.id}`);
+    } catch (caught) {
+      logCaught('components/studio/image/ImageStudioBody.tsx:sendToVideo', caught);
+      Alert.alert(t('studio.image.toVideo.title'), (caught as Error).message);
     } finally {
       setBusy(false);
     }
+  };
+  const pickVideoProject = async () => {
+    const metas = (await listProjects()).filter((m) => (m.kind ?? 'video') === 'video' && m.id !== project?.id).slice(0, 8);
+    if (metas.length === 0) {
+      Alert.alert(t('studio.image.toVideo.title'), t('studio.image.toVideo.noVideos'));
+      return;
+    }
+    useActionMenu.getState().open(
+      t('studio.image.toVideo.pickTitle'),
+      metas.map((m) => ({
+        label: m.name,
+        icon: 'videocam-outline',
+        onPress: () => {
+          void loadProject(m.id).then((p) => (p ? sendToVideo(p) : undefined));
+        },
+      }))
+    );
+  };
+  const insertIntoVideo = () => {
+    useActionMenu.getState().open(t('studio.image.toVideo.title'), [
+      { label: t('studio.image.toVideo.newLinked'), icon: 'link-outline', onPress: () => void sendToVideo(null) },
+      { label: t('studio.image.toVideo.existing'), icon: 'film-outline', onPress: () => void pickVideoProject() },
+    ]);
   };
 
   /**

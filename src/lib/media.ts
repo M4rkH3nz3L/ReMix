@@ -4,6 +4,7 @@ import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
+import { heifKeepsAlpha, toSrgbIfNeeded } from '@/lib/colorIntakeClient';
 import { bakeImage } from '@/lib/imageEditor';
 import { intakeOps } from '@/lib/imageIntake';
 import { parseCubeLut } from '@/lib/lutImport';
@@ -118,7 +119,9 @@ export async function normalizePickedImage(
   height?: number
 ): Promise<{ uri: string; width?: number; height?: number }> {
   try {
-    const baked = await bakeImage(uri, intakeOps(width, height), { persist: true });
+    const baked = await bakeImage(uri, intakeOps(width, height), { persist: true, keepAlpha: await heifKeepsAlpha(uri) });
+    // S16: az iPhone-fotó Display P3 — egyszer sRGB-re, hogy a szerver ugyanazt a színt lássa
+    await toSrgbIfNeeded(baked.uri);
     return { uri: baked.uri, width: baked.width, height: baked.height };
   } catch (caught) {
     logCaught('lib/media.ts:normalizePickedImage', caught);
@@ -140,7 +143,8 @@ export async function ingestImageFile(uri: string): Promise<PickedFile> {
     if (!first.width || !first.height) {
       return { status: 'invalid' };
     }
-    const baked = await bakeImage(uri, intakeOps(first.width, first.height), { persist: true });
+    const baked = await bakeImage(uri, intakeOps(first.width, first.height), { persist: true, keepAlpha: await heifKeepsAlpha(uri) });
+    await toSrgbIfNeeded(baked.uri);
     return { status: 'ok', uri: baked.uri, width: baked.width, height: baked.height, originalWidth: first.width };
   } catch (caught) {
     logCaught('lib/media.ts:ingestImageFile', caught);

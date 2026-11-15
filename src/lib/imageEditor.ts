@@ -41,8 +41,8 @@ function mediaDir(): Directory {
 }
 
 /** PNG-t őrzünk (alfa-csatorna, pl. háttér-eltávolítás után), különben JPEG. */
-function formatFor(uri: string): { format: SaveFormat; ext: string } {
-  return keepsAlpha(uri)
+function formatFor(uri: string, alpha = keepsAlpha(uri)): { format: SaveFormat; ext: string } {
+  return alpha
     ? { format: SaveFormat.PNG, ext: 'png' }
     : { format: SaveFormat.JPEG, ext: 'jpg' };
 }
@@ -63,7 +63,8 @@ export async function getImageSize(uri: string): Promise<{ width: number; height
 export async function bakeImage(
   uri: string,
   ops: ImageOp[],
-  opts: { persist?: boolean } = {}
+  /** `keepAlpha`: a kiterjesztéstől függetlenül PNG (pl. alfás HEIC — S16) */
+  opts: { persist?: boolean; keepAlpha?: boolean } = {}
 ): Promise<BakedImage> {
   const ctx = ImageManipulator.manipulate(uri);
   for (const op of ops) {
@@ -83,7 +84,7 @@ export async function bakeImage(
     }
   }
   const ref = await ctx.renderAsync();
-  const { format, ext } = formatFor(uri);
+  const { format, ext } = formatFor(uri, opts.keepAlpha || keepsAlpha(uri));
   // művelet nélkül (csak EXIF-beégetés / HEIC-konverzió) nincs generációs minőségvesztés
   const saved = await ref.saveAsync({ format, compress: ops.length === 0 ? 1 : 0.92 });
   if (!opts.persist) {

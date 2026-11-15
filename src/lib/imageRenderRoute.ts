@@ -11,10 +11,13 @@ import type { ImageDoc } from '@/types/project';
  * Expo-mentes, önmagában tesztelhető.
  */
 
-/** a csak a szerver-renderben létező fotó-effektek (`server/imagedoc.js` DEVELOP_DETAIL_*) */
-export type ServerOnlyEffect = 'noiseReduction' | 'chromaticAberration' | 'lensDistortion';
+/**
+ * a csak a szerver-renderben létező fotó-effektek (`server/imagedoc.js` DEVELOP_DETAIL_*); a kromatikus
+ * aberráció és a lencsetorzítás 2026-11-15 óta a vásznon és a telefonon is rajzolódik (S15, `LUT_SHADER`)
+ */
+export type ServerOnlyEffect = 'noiseReduction';
 
-const SERVER_ONLY: ServerOnlyEffect[] = ['noiseReduction', 'chromaticAberration', 'lensDistortion'];
+const SERVER_ONLY: ServerOnlyEffect[] = ['noiseReduction'];
 
 /** A látható rétegeken használt, telefonon nem rajzolható effektek (ismétlés nélkül). */
 export function serverOnlyEffects(doc: ImageDoc): ServerOnlyEffect[] {

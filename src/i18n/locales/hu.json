@@ -3955,7 +3955,8 @@
         "sharpness": "Élesség",
         "noiseReduction": "Zajcsökkentés",
         "chromaticAberration": "Színhiba",
-        "lensDistortion": "Lencse-torzítás"
+        "lensDistortion": "Lencse-torzítás",
+        "exportOnly": "Csak a kész képen látszik (szerveres render)"
       },
       "filter": "Szűrő",
       "corrections": "Korrekció",

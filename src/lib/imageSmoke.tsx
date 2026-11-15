@@ -7955,6 +7955,65 @@ async function smokeInnerFx(log: Log, setHarness: (n: ReactNode) => void) {
   [grey, disc].forEach((u) => removeFile(u));
 }
 
+/** 🔍 S15: kromatikus aberráció és lencsetorzítás — a vászon/telefon shadere = a szerver `rgbashift`/`lenscorrection`-je */
+async function smokeLensFx(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  // éles szélű, színes minta: a csatorna-eltolás és a torzítás is látszik rajta
+  const surface = Skia.Surface.MakeOffscreen(240, 240)!;
+  const c = surface.getCanvas();
+  const paint = Skia.Paint();
+  const cols = ['#f0f0f0', '#202020', '#e03030', '#30a0f0'];
+  for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) {
+    paint.setColor(Skia.Color(cols[(i + j * 2) % 4]));
+    c.drawRect(Skia.XYWHRect(i * 40, j * 40, 40, 40), paint);
+  }
+  surface.flush();
+  const f = new File(projectMediaDir(), `smoke_lens_${Date.now().toString(36)}.png`);
+  f.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const meanDiff = (p: SkImage, q: SkImage) => {
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < 80; i++) for (let j = 0; j < 80; j++) {
+      const u = pixel(p, Math.floor(((j + 0.5) / 80) * p.width()), Math.floor(((i + 0.5) / 80) * p.height()));
+      const w = pixel(q, Math.floor(((j + 0.5) / 80) * q.width()), Math.floor(((i + 0.5) / 80) * q.height()));
+      sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+      n += 1;
+    }
+    return sum / n;
+  };
+  const bg = { id: 'bg', kind: 'fill', fill: '#203040' } as unknown as ImageLayer;
+  const mk = (detail: Record<string, number>) => ({ id: 'lens', name: 'lens', aspectRatio: '1:1', width: 400, height: 400, layers: [bg, { id: 'p', kind: 'photo', uri: f.uri, position: { x: 0.5, y: 0.5 }, w: 0.6, h: 0.6, fit: 'stretch', develop: { base: {}, detail } }] }) as unknown as ImageDoc;
+  const plain = await ref.current!.render(mk({}), 400);
+  const CASES: [string, Record<string, number>][] = [
+    ['kromatikus aberráció 0,5', { chromaticAberration: 0.5 }],
+    ['kromatikus aberráció 1', { chromaticAberration: 1 }],
+    ['hordótorzítás +0,6', { lensDistortion: 0.6 }],
+    ['párnatorzítás −0,6', { lensDistortion: -0.6 }],
+    ['mindkettő', { chromaticAberration: 0.7, lensDistortion: 0.4 }],
+  ];
+  for (const [name, detail] of CASES) {
+    const doc = mk(detail);
+    const dev = await ref.current!.render(doc, 400);
+    const srv = await renderImageDoc(doc, 400);
+    if (!dev || !srv || !plain) {
+      log(false, name, 'nincs kép');
+      continue;
+    }
+    const a = await decode(dev);
+    const d = meanDiff(a, await decode(srv));
+    const ctl = meanDiff(a, await decode(plain));
+    log(d <= 6 && ctl > d * 2, `${name} — telefon = szerver`, `${d.toFixed(2)} · ellenpróba (effekt nélkül) ${ctl.toFixed(2)} /255`);
+    removeFile(dev);
+    removeFile(srv);
+  }
+  if (plain) removeFile(plain);
+  setHarness(null);
+  removeFile(f.uri);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -11876,6 +11935,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'lensfx') {
+    await step(phase, () => smokeLensFx(log, setHarness));
     return;
   }
   if (phase === 'innerfx') {

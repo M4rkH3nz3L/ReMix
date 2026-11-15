@@ -3955,7 +3955,8 @@
         "sharpness": "Sharpness",
         "noiseReduction": "Noise reduction",
         "chromaticAberration": "Chromatic aberration",
-        "lensDistortion": "Lens distortion"
+        "lensDistortion": "Lens distortion",
+        "exportOnly": "Visible only in the exported image (server render)"
       },
       "filter": "Filter",
       "corrections": "Corrections",

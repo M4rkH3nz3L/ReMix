@@ -163,6 +163,8 @@ export function PhotoSkiaContent({
     heal1: heal[1],
     heal2: heal[2],
     heal3: heal[3],
+    ca: detail.ca,
+    lens: detail.lens,
   };
   let content =
     runtime && lut ? (

@@ -71,6 +71,10 @@ export interface LayerDetail {
   vignette: [number, number, number];
   /** folt-javítás téglalapok (box-lokális), legfeljebb 4 */
   heal: [number, number, number, number][];
+  /** kromatikus aberráció: a vörös jobbra, a kék balra tolva ennyi ponttal (a render `rgbashift`-je) */
+  ca: number;
+  /** lencsetorzítás k1 = k2 (a render `lenscorrection`-je; 0 = nincs) */
+  lens: number;
   scale: number;
 }
 
@@ -89,13 +93,15 @@ export function layerDetail(layer: Pick<PhotoLayer, 'filters' | 'develop' | 'gra
     noise: (Math.max(amount('noise'), amount('grain')) * 40) / 255,
     vignette: [adjV * (Math.PI / 4), gradeV, fx > 0 ? 0.1 + fx * 1.1 : 0],
     heal: (layer.heal ?? []).slice(0, 4).map((r) => [r.x, r.y, r.w, r.h]),
+    ca: Math.round(Math.max(-1, Math.min(1, Number(d.chromaticAberration) || 0)) * 12) * scale,
+    lens: Math.max(-1, Math.min(1, Number(d.lensDistortion) || 0)) * 0.3,
     scale,
   };
 }
 
 /** Van-e térbeli művelet? (a detail-shader akkor is kell, ha nincs színlánc) */
 export function hasDetail(d: LayerDetail): boolean {
-  return d.sharp !== 0 || d.clarity !== 0 || d.block > 0 || d.noise > 0 || d.vignette[0] > 0 || d.vignette[1] > 0 || d.vignette[2] > 0 || d.heal.length > 0;
+  return d.sharp !== 0 || d.clarity !== 0 || d.block > 0 || d.noise > 0 || d.vignette[0] > 0 || d.vignette[1] > 0 || d.vignette[2] > 0 || d.heal.length > 0 || d.ca !== 0 || d.lens !== 0;
 }
 
 /**
@@ -118,6 +124,8 @@ uniform float4 heal0;
 uniform float4 heal1;
 uniform float4 heal2;
 uniform float4 heal3;
+uniform float ca;
+uniform float lens;
 
 half4 healAt(float2 p, float4 r) {
   float2 o = r.xy * box;
@@ -165,7 +173,7 @@ float binomial(float2 xy, float s) {
   return sum / 256.0;
 }
 float rnd(float2 p) { return fract(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453); }
-half4 main(float2 xy) {
+half4 pix(float2 xy) {
   half4 c = src(xy);
   if (c.a <= 0.0) { return c; }
   float3 rgb = float3(c.rgb) / float(c.a);
@@ -189,4 +197,22 @@ half4 main(float2 xy) {
   if (vign.z > 0.0) { float k = cos(vign.z * d); o *= k * k * k * k; }
   if (noise > 0.0) { o += (rnd(xy) - 0.5) * noise; }
   return half4(half3(clamp(o, 0.0, 1.0)) * c.a, c.a);
+}
+// a render a develop végén: kromatikus aberráció (rgbashift, a széleken nyújtva), majd
+// lencsetorzítás (lenscorrection: r² a fél-átlóra normálva, k1 = k2, a dobozon kívül átlátszó)
+half4 main(float2 xy) {
+  float2 q = xy;
+  if (lens != 0.0) {
+    float2 off = xy - box * 0.5;
+    float r2 = dot(off, off) * 4.0 / dot(box, box);
+    q = box * 0.5 + off * (1.0 + lens * r2 + lens * r2 * r2);
+    if (q.x < 0.0 || q.y < 0.0 || q.x >= box.x || q.y >= box.y) { return half4(0.0); }
+  }
+  half4 c = pix(q);
+  if (ca != 0.0) {
+    float hi = box.x - 0.5;
+    c.r = pix(float2(clamp(q.x - ca, 0.5, hi), q.y)).r;
+    c.b = pix(float2(clamp(q.x + ca, 0.5, hi), q.y)).b;
+  }
+  return c;
 }`;

@@ -3988,7 +3988,8 @@
         "sharpness": "Schärfe",
         "noiseReduction": "Rauschreduzierung",
         "chromaticAberration": "Chromatische Aberration",
-        "lensDistortion": "Objektivverzerrung"
+        "lensDistortion": "Objektivverzerrung",
+        "exportOnly": "Nur im exportierten Bild sichtbar (Server-Rendering)"
       },
       "filter": "Filter",
       "corrections": "Korrekturen",

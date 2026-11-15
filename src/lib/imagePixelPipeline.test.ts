@@ -222,6 +222,11 @@ describe('részlet-műveletek a shadernek', () => {
   });
   it('üres réteghez nem kell részlet-shader', () => {
     expect(hasDetail(layerDetail({} as PhotoLayer, 1))).toBe(false);
+    // S15: kromatikus aberráció (render: rgbashift n = round(a·12) px) és lencsetorzítás (k = a·0,3)
+    const lens = layerDetail({ develop: { base: {}, detail: { chromaticAberration: 0.5, lensDistortion: -0.6 } } } as unknown as PhotoLayer, 2);
+    expect(lens.ca).toBe(12);
+    expect(lens.lens).toBeCloseTo(-0.18);
+    expect(hasDetail(lens)).toBe(true);
     expect(hasDetail(layerDetail({ heal: [{ x: 0, y: 0, w: 0.1, h: 0.1 }] } as PhotoLayer, 1))).toBe(true);
   });
 });

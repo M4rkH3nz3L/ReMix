@@ -26,6 +26,8 @@ interface DevField {
   min: number;
   max: number;
   labelKey: string;
+  /** a vásznon nem látszik, csak a szerveres kész képen (S15) */
+  exportOnly?: boolean;
 }
 
 /**
@@ -54,7 +56,8 @@ const FIELDS: DevField[] = [
   // ── detail ─────────────────────────────────────────────────────────────
   { group: 'detail', bucket: 'detail', key: 'texture', min: -1, max: 1, labelKey: 'studio.image.develop.texture' },
   { group: 'detail', bucket: 'detail', key: 'sharpness', min: 0, max: 1, labelKey: 'studio.image.develop.sharpness' },
-  { group: 'detail', bucket: 'detail', key: 'noiseReduction', min: 0, max: 1, labelKey: 'studio.image.develop.noiseReduction' },
+  // a zajcsökkentés (nlmeans) csak a szerveres kész képen él → a csúszka alatt jelezzük
+  { group: 'detail', bucket: 'detail', key: 'noiseReduction', min: 0, max: 1, labelKey: 'studio.image.develop.noiseReduction', exportOnly: true },
   // ── lencse ─────────────────────────────────────────────────────────────
   { group: 'lens', bucket: 'base', key: 'vignette', min: 0, max: 1, labelKey: 'panels.adjust.adjust_vignette' },
   { group: 'lens', bucket: 'detail', key: 'chromaticAberration', min: 0, max: 1, labelKey: 'studio.image.develop.chromaticAberration' },
@@ -150,15 +153,17 @@ export function DevelopSheet({
               <Text style={styles.groupTitle}>{t(meta.titleKey)}</Text>
             </View>
             {fields.map((f) => (
-              <Slider
-                key={`${f.bucket}.${f.key}`}
-                label={t(f.labelKey, { defaultValue: f.key })}
-                value={value(f)}
-                min={f.min}
-                max={f.max}
-                onChange={(v) => setField(f, v)}
-                format={(v) => v.toFixed(2)}
-              />
+              <View key={`${f.bucket}.${f.key}`}>
+                <Slider
+                  label={t(f.labelKey, { defaultValue: f.key })}
+                  value={value(f)}
+                  min={f.min}
+                  max={f.max}
+                  onChange={(v) => setField(f, v)}
+                  format={(v) => v.toFixed(2)}
+                />
+                {f.exportOnly ? <Text style={styles.exportOnly}>{t('studio.image.develop.exportOnly')}</Text> : null}
+              </View>
             ))}
           </View>
         );
@@ -175,6 +180,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingBottom: 4,
   },
+  exportOnly: { color: palette.textDim, fontSize: 11, fontStyle: 'italic', marginTop: 2 },
   group: {
     gap: 8,
     backgroundColor: palette.surfaceHigh,

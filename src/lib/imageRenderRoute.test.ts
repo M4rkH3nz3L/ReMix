@@ -19,14 +19,20 @@ describe('🧭 kép-render útvonal (offline first)', () => {
 
   it('a csak-exportban effektek a workert kérik, ha elérhető', () => {
     const d = doc([photo('a', develop({ noiseReduction: 0.4, clarity: 0.5 })), photo('b', develop({ lensDistortion: -0.2 }))]);
-    expect(serverOnlyEffects(d)).toEqual(['noiseReduction', 'lensDistortion']);
+    expect(serverOnlyEffects(d)).toEqual(['noiseReduction']);
     expect(chooseImageRenderRoute(d, true)).toBe('worker');
   });
 
   it('worker nélkül a telefon renderel (a hívó jelzi a kimaradó effektet)', () => {
-    const d = doc([photo('a', develop({ chromaticAberration: 0.3 }))]);
+    const d = doc([photo('a', develop({ noiseReduction: 0.3 }))]);
     expect(chooseImageRenderRoute(d, false)).toBe('device');
-    expect(serverOnlyEffects(d)).toEqual(['chromaticAberration']);
+    expect(serverOnlyEffects(d)).toEqual(['noiseReduction']);
+  });
+
+  it('a kromatikus aberráció és a lencsetorzítás a telefonon rajzolódik (S15)', () => {
+    const d = doc([photo('a', develop({ chromaticAberration: 0.6, lensDistortion: -0.4 }))]);
+    expect(serverOnlyEffects(d)).toEqual([]);
+    expect(chooseImageRenderRoute(d, true)).toBe('device');
   });
 
   it('rejtett réteg és rejtett csoport effektje nem számít', () => {

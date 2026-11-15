@@ -1,3 +1,4 @@
+import { t } from 'i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { createContext, type ReactNode, useContext, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -115,7 +116,7 @@ export function StudioSheet({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.scrim} onPress={onClose} />
+      <Pressable accessibilityRole="button" accessibilityLabel={t('common.close')} style={styles.scrim} onPress={onClose} />
       <View style={styles.card}>
         <View style={styles.grip} />
         {head}

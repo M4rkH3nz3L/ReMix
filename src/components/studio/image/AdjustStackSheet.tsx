@@ -185,22 +185,26 @@ export function AdjustStackSheet({
                     </Text>
                     <IconBtn
                       icon={l.enabled ? 'eye-outline' : 'eye-off-outline'}
+                      label={t(l.enabled ? 'studio.image.a11y.hide' : 'studio.image.a11y.show', { name: l.name })}
                       color={l.enabled ? palette.text : palette.textDim}
                       onPress={() => commitStack(toggleAdjustment(stack, l.id))}
                     />
                     <IconBtn
                       icon="chevron-up"
+                      label={t('studio.image.a11y.moveUp', { name: l.name })}
                       color={i < stack.length - 1 ? palette.textDim : palette.border}
                       onPress={() => commitStack(reorderAdjustment(stack, l.id, 1))}
                     />
                     <IconBtn
                       icon="chevron-down"
+                      label={t('studio.image.a11y.moveDown', { name: l.name })}
                       color={i > 0 ? palette.textDim : palette.border}
                       onPress={() => commitStack(reorderAdjustment(stack, l.id, -1))}
                     />
-                    <IconBtn icon="copy-outline" onPress={() => commitStack(duplicateAdjustment(stack, l.id))} />
+                    <IconBtn icon="copy-outline" label={t('common.duplicate')} onPress={() => commitStack(duplicateAdjustment(stack, l.id))} />
                     <IconBtn
                       icon="trash-outline"
+                      label={t('common.delete')}
                       color={palette.danger}
                       onPress={() => commitStack(removeAdjustment(stack, l.id))}
                     />
@@ -250,15 +254,18 @@ export function AdjustStackSheet({
 
 function IconBtn({
   icon,
+  label,
   color = palette.textDim,
   onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   color?: string;
   onPress: () => void;
+  /** a képernyőolvasó neve (ikonos gomb) */
+  label: string;
 }) {
   return (
-    <Pressable hitSlop={8} onPress={onPress} style={styles.iconBtn}>
+    <Pressable hitSlop={8} onPress={onPress} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={label}>
       <Ionicons name={icon} size={17} color={color} />
     </Pressable>
   );

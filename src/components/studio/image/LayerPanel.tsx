@@ -155,7 +155,8 @@ function IconBtn({
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   color?: string;
-  label?: string;
+  /** a képernyőolvasó neve (kötelező: ikonos gomb) */
+  label: string;
   onPress: () => void;
 }) {
   return (
@@ -271,6 +272,7 @@ function GroupHeader({
       <View style={styles.groupHead}>
         <IconBtn
           icon={g.collapsed ? 'chevron-forward' : 'chevron-down'}
+          label={t(g.collapsed ? 'studio.image.a11y.expandGroup' : 'studio.image.a11y.collapseGroup', { name: g.name })}
           color={palette.text}
           onPress={() => commit(updateGroup(doc, g.id, { collapsed: !g.collapsed }), 'group-collapse')}
         />
@@ -290,11 +292,13 @@ function GroupHeader({
         />
         <IconBtn
           icon={g.hidden ? 'eye-off-outline' : 'eye-outline'}
+          label={t(g.hidden ? 'studio.image.a11y.show' : 'studio.image.a11y.hide', { name: g.name })}
           color={g.hidden ? palette.textDim : palette.text}
           onPress={() => commit(updateGroup(doc, g.id, { hidden: !g.hidden }), 'group-hide')}
         />
         <IconBtn
           icon="remove-circle-outline"
+          label={t('studio.image.a11y.ungroup', { name: g.name })}
           color={palette.accent2}
           onPress={() => {
             onSelect(null);

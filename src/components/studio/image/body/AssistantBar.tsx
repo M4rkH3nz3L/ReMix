@@ -46,7 +46,7 @@ export function AssistantBar({
         <Pressable onPress={onClose} style={styles.icon} hitSlop={4} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={18} color={palette.text} />
         </Pressable>
-        <TextInput
+        <TextInput accessibilityLabel={t('studio.image.a11y.assistantInput')}
           value={text}
           onChangeText={setText}
           placeholder={t('studio.image.assistant.placeholder')}

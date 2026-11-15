@@ -76,7 +76,7 @@ export function GradientEditor({
           {/* preset-ek */}
           <View style={styles.presetRow}>
             {PRESETS.map((p, i) => (
-              <Pressable key={i} onPress={() => onChange(p)} style={styles.presetWrap}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('studio.image.a11y.gradientPreset', { n: i + 1 })} key={i} onPress={() => onChange(p)} style={styles.presetWrap}>
                 <LinearGradient
                   colors={sortedStops(p.stops).map((s) => s.color) as [string, string, ...string[]]}
                   start={{ x: 0, y: 0 }}

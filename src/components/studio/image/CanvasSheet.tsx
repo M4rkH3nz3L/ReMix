@@ -166,7 +166,7 @@ export function CanvasSheet({
       <View style={styles.dimRow}>
         <View style={styles.dimField}>
           <Text style={styles.dimLabel}>{t('home.widthLabel')}</Text>
-          <TextInput
+          <TextInput accessibilityLabel={t('studio.image.a11y.canvasWidth')}
             value={w}
             onChangeText={(v) => setW(v.replace(/[^0-9]/g, ''))}
             keyboardType="number-pad"
@@ -187,7 +187,7 @@ export function CanvasSheet({
         </Pressable>
         <View style={styles.dimField}>
           <Text style={styles.dimLabel}>{t('home.heightLabel')}</Text>
-          <TextInput
+          <TextInput accessibilityLabel={t('studio.image.a11y.canvasHeight')}
             value={h}
             onChangeText={(v) => setH(v.replace(/[^0-9]/g, ''))}
             keyboardType="number-pad"
@@ -238,7 +238,7 @@ export function CanvasSheet({
           <Ionicons name="ban-outline" size={18} color={palette.textDim} />
         </Pressable>
       </View>
-      <TextInput
+      <TextInput accessibilityLabel={t('studio.image.a11y.backgroundHex')}
         value={bg === 'transparent' ? '' : bg}
         onChangeText={setBg}
         placeholder={t('home.bgHexPlaceholder')}

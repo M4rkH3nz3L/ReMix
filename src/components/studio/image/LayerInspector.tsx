@@ -134,7 +134,7 @@ export function LayerInspector({
       {layer.kind === 'photo' || layer.kind === 'shape' ? <GeometryFields doc={doc} layer={layer} commit={commit} /> : null}
       {layer.kind === 'text' ? (
         <>
-          <TextInput
+          <TextInput accessibilityLabel={t('studio.image.a11y.textContent')}
             style={styles.textInput}
             value={layer.text}
             onChangeText={(text) =>

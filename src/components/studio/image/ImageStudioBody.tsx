@@ -1960,7 +1960,7 @@ export function ImageStudioBody({
       <NewerSchemaBanner />
       {/* felső sáv */}
       <View style={[styles.topBar, precisionMode ? styles.hidden : null]}>
-        <Pressable onPress={exitStudio} hitSlop={10} style={styles.topBtn}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t(mode === 'scoped' ? 'common.close' : 'common.back')} onPress={exitStudio} hitSlop={10} style={styles.topBtn}>
           <Ionicons name={mode === 'scoped' ? 'close' : 'chevron-back'} size={26} color={palette.text} />
         </Pressable>
         <View style={styles.titleWrap}>
@@ -2052,10 +2052,10 @@ export function ImageStudioBody({
             </Pressable>
           </ScrollView>
           <View style={styles.pageActions}>
-            <Pressable onPress={() => movePage(-1)} disabled={activeIdx <= 0} hitSlop={6} style={styles.pageActionBtn}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('studio.image.a11y.pagePrev')} onPress={() => movePage(-1)} disabled={activeIdx <= 0} hitSlop={6} style={styles.pageActionBtn}>
               <Ionicons name="chevron-back" size={16} color={activeIdx <= 0 ? palette.border : palette.textDim} />
             </Pressable>
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel={t('studio.image.a11y.pageNext')}
               onPress={() => movePage(1)}
               disabled={activeIdx < 0 || activeIdx >= pages.length - 1}
               hitSlop={6}
@@ -2067,10 +2067,10 @@ export function ImageStudioBody({
                 color={activeIdx < 0 || activeIdx >= pages.length - 1 ? palette.border : palette.textDim}
               />
             </Pressable>
-            <Pressable onPress={duplicateActivePage} hitSlop={6} style={styles.pageActionBtn}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('studio.image.a11y.pageDuplicate')} onPress={duplicateActivePage} hitSlop={6} style={styles.pageActionBtn}>
               <Ionicons name="copy-outline" size={15} color={palette.textDim} />
             </Pressable>
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel={t('studio.image.a11y.pageDelete')}
               onPress={deleteActivePage}
               disabled={!canRemovePage({ imageDocs: pages })}
               hitSlop={6}
@@ -2230,7 +2230,7 @@ export function ImageStudioBody({
           {/* ✂️ kivágás-sáv (crop-módban a toolbar HELYETT) */}
           {cropRect ? (
             <View style={styles.cropBar}>
-              <Pressable onPress={() => setCropRect(null)} style={styles.cropBtn} hitSlop={6}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('common.cancel')} onPress={() => setCropRect(null)} style={styles.cropBtn} hitSlop={6}>
                 <Ionicons name="close" size={20} color={palette.text} />
               </Pressable>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cropPresets}>
@@ -2256,10 +2256,10 @@ export function ImageStudioBody({
           ) : penPoints ? (
             /* ✏️ toll-sáv (toll-módban a toolbar HELYETT) */
             <View style={styles.cropBar}>
-              <Pressable onPress={() => setPenPoints(null)} style={styles.cropBtn} hitSlop={6}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('common.cancel')} onPress={() => setPenPoints(null)} style={styles.cropBtn} hitSlop={6}>
                 <Ionicons name="close" size={20} color={palette.text} />
               </Pressable>
-              <Pressable
+              <Pressable accessibilityRole="button" accessibilityLabel={t('studio.image.a11y.penUndoPoint')}
                 onPress={() => setPenPoints((prev) => (prev && prev.length ? prev.slice(0, -1) : prev))}
                 style={styles.cropBtn}
                 hitSlop={6}
@@ -2293,12 +2293,12 @@ export function ImageStudioBody({
           ) : pathEditId ? (
             /* ✏️ node-szerkesztő sáv (toll v2/v3 — a toolbar HELYETT) */
             <View style={styles.cropBar}>
-              <Pressable onPress={() => setPathEditId(null)} style={styles.cropBtn} hitSlop={6}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('common.close')} onPress={() => setPathEditId(null)} style={styles.cropBtn} hitSlop={6}>
                 <Ionicons name="close" size={20} color={palette.text} />
               </Pressable>
               <View style={{ flex: 1 }} />
               {/* ✏️ v4: a kijelölt node törlése */}
-              <Pressable
+              <Pressable accessibilityRole="button" accessibilityLabel={t('studio.image.a11y.deleteNode')}
                 onPress={deleteNode}
                 style={[styles.cropBtn, pathEditNode == null ? styles.penDisabled : null]}
                 hitSlop={6}
@@ -2364,7 +2364,7 @@ export function ImageStudioBody({
           ) : lassoActive ? (
             /* 🪢 lasszó-sáv (húzás a vásznon rajzol; felengedésre zár) */
             <View style={styles.cropBar}>
-              <Pressable onPress={cancelLasso} style={styles.cropBtn} hitSlop={6}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('common.cancel')} onPress={cancelLasso} style={styles.cropBtn} hitSlop={6}>
                 <Ionicons name="close" size={20} color={palette.text} />
               </Pressable>
               <Text style={styles.lassoLabel} numberOfLines={1}>
@@ -2374,7 +2374,7 @@ export function ImageStudioBody({
           ) : wandActive ? (
             /* 🪄 varázspálca-sáv (fotóra koppintva szín-szelekció) */
             <View style={styles.cropBar}>
-              <Pressable onPress={() => setWandActive(false)} style={styles.cropBtn} hitSlop={6}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('common.close')} onPress={() => setWandActive(false)} style={styles.cropBtn} hitSlop={6}>
                 <Ionicons name="close" size={20} color={palette.text} />
               </Pressable>
               {busy ? <ActivityIndicator size="small" color={palette.accent} /> : null}
@@ -2401,7 +2401,7 @@ export function ImageStudioBody({
           ) : guidesActive ? (
             /* 📐 vonalzók/segédvonalak sáv (Harmadok / Törlés + kilépés) */
             <View style={styles.cropBar}>
-              <Pressable onPress={() => setGuidesActive(false)} style={styles.cropBtn} hitSlop={6}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('common.close')} onPress={() => setGuidesActive(false)} style={styles.cropBtn} hitSlop={6}>
                 <Ionicons name="close" size={20} color={palette.text} />
               </Pressable>
               <Pressable

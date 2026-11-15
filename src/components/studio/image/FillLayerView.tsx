@@ -1,3 +1,4 @@
+import { t } from 'i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet } from 'react-native';
 import Svg, { Defs, RadialGradient as SvgRadial, Rect, Stop } from 'react-native-svg';
@@ -58,7 +59,7 @@ export function FillLayerView({
   }
 
   return (
-    <Pressable
+    <Pressable accessibilityRole="button" accessibilityLabel={layer.name ?? t('studio.image.a11y.fillLayer')}
       onPress={onSelect}
       style={[StyleSheet.absoluteFill, { backgroundColor: g ? undefined : layer.fill, opacity }]}
     >

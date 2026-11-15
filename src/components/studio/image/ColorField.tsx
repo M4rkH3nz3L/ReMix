@@ -74,7 +74,7 @@ export function ColorField({
       </View>
       <View style={styles.row}>
         {SWATCHES.map((c) => (
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel={t('studio.image.a11y.swatch', { color: c })}
             key={c}
             onPress={() => onChange(c)}
             style={[styles.swatch, { backgroundColor: c }, value.toLowerCase() === c ? styles.active : null]}
@@ -82,7 +82,7 @@ export function ColorField({
         ))}
         <View style={styles.hexWrap}>
           <Text style={styles.hash}>#</Text>
-          <TextInput
+          <TextInput accessibilityLabel={t('studio.image.a11y.colorHex')}
             key={value}
             defaultValue={value.replace('#', '')}
             onEndEditing={(e) => {

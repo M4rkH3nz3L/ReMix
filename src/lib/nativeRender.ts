@@ -41,6 +41,8 @@ interface RemixRenderModule {
   cancel(): Promise<void>;
   /** ⏩ az iOS-build a hang-szegmens sebességét is skálázza (régi buildben hiányzik) */
   readonly supportsAudioSpeed?: boolean;
+  /** 🖼️ a kép-klipet (állókép-szegmens) is rendereli — S5 */
+  readonly supportsStillSegments?: boolean;
   addListener(
     event: 'onProgress',
     listener: (e: NativeProgressEvent) => void
@@ -87,6 +89,8 @@ interface PlanVideoSegment {
   speed: number;
   volume: number;
   filter: string;
+  /** 🖼️ a forrás állókép (a fő sáv kép-klipje) — csak az ezt tudó iOS-build kapja (S5) */
+  still?: boolean;
 }
 
 interface PlanAudioSegment {
@@ -185,6 +189,9 @@ export function buildRenderPlan(
           volume: clip.volume ?? 1,
           filter: clip.filterId ?? 'none',
         });
+      } else if (clip.kind === 'image' && track.type === 'video' && Platform.OS === 'ios' && uri && !uri.startsWith('http')) {
+        // 🖼️ S5: a natív iOS-motor a képből álló-videót ír (cover), és szegmensként fűzi be
+        video.push({ uri, atSec: clip.start, inSec: 0, durationSec: clip.duration, speed: 1, volume: 0, filter: 'none', still: true });
       } else if (clip.kind === 'audio' && AUDIO_TRACK_SET.has(track.type) && uri && !uri.startsWith('http')) {
         audio.push({
           uri,
@@ -229,6 +236,10 @@ export function canRenderLocally(project: Project, settings: RenderSettings): bo
     return false;
   }
   const platform = Platform.OS === 'android' ? 'android' : 'ios';
+  // 🖼️ az álló-szegmenst (kép-klip) csak az ezt jelző build tudja — a régi build a felhőre küldi
+  if (Native?.supportsStillSegments !== true && buildRenderPlan(project, settings).video.some((v) => v.still)) {
+    return false;
+  }
   if (!localRenderMatchesPreview(project, platform)) {
     return false;
   }

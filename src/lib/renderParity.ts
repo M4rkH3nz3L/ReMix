@@ -1,5 +1,5 @@
 import { textClipUnsupportedOnDevice } from '@/lib/overlayPlan';
-import type { AudioClip, Clip, Project, VideoClip } from '@/types/project';
+import type { AudioClip, Clip, ImageClip, Project, VideoClip } from '@/types/project';
 
 /**
  * 🎯 Eszközön-render PARITÁS-KAPU — tiszta mag (WYSIWYG-szabály).
@@ -131,6 +131,17 @@ function videoClipGaps(clip: VideoClip, platform: RenderPlatform, out: Set<Local
   }
 }
 
+/**
+ * 🖼️ IMAGE-PROD S5: a fő sáv kép-klipje az iOS-motorban álló-videó szegmens (cover-kitöltés, mint az
+ * előnézetben) — ugyanazok a megkötések, mint a videó-klipnél, plusz a kép-saját mezők.
+ */
+function imageClipGaps(clip: ImageClip, out: Set<LocalRenderGap>): void {
+  videoClipGaps(clip as unknown as VideoClip, 'ios', out);
+  if (clip.pipFrame || clip.depthParallax || clip.depthFocus) {
+    out.add('videoFx');
+  }
+}
+
 /** 🎙️ B15: a hangklip a natív keverőben csak hangerővel + vágással megy */
 function audioClipGaps(clip: AudioClip, out: Set<LocalRenderGap>): void {
   if ((clip.fadeIn ?? 0) > 0 || (clip.fadeOut ?? 0) > 0) {
@@ -182,6 +193,11 @@ export function localRenderGaps(project: Project, platform: RenderPlatform): Loc
   const out = new Set<LocalRenderGap>();
   for (const track of project.tracks) {
     for (const clip of track.clips) {
+      // 🖼️ a fő sáv kép-klipje iOS-en álló-szegmensként megy (S5); máshol (PiP-sáv, Android) felhő
+      if (clip.kind === 'image' && platform === 'ios' && track.type === 'video') {
+        imageClipGaps(clip as ImageClip, out);
+        continue;
+      }
       const kindGap = clipKindGap(clip, platform);
       if (kindGap) {
         out.add(kindGap);

@@ -30,6 +30,9 @@ struct RenderVideoSegment: Codable {
   let speed: Double
   let volume: Double
   let filter: String
+  // 🖼️ opcionális: a forrás ÁLLÓKÉP (kép-klip a fő sávon) — a motor a kimeneti méretben, „cover”
+  // kitöltéssel álló-videót ír belőle, és videó-szegmensként illeszti be (IMAGE-PROD S5)
+  let still: Bool?
 }
 
 struct RenderAudioSegment: Codable {
@@ -143,6 +146,8 @@ public class RemixRenderModule: Module {
     // ⏩ képesség-jelző: ez a build a hang-szegmens `speed` mezőjét is skálázza (a régi build
     // csendben figyelmen kívül hagyná → a JS ilyenkor a felhő-útra küldi a gyorsított hangot)
     Constant("supportsAudioSpeed") { true }
+    // 🖼️ képesség-jelző: ez a build a kép-klipet (állókép-szegmens) is rendereli; a régi build nem
+    Constant("supportsStillSegments") { true }
 
     Events("onProgress")
 
@@ -620,8 +625,19 @@ public class RemixRenderModule: Module {
     var cursor = CMTime.zero // a videó-idővonal aktuális vége
     let fileName = { (uri: String) in (uri as NSString).lastPathComponent }
 
+    var stillFiles: [URL] = []
+    defer { stillFiles.forEach { try? FileManager.default.removeItem(at: $0) } }
     for seg in plan.video {
-      let asset = AVURLAsset(url: fileURL(seg.uri))
+      var segURL = fileURL(seg.uri)
+      if seg.still == true {
+        do {
+          segURL = try Self.writeStillVideo(imageUri: seg.uri, size: renderSize, durationSec: seg.durationSec)
+          stillFiles.append(segURL)
+        } catch {
+          throw RenderError.badSegment("\(fileName(seg.uri)) — \(error.localizedDescription)")
+        }
+      }
+      let asset = AVURLAsset(url: segURL)
       // B12: hiányzó / olvashatatlan szegmens → HIBA (eddig `continue` — a kész videóból
       // csendben kimaradt egy rész)
       guard let srcVideo = asset.tracks(withMediaType: .video).first else {
@@ -689,8 +705,14 @@ public class RemixRenderModule: Module {
     }
 
     if cursor == .zero { throw RenderError.noVideo }
-    mainAudioParams.audioTimePitchAlgorithm = .spectral
-    mixParams.append(mainAudioParams)
+    // üres fő hangsáv (csak kép / néma videó): az export-session ezen „Operation Stopped”-dal bukik
+    // (AVFoundation −11838 / −16976, eszközön mérve) → kivesszük a kompozícióból és a keverőből
+    if compAudio.segments.isEmpty {
+      composition.removeTrack(compAudio)
+    } else {
+      mainAudioParams.audioTimePitchAlgorithm = .spectral
+      mixParams.append(mainAudioParams)
+    }
 
     // külön hang-szegmensek (zene/voiceover/SFX) — az abszolút idejükre helyezve
     for seg in plan.audio {
@@ -830,9 +852,86 @@ public class RemixRenderModule: Module {
       throw RenderError.cancelled
     }
     if export.status != .completed {
-      throw RenderError.exportFailed(export.error?.localizedDescription ?? "ismeretlen")
+      // a pontos ok (domain/kód + a mögöttes hiba) — a „Művelet leállítva” önmagában nem diagnosztizálható
+      let ns = export.error as NSError?
+      let under = (ns?.userInfo[NSUnderlyingErrorKey] as? NSError).map { " · \($0.domain) \($0.code)" } ?? ""
+      throw RenderError.exportFailed("\(ns?.localizedDescription ?? "ismeretlen") [\(ns?.domain ?? "?") \(ns?.code ?? 0)\(under)]")
     }
     return outURL.absoluteString
+  }
+
+  /**
+   * 🖼️ Állókép → álló-videó a kimeneti méretben, „cover” kitöltéssel (az előnézet kép-klipjének kitöltése),
+   * az EXIF-tájolás beégetve. Másodpercenként egy kocka (+ a vég), H.264 — a kompozíció a saját fps-ére
+   * mintázza. A hívó törli a fájlt.
+   */
+  static func writeStillVideo(imageUri: String, size: CGSize, durationSec: Double) throws -> URL {
+    let image = try uprightImage(uri: imageUri)
+    let w = Int(size.width) & ~1
+    let h = Int(size.height) & ~1
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("still_\(UUID().uuidString).mp4")
+    try? FileManager.default.removeItem(at: url)
+    let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
+    let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
+      AVVideoCodecKey: AVVideoCodecType.h264,
+      AVVideoWidthKey: w,
+      AVVideoHeightKey: h,
+    ])
+    input.expectsMediaDataInRealTime = false
+    let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
+      kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+      kCVPixelBufferWidthKey as String: w,
+      kCVPixelBufferHeightKey as String: h,
+    ])
+    guard writer.canAdd(input) else { throw RenderError.exportFailed("still: input") }
+    writer.add(input)
+    guard writer.startWriting() else { throw RenderError.exportFailed("still: \(writer.error?.localizedDescription ?? "?")") }
+    writer.startSession(atSourceTime: .zero)
+
+    var pb: CVPixelBuffer?
+    CVPixelBufferCreate(kCFAllocatorDefault, w, h, kCVPixelFormatType_32BGRA, [
+      kCVPixelBufferCGImageCompatibilityKey: true,
+      kCVPixelBufferCGBitmapContextCompatibilityKey: true,
+    ] as CFDictionary, &pb)
+    guard let buffer = pb else { throw RenderError.exportFailed("still: buffer") }
+    CVPixelBufferLockBaseAddress(buffer, [])
+    if let ctx = CGContext(
+      data: CVPixelBufferGetBaseAddress(buffer), width: w, height: h, bitsPerComponent: 8,
+      bytesPerRow: CVPixelBufferGetBytesPerRow(buffer), space: CGColorSpace(name: CGColorSpace.sRGB)!,
+      bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue) {
+      ctx.setFillColor(UIColor.black.cgColor)
+      ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+      // „cover”: a rövidebb arány tölti ki a vásznat, középre vágva
+      let iw = CGFloat(image.width)
+      let ih = CGFloat(image.height)
+      let k = max(CGFloat(w) / iw, CGFloat(h) / ih)
+      let dw = iw * k
+      let dh = ih * k
+      ctx.interpolationQuality = .high
+      ctx.draw(image, in: CGRect(x: (CGFloat(w) - dw) / 2, y: (CGFloat(h) - dh) / 2, width: dw, height: dh))
+    }
+    CVPixelBufferUnlockBaseAddress(buffer, [])
+
+    // a sáv a felhasznált hossznál fél másodperccel tovább tart: a kompozíció utasítás-ablaka így
+    // biztosan a forráson belül marad (különben „Operation Stopped” — eszközön mérve)
+    let total = max(0.04, durationSec) + 0.5
+    var times: [Double] = Array(stride(from: 0.0, to: total, by: 0.5))
+    times.append(total)
+    for t in times {
+      while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.002) }
+      if !adaptor.append(buffer, withPresentationTime: CMTime(seconds: t, preferredTimescale: 600)) {
+        throw RenderError.exportFailed("still: \(writer.error?.localizedDescription ?? "append")")
+      }
+    }
+    input.markAsFinished()
+    writer.endSession(atSourceTime: CMTime(seconds: total, preferredTimescale: 600))
+    let sema = DispatchSemaphore(value: 0)
+    writer.finishWriting { sema.signal() }
+    sema.wait()
+    if writer.status != .completed {
+      throw RenderError.exportFailed("still: \(writer.error?.localizedDescription ?? "ismeretlen")")
+    }
+    return url
   }
 
   // A forrást a vászonra tölti (aspect-fill), a preferredTransform (forgatás)

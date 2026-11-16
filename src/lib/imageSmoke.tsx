@@ -80,6 +80,7 @@ import { useSoundPacks } from '@/store/soundPackStore';
 import { denoiseStereo } from '@/lib/denoise';
 import { formantCorrect } from '@/lib/formant';
 import { canRenderLocally, renderLocal } from '@/lib/nativeRender';
+import * as StillThumbs from 'expo-video-thumbnails';
 import { previewEngine } from '@/lib/previewEngine';
 import { barsBeatsLabel, beatSplitTimes } from '@/lib/audioTransport';
 import { useProgressStore } from '@/store/progressStore';
@@ -8915,6 +8916,63 @@ async function smokeCornerPin(log: Log, setHarness: (n: ReactNode) => void) {
   removeFile(f.uri);
 }
 
+/** 🖼️ S5: kép-klip a natív iOS-motorban — a videó felhő nélkül készül, a kocka = a kép (cover, tájolás) */
+async function smokeStillRender(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  // 1200×800-as kép: felső fele piros, alsó kék, a jobb szélén zöld csík (a cover-vágás ezt levágja 9:16-ban)
+  const surf = Skia.Surface.MakeOffscreen(1200, 800)!;
+  const p = Skia.Paint();
+  const rect = (col: string, x: number, y: number, w: number, h: number) => {
+    p.setColor(Skia.Color(col));
+    surf.getCanvas().drawRect(Skia.XYWHRect(x, y, w, h), p);
+  };
+  rect('#e02020', 0, 0, 1200, 400);
+  rect('#2040e0', 0, 400, 1200, 400);
+  rect('#20c040', 1100, 0, 100, 800);
+  surf.flush();
+  const img = new File(projectMediaDir(), `smoke_still_${Date.now().toString(36)}.png`);
+  img.write(surf.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const base = createEmptyProject('smoke still', '16:9');
+  const clip = (id: string, start: number, duration: number) => ({ kind: 'image', id, start, duration, uri: img.uri, filterId: 'none' });
+  const settings = { resolution: 720, fps: 30, quality: 'high', codec: 'h264' } as const;
+  for (const [name, aspect, clips] of [
+    ['csak kép (16:9)', '16:9', [clip('a', 0, 3)]],
+    ['két kép egymás után (9:16, cover-vágás)', '9:16', [clip('a', 0, 2), clip('b', 2, 2)]],
+  ] as const) {
+    const project = { ...base, aspectRatio: aspect, tracks: [{ id: 'tv', type: 'video', name: 'V', clips }] } as unknown as Project;
+    const local = canRenderLocally(project, settings as never);
+    log(local, `${name}: a telefon rendereli (nem kell felhő)`, `canRenderLocally ${local}`);
+    if (!local) continue;
+    const t0 = Date.now();
+    let out: File | null = null;
+    try {
+      out = await renderLocal(project, settings as never);
+    } catch (caught) {
+      log(false, `${name}: render`, (caught as Error).message);
+      continue;
+    }
+    const ms = Date.now() - t0;
+    const total = clips.reduce((n, c) => Math.max(n, c.start + c.duration), 0);
+    const frame = async (sec: number) => decode((await StillThumbs.getThumbnailAsync(out!.uri, { time: Math.round(sec * 1000) })).uri);
+    const mid = await frame(total / 2);
+    const [W, H] = [mid.width(), mid.height()];
+    const top = pixel(mid, Math.round(W / 2), Math.round(H * 0.2));
+    const bottom = pixel(mid, Math.round(W / 2), Math.round(H * 0.8));
+    const right = pixel(mid, W - 3, Math.round(H / 2));
+    const upright = top[0] > 180 && top[2] < 80 && bottom[2] > 180 && bottom[0] < 80;
+    // 16:9-ben a zöld csík a kép jobb szélén látszik; 9:16-os cover-vágásnál kimarad (középre vágva)
+    const greenSeen = right[1] > 150 && right[0] < 100;
+    const coverOk = aspect === '16:9' ? greenSeen : !greenSeen;
+    log(upright && coverOk && W > H === (aspect === '16:9'), `${name}: a kocka a kép — fejjel felfelé, cover-kitöltéssel`, `${W}×${H}, fent ${top.slice(0, 3).join(',')}, lent ${bottom.slice(0, 3).join(',')}, jobb szél ${right.slice(0, 3).join(',')}, ${ms} ms`);
+    // a vége előtt is kép van (a hossz nem rövidül)
+    const late = await frame(total - 0.2);
+    const lateTop = pixel(late, Math.round(late.width() / 2), Math.round(late.height() * 0.2));
+    log(lateTop[0] > 180, `${name}: a videó végéig tart (${total} s)`, `a ${(total - 0.2).toFixed(1)} s-os kocka fent ${lateTop.slice(0, 3).join(',')}`);
+    removeFile(out.uri);
+  }
+  removeFile(img.uri);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -12836,6 +12894,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'stillrender') {
+    await step(phase, () => smokeStillRender(log));
     return;
   }
   if (phase === 'cornerpin') {

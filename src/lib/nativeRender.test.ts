@@ -173,3 +173,13 @@ describe('⏩ gyorsított hangklip az eszközön-renderben', () => {
     expect(canRenderLocally(withVoice(1.5), DEFAULT_SETTINGS)).toBe(false);
   });
 });
+
+describe('🖼️ S5: kép-klip álló-szegmensként a tervben (iOS)', () => {
+  it('a fő sáv kép-klipje a helyén, hang nélkül, „still” jelöléssel kerül a videó-szegmensek közé', () => {
+    const img = { kind: 'image', id: 'im', start: 2, duration: 3, uri: 'file:///doc/media/a.png', filterId: 'none' } as unknown as VideoClip;
+    const p = projectWithClips([videoClip('v', 0, 2), img]);
+    const plan = buildRenderPlan(p, DEFAULT_SETTINGS);
+    expect(plan.video.map((v) => [v.atSec, v.durationSec, !!(v as { still?: boolean }).still])).toEqual([[0, 2, false], [2, 3, true]]);
+    expect((plan.video[1] as { volume: number }).volume).toBe(0);
+  });
+});

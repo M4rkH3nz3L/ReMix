@@ -157,3 +157,23 @@ describe('PRO-VIDEO B10/B15 — a natív motor csendben nem hagyhat el semmit', 
     expect(gaps({ keyframes: { volume: [{ time: 0, value: 0, easing: 'linear' }] } })).toContain('audioAutomation');
   });
 });
+
+describe('🖼️ S5: kép-klip a natív iOS-motorban (álló-szegmens)', () => {
+  const image = (extra: Record<string, unknown> = {}) =>
+    ({ kind: 'image', id: 'i1', start: 0, duration: 4, uri: 'file:///doc/media/a.png', filterId: 'none', ...extra }) as unknown as VideoClip;
+
+  it('a fő sáv sima kép-klipje iOS-en nem rés; Androidon és más sávon igen', () => {
+    expect(localRenderGaps(project([image()]), 'ios')).toEqual([]);
+    expect(localRenderGaps(project([image()]), 'android')).toEqual(['image']);
+    const overlay: Track = { id: 't2', type: 'overlay', name: 'O', clips: [image() as never] } as Track;
+    expect(localRenderGaps(project([], [overlay]), 'ios')).toEqual(['image']);
+  });
+
+  it('ami a natív álló-szegmensből hiányozna, az rés marad (transzform, áttűnés, effekt, mélység, elmosott háttér)', () => {
+    expect(localRenderGaps(project([image({ transform: { scale: 1.3, x: 0.1, y: 0 } })]), 'ios')).toContain('transform');
+    expect(localRenderGaps(project([image({ fadeInSec: 0.5 })]), 'ios')).toContain('fade');
+    expect(localRenderGaps(project([image({ effects: [{ type: 'grayscale' }] })]), 'ios')).toContain('effects');
+    expect(localRenderGaps(project([image({ depthFocus: { focus: 0.5 } })]), 'ios')).toContain('videoFx');
+    expect(localRenderGaps(project([image({ backgroundFill: 'blur' })]), 'ios')).toContain('videoFx');
+  });
+});

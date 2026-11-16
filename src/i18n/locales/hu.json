@@ -611,6 +611,7 @@
     "clearCache": "Gyorsítótár ürítése",
     "legalSection": "Jogi / Adatvédelem"
   },
+  "seoGate": {"title": "Megosztás előtt: a felfedezéshez", "hint": "A leírás, a hashtagek és a kulcsszavak a feedben, a TikTok/Reels feliratban és a YouTube-keresésben segítenek. Egyszer kell megadni, a projekt megjegyzi.", "continue": "Mentés és megosztás"},
   "home": {
     "appName": "Remix",
     "newProject": "Új projekt",
@@ -655,7 +656,7 @@
     "sourceLabel": "Forrás-mappa",
     "sourceHint": "Importálj támogatott fájlokat a projekt forrás-mappájába — ezekből dolgozol majd a szerkesztőben.",
     "seoSectionTitle": "SEO — a felfedezéshez",
-    "seoSectionHint": "A TikTok/Reels felirathoz és a YouTube kereséshez — mindet meg kell adni.",
+    "seoSectionHint": "A felfedezéshez — most elhagyható, a megosztáskor kéri az app.",
     "descriptionLabel": "Leírás",
     "descriptionPlaceholder": "Miről szól a videó? Kulcsszavakkal…",
     "missingFields": "Hiányzik: {{fields}}",
@@ -3006,6 +3007,7 @@
       "projectSyncOff": "ReMix Storage-szinkron kikapcsolva",
       "setCover": "borítókép beállítva",
       "clearCover": "borítókép eltávolítva",
+      "setSeo": "Közzétételi adatok mentve",
       "setThumbnail": "A thumbnail beállítása",
       "clearThumbnail": "A thumbnail eltávolítása",
       "setFonts": "Saját betűtípusok ({{count}})",

@@ -17,10 +17,13 @@ export interface CreateFormValues {
 }
 
 export function missingCreateFields(v: CreateFormValues): CreateFieldId[] {
+  // S22: létrehozáskor csak a név kötelező — a SEO a megosztáskor kell (`missingSeoFields`)
+  return v.name.trim() ? [] : ['name'];
+}
+
+/** 📣 S22: a megosztáshoz (feed / közzététel) hiányzó SEO-mezők, sorrendben */
+export function missingSeoFields(v: Omit<CreateFormValues, 'name'>): CreateFieldId[] {
   const out: CreateFieldId[] = [];
-  if (!v.name.trim()) {
-    out.push('name');
-  }
   if (!v.description.trim()) {
     out.push('description');
   }

@@ -195,6 +195,7 @@ import { makeId } from '@/lib/id';
 import { colorRangeSelect, magicWandSelect, refineSelectionToEdges } from '@/lib/magicWandClient';
 import { normalizePickedImage } from '@/lib/media';
 import { toSrgbIfNeeded } from '@/lib/colorIntakeClient';
+import { useSeoGate } from '@/store/seoGateStore';
 import { createAdjustment, flattenAdjustments } from '@/lib/adjustmentStack';
 import { IMAGE_LOOKS, applyLook } from '@/lib/imageLooks';
 import { projectMediaDir } from '@/lib/projectFolderClient';
@@ -9038,6 +9039,50 @@ async function smokeStrokeAlign(log: Log, setHarness: (n: ReactNode) => void) {
   setHarness(null);
 }
 
+/** 📣 S22: gyors kép csak névvel (SEO nélkül) a valódi létrehozási úton; a SEO a megosztáskor kérődik be */
+async function smokeQuickCreate(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const st = useEditorStore.getState;
+  const name = 'smoke gyors kép';
+  let createdId: string | null = null;
+  try {
+    router.replace('/studio' as Href);
+    await sleep(1500);
+    runDevAction('studio.fillCreate', { name, kind: 'image', noSeo: true });
+    await sleep(400);
+    await runDevAction('studio.create');
+    for (let i = 0; i < 60 && st().project?.name !== name; i++) await sleep(200);
+    await sleep(800);
+    const p = st().project;
+    createdId = p?.name === name ? p.id : null;
+    log(!!p && p.name === name && p.kind === 'image' && !p.seo?.description, 'csak névvel létrejön a kép-projekt, és a Kép Stúdióban nyílik (SEO nélkül)', p ? `${p.kind}, SEO-leírás: „${p.seo?.description ?? ''}”` : 'nincs projekt');
+    if (!p) return;
+    // a megosztás kapuja: a lap feljön (képernyőkép), megszakítva nem enged tovább
+    const pending = useSeoGate.getState().ensureSeo(p);
+    await sleep(800);
+    log(useSeoGate.getState().request?.project.id === p.id, 'megosztáskor a SEO-lap bekéri a hiányzó mezőket', 'a lap nyitva');
+    log(true, 'FOTÓZHATÓ', 'a SEO-lap a Kép Stúdió fölött');
+    await sleep(6000);
+    useSeoGate.getState().finish(null);
+    log((await pending) === null, 'megszakítva: nincs megosztás');
+    // kitöltve: továbbenged, és a projekt megkapja (parancsként, visszavonhatóan)
+    const seo = { title: name, description: 'gyors teszt', hashtags: ['remix'], keywords: ['teszt'] };
+    st().dispatch({ type: 'SET_PROJECT_SEO', seo }, 'user');
+    const passed = await useSeoGate.getState().ensureSeo(st().project!);
+    log(passed?.seo?.description === 'gyors teszt', 'kitöltött SEO-val a kapu azonnal továbbenged', `${passed?.seo?.hashtags.join(' ')}`);
+  } finally {
+    useSeoGate.getState().finish(null);
+    router.replace('/studio' as Href);
+    await sleep(500);
+    const { deleteCloudProject, listCloudProjectMetas } = await import('@/lib/cloudSync');
+    const leftovers = (await listCloudProjectMetas().catch(() => [])).filter((m) => m.name === name).map((m) => m.id);
+    for (const id of new Set([...(createdId ? [createdId] : []), ...leftovers])) {
+      await deleteProject(id).catch((caught) => logCaught('lib/imageSmoke.tsx:quickcreate-del', caught));
+      await deleteCloudProject(id);
+    }
+  }
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -12959,6 +13004,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'quickcreate') {
+    await step(phase, () => smokeQuickCreate(log));
     return;
   }
   if (phase === 'strokealign') {

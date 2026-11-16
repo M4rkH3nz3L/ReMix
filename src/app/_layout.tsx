@@ -48,6 +48,7 @@ if (__DEV__) {
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PaywallSheet } from '@/components/PaywallSheet';
+import { SeoGateHost } from '@/components/SeoGateHost';
 import { ProgressOverlay } from '@/components/ProgressOverlay';
 import { TutorialMenu } from '@/components/tutorial/TutorialMenu';
 import { TutorialOverlay } from '@/components/tutorial/TutorialOverlay';
@@ -302,6 +303,7 @@ export default function RootLayout() {
         )}
         <ActionMenuHost />
         <PaywallSheet />
+        <SeoGateHost />
         {/* futó hosszú műveletek: mit csinál · hol tart · mennyi van hátra */}
         <ProgressOverlay />
         {/* 🎓 interaktív felület-vezető (spotlight + coach-kártya) + lecke-választó */}

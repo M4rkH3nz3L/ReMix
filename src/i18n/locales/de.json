@@ -611,6 +611,7 @@
     "clearCache": "Cache leeren",
     "legalSection": "Rechtliches / Datenschutz"
   },
+  "seoGate": {"title": "Vor dem Teilen: für die Auffindbarkeit", "hint": "Beschreibung, Hashtags und Schlüsselwörter helfen im Feed, in der TikTok/Reels-Beschriftung und in der YouTube-Suche. Einmal angeben, das Projekt merkt es sich.", "continue": "Speichern und teilen"},
   "home": {
     "appName": "Remix",
     "newProject": "Neues Projekt",
@@ -655,7 +656,7 @@
     "sourceLabel": "Quellordner",
     "sourceHint": "Importiere unterstützte Dateien in den Quellordner des Projekts — damit arbeitest du im Editor.",
     "seoSectionTitle": "SEO — für die Auffindbarkeit",
-    "seoSectionHint": "Für die TikTok/Reels-Beschriftung und die YouTube-Suche — alle Pflicht.",
+    "seoSectionHint": "Für die Auffindbarkeit — jetzt optional; die App fragt beim Teilen danach.",
     "descriptionLabel": "Beschreibung",
     "descriptionPlaceholder": "Worum geht's im Video? Mit Schlüsselwörtern…",
     "missingFields": "Fehlt: {{fields}}",
@@ -3006,6 +3007,7 @@
       "projectSyncOff": "ReMix-Storage-Sync ausgeschaltet",
       "setCover": "Titelbild festgelegt",
       "clearCover": "Titelbild entfernt",
+      "setSeo": "Veröffentlichungsdaten gespeichert",
       "setThumbnail": "Thumbnail festlegen",
       "clearThumbnail": "Thumbnail entfernen",
       "setFonts": "Eigene Schriften ({{count}})",

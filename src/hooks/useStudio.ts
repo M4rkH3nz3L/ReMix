@@ -34,6 +34,7 @@ import { projectStorageMap } from '@/lib/storageQuota';
 import { pickAndParseVided, relinkInteractive } from '@/lib/videdFile';
 import { guardPro } from '@/store/paywallStore';
 import { withProgress } from '@/store/progressStore';
+import { useSeoGate } from '@/store/seoGateStore';
 import type { MeshFormat } from '@/types/model3d';
 import type { AspectRatio, Asset, AudioMasterTarget, Project, ProjectKind, ProjectMeta } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
@@ -203,7 +204,7 @@ export function useStudio() {
     setSources((prev) => prev.filter((x) => x.id !== id));
   };
 
-  // az Új projekt gomb csak akkor aktív, ha a kötelező SEO-mezők ki vannak töltve —
+  // az Új projekt gomb csak a név hiányában tiltott (S22: a SEO a megosztáskor kell) —
   // a hiányzók LISTÁJA kell a képernyőnek is (megmondja, mi hiányzik, és odaugrik)
   const missingFields = missingCreateFields({
     name,
@@ -218,8 +219,8 @@ export function useStudio() {
     const description = seoDescription.trim();
     const hashtags = parseHashtags(seoHashtags);
     const keywords = parseKeywords(seoKeywords);
-    // védőkorlát: a gomb tiltva van, míg mind ki nincs töltve
-    if (!title || !description || hashtags.length === 0 || keywords.length === 0) {
+    // védőkorlát: a gomb név nélkül tiltott; a SEO itt elhagyható (S22: a megosztás kéri be)
+    if (!title) {
       return;
     }
     // 🎛️ fajta-specifikus induló-beállítások: kép → szabad W×H + formátum + háttér, hang → master-cél
@@ -360,7 +361,9 @@ export function useStudio() {
       return;
     }
     loadProject(meta.id)
-      .then((p) => {
+      .then(async (loaded) => {
+        // 📣 S22: a SEO a megosztáskor kell — hiányzik → bekéri, megszakításkor nem posztol
+        const p = loaded ? await useSeoGate.getState().ensureSeo(loaded) : null;
         if (!p) {
           return;
         }
@@ -473,11 +476,12 @@ export function useStudio() {
   useEffect(() => {
     const offs = [
       registerDevAction('studio.fillCreate', (arg) => {
-        const a = arg as { name: string; kind: ProjectKind; audioTemplate?: AudioTemplate; designTemplate?: string };
+        const a = arg as { name: string; kind: ProjectKind; audioTemplate?: AudioTemplate; designTemplate?: string; noSeo?: boolean };
         setName(a.name);
-        setSeoDescription('smoke');
-        setSeoHashtags('#smoke');
-        setSeoKeywords('smoke');
+        // S22: `noSeo` — a SEO nélküli (csak névvel) létrehozás mérése
+        setSeoDescription(a.noSeo ? '' : 'smoke');
+        setSeoHashtags(a.noSeo ? '' : '#smoke');
+        setSeoKeywords(a.noSeo ? '' : 'smoke');
         setKind(a.kind);
         if (a.audioTemplate) setAudioTemplate(a.audioTemplate);
         if (a.designTemplate) setDesignTemplate(a.designTemplate);

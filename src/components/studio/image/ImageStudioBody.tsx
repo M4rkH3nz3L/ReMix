@@ -113,6 +113,7 @@ import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { useEditorStore } from '@/store/editorStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
+import { useSeoGate } from '@/store/seoGateStore';
 import type { Asset, ClipMask, ImageDoc, ImageGrid, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
 import type { PostVisibility } from '@/types/social';
 import { logCaught } from '@/lib/logCaught';
@@ -2117,6 +2118,10 @@ export function ImageStudioBody({
   const shareToFeed = async (shareMode: ImageShareMode, visibility: PostVisibility) => {
     const s = useEditorStore.getState();
     if (!s.project || busy) {
+      return;
+    }
+    // 📣 S22: a SEO a megosztáskor kell (létrehozáskor elhagyható volt) — hiányzik → bekéri
+    if (!(await useSeoGate.getState().ensureSeo(s.project))) {
       return;
     }
     setBusy(true);

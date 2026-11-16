@@ -129,6 +129,7 @@ import { metronomeWindow, openTakePlacement, punchCommands, punchWindow } from '
 import { insertSilenceCommands, joinableNext, joinCommands, type GapScope } from '@/lib/gapEdit';
 import { alignCountInTake, alignPunchTake, PunchSession, runCountIn } from '@/lib/recordTakeClient';
 import { METRONOME_LEVELS, useRecordPrefs } from '@/store/recordPrefsStore';
+import { useSeoGate } from '@/store/seoGateStore';
 import { useFinishRecordingOnLeave } from '@/hooks/useFinishRecordingOnLeave';
 import { recordingPhase } from '@/lib/interruption';
 import { logCaught } from '@/lib/logCaught';
@@ -1488,6 +1489,10 @@ export function AudioStudioBody({
 
   const shareAlbum = async (visibility: PostVisibility) => {
     if (!useEditorStore.getState().project?.album || albumSharing) {
+      return;
+    }
+    // 📣 S22: a SEO a megosztáskor kell — hiányzik → bekéri (az album-poszt a projektéből örököl)
+    if (!(await useSeoGate.getState().ensureSeo(useEditorStore.getState().project!))) {
       return;
     }
     setAlbumSharing(true);

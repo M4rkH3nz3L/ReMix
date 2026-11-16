@@ -5,7 +5,7 @@ import { imageDocsReference, withImageDocAssets } from '@/lib/imageDocMedia';
 import { canHostClip, findClip, relinkUri, replaceClip, splitClip } from '@/lib/projectUtils';
 import type { LiveDoc } from '@/types/live';
 import type { Model3DDoc } from '@/types/model3d';
-import type { AlbumDoc, AspectRatio, Asset, AssetSource, AudioBus, TrackSidechain, AudioMaster, Chapter, Clip, ImageDoc, InstrumentDoc, Marker, ParticlesConfig, Project, TempoChange, TimelineRegion, Track, TrackType, ProjectFont } from '@/types/project';
+import type { AlbumDoc, AspectRatio, Asset, AssetSource, AudioBus, TrackSidechain, AudioMaster, Chapter, Clip, ImageDoc, InstrumentDoc, Marker, ParticlesConfig, Project, TempoChange, TimelineRegion, Track, TrackType, ProjectFont, ProjectSeo } from '@/types/project';
 import { normalizeTempoMap } from '@/lib/audioTransport';
 import { retimeTempoDelays } from '@/lib/fxParams';
 import type { WorkflowRun } from '@/lib/workflowTemplate';
@@ -32,6 +32,8 @@ export type EditorCommand =
   | { type: 'SET_PROJECT_SYNC'; enabled: boolean }
   /** 🖼️ a projekt borítóképe / album-borítója (null → eltávolítás; a kép-asset regisztrálódik) */
   | { type: 'SET_PROJECT_COVER'; asset: Asset | null }
+  /** 📣 S22: a közzétételi (SEO) adatok — a megosztás előtti kapu írja */
+  | { type: 'SET_PROJECT_SEO'; seo: ProjectSeo }
   /** 🖼️ CORE K5: a szerkeszthető thumbnail lapja (`imageDocs` egyik eleme); null = nincs */
   | { type: 'SET_THUMBNAIL_DOC'; docId: string | null }
   /** 🔤 IMAGE-PROD S10: a projekt saját betűtípus-listája (import / eltávolítás) */
@@ -279,6 +281,8 @@ function applyCommandRaw(project: Project, cmd: EditorCommand): Project | null {
       return { ...project, syncToRemix: cmd.enabled };
     }
 
+    case 'SET_PROJECT_SEO':
+      return { ...project, seo: cmd.seo };
     case 'SET_PROJECT_COVER': {
       if (!cmd.asset) {
         if (!project.coverAssetId) {
@@ -720,6 +724,8 @@ export function describeCommand(cmd: EditorCommand): string {
       return tr(cmd.enabled ? 'lib.commands.projectSyncOn' : 'lib.commands.projectSyncOff');
     case 'SET_PROJECT_COVER':
       return tr(cmd.asset ? 'lib.commands.setCover' : 'lib.commands.clearCover');
+    case 'SET_PROJECT_SEO':
+      return tr('lib.commands.setSeo');
     case 'SET_THUMBNAIL_DOC':
       return tr(cmd.docId ? 'lib.commands.setThumbnail' : 'lib.commands.clearThumbnail');
     case 'SET_PROJECT_FONTS':

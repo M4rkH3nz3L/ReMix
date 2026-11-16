@@ -42,6 +42,7 @@ import { shareVidedFile } from '@/lib/videdFile';
 import { publishRenderedProject } from '@/lib/feed';
 import type { PostVisibility } from '@/types/social';
 import { useEditorStore } from '@/store/editorStore';
+import { useSeoGate } from '@/store/seoGateStore';
 import { AiProviderPicker } from '@/components/editor/AiProviderPicker';
 import { pullProject, pushProject } from '@/lib/cloudSync';
 import { logCaught } from '@/lib/logCaught';
@@ -319,15 +320,21 @@ export function ExportPanel() {
 
   // a választott láthatósággal renderel + posztol. A renderelt változat a
   // projekten marad (újramegosztáshoz).
-  const doShareToFeed = (visibility: PostVisibility, remixable = true) => {
+  const doShareToFeed = async (visibility: PostVisibility, remixable = true) => {
     if (renderStatus) {
       return;
     }
+    // 📣 S22: a SEO a megosztáskor kell — hiányzik → bekéri, megszakításkor nem posztol
+    const seoReady = await useSeoGate.getState().ensureSeo(project);
+    if (!seoReady) {
+      return;
+    }
+    const project_ = seoReady;
     setRenderStatus(t('common.processing'));
     void guardPro(
       () =>
         withProgress(t('feed.rendering'), (report) =>
-          publishRenderedProject(project, report, {
+          publishRenderedProject(project_, report, {
             visibility,
             remixable,
             ...(isPro ? { renderMode: engine } : {}),

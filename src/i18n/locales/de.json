@@ -3968,6 +3968,7 @@
       "straighten": "Begradigen",
       "cornerPin": {"hint": "Ziehe die Ecken: das Bild verzerrt sich auf das Viereck", "reset": "Zurücksetzen", "corner": "Ecke {{n}}"},
       "borderAlign": {"inside": "Innen", "center": "Mitte", "outside": "Außen"},
+      "empty": {"title": "Beginne mit einem Foto, Text oder einer Vorlage.", "photo": "Foto", "text": "Text", "templates": "Vorlage"},
       "clipToShape": "In Form darunter beschneiden",
       "clipToText": "In Text darunter beschneiden",
       "clipNeedsShape": "Lege eine Form oder einen Text unter das Foto, um es in deren Kontur zu schneiden.",

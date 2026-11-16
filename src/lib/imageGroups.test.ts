@@ -1,4 +1,4 @@
-import { createGroup, effectiveLayerOpacity, groupChain, nestGroup, ungroup, visibleLayers } from '@/lib/imageDoc';
+import { addLayer, createGroup, createImageDoc, docIsEmpty, effectiveLayerOpacity, groupChain, nestGroup, ungroup, visibleLayers } from '@/lib/imageDoc';
 import type { ImageDoc, ImageLayer } from '@/types/project';
 
 const l = (id: string, groupId?: string, extra: Record<string, unknown> = {}) =>
@@ -49,4 +49,14 @@ describe('🗂️ S18: beágyazott csoportok', () => {
     expect(Math.abs(ids.indexOf('a') - ids.indexOf('b'))).toBe(1);
   });
 
+});
+
+describe('docIsEmpty — S22: az üres lap vezetése', () => {
+  it('új lap (csak háttér) üres; az első tartalom-réteggel már nem', () => {
+    let n = 0;
+    const doc = createImageDoc('lap', '1:1', () => `id${n++}`);
+    expect(docIsEmpty(doc)).toBe(true);
+    const withText = addLayer(doc, l('s1'));
+    expect(docIsEmpty(withText)).toBe(false);
+  });
 });

@@ -3935,6 +3935,7 @@
       "straighten": "Kiegyenesítés",
       "cornerPin": {"hint": "Húzd a sarkokat: a kép a négyszögre torzul", "reset": "Alaphelyzet", "corner": "{{n}}. sarok"},
       "borderAlign": {"inside": "Belül", "center": "Középen", "outside": "Kívül"},
+      "empty": {"title": "Kezdd egy fotóval, szöveggel vagy sablonnal.", "photo": "Fotó", "text": "Szöveg", "templates": "Sablon"},
       "clipToShape": "Vágás az alatta lévő formába",
       "clipToText": "Vágás az alatta lévő szövegbe",
       "clipNeedsShape": "Tegyél egy formát vagy szöveget a fotó alá, és a fotó az alakjába vágható.",

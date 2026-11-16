@@ -13,6 +13,7 @@ import { keepRenderedInProject, RenderStage, type RenderStageHandle, ensureTextC
 import { Chip } from '@/components/ui/controls';
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { ImageAdjustStrip } from '@/components/studio/image/ImageAdjustStrip';
+import { EmptyCanvasHint } from '@/components/studio/image/EmptyCanvasHint';
 import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
 import {
   ImageStudioSheets,
@@ -73,6 +74,7 @@ import {
   addLayer,
   createGroup,
   createImageDoc,
+  docIsEmpty,
   duplicateLayer,
   layerLabel,
   moveLayerTo,
@@ -2444,6 +2446,10 @@ export function ImageStudioBody({
               <ActivityIndicator color={palette.accent} />
             </View>
           )}
+          {/* 👋 S22: üres lapon egy mondatos vezetés (az első réteggel eltűnik) */}
+          {doc && docIsEmpty(doc) && !sheet && !brushActive && !lassoActive && !wandActive && !cropRect && !penPoints ? (
+            <EmptyCanvasHint onTool={(k) => onTool(k)} />
+          ) : null}
 
           {/* telefonon a rétegpanel a vászon fölé nyílik; az összecsukott oldalt fül hozza vissza */}
           {!precisionMode ? (

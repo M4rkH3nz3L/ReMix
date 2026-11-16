@@ -187,7 +187,7 @@ import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { PhotoSkiaContent, makeLutImage } from '@/components/studio/image/SkiaPhotoLayer';
 import { flushProjectSave, useProjectAutosave } from '@/hooks/useProjectAutosave';
 import { rasterSubDoc, replaceWithRaster, rotateCanvasDoc } from '@/lib/imageCanvasOps';
-import { addLayer, createImageDoc } from '@/lib/imageDoc';
+import { addLayer, createImageDoc, docIsEmpty } from '@/lib/imageDoc';
 import { renderImageDoc } from '@/lib/imageDocClient';
 import { LUT_DRAFT_SIZE, LUT_SIZE } from '@/lib/imagePreviewLut';
 import { exportSize } from '@/lib/imageExport';
@@ -9057,6 +9057,11 @@ async function smokeQuickCreate(log: Log) {
     createdId = p?.name === name ? p.id : null;
     log(!!p && p.name === name && p.kind === 'image' && !p.seo?.description, 'csak névvel létrejön a kép-projekt, és a Kép Stúdióban nyílik (SEO nélkül)', p ? `${p.kind}, SEO-leírás: „${p.seo?.description ?? ''}”` : 'nincs projekt');
     if (!p) return;
+    // 👋 üres lapon a vezetés (fotó / szöveg / sablon) látszik
+    const firstDoc = Object.values(p.imageDocs ?? {})[0];
+    log(!!firstDoc && docIsEmpty(firstDoc), 'üres lapon egy mondatos vezetés jelenik meg', `${firstDoc?.layers.length ?? 0} réteg`);
+    log(true, 'FOTÓZHATÓ', 'üres lap vezetéssel');
+    await sleep(6000);
     // a megosztás kapuja: a lap feljön (képernyőkép), megszakítva nem enged tovább
     const pending = useSeoGate.getState().ensureSeo(p);
     await sleep(800);

@@ -3935,6 +3935,7 @@
       "straighten": "Straighten",
       "cornerPin": {"hint": "Drag the corners: the image warps to the shape", "reset": "Reset", "corner": "Corner {{n}}"},
       "borderAlign": {"inside": "Inside", "center": "Center", "outside": "Outside"},
+      "empty": {"title": "Start with a photo, text or a template.", "photo": "Photo", "text": "Text", "templates": "Template"},
       "clipToShape": "Clip to shape below",
       "clipToText": "Clip to text below",
       "clipNeedsShape": "Put a shape or text below the photo to clip the photo to its outline.",

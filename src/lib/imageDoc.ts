@@ -431,3 +431,8 @@ export function docMediaUris(doc: ImageDoc): string[] {
   }
   return [...new Set(out)];
 }
+
+/** 👋 S22: üres lap = a háttéren (és a korrekciós rétegen) kívül nincs tartalom — ekkor jön a vezetés */
+export function docIsEmpty(doc: ImageDoc): boolean {
+  return !doc.layers.some((l) => l.kind !== 'fill' && l.kind !== 'adjust');
+}

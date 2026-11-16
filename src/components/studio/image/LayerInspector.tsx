@@ -68,6 +68,11 @@ const JOINS: NonNullable<ShapeLayer['strokeJoin']>[] = ['round', 'miter', 'bevel
  * lapban ([LayerStyleSheet](./LayerStyleSheet.tsx)) — így a gazdag vezérlők a
  * kijelölésből KÖZVETLENÜL is elérhetők (felfedezhetőség), nem csak a réteg-fán át.
  */
+/** a régi (igazítás nélküli) körvonal helye formánként — a chip ezt mutatja aktívnak */
+function defaultBorderAlign(l: ShapeLayer): 'inside' | 'center' | 'outside' {
+  return l.shape === 'rectangle' || l.shape === 'ellipse' ? 'inside' : l.shape === 'path' ? 'center' : 'outside';
+}
+
 export function LayerInspector({
   doc,
   layer,
@@ -749,6 +754,19 @@ export function LayerInspector({
               value={layer.borderColor ?? '#ffffff'}
               onChange={(borderColor) => commit(updateLayer<ShapeLayer>(doc, layer.id, { borderColor }))}
             />
+          ) : null}
+          {/* 🖊️ S18: a körvonal igazítása (zárt formán) — belül / középen / kívül */}
+          {(layer.borderWidth ?? 0) > 0 && (layer.shape !== 'path' || layer.closed || !!layer.subpaths?.length) && layer.shape !== 'line' ? (
+            <View style={styles.chipRow}>
+              {(['inside', 'center', 'outside'] as const).map((a) => (
+                <Chip
+                  key={a}
+                  label={t(`studio.image.borderAlign.${a}`)}
+                  active={(layer.borderAlign ?? defaultBorderAlign(layer)) === a}
+                  onPress={() => commit(updateLayer<ShapeLayer>(doc, layer.id, { borderAlign: a }), 'border-align')}
+                />
+              ))}
+            </View>
           ) : null}
           {(layer.borderWidth ?? 0) > 0 || layer.shape === 'path' ? (
             <>

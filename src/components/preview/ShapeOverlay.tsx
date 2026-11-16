@@ -6,10 +6,12 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import Svg, {
   Circle,
+  ClipPath,
   Defs,
   G,
   Line,
   LinearGradient as SvgGradient,
+  Mask,
   Path,
   Pattern,
   Polygon,
@@ -23,6 +25,7 @@ import { pathData } from '@/lib/draw';
 import { angleToLinearPoints, sortedStops } from '@/lib/gradient';
 import { sampleChannel } from '@/lib/keyframes';
 import { isRenderableShapePattern, patternTile, type PatternPrim } from '@/lib/shapePattern';
+import { borderAlignOf, shapeOutlineD, strokeJoinOf, strokeSpec, type BorderAlign } from '@/lib/shapeStroke';
 import { clamp } from '@/lib/time';
 import { useEditorStore } from '@/store/editorStore';
 import type { ShapeClip, ShapeGradient } from '@/types/project';
@@ -52,6 +55,48 @@ function SvgGradientDef({ id, gradient }: { id: string; gradient: ShapeGradient 
 /** nyíl/csillag sokszögek 0–100-as koordinátákban — a renderrel megegyezőek */
 function polygonPoints(poly: [number, number][], w: number, h: number): string {
   return poly.map(([px, py]) => `${(px / 100) * w},${(py / 100) * h}`).join(' ');
+}
+
+/**
+ * 🖊️ S18: igazított körvonal (belül / középen / kívül) külön SVG-rétegként — a szerver `shapeBorderSvg`-ével
+ * azonos `d`, szélesség, vágás / maszk. A doboznál nagyobb (a túlnyúló vonal miatt), a doboz fölé igazítva.
+ */
+function ShapeBorder({ clip, w, h, width, align }: { clip: ShapeClip; w: number; h: number; width: number; align: BorderAlign }) {
+  const d = shapeOutlineD(clip, w, h);
+  if (!d || width <= 0) {
+    return null;
+  }
+  const spec = strokeSpec(align, width);
+  const P = Math.ceil(spec.pad) + 2;
+  const id = `b${clip.id}`;
+  const dash = clip.strokeDash && clip.strokeDash > 0 ? [clip.strokeDash * width * 2, clip.strokeDash * width * 2] : undefined;
+  return (
+    <Svg width={w + 2 * P} height={h + 2 * P} viewBox={`${-P} ${-P} ${w + 2 * P} ${h + 2 * P}`} style={{ position: 'absolute', left: -P, top: -P }} pointerEvents="none">
+      <Defs>
+        {spec.clip ? (
+          <ClipPath id={`${id}c`}>
+            <Path d={d} />
+          </ClipPath>
+        ) : null}
+        {spec.mask ? (
+          <Mask id={`${id}m`} maskUnits="userSpaceOnUse" x={-P} y={-P} width={w + 2 * P} height={h + 2 * P}>
+            <Rect x={-P} y={-P} width={w + 2 * P} height={h + 2 * P} fill="white" />
+            <Path d={d} fill="black" />
+          </Mask>
+        ) : null}
+      </Defs>
+      <Path
+        d={d}
+        fill="none"
+        stroke={clip.borderColor ?? '#ffffff'}
+        strokeWidth={spec.width}
+        strokeLinejoin={strokeJoinOf(clip) as 'miter' | 'round' | 'bevel'}
+        strokeDasharray={dash}
+        clipPath={spec.clip ? `url(#${id}c)` : undefined}
+        mask={spec.mask ? `url(#${id}m)` : undefined}
+      />
+    </Svg>
+  );
 }
 
 /** egy csempe-primitív → react-native-svg elem (a worker SVG-stringjével AZONOS). */
@@ -257,7 +302,12 @@ export function ShapeOverlay({
     clip.shape === 'ellipse'
       ? Math.max(w, h)
       : (clip.cornerRadius ?? 0) * Math.min(w, h);
-  const borderWidth = ((clip.borderWidth ?? 0) / 100) * box.h;
+  const rawBorder = ((clip.borderWidth ?? 0) / 100) * box.h;
+  // 🖊️ S18: igazított körvonal; igazítás nélkül a sokszög a régi renderrel azonos módon KÍVÜL kap vonalat
+  // (eddig a vásznon egyáltalán nem látszott), a téglalap/ellipszis/görbe a régi úton marad
+  const borderAlign: BorderAlign | null =
+    rawBorder > 0 && !clip.outline ? borderAlignOf(clip.borderAlign) ?? (polygonFor(clip) ? 'outside' : null) : null;
+  const borderWidth = borderAlign ? 0 : rawBorder;
 
   // ✨ Effektek-előnézet: a worker CSS `filter: drop-shadow`-láncát `boxShadow`-val
   // tükrözzük (RN 0.86 támogatja a több-árnyékos boxShadow-t). A ragyogás a NEM-path
@@ -311,7 +361,7 @@ export function ShapeOverlay({
       >
         {isRenderableShapePattern(clip.pattern) ? (
           // 🧩 minta-kitöltés — felülírja a sima fill-t, minden forma-típusra
-          <PatternShape clip={clip} w={w} h={h} radius={radius} strokePx={strokePx} />
+          <PatternShape clip={borderAlign ? { ...clip, borderWidth: 0 } : clip} w={w} h={h} radius={radius} strokePx={strokePx} />
         ) : clip.shape === 'path' && ((clip.points?.length ?? 0) >= 2 || clip.subpaths?.length) ? (
           // ✏️ path / bezier / összetett (boolean) — a renderrel AZONOS `d`-ből
           <Svg width={w} height={h} style={styles.pathSvg}>
@@ -420,6 +470,7 @@ export function ShapeOverlay({
         ) : (
           <View style={[baseStyle, { backgroundColor: clip.fill }]} />
         )}
+        {borderAlign ? <ShapeBorder clip={clip} w={w} h={h} width={rawBorder} align={borderAlign} /> : null}
       </Animated.View>
     </GestureDetector>
   );

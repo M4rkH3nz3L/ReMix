@@ -8973,6 +8973,71 @@ async function smokeStillRender(log: Log) {
   removeFile(img.uri);
 }
 
+/** 🖊️ S18: a forma körvonala (belső / közép / külső) — telefon = szerver, és a körvonal tényleg ott van */
+async function smokeStrokeAlign(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  const meanDiff = (p: SkImage, q: SkImage) => {
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < 100; i++) for (let j = 0; j < 100; j++) {
+      const u = pixel(p, Math.floor(((j + 0.5) / 100) * p.width()), Math.floor(((i + 0.5) / 100) * p.height()));
+      const w = pixel(q, Math.floor(((j + 0.5) / 100) * q.width()), Math.floor(((i + 0.5) / 100) * q.height()));
+      sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+      n += 1;
+    }
+    return sum / n;
+  };
+  // a körvonal (piros) mennyisége a doboz belsejében és azon kívül
+  const redIn = (img: SkImage, box: { x0: number; y0: number; x1: number; y1: number }) => {
+    let inside = 0;
+    let outside = 0;
+    for (let y = 0; y < img.height(); y += 2) for (let x = 0; x < img.width(); x += 2) {
+      const p = pixel(img, x, y);
+      if (!(p[0] > 180 && p[1] < 80 && p[2] < 80)) continue;
+      if (x >= box.x0 && x <= box.x1 && y >= box.y0 && y <= box.y1) inside += 1;
+      else outside += 1;
+    }
+    return { inside, outside };
+  };
+  const doc = (shape: Record<string, unknown>) => ({ id: 'sa', name: 'sa', aspectRatio: '1:1', width: 400, height: 400, layers: [{ id: 'bg', kind: 'fill', fill: '#203040' }, { id: 's', kind: 'shape', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5, fill: '#ffffff', borderColor: '#ff2020', borderWidth: 3, ...shape }] }) as unknown as ImageDoc;
+  const box = { x0: 100, y0: 100, x1: 300, y1: 300 };
+  const CASES: [string, Record<string, unknown>][] = [
+    ['téglalap (alap)', { shape: 'rectangle' }],
+    ['ellipszis (alap)', { shape: 'ellipse' }],
+    ['csillag (alap)', { shape: 'star' }],
+    ['görbe (alap)', { shape: 'path', closed: true, points: [{ x: 0, y: 0 }, { x: 1, y: 0.2 }, { x: 0.6, y: 1 }] }],
+    ['téglalap kívül', { shape: 'rectangle', borderAlign: 'outside' }],
+    ['téglalap középen', { shape: 'rectangle', borderAlign: 'center' }],
+    ['ellipszis kívül', { shape: 'ellipse', borderAlign: 'outside' }],
+    ['csillag belül', { shape: 'star', borderAlign: 'inside' }],
+    ['lekerekített téglalap belül', { shape: 'rectangle', cornerRadius: 0.25, borderAlign: 'inside' }],
+    ['görbe kívül', { shape: 'path', closed: true, borderAlign: 'outside', points: [{ x: 0, y: 0 }, { x: 1, y: 0.2 }, { x: 0.6, y: 1 }] }],
+  ];
+  for (const [name, shape] of CASES) {
+    const d = doc(shape);
+    const dev = await ref.current!.render(d, 400);
+    const srv = await renderImageDoc(d, 400);
+    if (!dev || !srv) {
+      log(false, name, 'nincs kép');
+      continue;
+    }
+    const a = await decode(dev);
+    const b = await decode(srv);
+    const diff = meanDiff(a, b);
+    const [ra, rb] = [redIn(a, box), redIn(b, box)];
+    const align = String(shape.borderAlign ?? '');
+    // kívül: a doboz körül is van piros; belül: csak a dobozon belül
+    const placeOk = align === 'outside' ? ra.outside > 50 && rb.outside > 50 : align === 'inside' ? ra.outside < 10 && rb.outside < 10 : true;
+    const seen = ra.inside + ra.outside > 50;
+    log(diff <= 6 && placeOk && seen, `${name} — telefon = szerver, a körvonal a helyén`, `${diff.toFixed(2)}/255 · piros telefon ${ra.inside}+${ra.outside} · szerver ${rb.inside}+${rb.outside} (dobozon belül+kívül)`);
+    [dev, srv].forEach((u) => removeFile(u));
+  }
+  setHarness(null);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -12894,6 +12959,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'strokealign') {
+    await step(phase, () => smokeStrokeAlign(log, setHarness));
     return;
   }
   if (phase === 'stillrender') {

@@ -1107,6 +1107,8 @@ export interface ShapeClip extends ClipBase {
   borderColor?: string;
   /** a vászon magasságának %-ában (0–2) */
   borderWidth?: number;
+  /** 🖊️ S18: a körvonal igazítása (hiányzó = a régi: téglalap/ellipszis belül, sokszög kívül, görbe középen) */
+  borderAlign?: 'inside' | 'center' | 'outside';
   /** lekerekítés a rövidebb oldal arányában (0–0.5; ellipszisnél nem számít) */
   cornerRadius?: number;
   /** 0–1 (hiányzó = 1) */

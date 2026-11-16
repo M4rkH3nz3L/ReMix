@@ -47,6 +47,7 @@ function findChromium() {
 // render EGYETLEN forrása a függőség-mentes ./fonts (a kliens↔worker parity-t a
 // src/lib/contract.test.ts zárolja). A TTF base64 data-URI-ként ágyazódik a HTML-be.
 const { FONT_FILES } = require('./fonts');
+const { borderAlignOf, shapeBorderSvg, strokeSpec } = require('./shapeStroke');
 const { polygonFor } = require('./shapeGeometry');
 const FALLBACK_FONT = "-apple-system, 'Helvetica Neue', Arial, sans-serif";
 const fontFaceCache = {};
@@ -790,6 +791,10 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
           ? Math.max(w, h)
           : Math.round((clip.cornerRadius ?? 0) * Math.min(w, h));
       const borderWidth = Math.round(((clip.borderWidth ?? 0) / 100) * canvas.h);
+      // 🖊️ S18: igazított körvonal (belül / középen / kívül) — külön SVG-réteg; ilyenkor a régi
+      // (formánként eltérő) körvonal-utak kimaradnak. Igazítás nélkül a régi viselkedés él.
+      const borderAlign = borderAlignOf(clip.borderAlign);
+      const alignedBorder = Boolean(borderAlign) && borderWidth > 0 && !clip.outline;
       // kép-kitöltés (logó/watermark): a fájl data-URI-ként ágyazódik be —
       // az SVG-t a Chromium natívan rendereli, méretezés contain-nel
       let background = clip.gradient
@@ -858,7 +863,7 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
         const cStrokeW = closed
           ? clip.outline
             ? Math.max(1, Math.round((clip.outline.width / 100) * canvas.h))
-            : clip.borderWidth
+            : clip.borderWidth && !alignedBorder
               ? borderWidth
               : 0
           : sw;
@@ -914,7 +919,7 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
         const fillRef = gradDef ? `url(#${gradId})` : clip.fill;
         const strokeW = clip.outline
           ? Math.max(1, Math.round((clip.outline.width / 100) * canvas.h))
-          : borderWidth > 0
+          : borderWidth > 0 && !alignedBorder
             ? borderWidth
             : 0;
         const strokeCol = clip.outline
@@ -934,7 +939,7 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
           `/></svg>`;
       }
       const border =
-        borderWidth > 0 && !clipPath && !useSvgPoly && !pathSvg
+        borderWidth > 0 && !clipPath && !useSvgPoly && !pathSvg && !alignedBorder
           ? `border:${borderWidth}px ${clip.strokeDash && clip.strokeDash > 0 ? 'dashed' : 'solid'} ${clip.borderColor ?? '#ffffff'};`
           : '';
       // az árnyék a sziluettet követi (drop-shadow), és túlnyúlik a formán —
@@ -1010,10 +1015,13 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
       const svgStroke = pathSvg || svgPoly
         ? Math.ceil(Math.max(clip.borderWidth ? borderWidth : 0, clip.shape === 'path' ? ((clip.strokeWidth ?? 0.9) / 100) * canvas.h : 0) / 2) + 1
         : 0;
+      // az igazított körvonal kívül/középen túlnyúlik a formán: a margó befogadja
+      const alignPad = alignedBorder ? Math.ceil(strokeSpec(borderAlign, borderWidth).pad) + 2 : 0;
+      const borderSvg = alignedBorder ? shapeBorderSvg(clip, w, h, borderWidth, borderAlign, i) : '';
       const shadowPad =
         filters.length > 0 || clip.shadow || glowPx > 0
-          ? Math.max(8, shadowSpread, glowPx * 2, outlinePx * 2, svgStroke)
-          : svgStroke;
+          ? Math.max(8, shadowSpread, glowPx * 2, outlinePx * 2, svgStroke, alignPad)
+          : Math.max(svgStroke, alignPad);
       const shadowCss = filters.length > 0 ? `filter:${filters.join(' ')};` : '';
       const usesWrap = shadowPad > 0;
       // 🧩 minta-kitöltés — FELÜLÍRJA a sima fill-t. A formát inline SVG-vel
@@ -1026,7 +1034,7 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
         const pid = `pat${i}`;
         const def = shapePatternSvgDefJs(clip.pattern, pid, w, h);
         const pFill = `url(#${pid})`;
-        const pStrokeW = clip.borderWidth ? borderWidth : 0;
+        const pStrokeW = clip.borderWidth && !alignedBorder ? borderWidth : 0;
         const pStroke =
           pStrokeW > 0
             ? ` stroke="${clip.borderColor ?? '#ffffff'}" stroke-width="${pStrokeW}"`
@@ -1070,7 +1078,7 @@ async function renderShapePngs(shapeClips, canvas, outDir) {
           ${patternSvg ? '' : border}
           box-sizing:border-box;
           opacity:${clip.opacity ?? 1};
-        ">${patternSvg || `${pathSvg}${polySvg}`}</div>
+        ">${patternSvg || `${pathSvg}${polySvg}`}${borderSvg}</div>
         </div>
         </div>
       </body></html>`;

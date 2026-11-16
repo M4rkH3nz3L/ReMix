@@ -1,7 +1,7 @@
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { layerBoxToCanvas } from '@/lib/imageLayerGeometry';
 import { shapeToPathPoints } from '@/lib/shapeGeometry';
-import type { ClipMask, ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
+import type { ClipMask, ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer, TextLayer } from '@/types/project';
 
 /**
  * ✂️ Vágómaszk (IMAGE-PROD S18) — pure. A `clipTo`-s fotó a hivatkozott forma alakján belül látszik.
@@ -96,25 +96,80 @@ export function clipMaskFor(photo: PhotoLayer, shape: ShapeLayer, canvas: { widt
   };
 }
 
-/** a vágómaszkok feloldása a render előtt: a `clipTo`-s fotó maszkot kap (a dokumentum nem változik) */
-export function resolveClipMasks(doc: ImageDoc): ImageDoc {
+// ── ✂️🔤 vágás SZÖVEGBE: a betűk alakja festett maszkként (a telefon rendereli, élő kulccsal) ──
+
+/** a szöveg-maszk tartalmi kulcsa: minden, ami a betűk alakját és helyét adja (a szín, az átlátszóság nem) */
+export function textMaskKey(text: TextLayer, canvas: { width: number; height: number }): string {
+  const { id: _id, name: _n, color: _c, opacity: _o, blendMode: _b, hidden: _h, locked: _l, groupId: _g, textStyle, ...shape } = text as TextLayer & { name?: string; groupId?: string; locked?: boolean };
+  const stroke = textStyle?.stroke ? { w: textStyle.stroke.width } : null;
+  const raw = JSON.stringify({ shape, stroke, w: canvas.width, h: canvas.height });
+  let h = 0x811c9dc5;
+  for (let i = 0; i < raw.length; i++) {
+    h ^= raw.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `${raw.length.toString(36)}${h.toString(36)}`;
+}
+
+/** a maszk-render rész-dokumentuma: fekete alapon a szöveg fehéren, effektek (árnyék, ragyogás, háttér) nélkül */
+export function textMaskSubDoc(doc: ImageDoc, text: TextLayer): ImageDoc {
+  const white: TextLayer = {
+    ...text,
+    color: '#ffffff',
+    opacity: 1,
+    hidden: false,
+    blendMode: undefined,
+    groupId: undefined,
+    backgroundColor: null,
+    stylePreset: 'plain',
+    dropShadow: undefined,
+    outerGlow: undefined,
+    textStyle: text.textStyle?.stroke ? { stroke: { ...text.textStyle.stroke, color: '#ffffff' } } : undefined,
+  } as TextLayer;
+  return { ...doc, layers: [{ id: 'mask_bg', kind: 'fill', fill: '#000000' } as ImageLayer, white], groups: [], grade: undefined, adjust: undefined, vignette: 0, grain: 0, renderedUri: undefined };
+}
+
+/** a szöveg-alapú vágások kulcsai (a még hiányzó maszkok rendereléséhez) */
+export function textClipBases(doc: ImageDoc): { key: string; text: TextLayer }[] {
+  const canvas = effectiveCanvas(doc);
+  const out = new Map<string, TextLayer>();
+  for (const l of doc.layers) {
+    if (l.kind !== 'photo' || !l.clipTo) continue;
+    const base = doc.layers.find((x) => x.id === l.clipTo);
+    if (base?.kind === 'text' && !base.hidden) out.set(textMaskKey(base, canvas), base);
+  }
+  return [...out].map(([key, text]) => ({ key, text }));
+}
+
+/**
+ * a vágómaszkok feloldása a render előtt: a `clipTo`-s fotó maszkot kap (a dokumentum nem változik).
+ * Szöveg-alapnál a `textMasks` (kulcs → a betűk maszk-képe) adja; ha még nincs meg, a fotó vágatlan marad.
+ */
+export function resolveClipMasks(doc: ImageDoc, textMasks?: ReadonlyMap<string, string>): ImageDoc {
   if (!doc.layers.some((l) => l.kind === 'photo' && l.clipTo)) return doc;
   const canvas = effectiveCanvas(doc);
   const layers = doc.layers.map((l): ImageLayer => {
     if (l.kind !== 'photo' || !l.clipTo) return l;
     const base = doc.layers.find((x) => x.id === l.clipTo);
-    if (base?.kind !== 'shape' || base.hidden) return l;
+    if (!base || base.hidden) return l;
+    if (base.kind === 'text') {
+      const uri = textMasks?.get(textMaskKey(base, canvas));
+      // a festett maszk nem metszhető a saját maszkkal → saját maszk mellett a vágás nem képezhető (korlát)
+      return uri && !l.mask ? ({ ...l, mask: { shape: 'rectangle', x: 0.5, y: 0.5, w: 1, h: 1, feather: 0, image: uri } } as ImageLayer) : l;
+    }
+    if (base.kind !== 'shape') return l;
     const mask = clipMaskFor(l, base, canvas);
     return mask ? { ...l, mask } : l;
   });
   return { ...doc, layers };
 }
 
-/** a fotó alatti legközelebbi forma (a vágómaszk alapja), vagy null */
-export function clipBaseBelow(doc: ImageDoc, photoId: string): ShapeLayer | null {
+/** a fotó alatti legközelebbi forma vagy szöveg (a vágómaszk alapja), vagy null */
+export function clipBaseBelow(doc: ImageDoc, photoId: string): ShapeLayer | TextLayer | null {
   const i = doc.layers.findIndex((l) => l.id === photoId);
   for (let k = i - 1; k >= 0; k--) {
     const l = doc.layers[k];
+    if (l.kind === 'text') return l;
     if (l.kind === 'shape' && l.shape !== 'line' && !(l.shape === 'path' && !l.closed && !l.subpaths?.length)) return l;
   }
   return null;

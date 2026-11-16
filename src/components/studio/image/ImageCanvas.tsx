@@ -31,6 +31,7 @@ import { canvasTransform, clampPan, pinchAt, zoomStep } from '@/lib/canvasZoom';
 import type { CropRect } from '@/lib/imageCrop';
 import { snapToLayers, type LayerBox, type SnapLine } from '@/lib/smartGuides';
 import { resolveClipMasks } from '@/lib/imageClip';
+import { useTextMasks } from '@/store/textMaskStore';
 import { effectiveLayerOpacity, updateLayer, visibleLayers } from '@/lib/imageDoc';
 import { type LivePatch } from '@/lib/imageLayerClip';
 import { DocGrain, DocVignette } from '@/components/studio/image/DocVignette';
@@ -369,7 +370,8 @@ export function ImageCanvas({
   };
 
   // ✂️ S18: a vágómaszkok feloldva — a forma élő húzása (keret-fogó) közben is követi a vágás
-  const clipped = useMemo(() => resolveClipMasks(live ? { ...doc, layers: doc.layers.map((l) => (l.id === live.id ? withLive(l, live.patch) : l)) } : doc), [doc, live]);
+  const textMasks = useTextMasks((s) => s.map);
+  const clipped = useMemo(() => resolveClipMasks(live ? { ...doc, layers: doc.layers.map((l) => (l.id === live.id ? withLive(l, live.patch) : l)) } : doc, textMasks), [doc, live, textMasks]);
   const layers = visibleLayers(clipped);
   // ⚡ a rétegek memoizáltak: a kellékeik csak akkor változhatnak, ha tényleg más a rajzuk
   const box = useMemo(() => ({ w: fit.w, h: fit.h }), [fit.w, fit.h]);

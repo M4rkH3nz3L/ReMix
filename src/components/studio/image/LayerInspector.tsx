@@ -399,7 +399,7 @@ export function LayerInspector({
             return base || on ? (
               <View style={styles.chipRow}>
                 <Chip
-                  label={t('studio.image.clipToShape')}
+                  label={t((on ? doc.layers.find((l) => l.id === layer.clipTo) : base)?.kind === 'text' ? 'studio.image.clipToText' : 'studio.image.clipToShape')}
                   active={on}
                   onPress={() => commit(updateLayer<PhotoLayer>(doc, layer.id, { clipTo: on ? undefined : base?.id }), t('studio.image.clipToShape'))}
                 />

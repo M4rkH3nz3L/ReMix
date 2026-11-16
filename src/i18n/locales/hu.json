@@ -3936,7 +3936,8 @@
       "cornerPin": {"hint": "Húzd a sarkokat: a kép a négyszögre torzul", "reset": "Alaphelyzet", "corner": "{{n}}. sarok"},
       "borderAlign": {"inside": "Belül", "center": "Középen", "outside": "Kívül"},
       "clipToShape": "Vágás az alatta lévő formába",
-      "clipNeedsShape": "Tegyél egy formát a fotó alá, és a fotó a forma alakjába vágható.",
+      "clipToText": "Vágás az alatta lévő szövegbe",
+      "clipNeedsShape": "Tegyél egy formát vagy szöveget a fotó alá, és a fotó az alakjába vágható.",
       "looks": {"title": "Lookok", "save": "Mentés lookként", "mine": "Saját look", "removeHint": "Hosszan nyomva törlődik", "portrait": "Portré", "food": "Étel", "landscape": "Tájkép", "bwContrast": "Fekete-fehér", "matte": "Matt", "sunny": "Napfényes", "coldMorning": "Hideg reggel", "vintage": "Vintage", "cinematic": "Filmes", "pop": "Élénk", "step": {"tone": "Tónus", "warm": "Melegítés", "vibrance": "Élénkség", "exposure": "Expozíció", "contrast": "Kontraszt", "mono": "Fekete-fehér", "saturation": "Telítettség", "balance": "Színegyensúly", "cool": "Hűtés", "vignette": "Vignetta"}},
       "adjustStack": {
         "quick": "Gyors",

@@ -9083,6 +9083,74 @@ async function smokeQuickCreate(log: Log) {
   }
 }
 
+/** ✂️🔤 S18: vágás szövegbe — a fotó a betűk alakjában; telefon = szerver; a szöveg átírására a vágás követ */
+async function smokeClipText(log: Log, setHarness: (n: ReactNode) => void) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const ref = createRef<RenderStageHandle>() as RefObject<RenderStageHandle>;
+  setHarness(<View style={{ width: 1, height: 1 }}><RenderStage ref={ref} /></View>);
+  await sleep(300);
+  const surface = Skia.Surface.MakeOffscreen(400, 400)!;
+  const paint = Skia.Paint();
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
+    paint.setColor(Skia.Color(`hsl(${(i * 45 + j * 20) % 360}, 80%, 55%)`));
+    surface.getCanvas().drawRect(Skia.XYWHRect(i * 50, j * 50, 50, 50), paint);
+  }
+  surface.flush();
+  const f = new File(projectMediaDir(), `smoke_cliptext_${Date.now().toString(36)}.png`);
+  f.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const meanDiff = (p: SkImage, q: SkImage) => {
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < 100; i++) for (let j = 0; j < 100; j++) {
+      const u = pixel(p, Math.floor(((j + 0.5) / 100) * p.width()), Math.floor(((i + 0.5) / 100) * p.height()));
+      const w = pixel(q, Math.floor(((j + 0.5) / 100) * q.width()), Math.floor(((i + 0.5) / 100) * q.height()));
+      sum += (Math.abs(u[0] - w[0]) + Math.abs(u[1] - w[1]) + Math.abs(u[2] - w[2])) / 3;
+      n += 1;
+    }
+    return sum / n;
+  };
+  // a „színes” képpontok aránya (a háttér sötétkék, a szöveg alatta fehér — a fotó csak a betűkben látszik)
+  const colorful = (img: SkImage) => {
+    let n = 0;
+    let c = 0;
+    for (let y = 0; y < img.height(); y += 4) for (let x = 0; x < img.width(); x += 4) {
+      const p = pixel(img, x, y);
+      const spread = Math.max(p[0], p[1], p[2]) - Math.min(p[0], p[1], p[2]);
+      if (spread > 90) c += 1;
+      n += 1;
+    }
+    return c / n;
+  };
+  const docOf = (txt: string, clip = true) => ({ id: 'ct', name: 'ct', aspectRatio: '1:1', width: 400, height: 400, layers: [
+    { id: 'bg', kind: 'fill', fill: '#101828' },
+    { id: 't', kind: 'text', text: txt, position: { x: 0.5, y: 0.5 }, fontSize: 30, color: '#ffffff', fontFamily: 'Anton', textAlign: 'center', backgroundColor: null, stylePreset: 'plain' },
+    { id: 'p', kind: 'photo', uri: f.uri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch', ...(clip ? { clipTo: 't' } : {}) },
+  ] }) as unknown as ImageDoc;
+  const d = docOf('REMIX');
+  const dev = await ref.current!.render(d, 400);
+  const srv = await renderImageDoc(d, 400);
+  const open = await ref.current!.render(docOf('REMIX', false), 400);
+  if (!dev || !srv || !open) {
+    log(false, 'vágás szövegbe', 'nincs kép');
+  } else {
+    const [a, b, c] = [await decode(dev), await decode(srv), await decode(open)];
+    const diff = meanDiff(a, b);
+    const [ca, cb, cc] = [colorful(a), colorful(b), colorful(c)];
+    log(diff <= 6 && ca > 0.05 && ca < 0.6 && cc > 0.9, 'a fotó a betűk alakjában — telefon = szerver', `${diff.toFixed(2)}/255 · színes rész telefon ${(ca * 100).toFixed(0)}%, szerver ${(cb * 100).toFixed(0)}%, vágás nélkül ${(cc * 100).toFixed(0)}%`);
+    [dev, srv, open].forEach((u) => removeFile(u));
+  }
+  // élő kapcsolat: más szöveg → új maszk → más vágás
+  const d2 = docOf('I');
+  const dev2 = await ref.current!.render(d2, 400);
+  if (dev2) {
+    const c2 = colorful(await decode(dev2));
+    log(c2 > 0.005 && c2 < 0.15, 'a szöveg átírására a vágás követ (új maszk)', `színes rész az „I” betűben ${(c2 * 100).toFixed(1)}%`);
+    removeFile(dev2);
+  }
+  setHarness(null);
+  removeFile(f.uri);
+}
+
 async function smokeAudioTemplate(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   const st = useEditorStore.getState;
@@ -13004,6 +13072,10 @@ export async function runImageSmoke(
   }
   if (phase === 'thumbdoc') {
     await step(phase, () => smokeThumbDoc(log));
+    return;
+  }
+  if (phase === 'cliptext') {
+    await step(phase, () => smokeClipText(log, setHarness));
     return;
   }
   if (phase === 'quickcreate') {

@@ -77,7 +77,8 @@ export function stageSize(
 export function stageSettleMs(doc: ImageDoc): number {
   const media = visibleLayers(doc).reduce((n, l) => {
     if (l.kind !== 'photo') return n;
-    return n + 1 + (l.mask?.image ? 1 : 0) + (l.lut ? 1 : 0);
+    // a vágómaszk (S18) a render előtt festett maszk-képpé válhat (szöveg-alap) — annak a betöltése is kell
+    return n + 1 + (l.mask?.image ? 1 : 0) + (l.clipTo ? 1 : 0) + (l.lut ? 1 : 0);
   }, 0);
   return Math.min(2500, 250 + media * 200);
 }

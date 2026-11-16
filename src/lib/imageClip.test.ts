@@ -1,4 +1,4 @@
-import { clipBaseBelow, flattenRing, resolveClipMasks, shapeOutlineOnCanvas } from '@/lib/imageClip';
+import { clipBaseBelow, flattenRing, resolveClipMasks, shapeOutlineOnCanvas, textClipBases, textMaskKey, textMaskSubDoc } from '@/lib/imageClip';
 import { selectionContains } from '@/lib/selection';
 import type { ImageDoc, ImageLayer, PhotoLayer, ShapeLayer } from '@/types/project';
 
@@ -58,5 +58,35 @@ describe('✂️ S18: vágómaszk', () => {
     expect(clipBaseBelow(doc([open as ImageLayer, photo()]), 'p')).toBeNull();
     expect(clipBaseBelow(doc([shape(), photo()]), 'p')?.id).toBe('s');
     expect(clipBaseBelow(doc([photo(), shape()]), 'p')).toBeNull(); // a forma fölötte van
+  });
+});
+
+describe('✂️🔤 S18: vágás szövegbe (élő maszk-kulccsal)', () => {
+  const text = { kind: 'text', id: 't', text: 'ABC', position: { x: 0.5, y: 0.5 }, fontSize: 20, color: '#ff0000', fontFamily: 'Anton', textStyle: { glow: { color: '#fff', size: 0.2 } } } as unknown as ImageLayer;
+  const canvas = { width: 400, height: 400 };
+
+  it('a maszk kulcsa a betűk alakjától függ, a színtől és az átlátszóságtól nem', () => {
+    const k = textMaskKey(text as never, canvas);
+    expect(textMaskKey({ ...text, color: '#00ff00', opacity: 0.3 } as never, canvas)).toBe(k);
+    expect(textMaskKey({ ...text, text: 'ABD' } as never, canvas)).not.toBe(k);
+    expect(textMaskKey({ ...text, position: { x: 0.4, y: 0.5 } } as never, canvas)).not.toBe(k);
+    expect(textMaskKey(text as never, { width: 800, height: 400 })).not.toBe(k);
+  });
+
+  it('a maszk-dokumentum: fekete alapon fehér szöveg, effektek nélkül', () => {
+    const sub = textMaskSubDoc(doc([text]), text as never);
+    expect(sub.layers.map((l) => l.kind)).toEqual(['fill', 'text']);
+    expect((sub.layers[0] as { fill: string }).fill).toBe('#000000');
+    expect(sub.layers[1]).toMatchObject({ color: '#ffffff', opacity: 1 });
+    expect((sub.layers[1] as { textStyle?: unknown }).textStyle).toBeUndefined();
+  });
+
+  it('a fotó a szöveg maszk-képét kapja, ha kész; amíg nincs, vágatlan; a kulcsok listája a hiányzókhoz', () => {
+    const d = doc([text, photo({ clipTo: 't' })]);
+    expect(textClipBases(d).map((b) => b.key)).toEqual([textMaskKey(text as never, canvas)]);
+    expect((resolveClipMasks(d).layers.find((l) => l.id === 'p') as PhotoLayer).mask).toBeUndefined();
+    const ready = resolveClipMasks(d, new Map([[textMaskKey(text as never, canvas), 'file:///m.png']]));
+    expect((ready.layers.find((l) => l.id === 'p') as PhotoLayer).mask).toMatchObject({ image: 'file:///m.png', w: 1, h: 1 });
+    expect(clipBaseBelow(d, 'p')?.kind).toBe('text');
   });
 });

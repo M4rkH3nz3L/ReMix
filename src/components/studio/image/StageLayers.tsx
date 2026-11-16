@@ -4,6 +4,7 @@ import { CanvasLayerView } from '@/components/studio/image/CanvasLayerView';
 import { DocGrain, DocVignette } from '@/components/studio/image/DocVignette';
 import { effectiveCanvas } from '@/lib/canvasPresets';
 import { resolveClipMasks } from '@/lib/imageClip';
+import { useTextMasks } from '@/store/textMaskStore';
 import { effectiveLayerOpacity, visibleLayers } from '@/lib/imageDoc';
 import { correctionContext, docVignetteAngles, NO_CORRECTIONS } from '@/lib/imagePixelPipeline';
 import type { ClipMask, ImageDoc, ImageLayer } from '@/types/project';
@@ -18,7 +19,8 @@ export function StageLayers({ doc, w, h }: { doc: ImageDoc; w: number; h: number
   const canvas = useMemo(() => ({ width, height }), [width, height]);
   const corrections = useMemo(() => correctionContext<ClipMask>(doc), [doc]);
   // ✂️ S18: a vágómaszkok feloldva (ugyanaz a lépés, mint a vásznon és a szerver előtt)
-  const clipped = useMemo(() => resolveClipMasks(doc), [doc]);
+  const textMasks = useTextMasks((s) => s.map);
+  const clipped = useMemo(() => resolveClipMasks(doc, textMasks), [doc, textMasks]);
   return (
     <>
       {visibleLayers(clipped).map((raw0) => {

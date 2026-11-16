@@ -9,7 +9,7 @@ import { ActivityIndicator, Alert, Image, PixelRatio, Pressable, ScrollView, Sty
 import { captureRef } from 'react-native-view-shot';
 
 import { NewerSchemaBanner } from '@/components/NewerSchemaBanner';
-import { keepRenderedInProject, RenderStage, type RenderStageHandle } from '@/components/studio/image/RenderStage';
+import { keepRenderedInProject, RenderStage, type RenderStageHandle, ensureTextClipMasks } from '@/components/studio/image/RenderStage';
 import { Chip } from '@/components/ui/controls';
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { ImageAdjustStrip } from '@/components/studio/image/ImageAdjustStrip';
@@ -1611,6 +1611,15 @@ export function ImageStudioBody({
     refineRef.current();
     return true;
   }), []);
+
+  // ✂️🔤 S18: a szöveg-vágás maszkja a szöveg változásakor (gépelés közben késleltetve) újra elkészül
+  useEffect(() => {
+    if (!doc || !doc.layers.some((l) => l.kind === 'photo' && l.clipTo)) return;
+    const timer = setTimeout(() => {
+      void ensureTextClipMasks(doc);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [doc]);
 
   // 🧪 füstteszt: egy réteg-művelet indítása (mintha a sávon koppintanák)
   const onToolRef = useRef<(k: ToolKey) => void>(() => {});

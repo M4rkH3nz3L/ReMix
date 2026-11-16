@@ -3969,7 +3969,8 @@
       "cornerPin": {"hint": "Ziehe die Ecken: das Bild verzerrt sich auf das Viereck", "reset": "Zurücksetzen", "corner": "Ecke {{n}}"},
       "borderAlign": {"inside": "Innen", "center": "Mitte", "outside": "Außen"},
       "clipToShape": "In Form darunter beschneiden",
-      "clipNeedsShape": "Lege eine Form unter das Foto, um das Foto in ihre Kontur zu schneiden.",
+      "clipToText": "In Text darunter beschneiden",
+      "clipNeedsShape": "Lege eine Form oder einen Text unter das Foto, um es in deren Kontur zu schneiden.",
       "looks": {"title": "Looks", "save": "Als Look speichern", "mine": "Mein Look", "removeHint": "Lange drücken zum Löschen", "portrait": "Porträt", "food": "Essen", "landscape": "Landschaft", "bwContrast": "Schwarzweiß", "matte": "Matt", "sunny": "Sonnig", "coldMorning": "Kalter Morgen", "vintage": "Vintage", "cinematic": "Kinolook", "pop": "Pop", "step": {"tone": "Tonwerte", "warm": "Wärmer", "vibrance": "Dynamik", "exposure": "Belichtung", "contrast": "Kontrast", "mono": "Schwarzweiß", "saturation": "Sättigung", "balance": "Farbbalance", "cool": "Kühler", "vignette": "Vignette"}},
       "adjustStack": {
         "quick": "Schnell",

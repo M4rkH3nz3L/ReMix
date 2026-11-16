@@ -3929,7 +3929,8 @@
         "moveDown": "{{name}} nach unten",
         "expandGroup": "{{name}} aufklappen",
         "collapseGroup": "{{name}} zuklappen",
-        "ungroup": "Gruppe {{name}} auflösen"
+        "ungroup": "Gruppe {{name}} auflösen",
+        "unnestGroup": "{{name}} aus der übergeordneten Gruppe lösen"
       },
       "toVideo": {
         "title": "Ins Video",

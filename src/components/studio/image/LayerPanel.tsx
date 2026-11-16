@@ -15,6 +15,8 @@ import {
   toggleLayerHidden,
   toggleLayerLocked,
   ungroup,
+  groupChain,
+  nestGroup,
   updateGroup,
 } from '@/lib/imageDoc';
 import { mergeDownTargets } from '@/lib/imageCanvasOps';
@@ -63,40 +65,42 @@ export function LayerPanel({
       {/* réteg-lista (fölül a legfelső réteg) — 🗂️ csoportokba bucketelve */}
       <View style={{ gap: 6 }}>
         {(() => {
-          const groupsById = new Map((doc.groups ?? []).map((g) => [g.id, g]));
           const seen = new Set<string>();
           const rows: ReactNode[] = [];
           for (const l of [...doc.layers].reverse()) {
-            const g = l.groupId ? groupsById.get(l.groupId) : undefined;
-            if (g && !seen.has(g.id)) {
-              seen.add(g.id);
-              rows.push(
-                <GroupHeader
-                  key={`g-${g.id}`}
-                  doc={doc}
-                  group={g}
-                  commit={commit}
-                  onSelect={onSelect}
-                  t={t}
-                />
-              );
-            }
-            if (g?.collapsed) {
+            // 🗂️ S18: a réteg csoport-lánca kívülről befelé; minden még nem látott csoport fejlécet kap,
+            // a saját mélységével — az összecsukott ős a teljes alfát elrejti
+            const chain = groupChain(doc, l.groupId).reverse();
+            let hiddenByCollapse = false;
+            chain.forEach((g, depth) => {
+              if (hiddenByCollapse) return;
+              if (!seen.has(g.id)) {
+                seen.add(g.id);
+                rows.push(
+                  <View key={`g-${g.id}`} style={depth ? { marginLeft: depth * 12 } : null}>
+                    <GroupHeader doc={doc} group={g} commit={commit} onSelect={onSelect} t={t} />
+                  </View>
+                );
+              }
+              if (g.collapsed) hiddenByCollapse = true;
+            });
+            if (hiddenByCollapse) {
               continue; // összecsukva: a tag-sorok nem jelennek meg
             }
             rows.push(
-              <LayerRow
-                key={l.id}
-                doc={doc}
-                layer={l}
-                label={labels.get(l.id) ?? layerLabel(l)}
-                onOrderPreview={onOrderPreview}
-                indented={!!g}
-                selected={l.id === selectedId}
-                onSelect={onSelect}
-                commit={commit}
-                t={t}
-              />
+              <View key={l.id} style={chain.length > 1 ? { marginLeft: (chain.length - 1) * 12 } : null}>
+                <LayerRow
+                  doc={doc}
+                  layer={l}
+                  label={labels.get(l.id) ?? layerLabel(l)}
+                  onOrderPreview={onOrderPreview}
+                  indented={chain.length > 0}
+                  selected={l.id === selectedId}
+                  onSelect={onSelect}
+                  commit={commit}
+                  t={t}
+                />
+              </View>
             );
           }
           return rows;
@@ -296,6 +300,14 @@ function GroupHeader({
           color={g.hidden ? palette.textDim : palette.text}
           onPress={() => commit(updateGroup(doc, g.id, { hidden: !g.hidden }), 'group-hide')}
         />
+        {g.parentId ? (
+          <IconBtn
+            icon="arrow-up-circle-outline"
+            label={t('studio.image.a11y.unnestGroup', { name: g.name })}
+            color={palette.text}
+            onPress={() => commit(nestGroup(doc, g.id, undefined), 'group-unnest')}
+          />
+        ) : null}
         <IconBtn
           icon="remove-circle-outline"
           label={t('studio.image.a11y.ungroup', { name: g.name })}

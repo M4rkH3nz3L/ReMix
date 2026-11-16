@@ -218,18 +218,38 @@ export function toggleLayerHidden(doc: ImageDoc, id: string): ImageDoc {
   return layer ? updateLayer(doc, id, { hidden: !layer.hidden }) : doc;
 }
 
-// ── 🗂️ Réteg-csoportok (mappák) — lapos groupId-modell ──────────────────────
+// ── 🗂️ Réteg-csoportok (mappák) — groupId + a csoport `parentId`-ja (S18: beágyazás) ──────────
 
-/** egy csoport tagjait összefüggő blokká rendezi az ELSŐ tag helyén (a relatív
- *  sorrendet megőrzi) — így a panel egymás mellett mutatja, a z-rend értelmes. */
-function placeContiguous(layers: ImageLayer[], groupId: string): ImageLayer[] {
-  const members = layers.filter((l) => l.groupId === groupId);
+/** a csoport és az ősei (belülről kifelé); körkörös hivatkozásnál megáll */
+export function groupChain(doc: Pick<ImageDoc, 'groups'>, groupId: string | undefined): ImageGroup[] {
+  const byId = new Map((doc.groups ?? []).map((g) => [g.id, g]));
+  const out: ImageGroup[] = [];
+  const seen = new Set<string>();
+  let cur = groupId ? byId.get(groupId) : undefined;
+  while (cur && !seen.has(cur.id)) {
+    seen.add(cur.id);
+    out.push(cur);
+    cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+  }
+  return out;
+}
+
+/** a réteg a csoportban van-e (közvetlenül vagy egy beágyazott csoportján át) */
+export function layerInGroup(doc: Pick<ImageDoc, 'groups'>, layer: ImageLayer, groupId: string): boolean {
+  return groupChain(doc, layer.groupId).some((g) => g.id === groupId);
+}
+
+/** egy csoport tagjait (a beágyazott csoportokéit is) összefüggő blokká rendezi az ELSŐ tag helyén
+ *  (a relatív sorrendet megőrzi) — így a panel egymás mellett mutatja, a z-rend értelmes. */
+function placeContiguous(layers: ImageLayer[], groupId: string, groups: ImageGroup[] = []): ImageLayer[] {
+  const inG = (l: ImageLayer) => layerInGroup({ groups }, l, groupId);
+  const members = layers.filter(inG);
   if (members.length < 2) {
     return layers;
   }
-  const rest = layers.filter((l) => l.groupId !== groupId);
-  const firstIdx = layers.findIndex((l) => l.groupId === groupId);
-  const before = layers.slice(0, firstIdx).filter((l) => l.groupId !== groupId).length;
+  const rest = layers.filter((l) => !inG(l));
+  const firstIdx = layers.findIndex(inG);
+  const before = layers.slice(0, firstIdx).filter((l) => !inG(l)).length;
   return [...rest.slice(0, before), ...members, ...rest.slice(before)];
 }
 
@@ -239,10 +259,14 @@ export function createGroup(doc: ImageDoc, layerIds: string[], id: string, name:
   if (ids.size === 0) {
     return doc;
   }
-  const group: ImageGroup = { id, name };
+  // S18: ha mind ugyanabban a csoportban vannak, az új csoport abba ágyazódik
+  const parents = new Set(doc.layers.filter((l) => ids.has(l.id)).map((l) => l.groupId ?? ''));
+  const parentId = parents.size === 1 ? [...parents][0] || undefined : undefined;
+  const group: ImageGroup = parentId ? { id, name, parentId } : { id, name };
+  const groups = [...(doc.groups ?? []), group];
   let layers = doc.layers.map((l) => (ids.has(l.id) ? ({ ...l, groupId: id } as ImageLayer) : l));
-  layers = placeContiguous(layers, id);
-  return { ...doc, layers, groups: [...(doc.groups ?? []), group], renderedUri: undefined };
+  layers = placeContiguous(layers, id, groups);
+  return { ...doc, layers, groups, renderedUri: undefined };
 }
 
 /** Egy réteg csoportba tétele (vagy kivétele, ha `groupId` null/undefined). */
@@ -252,17 +276,38 @@ export function assignLayerToGroup(doc: ImageDoc, layerId: string, groupId: stri
   }
   let layers = doc.layers.map((l) => (l.id === layerId ? ({ ...l, groupId } as ImageLayer) : l));
   if (groupId) {
-    layers = placeContiguous(layers, groupId);
+    layers = placeContiguous(layers, groupId, doc.groups ?? []);
   }
   return { ...doc, layers, renderedUri: undefined };
 }
 
-/** Csoport feloldása: a tagok groupId-ja törlődik, a csoport-rekord eltűnik. */
+/** Csoport feloldása: a tagok (rétegek és beágyazott csoportok) egy szinttel feljebb kerülnek. */
 export function ungroup(doc: ImageDoc, groupId: string): ImageDoc {
+  const parent = (doc.groups ?? []).find((g) => g.id === groupId)?.parentId;
   const layers = doc.layers.map((l) =>
-    l.groupId === groupId ? ({ ...l, groupId: undefined } as ImageLayer) : l
+    l.groupId === groupId ? ({ ...l, groupId: parent } as ImageLayer) : l
   );
-  return { ...doc, layers, groups: (doc.groups ?? []).filter((g) => g.id !== groupId), renderedUri: undefined };
+  const groups = (doc.groups ?? [])
+    .filter((g) => g.id !== groupId)
+    .map((g) => (g.parentId === groupId ? { ...g, parentId: parent } : g));
+  return { ...doc, layers, groups, renderedUri: undefined };
+}
+
+/**
+ * 🗂️ S18: csoport beágyazása egy másikba (vagy kivétele a gyökérbe, `parentId` nélkül). Körkörös
+ * beágyazás (önmagába / a saját leszármazottjába) nem engedett — ilyenkor a dokumentum változatlan.
+ */
+export function nestGroup(doc: ImageDoc, groupId: string, parentId: string | undefined): ImageDoc {
+  const groups = doc.groups ?? [];
+  if (!groups.some((g) => g.id === groupId) || (parentId && !groups.some((g) => g.id === parentId))) {
+    return doc;
+  }
+  if (parentId && groupChain(doc, parentId).some((g) => g.id === groupId)) {
+    return doc;
+  }
+  const next = groups.map((g) => (g.id === groupId ? { ...g, parentId } : g));
+  const layers = parentId ? placeContiguous(doc.layers, parentId, next) : doc.layers;
+  return { ...doc, layers, groups: next, renderedUri: undefined };
 }
 
 /** Csoport-mezők módosítása (név/rejtés/összecsukás/opacity). */
@@ -294,18 +339,16 @@ export function duplicateLayer(
 
 /** amit a rasterizáló ténylegesen kirajzol (rejtett és teljesen átlátszó nélkül) */
 export function visibleLayers(doc: ImageDoc): ImageLayer[] {
-  // 🗂️ a rejtett csoport tagjai sem látszanak (a worker `isVisible && !groupHidden`-jével paritásban)
-  const hiddenGroups = new Set((doc.groups ?? []).filter((g) => g.hidden).map((g) => g.id));
+  // 🗂️ a rejtett csoport (és bármely őse) tagjai sem látszanak (a worker láncával paritásban)
   return doc.layers.filter(
-    (l) => !l.hidden && (l.opacity ?? 1) > 0.001 && !(l.groupId && hiddenGroups.has(l.groupId))
+    (l) => !l.hidden && (l.opacity ?? 1) > 0.001 && !groupChain(doc, l.groupId).some((g) => g.hidden)
   );
 }
 
 /** 🗂️ egy réteg EFFEKTÍV áttetszősége a preview-hoz = saját opacity × a csoportja opacity-je. */
 export function effectiveLayerOpacity(doc: ImageDoc, layer: ImageLayer): number {
-  const own = layer.opacity ?? 1;
-  const g = layer.groupId ? (doc.groups ?? []).find((gr) => gr.id === layer.groupId) : undefined;
-  return own * (g?.opacity ?? 1);
+  // S18: a beágyazott csoportok áttetszősége végigszorzódik a láncon
+  return groupChain(doc, layer.groupId).reduce((acc, g) => acc * Math.max(0, Math.min(1, g.opacity ?? 1)), layer.opacity ?? 1);
 }
 
 /**

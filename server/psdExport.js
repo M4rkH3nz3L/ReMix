@@ -361,9 +361,13 @@ async function buildPsdFromImageDoc(doc, opts = {}) {
     }
     const gid = layer.groupId;
     if (gid && groupDefs.has(gid)) {
-      let node = groupNodes.get(gid);
-      if (!node) {
-        const def = groupDefs.get(gid);
+      // 🗂️ S18: beágyazott csoport → beágyazott PSD-mappa (a szülő-mappa is ekkor jön létre, ha még nincs)
+      const nodeFor = (id, guard = new Set()) => {
+        let node = groupNodes.get(id);
+        if (node) {
+          return node;
+        }
+        const def = groupDefs.get(id);
         node = {
           name: typeof def.name === 'string' && def.name ? def.name : 'Group',
           opened: !def.collapsed,
@@ -371,10 +375,14 @@ async function buildPsdFromImageDoc(doc, opts = {}) {
           opacity: clamp01(def.opacity, 1),
           children: [],
         };
-        groupNodes.set(gid, node);
-        rootChildren.push(node); // a group az ELSŐ tagja pozíciójánál a gyökérbe
-      }
-      node.children.push(built);
+        groupNodes.set(id, node);
+        guard.add(id);
+        const parent = def.parentId && groupDefs.has(def.parentId) && !guard.has(def.parentId) ? nodeFor(def.parentId, guard) : null;
+        // a mappa az ELSŐ tagja pozíciójánál kerül a szülőjébe (vagy a gyökérbe)
+        (parent ? parent.children : rootChildren).push(node);
+        return node;
+      };
+      nodeFor(gid).children.push(built);
     } else {
       rootChildren.push(built);
     }

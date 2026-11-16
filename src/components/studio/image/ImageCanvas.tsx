@@ -483,7 +483,7 @@ export function ImageCanvas({
             }
             // 🗂️ csoport-opacity: a réteg saját opacity-jére rászorozva (a worker-renderrel paritásban)
             const raw =
-              raw0.groupId && doc.groups?.some((g) => g.id === raw0.groupId && (g.opacity ?? 1) < 1)
+              raw0.groupId && effectiveLayerOpacity(doc, raw0) !== (raw0.opacity ?? 1)
                 ? ({ ...raw0, opacity: effectiveLayerOpacity(doc, raw0) } as ImageLayer)
                 : raw0;
             return (

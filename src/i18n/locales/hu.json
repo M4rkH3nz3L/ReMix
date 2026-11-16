@@ -3896,7 +3896,8 @@
         "moveDown": "{{name}} lejjebb",
         "expandGroup": "{{name}} kinyitása",
         "collapseGroup": "{{name}} összecsukása",
-        "ungroup": "{{name}} csoport bontása"
+        "ungroup": "{{name}} csoport bontása",
+        "unnestGroup": "{{name}} kiemelése a szülő-csoportból"
       },
       "toVideo": {
         "title": "Videóba",

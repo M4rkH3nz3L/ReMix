@@ -24,7 +24,7 @@ export function StageLayers({ doc, w, h }: { doc: ImageDoc; w: number; h: number
       {visibleLayers(clipped).map((raw0) => {
         // 🗂️ csoport-opacity a réteg saját opacity-jére szorozva (mint a vásznon)
         const raw =
-          raw0.groupId && doc.groups?.some((g) => g.id === raw0.groupId && (g.opacity ?? 1) < 1)
+          raw0.groupId && effectiveLayerOpacity(doc, raw0) !== (raw0.opacity ?? 1)
             ? ({ ...raw0, opacity: effectiveLayerOpacity(doc, raw0) } as ImageLayer)
             : raw0;
         return (

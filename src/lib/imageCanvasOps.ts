@@ -1,5 +1,6 @@
 import { effectiveCanvas, nearestAspect } from '@/lib/canvasPresets';
 import { cropImageDocRaw } from '@/lib/imageCrop';
+import { effectiveLayerOpacity, groupChain } from '@/lib/imageDoc';
 import type { ClipMask, ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
 
 /**
@@ -178,10 +179,10 @@ export function flipCanvasDoc(doc: ImageDoc, axis: 'horizontal' | 'vertical'): I
 
 /** Rétegek raszter-összevonásához a rész-dokumentum (csoport-opacitás beégetve, doc-effekt nélkül). */
 export function rasterSubDoc(doc: ImageDoc, ids: string[]): ImageDoc {
-  const groups = new Map((doc.groups ?? []).map((g) => [g.id, g]));
+  // S18: a (beágyazott) csoportok rejtettsége és áttetszősége a láncon át
   const layers = doc.layers
-    .filter((l) => ids.includes(l.id) && !(l.groupId && groups.get(l.groupId)?.hidden))
-    .map((l) => ({ ...l, groupId: undefined, opacity: (l.opacity ?? 1) * (l.groupId ? groups.get(l.groupId)?.opacity ?? 1 : 1) }) as ImageLayer);
+    .filter((l) => ids.includes(l.id) && !groupChain(doc, l.groupId).some((g) => g.hidden))
+    .map((l) => ({ ...l, groupId: undefined, opacity: effectiveLayerOpacity(doc, l) }) as ImageLayer);
   return { ...doc, layers, groups: [], grade: undefined, adjust: undefined, vignette: 0, grain: 0, renderedUri: undefined };
 }
 

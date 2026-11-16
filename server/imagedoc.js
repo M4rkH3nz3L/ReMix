@@ -395,8 +395,20 @@ async function renderImageDoc(doc, height, workDir, opts = {}) {
   const canvas = docCanvas(doc, height);
   // 🗂️ csoportok: a rejtett csoport tagjai kimaradnak, az opacity a tagokra RÁszorzódik
   const groups = new Map((doc.groups ?? []).map((g) => [g.id, g]));
-  const groupHidden = (l) => l.groupId && groups.get(l.groupId)?.hidden;
-  const groupOpacity = (l) => (l.groupId ? Math.max(0, Math.min(1, Number(groups.get(l.groupId)?.opacity ?? 1))) : 1);
+  // 🗂️ S18: beágyazott csoportok — a réteg csoportja és az ősei (belülről kifelé, körkörösség ellen védve)
+  const chainOf = (l) => {
+    const out = [];
+    const seen = new Set();
+    let g = l.groupId ? groups.get(l.groupId) : undefined;
+    while (g && !seen.has(g.id)) {
+      seen.add(g.id);
+      out.push(g);
+      g = g.parentId ? groups.get(g.parentId) : undefined;
+    }
+    return out;
+  };
+  const groupHidden = (l) => chainOf(l).some((g) => g.hidden);
+  const groupOpacity = (l) => chainOf(l).reduce((acc, g) => acc * Math.max(0, Math.min(1, Number(g.opacity ?? 1))), 1);
   const layers = (doc.layers ?? []).filter((l) => isVisible(l) && !groupHidden(l));
   if (layers.length === 0) {
     throw new Error('A dokumentumnak nincs látható rétege.');

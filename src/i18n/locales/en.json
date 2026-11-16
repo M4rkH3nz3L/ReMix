@@ -3896,7 +3896,8 @@
         "moveDown": "Move {{name}} down",
         "expandGroup": "Expand {{name}}",
         "collapseGroup": "Collapse {{name}}",
-        "ungroup": "Ungroup {{name}}"
+        "ungroup": "Ungroup {{name}}",
+        "unnestGroup": "Move {{name}} out of its parent group"
       },
       "toVideo": {
         "title": "To video",

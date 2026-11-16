@@ -12,7 +12,7 @@
 // kimarad (a `<image>` a nyers kép), a konikus gradient az első stop színére esik
 // vissza — ezeket a hívó tudja (a doc.format==='vector' alapvetően vektor-elemű).
 
-import { effectiveLayerOpacity } from '@/lib/imageDoc';
+import { effectiveLayerOpacity, groupChain } from '@/lib/imageDoc';
 import { textSize } from '@/lib/imageLayerLayout';
 import { polygonFor } from '@/lib/shapeGeometry';
 import type {
@@ -377,7 +377,7 @@ function isVisible(layer: ImageLayer & { visible?: boolean }, doc: ImageDoc): bo
   if (layer.hidden || layer.visible === false || (layer.opacity ?? 1) <= 0.001) {
     return false;
   }
-  return !doc.groups?.some((g) => g.id === layer.groupId && g.hidden);
+  return !groupChain(doc, layer.groupId).some((g) => g.hidden);
 }
 
 /**

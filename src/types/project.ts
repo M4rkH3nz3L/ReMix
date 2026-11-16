@@ -1508,6 +1508,8 @@ export interface ImageGroup {
   collapsed?: boolean;
   /** 0–1 közös áttetszőség — a tag-rétegek saját opacity-jére RÁszorzódik (render + preview) */
   opacity?: number;
+  /** 🗂️ S18: a szülő-csoport (beágyazás); a rejtettség és az áttetszőség végigöröklődik a láncon */
+  parentId?: string;
 }
 
 /** A gradient-maszk fade-irány (amerre a réteg átlátszóvá válik). */

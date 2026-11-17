@@ -12,6 +12,7 @@
 // kimarad (a `<image>` a nyers kép), a konikus gradient az első stop színére esik
 // vissza — ezeket a hívó tudja (a doc.format==='vector' alapvetően vektor-elemű).
 
+import { DEFAULT_FONT } from '@/constants/fonts';
 import { effectiveLayerOpacity, groupChain } from '@/lib/imageDoc';
 import { textSize } from '@/lib/imageLayerLayout';
 import { polygonFor } from '@/lib/shapeGeometry';
@@ -322,7 +323,7 @@ function wrapWords(text: string, perLine: number): string[] {
 function textSvg(layer: Extract<ImageLayer, { kind: 'text' }>, W: number, H: number): string {
   const b = boxOf(layer, W, H);
   const fontPx = ((layer.fontSize ?? 8) / 100) * H;
-  const family = layer.fontFamily ? esc(layer.fontFamily) : 'sans-serif';
+  const family = `${esc(layer.fontFamily || DEFAULT_FONT.family)}, sans-serif`;
   const weight = layer.fontWeight === 'bold' ? 'bold' : 'normal';
   // a betűköz em-ben tárolt (text-render.js), az SVG user-egységet vár
   const ls = layer.letterSpacing ? ` letter-spacing="${n(layer.letterSpacing * fontPx)}"` : '';

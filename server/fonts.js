@@ -19,4 +19,8 @@ const FONT_FILES = {
   PermanentMarker: 'PermanentMarker-Regular.ttf',
 };
 
-module.exports = { FONT_FILES };
+// 🔤 Az „Alap” betű (a hiányzó család is): beágyazott Inter, két vastagsággal. A rendszerfont
+// (SF) a Linux-szerveren nincs meg — Arial-ra esne, és a kész kép mást mutatna, mint a vászon.
+const DEFAULT_FONT = { family: 'Inter', regular: 'Inter-Regular.ttf', bold: 'Inter-Bold.ttf' };
+
+module.exports = { FONT_FILES, DEFAULT_FONT };

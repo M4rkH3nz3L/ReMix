@@ -8,7 +8,7 @@ import { StageLayers } from '@/components/studio/image/StageLayers';
 import { StudioSheet } from '@/components/studio/image/StudioSheet';
 import { Chip } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
-import { fontOptions } from '@/constants/fonts';
+import { fontOptions, renderFontFamily } from '@/constants/fonts';
 import { makeId } from '@/lib/id';
 import { pickImage } from '@/lib/media';
 import { docFromTemplate, TEMPLATE_CATEGORIES, templateFromDoc, templatesIn, type ImageTemplate, type TemplateCategory } from '@/lib/imageTemplates';
@@ -164,7 +164,7 @@ export function TemplatesSheet({
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
               >
-                <Text maxFontSizeMultiplier={1.3} style={[styles.fontText, { fontFamily: f.family }]} numberOfLines={1}>{f.label}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={[styles.fontText, { fontFamily: renderFontFamily(f.family) }]} numberOfLines={1}>{f.label}</Text>
               </Pressable>
             );
           })}

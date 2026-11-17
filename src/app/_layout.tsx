@@ -223,6 +223,9 @@ export default function RootLayout() {
 
   // választható betűtípusok betöltése (a family-nevek egyeznek a renderrel)
   useFonts({
+    // 🔤 az „Alap” betű (renderFontFamily): Inter, a félkövér külön néven
+    Inter: require('../../assets/fonts/Inter-Regular.ttf'),
+    'Inter-Bold': require('../../assets/fonts/Inter-Bold.ttf'),
     Anton: require('../../assets/fonts/Anton-Regular.ttf'),
     BebasNeue: require('../../assets/fonts/BebasNeue-Regular.ttf'),
     Poppins: require('../../assets/fonts/Poppins-Bold.ttf'),

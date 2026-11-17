@@ -5,8 +5,11 @@
  * Expo-mentes, önmagában tesztelhető; a beépített táblát a `fontMetrics.test.ts` a TTF-ekhez zárolja.
  */
 
-/** a rendszerfont (SF) és az ismeretlen font természetes sormagassága */
+/** az ismeretlen (még nem regisztrált) font természetes sormagassága */
 export const DEFAULT_NATURAL_LEADING = 1.2;
+
+/** az „Alap” betű (Inter, a hiányzó család is) természetes sormagassága — a TTF-hez zárolva */
+export const DEFAULT_FONT_NATURAL_LEADING = 1.21;
 
 /** a beépített fontok (`src/constants/fonts.ts`, `server/fonts.js`) természetes sormagassága */
 export const BUILTIN_NATURAL_LEADING: Readonly<Record<string, number>> = {
@@ -54,7 +57,7 @@ export function registerFontLeading(family: string, leading: number | null): voi
 
 /** a család természetes sormagassága (em) */
 export function naturalLeading(family: string | undefined): number {
-  if (!family) return DEFAULT_NATURAL_LEADING;
+  if (!family || family === 'Inter') return DEFAULT_FONT_NATURAL_LEADING;
   return custom.get(family) ?? BUILTIN_NATURAL_LEADING[family] ?? DEFAULT_NATURAL_LEADING;
 }
 

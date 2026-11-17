@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 import { palette } from '@/constants/editor';
+import { renderFontFamily } from '@/constants/fonts';
 import { tightLeadingShift } from '@/lib/fontMetrics';
 import { sampleChannel } from '@/lib/keyframes';
 import { clamp } from '@/lib/time';
@@ -395,7 +396,7 @@ export function TextOverlay({
                 color: glowCopy.color,
                 fontSize,
                 fontWeight: clip.fontWeight,
-                fontFamily: clip.fontFamily,
+                fontFamily: renderFontFamily(clip.fontFamily, clip.fontWeight),
                 textAlign: clip.textAlign ?? 'center',
                 ...typo,
                 paddingTop: tightShift + glowCopy.radius,
@@ -421,7 +422,7 @@ export function TextOverlay({
                     color: clip.textStyle!.stroke!.color,
                     fontSize,
                     fontWeight: clip.fontWeight,
-                    fontFamily: clip.fontFamily,
+                    fontFamily: renderFontFamily(clip.fontFamily, clip.fontWeight),
                     textAlign: clip.textAlign ?? 'center',
                     ...typo,
                     top: dy * (clip.textStyle!.stroke!.width * fontSize) / 2,
@@ -443,7 +444,7 @@ export function TextOverlay({
                 color: '#1c1c24',
                 fontSize,
                 fontWeight: '800',
-                fontFamily: clip.fontFamily,
+                fontFamily: renderFontFamily(clip.fontFamily, '800'),
                 textAlign: 'center',
               }}
             >
@@ -457,7 +458,8 @@ export function TextOverlay({
                 color: clip.text3d ? text3dFaceColor(clip.text3d, clip.color) : clip.color,
                 fontSize,
                 fontWeight: clip.text3d ? '800' : clip.fontWeight,
-                fontFamily: clip.fontFamily,
+                // a stílus-preset (pl. körvonal: 900) a vastagságot felülírja → a fájlt is az választja
+                fontFamily: renderFontFamily(clip.fontFamily, clip.text3d ? '800' : (preset.text as { fontWeight?: string } | undefined)?.fontWeight ?? clip.fontWeight),
                 textAlign: clip.textAlign ?? 'center',
               },
               // a beépített fontoknak nincs dőlt változata: a render is döntött betűképet ad

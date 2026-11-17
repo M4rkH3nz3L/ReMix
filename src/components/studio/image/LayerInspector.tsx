@@ -1,5 +1,5 @@
 import { GeometryFields } from '@/components/studio/image/GeometryFields';
-import { fontOptions } from '@/constants/fonts';
+import { fontOptions, renderFontFamily } from '@/constants/fonts';
 import { normalizeRotation } from '@/lib/imageLayerGeometry';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -199,7 +199,7 @@ export function LayerInspector({
                 accessibilityLabel={f.label}
                 accessibilityState={{ selected: layer.fontFamily === f.family }}
               >
-                <Text maxFontSizeMultiplier={1.3} style={[styles.fontChipText, { fontFamily: f.family }]} numberOfLines={1}>
+                <Text maxFontSizeMultiplier={1.3} style={[styles.fontChipText, { fontFamily: renderFontFamily(f.family) }]} numberOfLines={1}>
                   {f.label}
                 </Text>
               </Pressable>

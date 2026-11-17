@@ -8,7 +8,7 @@
 export interface FontOption {
   id: string;
   label: string;
-  /** RN/CSS font-family; hiányzó = rendszer-alap */
+  /** RN/CSS font-family; hiányzó = az „Alap” betű (beágyazott Inter, lásd `DEFAULT_FONT`) */
   family?: string;
 }
 
@@ -39,3 +39,26 @@ export const fontFiles: Record<string, string> = {
   Lobster: 'Lobster-Regular.ttf',
   PermanentMarker: 'PermanentMarker-Regular.ttf',
 };
+
+/**
+ * 🔤 Az „Alap” betű (és a hiányzó család): beágyazott Inter, két vastagsággal — a rendszerfont (SF) a
+ * szerveren nincs meg, ott Arial-ra esne, és a kész kép mást mutatna, mint a vászon. A worker tükre:
+ * `server/fonts.js` `DEFAULT_FONT` (contract-teszt).
+ */
+export const DEFAULT_FONT = { family: 'Inter', regular: 'Inter-Regular.ttf', bold: 'Inter-Bold.ttf' } as const;
+
+/** az app a félkövér Intert külön néven tölti be (beágyazott fontnál az iOS nem vastagít) */
+export const DEFAULT_FONT_BOLD_FAMILY = 'Inter-Bold';
+
+/** félkövér-e a vastagság (a CSS-ben a 600 fölötti a 700-as fájlt kapja) */
+export function isBoldWeight(weight: string | number | null | undefined): boolean {
+  return weight === 'bold' || Number(weight) >= 600;
+}
+
+/** a rajzoláshoz használt családnév: a hiányzó család (és az „Inter”) a vastagság szerinti Inter-fájl */
+export function renderFontFamily(family: string | null | undefined, weight?: string | number | null): string {
+  if (family && family !== DEFAULT_FONT.family) {
+    return family;
+  }
+  return isBoldWeight(weight) ? DEFAULT_FONT_BOLD_FAMILY : DEFAULT_FONT.family;
+}

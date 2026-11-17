@@ -4,7 +4,7 @@ import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 
 import { Chip, ColorDot, PanelSection, PrimaryButton, Stepper } from '@/components/ui/controls';
 import { aspectValue, palette, textAnimations, textColors, textStylePresets } from '@/constants/editor';
-import { fontOptions } from '@/constants/fonts';
+import { fontOptions, renderFontFamily } from '@/constants/fonts';
 import { TEXT_TEMPLATES, type TextTemplate } from '@/constants/textTemplates';
 import { fetchFaces, pickPrimaryFace } from '@/lib/faceClient';
 import { makeId } from '@/lib/id';
@@ -268,7 +268,7 @@ export function TextPanel({ clip }: { clip: TextClip }) {
                       style={[
                         styles.fontChipText,
                         active && styles.fontChipTextActive,
-                        f.family ? { fontFamily: f.family } : null,
+                        { fontFamily: renderFontFamily(f.family) },
                       ]}
                     >
                       {f.label}

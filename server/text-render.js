@@ -46,7 +46,7 @@ function findChromium() {
 // Választható betűtípusok (a család-név egyezik az app expo-font kulcsával) — a
 // render EGYETLEN forrása a függőség-mentes ./fonts (a kliens↔worker parity-t a
 // src/lib/contract.test.ts zárolja). A TTF base64 data-URI-ként ágyazódik a HTML-be.
-const { FONT_FILES } = require('./fonts');
+const { DEFAULT_FONT, FONT_FILES } = require('./fonts');
 const { borderAlignOf, shapeBorderSvg, strokeSpec } = require('./shapeStroke');
 const { polygonFor } = require('./shapeGeometry');
 const FALLBACK_FONT = "-apple-system, 'Helvetica Neue', Arial, sans-serif";
@@ -80,8 +80,8 @@ function fontFaceCss(family, fontPath) {
   if (custom) {
     return custom;
   }
-  if (!family || !FONT_FILES[family]) {
-    return '';
+  if (!family || family === DEFAULT_FONT.family || !FONT_FILES[family]) {
+    return defaultFaceCss();
   }
   if (fontFaceCache[family] === undefined) {
     try {
@@ -99,7 +99,27 @@ function fontFamilyCss(family, fontPath) {
   if (customFace(family, fontPath)) {
     return `'${family}', ${FALLBACK_FONT}`;
   }
-  return family && FONT_FILES[family] ? `'${family}', ${FALLBACK_FONT}` : FALLBACK_FONT;
+  return family && FONT_FILES[family] ? `'${family}', ${FALLBACK_FONT}` : `'${DEFAULT_FONT.family}', ${FALLBACK_FONT}`;
+}
+
+let defaultFace = null;
+
+/** 🔤 az „Alap” betű (Inter) két vastagsága — a hiányzó/ismeretlen család is ezt kapja, mint a telefonon */
+function defaultFaceCss() {
+  if (defaultFace === null) {
+    try {
+      defaultFace = [['regular', 400], ['bold', 700]]
+        .map(([k, w]) => {
+          const b64 = fs.readFileSync(path.join(__dirname, 'assets', 'fonts', DEFAULT_FONT[k])).toString('base64');
+          return `@font-face{font-family:'${DEFAULT_FONT.family}';font-weight:${w};src:url(data:font/ttf;base64,${b64}) format('truetype');font-display:block;}`;
+        })
+        .join('');
+    } catch (caught) {
+      logCaught('text-render.js:defaultFaceCss', caught);
+      defaultFace = '';
+    }
+  }
+  return defaultFace;
 }
 
 /** 🔡 Pro tipográfia: betűköz (tracking) · sorköz (leading) · kerning. */

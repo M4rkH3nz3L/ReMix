@@ -30,7 +30,7 @@ import {
 } from '@/lib/usageMeter';
 import { shearPoint, skewUnitCorners } from '@/lib/canvasTransform';
 import { TRANSITION_XFADE, xfadeMode, type TransitionType } from '@/lib/transitions';
-import { fontFiles, fontOptions } from '@/constants/fonts';
+import { DEFAULT_FONT, DEFAULT_FONT_BOLD_FAMILY, fontFiles, fontOptions, renderFontFamily } from '@/constants/fonts';
 import { MAX_PROJECT_DURATION_SEC } from '@/lib/projectUtils';
 import { ENTITLEMENTS, canCloudRender, canCloudStore, shouldWatermark } from '@/lib/entitlements';
 import { PRESET_BEZIER, bezierEase } from '@/lib/keyframes';
@@ -314,6 +314,19 @@ describe('contract: font-parity (constants/fonts.ts ⇄ server/fonts.js ⇄ _lay
       expect({ family, registered: layout.includes(`${family}: require(`) }).toEqual({ family, registered: true });
       expect({ family, file, present: layout.includes(file) }).toEqual({ family, file, present: true });
     }
+  });
+  it('az „Alap” betű (Inter, két vastagság) ugyanaz az appban és a workerben, mindkét TTF megvan és be van töltve', () => {
+    expect(DEFAULT_FONT).toEqual(workerFonts.DEFAULT_FONT);
+    const layout = fs.readFileSync(path.join(ROOT, 'src', 'app', '_layout.tsx'), 'utf8');
+    for (const file of [DEFAULT_FONT.regular, DEFAULT_FONT.bold]) {
+      expect({ file, app: fs.existsSync(path.join(ROOT, 'assets', 'fonts', file)) }).toEqual({ file, app: true });
+      expect({ file, worker: fs.existsSync(path.join(ROOT, 'server', 'assets', 'fonts', file)) }).toEqual({ file, worker: true });
+      expect({ file, present: layout.includes(file) }).toEqual({ file, present: true });
+    }
+    expect(layout.includes(`${DEFAULT_FONT.family}: require(`)).toBe(true);
+    expect(layout.includes(`'${DEFAULT_FONT_BOLD_FAMILY}': require(`)).toBe(true);
+    // a hiányzó család és az „Inter” a vastagság szerinti fájlt kapja; a többi család változatlan
+    expect([renderFontFamily(undefined), renderFontFamily(undefined, 'bold'), renderFontFamily('Inter', '900'), renderFontFamily('Poppins', 'bold')]).toEqual(['Inter', 'Inter-Bold', 'Inter-Bold', 'Poppins']);
   });
 });
 

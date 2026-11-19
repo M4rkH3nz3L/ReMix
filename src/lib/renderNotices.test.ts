@@ -20,7 +20,13 @@ describe('🛑 a szerveres render visszaesései a felhasználónak (MO-B2)', () 
   });
 
   it('a kliens kulcsai = a szerver noteDegraded-kulcsai (nincs drift)', () => {
-    const src = fs.readFileSync(path.join(__dirname, '../../server/render.js'), 'utf8') as string;
+    // a render a server/render.js vezénylőből + a server/render/ moduljaiból áll
+    const renderDir = path.join(__dirname, '../../server/render');
+    const files = [
+      path.join(__dirname, '../../server/render.js'),
+      ...(fs.readdirSync(renderDir) as string[]).filter((f) => f.endsWith('.js')).map((f) => path.join(renderDir, f)),
+    ];
+    const src = files.map((f) => fs.readFileSync(f, 'utf8') as string).join('\n');
     const server = [...new Set([...src.matchAll(/noteDegraded\(report, '(\w+)'\)/g)].map((m) => m[1]))].sort();
     expect(server).toEqual([...DEGRADED_KEYS].sort());
   });

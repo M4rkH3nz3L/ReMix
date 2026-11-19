@@ -1,3 +1,4 @@
+// @ts-check
 // 🎬 Render-job ownership (OWASP API1 — Broken Object Level Authorization).
 //
 // A `/render/:id` (státusz) és `/render/:id/file` (letöltés) eddig AUTH NÉLKÜL,

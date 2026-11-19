@@ -1,3 +1,4 @@
+// @ts-check
 const { logCaught } = require('../lib/caught');
 // 🔑 Endpoint policy-réteg (OWASP API5 — Broken Function Level Authorization,
 // API9 — Improper Inventory Management).
@@ -29,9 +30,19 @@ const LEVELS = [
 
 // ───────────────────────────────────────────────────────── inventory (API9)
 
+/**
+ * A route-definíció leíró adatai (a leltárhoz).
+ * @typedef {{method?: string, path?: string, rateClass?: string}} RouteMeta
+ */
+
+/** @type {Array<{level: string, method: string | null, path: string | null, rateClass: string | null}>} */
 const _inventory = [];
 
-/** Egy route regisztrálása a leltárba (a factory hívja a route-definíciónál). */
+/**
+ * Egy route regisztrálása a leltárba (a factory hívja a route-definíciónál).
+ * @param {string} level
+ * @param {RouteMeta} [meta]
+ */
 function registerRoute(level, meta = {}) {
   _inventory.push({
     level,
@@ -58,6 +69,9 @@ const DENY_401 = { allow: false, status: 401, error: 'Hitelesítés szükséges.
 /**
  * PURE policy-döntés. `caps` a hívó feloldott képességei:
  *   { authed, pro, owner, editor, role:'admin'|'moderator'|null, system }
+ * @param {string} level
+ * @param {{authed?: boolean, pro?: boolean, owner?: boolean, editor?: boolean,
+ *          role?: string | null, system?: boolean}} [caps]
  * @returns {{allow:boolean, status?:number, error?:string}}
  */
 function decide(level, caps = {}) {
@@ -102,7 +116,10 @@ function decide(level, caps = {}) {
 
 // ───────────────────────────────────────────────────────── middleware-ek
 
-/** szerver-hiteles Pro-kapu (a meglévő requirePro szemantikája, lazy billinggel). */
+/**
+ * szerver-hiteles Pro-kapu (a meglévő requirePro szemantikája, lazy billinggel).
+ * @type {ExpressLite.Handler}
+ */
 function proGate(req, res, next) {
   if (INSECURE_DEV) {
     next();
@@ -130,25 +147,41 @@ function proGate(req, res, next) {
     .catch((caught) => { logCaught('security/authorization.js:proGate', caught); return res.status(402).json({ error: 'Az előfizetés nem ellenőrizhető.', pro: true }); });
 }
 
-/** PUBLIC — tudatosan nyitott (regisztrálva az inventory-ba). */
+/**
+ * PUBLIC — tudatosan nyitott (regisztrálva az inventory-ba).
+ * @param {RouteMeta} [meta]
+ * @returns {ExpressLite.Handler[]}
+ */
 function publicRoute(meta) {
   registerRoute('PUBLIC', meta);
   return [(req, _res, next) => next()];
 }
 
-/** AUTHENTICATED — verifikált token kell (a requireAuth kezeli az INSECURE_DEV-et). */
+/**
+ * AUTHENTICATED — verifikált token kell (a requireAuth kezeli az INSECURE_DEV-et).
+ * @param {RouteMeta} [meta]
+ * @returns {ExpressLite.Handler[]}
+ */
 function authenticated(meta) {
   registerRoute('AUTHENTICATED', meta);
   return [requireAuth];
 }
 
-/** PRO — hitelesítés + szerver-hiteles Pro-ellenőrzés. */
+/**
+ * PRO — hitelesítés + szerver-hiteles Pro-ellenőrzés.
+ * @param {RouteMeta} [meta]
+ * @returns {ExpressLite.Handler[]}
+ */
 function pro(meta) {
   registerRoute('PRO', meta);
   return [requireAuth, proGate];
 }
 
-/** SYSTEM — csak belső/rendszer-hívó (service-secret egyezés). */
+/**
+ * SYSTEM — csak belső/rendszer-hívó (service-secret egyezés).
+ * @param {RouteMeta} [meta]
+ * @returns {ExpressLite.Handler[]}
+ */
 function system(meta) {
   registerRoute('SYSTEM', meta);
   const secret = (process.env.WORKER_SYSTEM_SECRET || '').trim();

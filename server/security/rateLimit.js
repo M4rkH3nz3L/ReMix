@@ -1,3 +1,4 @@
+// @ts-check
 const { logCaught } = require('../lib/caught');
 // 🧱 Rate limiting (OWASP API4 — Unrestricted Resource Consumption).
 //
@@ -25,6 +26,7 @@ const DISABLED = process.env.RL_DISABLED === '1';
 
 // Alap-limitek osztályonként (ablak ms + max kérés/ablak). Szándékosan BŐKEZŰ:
 // a cél a visszaélés/DoS kivédése, nem a legitim használat akadályozása.
+/** @type {Record<string, {windowMs: number, max: number}>} */
 const DEFAULTS = {
   ai: { windowMs: 60_000, max: 30 }, // AI: drága, user+subscription
   render: { windowMs: 60_000, max: 20 }, // render dispatch
@@ -39,7 +41,11 @@ const DEFAULTS = {
   default: { windowMs: 60_000, max: 120 },
 };
 
-/** Egy osztály konfigja az env-felülírásokkal. */
+/**
+ * Egy osztály konfigja az env-felülírásokkal.
+ * @param {string} className
+ * @returns {{windowMs: number, max: number}}
+ */
 function classConfig(className) {
   const base = DEFAULTS[className] || DEFAULTS.default;
   const up = className.toUpperCase();
@@ -55,6 +61,9 @@ function classConfig(className) {
  * A kérés azonosító-kulcsa: a legerősebb ismert azonosító. A verifikált user
  * (requireAuth után req.user.id) a legjobb; utána egy kliens-eszköz fejléc;
  * végül az IP (névtelen hívó). `prefix` elkülöníti a tér-névteret (osztály).
+ * @param {ExpressLite.Request} req
+ * @param {string} className
+ * @returns {string}
  */
 function keyFor(req, className) {
   const uid = req.user && req.user.id;
@@ -67,20 +76,31 @@ function keyFor(req, className) {
     return `rl:${className}:d:${device.slice(0, 64)}`;
   }
   // IP: az első X-Forwarded-For (reverse proxy mögött), különben a socket
-  const fwd = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  // a Node az ismétlődő X-Forwarded-For fejlécet ', '-vel egy stringgé fűzi (nem tömb)
+  const fwd = (/** @type {string | undefined} */ (req.headers['x-forwarded-for']) || '').split(',')[0].trim();
   const ip = fwd || req.ip || req.socket?.remoteAddress || 'unknown';
   return `rl:${className}:ip:${ip}`;
 }
 
 // ───────────────────────────────────────────────────────── tárak
 
+/**
+ * Egy számláló-tár: a hit utáni ablak-állapotot adja.
+ * @typedef {{hit(key: string, windowMs: number): Promise<{count: number, resetAt: number}>}} RateStore
+ */
+
 /** Process-lokális fixed-window számláló (dev / egy-instance / teszt). */
 class MemoryStore {
   constructor() {
+    /** @type {Map<string, {count: number, resetAt: number}>} */
     this.map = new Map(); // key → { count, resetAt }
   }
 
-  /** @returns {{count:number, resetAt:number}} az aktuális ablak állapota a hit után */
+  /**
+   * @param {string} key
+   * @param {number} windowMs
+   * @returns {Promise<{count:number, resetAt:number}>} az aktuális ablak állapota a hit után
+   */
   async hit(key, windowMs) {
     const now = Date.now();
     const cur = this.map.get(key);
@@ -101,10 +121,18 @@ class MemoryStore {
 
 /** Közös Redis-számláló (több worker-instance között is helyes). */
 class RedisStore {
+  /**
+   * @param {{incr(key: string): Promise<number>, pexpire(key: string, ms: number): Promise<number>}} redis
+   */
   constructor(redis) {
     this.redis = redis;
   }
 
+  /**
+   * @param {string} key
+   * @param {number} windowMs
+   * @returns {Promise<{count: number, resetAt: number}>}
+   */
   async hit(key, windowMs) {
     const bucket = Math.floor(Date.now() / windowMs);
     const k = `${key}:${bucket}`;
@@ -116,8 +144,12 @@ class RedisStore {
   }
 }
 
+/** @type {RateStore | null} */
 let sharedStore = null;
-/** A használandó tár: Redis ha elérhető, különben in-memory. */
+/**
+ * A használandó tár: Redis ha elérhető, különben in-memory.
+ * @returns {RateStore}
+ */
 function store() {
   if (sharedStore) {
     return sharedStore;
@@ -138,6 +170,9 @@ function store() {
 
 /**
  * Pure döntés-függvény (tesztelhető): egy hit után megengedett-e a kérés.
+ * @param {RateStore} st
+ * @param {string} key
+ * @param {{max: number, windowMs: number}} cfg
  * @returns {Promise<{allowed:boolean, remaining:number, retryAfterSec:number, limit:number}>}
  */
 async function evaluate(st, key, { max, windowMs }) {
@@ -150,6 +185,8 @@ async function evaluate(st, key, { max, windowMs }) {
 /**
  * Express-middleware egy endpoint-osztályhoz. A `policy`-réteg (01) UTÁN fut,
  * így a `req.user` (ha van) már beállított → user-kulcsú limit a Pro-knak.
+ * @param {string} className
+ * @returns {ExpressLite.Handler}
  */
 function rateLimit(className) {
   if (DISABLED || INSECURE_DEV) {

@@ -1,7 +1,9 @@
+// @ts-check
 // 🔐 PRO-LIVE L11 — titkok kitakarása naplóból, hibaüzenetből, hibajelentésből.
 // Az RTMP(S) URL-ek útvonala (benne a stream-kulccsal) és a tipikus kulcs-minták
 // soha nem kerülhetnek logba / Alertbe / bug-jelentésbe.
 
+/** @type {Array<[RegExp, string]>} */
 const PATTERNS = [
   // rtmp(s)://host/app/KULCS → rtmp(s)://host/***
   [/(rtmps?:\/\/[^/\s"'<>]+)\/[^\s"'<>]*/gi, '$1/***'],
@@ -20,6 +22,10 @@ const PATTERNS = [
   [/enc:v1:[A-Za-z0-9+/=:._-]+/g, 'enc:v1:***'],
 ];
 
+/**
+ * @param {unknown} input
+ * @returns {string | null | undefined} a bemenet null/undefined esetén változatlanul
+ */
 function redactSecrets(input) {
   if (input == null) return input;
   let s = typeof input === 'string' ? input : String(input);

@@ -1,10 +1,13 @@
+// @ts-check
 const { logCaught } = require('./lib/caught');
 // Render-job-queue (BullMQ + Redis). REDIS_URL nélkül kikapcsolt → a render a
 // lokális in-process úton megy (dev). Beállítva: az API sorba tesz, a külön
 // render-worker(ek) dolgozzák fel — így vízszintesen skálázható és túléli az
 // API-újraindítást.
 const { Queue } = require('bullmq');
-const IORedis = require('ioredis');
+// az ioredis CJS-exportja maga a Redis-osztály (module.exports = Redis), a típusdeklaráció
+// viszont ES-modul névteret ír le → a konstruktor-típust kézzel adjuk meg
+const IORedis = /** @type {typeof import('ioredis').Redis} */ (/** @type {unknown} */ (require('ioredis')));
 
 const REDIS_URL = process.env.REDIS_URL || '';
 const QUEUE_NAME = 'render';
@@ -13,7 +16,9 @@ function queueEnabled() {
   return Boolean(REDIS_URL);
 }
 
+/** @type {import('ioredis').Redis | undefined} */
 let conn;
+/** @returns {import('ioredis').Redis} */
 function connection() {
   if (!conn) {
     // a BullMQ workerhez maxRetriesPerRequest: null kötelező
@@ -22,7 +27,9 @@ function connection() {
   return conn;
 }
 
+/** @type {import('bullmq').Queue | undefined} */
 let queue;
+/** @returns {import('bullmq').Queue} */
 function renderQueue() {
   if (!queue) {
     queue = new Queue(QUEUE_NAME, { connection: connection() });
@@ -36,6 +43,8 @@ function renderQueue() {
  * → free. A tier CSAK a SORRENDET befolyásolja (nem biztonsági; a felhő-render amúgy
  * is Pro-kapu mögött van) — a tényleges tier-differenciálás a 4-tier billing-bekötéssel
  * (§2.4) teljesedik ki; addig minden render-job egységes prioritást kap (FIFO).
+ * @param {unknown} tier
+ * @returns {number}
  */
 function tierJobPriority(tier) {
   switch (tier) {
@@ -56,6 +65,8 @@ function tierJobPriority(tier) {
  * Idempotencia: a `jobId` determinisztikus (ugyanaz az id ugyanazt a slotot foglalja,
  * nincs párhuzamos dupla). Retry: 2 próba, fix 3 s backoff (a tranziens S3/hálózat-hibára).
  * A lezárt jobok ~1 óra után kikerülnek (removeOn*), hogy a „Sor" ne hízzon végtelenül.
+ * @param {string} jobId
+ * @param {{tier?: unknown} | null | undefined} payload
  */
 function renderJobOptions(jobId, payload) {
   return {
@@ -68,13 +79,21 @@ function renderJobOptions(jobId, payload) {
   };
 }
 
-/** Sorba tesz egy render-jobot a megadott id-vel; visszaadja a job id-t. */
+/**
+ * Sorba tesz egy render-jobot a megadott id-vel; visszaadja a job id-t.
+ * @param {string} jobId
+ * @param {{tier?: unknown, userId?: string | null}} payload
+ * @returns {Promise<string>}
+ */
 async function enqueueRender(jobId, payload) {
   await renderQueue().add('render', payload, renderJobOptions(jobId, payload));
   return jobId;
 }
 
-/** A job állapota a kliens-polling számára (state/progress/result/error). */
+/**
+ * A job állapota a kliens-polling számára (state/progress/result/error).
+ * @param {string} id
+ */
 async function getRenderJob(id) {
   const job = await renderQueue().getJob(id);
   if (!job) {
@@ -94,7 +113,9 @@ async function getRenderJob(id) {
  * 🛑 Best-effort render-job megszakítás a sorban: a VÁRAKOZÓ (waiting/prioritized/
  * delayed) jobot eltávolítja; az ÉPP FUTÓ (active) ffmpeg-et a külön worker-
  * folyamatból innen nem tudjuk leállítani (kooperatív abort = követő lépés). A
- * hívó (index.js) a `userId`-vel BOLA-ellenőriz. @returns {found,userId,removed,active}
+ * hívó (index.js) a `userId`-vel BOLA-ellenőriz.
+ * @param {string} id
+ * @returns {Promise<{found: boolean, userId: string | null, removed: boolean, active: boolean}>}
  */
 async function cancelRenderJob(id) {
   const job = await renderQueue().getJob(id);
@@ -125,12 +146,18 @@ async function cancelRenderJob(id) {
 // 🛑 Kooperatív abort-jelzés a futó render-jobnak (Redis flag, 10 perc TTL). A
 // worker a feldolgozás alatt figyeli; az index.js `cancelRenderJob` állítja be.
 const CANCEL_PREFIX = 'render:cancel:';
+/** @param {string} id */
 async function requestJobCancel(id) {
   await connection().set(CANCEL_PREFIX + id, '1', 'EX', 600);
 }
+/**
+ * @param {string} id
+ * @returns {Promise<boolean>}
+ */
 async function isJobCancelRequested(id) {
   return (await connection().exists(CANCEL_PREFIX + id)) === 1;
 }
+/** @param {string} id */
 async function clearJobCancel(id) {
   await connection().del(CANCEL_PREFIX + id);
 }
@@ -159,7 +186,11 @@ function workerOptions() {
   };
 }
 
-/** Egy BullMQ-job → a schedules-nézet nyers mezői (belső, nem exportált). */
+/**
+ * Egy BullMQ-job → a schedules-nézet nyers mezői (belső, nem exportált).
+ * @param {import('bullmq').Job} job
+ * @param {string} state
+ */
 function jobFields(job, state) {
   const d = job.data || {};
   return {
@@ -182,6 +213,7 @@ function jobFields(job, state) {
  * (active) és a VÁRAKOZÓ (waiting, FIFO-sorrendben) jobok + nemrég kész/hibás
  * jobok. A `waiting` a valós feldolgozási sorrend, így ebből számol pozíciót és
  * ETA-t a hívó (index.js). A `completedLimit` a lezárt jobok visszamenő plafonja.
+ * @param {{completedLimit?: number}} [opts]
  */
 async function listRenderJobs({ completedLimit = 25 } = {}) {
   const q = renderQueue();

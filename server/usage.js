@@ -1,3 +1,4 @@
+// @ts-check
 const { loggedFetch, logCaught } = require('./lib/caught');
 // 📊 Usage-metering a workerben (audit §2.2) — a drága felhő-erőforrások havi
 // mérése + tier-kvóta ENFORCE-olása. A kvóta-logika AZONOS a kliens
@@ -16,7 +17,13 @@ const SERVICE_ROLE = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
 const USAGE_METRICS = ['aiTokens', 'renderMinutes', 'exports', 'cloudJobs'];
 
+/**
+ * Metrikánkénti havi keret (-1 = korlátlan).
+ * @typedef {Record<string, number>} Quota
+ */
+
 // Havi kvóták tierenként (-1 = korlátlan). AZONOS a kliens TIER_QUOTAS-szal.
+/** @type {Record<string, Quota>} */
 const TIER_QUOTAS = {
   free: { aiTokens: 0, renderMinutes: 0, exports: 15, cloudJobs: 25 },
   basic: { aiTokens: 200000, renderMinutes: 30, exports: 100, cloudJobs: 150 },
@@ -25,6 +32,10 @@ const TIER_QUOTAS = {
   business: { aiTokens: 2000000, renderMinutes: 300, exports: -1, cloudJobs: -1 },
 };
 
+/**
+ * @param {string} tier
+ * @returns {Quota}
+ */
 function quotaFor(tier) {
   return TIER_QUOTAS[tier] || TIER_QUOTAS.free;
 }
@@ -32,7 +43,12 @@ function quotaFor(tier) {
 // A Vállalati csomag legkisebb ülésszáma (PRO-CASH 5.1); a kliens seatQuota tükre.
 const BUSINESS_MIN_SEATS = 2;
 
-/** A szervezet KÖZÖS havi kerete: Vállalati = fejenkénti kvóta × ülésszám (min. 2). */
+/**
+ * A szervezet KÖZÖS havi kerete: Vállalati = fejenkénti kvóta × ülésszám (min. 2).
+ * @param {string} tier
+ * @param {number} seats
+ * @returns {Quota}
+ */
 function seatQuota(tier, seats) {
   const q = quotaFor(tier);
   if (tier !== 'business') {
@@ -46,18 +62,33 @@ function seatQuota(tier, seats) {
   return out;
 }
 
-/** A dátum havi periódus-kulcsa: `YYYY-MM` (UTC). */
+/**
+ * A dátum havi periódus-kulcsa: `YYYY-MM` (UTC).
+ * @param {Date} date
+ * @returns {string}
+ */
 function periodKey(date) {
   const y = date.getUTCFullYear();
   const m = String(date.getUTCMonth() + 1).padStart(2, '0');
   return `${y}-${m}`;
 }
 
+/**
+ * @param {Quota} quota
+ * @param {string} metric
+ * @returns {boolean}
+ */
 function isUnlimited(quota, metric) {
   return (quota[metric] ?? 0) < 0;
 }
 
-/** Hátralévő mennyiség (Infinity, ha korlátlan). */
+/**
+ * Hátralévő mennyiség (Infinity, ha korlátlan).
+ * @param {number | null | undefined} used
+ * @param {Quota} quota
+ * @param {string} metric
+ * @returns {number}
+ */
 function remaining(used, quota, metric) {
   if (isUnlimited(quota, metric)) {
     return Infinity;
@@ -65,7 +96,14 @@ function remaining(used, quota, metric) {
   return Math.max(0, (quota[metric] ?? 0) - (used || 0));
 }
 
-/** Belefér-e még `amount` (a már felhasznált `used` fölött). */
+/**
+ * Belefér-e még `amount` (a már felhasznált `used` fölött).
+ * @param {number | null | undefined} used
+ * @param {Quota} quota
+ * @param {string} metric
+ * @param {number} [amount]
+ * @returns {boolean}
+ */
 function canUse(used, quota, metric, amount = 1) {
   return remaining(used, quota, metric) >= amount;
 }
@@ -84,6 +122,11 @@ const aiUsageContext = new AsyncLocalStorage();
  * Anthropic: `usage.input_tokens/output_tokens`; OpenAI-kompat.: `usage.total_tokens`
  * vagy `prompt_tokens+completion_tokens`; Ollama: `prompt_eval_count+eval_count`.
  * Ismeretlen alak → 0 (a metering best-effort, sosem dob).
+ * @typedef {{usage?: AiTokenShape | null, input_tokens?: number, output_tokens?: number,
+ *            total_tokens?: number, prompt_tokens?: number, completion_tokens?: number,
+ *            prompt_eval_count?: number, eval_count?: number}} AiTokenShape
+ * @param {AiTokenShape | null | undefined} raw
+ * @returns {number}
  */
 function aiTokenCount(raw) {
   if (!raw || typeof raw !== 'object') {
@@ -105,7 +148,9 @@ function aiTokenCount(raw) {
   return 0;
 }
 
+/** @type {import('@supabase/supabase-js').SupabaseClient | null} */
 let admin = null;
+/** @returns {import('@supabase/supabase-js').SupabaseClient | null} */
 function getAdmin() {
   if (!SUPABASE_URL || !SERVICE_ROLE) {
     return null;
@@ -116,7 +161,13 @@ function getAdmin() {
   return admin;
 }
 
-/** A user adott metrikájának aktuális havi felhasználása (0, ha nincs/hiba). */
+/**
+ * A user adott metrikájának aktuális havi felhasználása (0, ha nincs/hiba).
+ * @param {string | null | undefined} userId
+ * @param {string} metric
+ * @param {Date} [now]
+ * @returns {Promise<number>}
+ */
 async function getUsage(userId, metric, now = new Date()) {
   const sb = getAdmin();
   if (!sb || !userId) {
@@ -143,6 +194,10 @@ async function getUsage(userId, metric, now = new Date()) {
  * A ténylegesen érvényes havi kvóta: a szint kvótája × ülésszám (Vállalati) + az add-onok
  * többlete (PRO-CASH C1.2: +1 M AI-token, +60 render-perc). A kliens tükre: usageMeter.ts
  * `effectiveQuota`. A korlátlan (-1) korlátlan marad.
+ * @param {string} tier
+ * @param {number} [seats]
+ * @param {Record<string, unknown> | null} [extras]
+ * @returns {Quota}
  */
 function effectiveQuota(tier, seats = 1, extras = {}) {
   const q = { ...seatQuota(tier, seats) };
@@ -155,7 +210,12 @@ function effectiveQuota(tier, seats = 1, extras = {}) {
   return q;
 }
 
-/** A user ülésszáma és add-on többlete a DB-ből (subscription_quota_for); hiba/nincs DB → üres. */
+/**
+ * A user ülésszáma és add-on többlete a DB-ből (subscription_quota_for); hiba/nincs DB → üres.
+ * @param {string | null | undefined} userId
+ * @returns {Promise<{seats: number, extras: Record<string, number>, orgId?: string | null,
+ *                    memberLimits?: Record<string, number | null> | null}>}
+ */
 async function quotaExtras(userId) {
   const sb = getAdmin();
   if (!sb || !userId) {
@@ -182,6 +242,11 @@ async function quotaExtras(userId) {
  * 🏢 Szervezeti tag hátralévő kerete (PRO-CASH C4.3): a közös kvótából a szervezet összes
  * fogyasztása jön le, és ha az admin taghatárt állított, a saját fogyasztás sem lépheti át.
  * `usage`: { pool, self } · `limit`: a tag havi határa (null = nincs).
+ * @param {Quota} quota
+ * @param {string} metric
+ * @param {{pool?: unknown, self?: unknown}} usage
+ * @param {number | null | undefined} limit
+ * @returns {number}
  */
 function orgRemaining(quota, metric, usage, limit) {
   const poolLeft = isUnlimited(quota, metric) ? Infinity : Math.max(0, (quota[metric] ?? 0) - (Number(usage.pool) || 0));
@@ -189,6 +254,14 @@ function orgRemaining(quota, metric, usage, limit) {
   return Math.min(poolLeft, selfLeft);
 }
 
+/**
+ * @param {string | null | undefined} userId
+ * @param {string} tier
+ * @param {string} metric
+ * @param {number} [amount]
+ * @param {Date} [now]
+ * @returns {Promise<{ok: boolean, remaining: number}>}
+ */
 async function enforceQuota(userId, tier, metric, amount = 1, now = new Date()) {
   if (!USAGE_METRICS.includes(metric)) {
     return { ok: true, remaining: Infinity };
@@ -216,6 +289,9 @@ async function enforceQuota(userId, tier, metric, amount = 1, now = new Date()) 
  * A user AKTUÁLIS tier-je a `subscriptions`-ből — ugyanaz a szabály, mint a billing
  * `activeTier`-é és a DB `active_tier_for`-é (server/tiers.js `activeTierFromRow`).
  * Hiba/nincs/lejárt → `free`. (A kvóta ENFORCE-hoz a HITELES, server-oldali tier kell.)
+ * @param {string | null | undefined} userId
+ * @param {Date} [now]
+ * @returns {Promise<string>}
  */
 async function userTier(userId, now = new Date()) {
   const sb = getAdmin();
@@ -230,7 +306,14 @@ async function userTier(userId, now = new Date()) {
   return activeTierFromRow(data, now.getTime());
 }
 
-/** Fogyasztás könyvelése a hívás UTÁN (best-effort, atomikus upsert-increment). */
+/**
+ * Fogyasztás könyvelése a hívás UTÁN (best-effort, atomikus upsert-increment).
+ * @param {string | null | undefined} userId
+ * @param {string} metric
+ * @param {number} amount
+ * @param {Date} [now]
+ * @returns {Promise<void>}
+ */
 async function trackUsage(userId, metric, amount, now = new Date()) {
   const sb = getAdmin();
   if (!sb || !userId || !USAGE_METRICS.includes(metric) || !(amount > 0)) {

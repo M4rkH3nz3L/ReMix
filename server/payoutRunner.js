@@ -1,3 +1,4 @@
+// @ts-check
 const { logCaught } = require('./lib/caught');
 // 💸 Jóváhagyott kifizetések végrehajtása (PRO-CASH C3.3) — az állapotgépen át:
 //   approved → processing → (partner-utalás) → paid | failed (failed → a DB visszaírja a Coint).
@@ -8,6 +9,27 @@ const { logCaught } = require('./lib/caught');
 const { payoutsConfigured, sendPayout } = require('./payouts');
 const { transferToAccount } = require('./stripeConnect');
 
+/**
+ * Egy jóváhagyott kifizetési kérés (payout_requests sor).
+ * @typedef {{id: string, user_id?: string, cents?: number, amount_eur_cents: number}} PayoutRequest
+ */
+
+/**
+ * A user célszámlája (payout_accounts sor).
+ * @typedef {{provider: string, email?: string | null, account_ref?: string | null,
+ *            kyc_status?: string | null}} PayoutAccount
+ */
+
+/**
+ * Partnerenkénti küldő (null = a partner nincs bekötve); a provider-referenciát adja.
+ * @typedef {(acct: PayoutAccount, req: PayoutRequest) => Promise<unknown>} PayoutSender
+ * @typedef {Record<string, PayoutSender | null>} PayoutSenders
+ */
+
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {PayoutSenders}
+ */
 function defaultSenders(env = process.env) {
   return {
     paypal: payoutsConfigured() ? (acct, req) => sendPayout(acct, req.amount_eur_cents, `ReMix payout ${req.id}`) : null,
@@ -17,6 +39,14 @@ function defaultSenders(env = process.env) {
   };
 }
 
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} sb
+ * @param {string} id
+ * @param {string} to
+ * @param {unknown} [ref]
+ * @param {string | null} [note]
+ * @returns {Promise<void>}
+ */
 async function transition(sb, id, to, ref = null, note = null) {
   const { error } = await sb.rpc('payout_transition', { p_request: id, p_to: to, p_provider_ref: ref, p_note: note });
   if (error) {
@@ -24,7 +54,14 @@ async function transition(sb, id, to, ref = null, note = null) {
   }
 }
 
-/** Egy jóváhagyott kérés végrehajtása. Visszaadja a végállapotot ('paid' | 'failed' | 'approved' | 'processing' = utalva, de a paid-írás elbukott). */
+/**
+ * Egy jóváhagyott kérés végrehajtása. Visszaadja a végállapotot ('paid' | 'failed' | 'approved' | 'processing' = utalva, de a paid-írás elbukott).
+ * @param {import('@supabase/supabase-js').SupabaseClient} sb
+ * @param {PayoutRequest} req
+ * @param {PayoutAccount | null | undefined} acct
+ * @param {PayoutSenders} [senders]
+ * @returns {Promise<'paid' | 'failed' | 'approved' | 'processing'>}
+ */
 async function executeApproved(sb, req, acct, senders = defaultSenders()) {
   const send = acct && senders[acct.provider];
   if (!send) {
@@ -36,7 +73,7 @@ async function executeApproved(sb, req, acct, senders = defaultSenders()) {
     ref = await send(acct, req);
   } catch (caught) {
     logCaught('payoutRunner.js:executeApproved', caught);
-    await transition(sb, req.id, 'failed', null, String((caught && caught.message) || caught).slice(0, 300));
+    await transition(sb, req.id, 'failed', null, String((caught && /** @type {{message?: unknown}} */ (caught).message) || caught).slice(0, 300));
     return 'failed';
   }
   // A pénz ELMENT: a „paid” írás hibája nem lehet „failed” (az visszaírná a Coint → dupla kifizetés).
@@ -44,14 +81,20 @@ async function executeApproved(sb, req, acct, senders = defaultSenders()) {
   try {
     await transition(sb, req.id, 'paid', ref || null);
   } catch (caught) {
-    const reason = String((caught && caught.message) || caught);
+    const reason = String((caught && /** @type {Error} */ (caught).message) || caught);
     logCaught('payoutRunner.js:executeApproved:paid', new Error(`utalva (${ref || 'nincs ref'}), de a paid-írás elbukott: ${reason}`));
     return 'processing';
   }
   return 'paid';
 }
 
-/** Az összes jóváhagyott (pl. kézi ellenőrzésen átment) kérés feldolgozása — az ütemező hívja. */
+/**
+ * Az összes jóváhagyott (pl. kézi ellenőrzésen átment) kérés feldolgozása — az ütemező hívja.
+ * @param {import('@supabase/supabase-js').SupabaseClient | null | undefined} sb
+ * @param {PayoutSenders} [senders]
+ * @param {number} [limit]
+ * @returns {Promise<{paid: number, failed: number, waiting: number}>}
+ */
 async function runApprovedPayouts(sb, senders = defaultSenders(), limit = 20) {
   const out = { paid: 0, failed: 0, waiting: 0 };
   if (!sb) {

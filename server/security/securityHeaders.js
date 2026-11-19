@@ -1,3 +1,4 @@
+// @ts-check
 // 🧢 Security-fejlécek (devs/tasks/remix/14) — helmet-szerű alap, ÚJ DEP NÉLKÜL.
 //
 // Minden worker-válasz megkapja a biztonsági alap-fejléceket. SZÁNDÉKOSAN NEM
@@ -6,7 +7,7 @@
 // biztonságos, funkció-semleges fejlécek.
 
 /**
- * @returns Express-middleware, ami beállítja a biztonsági fejléceket.
+ * @returns {ExpressLite.Handler} Express-middleware, ami beállítja a biztonsági fejléceket.
  */
 function securityHeaders() {
   return (req, res, next) => {

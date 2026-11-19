@@ -1,3 +1,4 @@
+// @ts-check
 const { logCaught } = require('./lib/caught');
 // 🪙 A Coin-gazdaság ütemezett futásai (PRO-CASH C0.3 + C1.3), óránként:
 //   1. tartás-feloldás és bónusz-lejárat (`coin_release_due`) — a DB minden olvasáskor
@@ -9,7 +10,20 @@ const { logCaught } = require('./lib/caught');
 //      kereten túli felhő-tárhely türelmi idejének vége előtt 7 nappal (`take_storage_grace_notices`, C1.6).
 // Az `sb`, a `now` és az értesítő injektálható (teszt); service_role nélkül no-op.
 
-/** Egy futás: a coin_release_due RPC. Visszaadja az érintett userek számát (hibánál 0). */
+/** @typedef {import('@supabase/supabase-js').SupabaseClient} SupabaseClient */
+
+/**
+ * Egy kiküldendő értesítés (a notify.js sendNotification bemenete).
+ * @typedef {{userId: string, type: string, title: string, body: string, route: string,
+ *            data: Record<string, unknown>}} Notice
+ */
+
+/**
+ * Egy futás: a coin_release_due RPC. Visszaadja az érintett userek számát (hibánál 0).
+ * @param {SupabaseClient | null | undefined} sb
+ * @param {Date} [now]
+ * @returns {Promise<number>}
+ */
 async function runCoinSettleOnce(sb, now = new Date()) {
   if (!sb) {
     return 0;
@@ -26,7 +40,12 @@ async function runCoinSettleOnce(sb, now = new Date()) {
   }
 }
 
-/** A megújítási értesítés szövege (magyar alapértelmezés; a route a pénztárcára visz). */
+/**
+ * A megújítási értesítés szövege (magyar alapértelmezés; a route a pénztárcára visz).
+ * @param {{user_id: string, cost_cents: number | string, balance_cents: number | string,
+ *          period_end: string}} row a take_renewal_notices egy sora
+ * @returns {Notice}
+ */
 function renewalNotice(row) {
   const need = Math.max(0, Number(row.cost_cents) - Number(row.balance_cents)) / 100;
   const date = new Date(row.period_end).toISOString().slice(0, 10);
@@ -43,6 +62,10 @@ function renewalNotice(row) {
 /**
  * Egy ciklus-futás: megújítás + értesítések. Visszaadja: { renewed, failed, ended, notified }.
  * `notify`: a sendNotification (injektálható); egy értesítés hibája nem állítja meg a többit.
+ * @param {SupabaseClient | null | undefined} sb
+ * @param {Date} [now]
+ * @param {((notice: Notice) => Promise<unknown>) | null} [notify]
+ * @returns {Promise<{renewed: number, failed: number, ended: number, notified: number}>}
  */
 async function runSubscriptionCycleOnce(sb, now = new Date(), notify = null) {
   const out = { renewed: 0, failed: 0, ended: 0, notified: 0 };
@@ -112,7 +135,11 @@ async function runSubscriptionCycleOnce(sb, now = new Date(), notify = null) {
   return out;
 }
 
-/** A felhő-tárhely türelmi idejének vége (C1.6): semmit nem törlünk, de a feltöltés zárva marad. */
+/**
+ * A felhő-tárhely türelmi idejének vége (C1.6): semmit nem törlünk, de a feltöltés zárva marad.
+ * @param {{user_id: string, grace_until: string, over_bytes: number | string}} row
+ * @returns {Notice}
+ */
 function storageGraceNotice(row) {
   const date = new Date(row.grace_until).toISOString().slice(0, 10);
   const gb = (Number(row.over_bytes) / 1073741824).toFixed(1).replace('.', ',');
@@ -126,7 +153,11 @@ function storageGraceNotice(row) {
   };
 }
 
-/** A próba végéről szóló értesítés (C2.4): automatikus terhelés nincs, a user dönt. */
+/**
+ * A próba végéről szóló értesítés (C2.4): automatikus terhelés nincs, a user dönt.
+ * @param {{user_id: string, ends_at: string}} row
+ * @returns {Notice}
+ */
 function trialNotice(row) {
   const date = new Date(row.ends_at).toISOString().slice(0, 10);
   return {

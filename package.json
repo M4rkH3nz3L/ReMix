@@ -87,7 +87,7 @@
     "lint": "expo lint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p server/tsconfig.json",
     "audit": "npm run typecheck && npm run lint && npm test",
     "test:rls": "set -o pipefail; for f in supabase/tests/*.sql; do echo \"── $f\"; docker exec -i supabase_db_ReMix psql -U postgres -d postgres -q < \"$f\" | grep -E 'FAIL|rendben' || exit 1; done; for f in supabase/tests/*.sh; do echo \"── $f\"; bash \"$f\" | grep -E 'FAIL|rendben' || exit 1; done",
     "test:mutation": "REMIX_ROOT=$PWD stryker run"

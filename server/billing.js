@@ -1,3 +1,4 @@
+// @ts-check
 const { logCaught } = require('./lib/caught');
 // 💳 Billing — a Pro szint EGYETLEN hiteles forrása a `subscriptions` táblában.
 //
@@ -16,6 +17,34 @@ const { planRevenueCatEvent } = require('./rcEvents');
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_DAYS = 30;
 
+/**
+ * Az aktiválás opciói (`until`: ISO vagy ms; `days`: hosszabbítás napokban).
+ * @typedef {{source?: string, seats?: number, until?: string | number | null, days?: number}} ActivateOpts
+ */
+
+/**
+ * A RevenueCat-webhook `event` mezőjéből itt használt rész.
+ * @typedef {{id?: string | number, type?: string, app_user_id?: string,
+ *            product_id?: string, transaction_id?: string}} RcEvent
+ */
+
+/**
+ * A `planRevenueCatEvent` (rcEvents.js) tervének alakjai.
+ * @typedef {{action: 'coins', cents: number, bonusCents: number, product: string}
+ *         | {action: 'coins_refund', cents: number, product: string}
+ *         | {action: 'grant', tier: string, until: number | null, paid: boolean, period: string}
+ *         | {action: 'revoke', status: string}
+ *         | {action: 'ignore', reason: string}} RcPlan
+ */
+
+/**
+ * A `planStripeEvent` (stripe.js) tervének alakjai.
+ * @typedef {{action: 'coins', userId: string, cents: number, bonusCents: number, ref: string}
+ *         | {action: 'coins_refund', userId: string, cents: number, ref: string}
+ *         | {action: 'kyc', userId: string, accountRef: string, status: string}
+ *         | {action: 'ignore', reason: string}} StripePlan
+ */
+
 /** Be van-e kötve a service_role (megy-e a billing-írás). */
 function billingAvailable() {
   return !!adminClient();
@@ -26,6 +55,10 @@ function billingAvailable() {
  * `opts.until` (ISO/ms): explicit lejárat (webhook). Különben `opts.days` (def. 30)
  * a meglévő, UGYANILYEN szintű érvényes lejárattól, vagy mosttól. `opts.seats`: ülésszám
  * (Vállalati: min. 2).
+ * @param {unknown} userId
+ * @param {string} tier
+ * @param {ActivateOpts} [opts]
+ * @returns {Promise<{tier: string, proUntil: string}>}
  */
 async function activateTier(userId, tier, opts = {}) {
   const sb = adminClient();
@@ -50,7 +83,7 @@ async function activateTier(userId, tier, opts = {}) {
       throw new Error('Érvénytelen lejárat (until).');
     }
   } else {
-    const days = Number.isFinite(opts.days) ? opts.days : DEFAULT_DAYS;
+    const days = Number.isFinite(opts.days) ? /** @type {number} */ (opts.days) : DEFAULT_DAYS;
     // megújítás: ha még érvényes UGYANEZ a szint, ONNAN hosszabbítunk, különben mosttól
     const { data: cur } = await sb
       .from('subscriptions')
@@ -73,7 +106,11 @@ async function activateTier(userId, tier, opts = {}) {
   return { tier, proUntil: end };
 }
 
-/** Haladó (`pro`) aktiválása — a régi hívók rövidítése az `activateTier`-re. */
+/**
+ * Haladó (`pro`) aktiválása — a régi hívók rövidítése az `activateTier`-re.
+ * @param {unknown} userId
+ * @param {ActivateOpts} [opts]
+ */
 function activatePro(userId, opts = {}) {
   return activateTier(userId, 'pro', opts);
 }
@@ -82,6 +119,13 @@ function activatePro(userId, opts = {}) {
  * 🪙 Coin jóváírása — service_role, a grant_coins RPC-n át. `cents`: cent-Coin (1 Coin = 100);
  * `bucket`: purchased (feltöltés) | bonus (csomag-bónusz, promó) | earned (bevétel, 30 nap tartás).
  * Visszaadja az új összes egyenleget (cent-Coin).
+ * @param {unknown} userId
+ * @param {unknown} cents
+ * @param {string} [bucket]
+ * @param {string} [kind]
+ * @param {string | null} [note]
+ * @param {string | null} [ref]
+ * @returns {Promise<{balance: unknown}>}
  */
 async function grantCoins(userId, cents, bucket = 'purchased', kind = 'topup', note = null, ref = null) {
   const sb = adminClient();
@@ -107,7 +151,12 @@ async function grantCoins(userId, cents, bucket = 'purchased', kind = 'topup', n
   return { balance: data };
 }
 
-/** Pro visszavonása (lejárat/visszatérítés/lemondás után). */
+/**
+ * Pro visszavonása (lejárat/visszatérítés/lemondás után).
+ * @param {unknown} userId
+ * @param {{status?: string, source?: string}} [opts]
+ * @returns {Promise<{tier: string, proUntil: null}>}
+ */
 async function deactivatePro(userId, opts = {}) {
   const sb = adminClient();
   if (!sb) {
@@ -130,6 +179,10 @@ async function deactivatePro(userId, opts = {}) {
 /**
  * 🧾 Áruházi Coin-visszatérítés: a csomag Coinja (+ bónusza) visszavonva; ha a vevő már
  * elköltötte, a hiány a fiókot ellenőrzésre jelöli (coin_clawback, PRO-CASH C0.5).
+ * @param {string} userId
+ * @param {number} cents
+ * @param {string} note
+ * @returns {Promise<unknown>}
  */
 async function clawbackCoins(userId, cents, note) {
   const sb = adminClient();
@@ -146,9 +199,11 @@ async function clawbackCoins(userId, cents, note) {
 /**
  * A tényleges entitlement-logika: a tiszta `planRevenueCatEvent` (server/rcEvents.js)
  * terve szerint Coin-jóváírás / -visszavonás, szint-aktiválás vagy -visszavonás.
+ * @param {RcEvent} ev
+ * @param {string} uid
  */
 async function processRevenueCatEvent(ev, uid) {
-  const plan = planRevenueCatEvent(ev);
+  const plan = /** @type {RcPlan} */ (planRevenueCatEvent(ev));
   const note = `${ev.product_id || ''}${ev.transaction_id ? `:${ev.transaction_id}` : ''}`;
   switch (plan.action) {
     case 'coins': {
@@ -183,6 +238,9 @@ async function processRevenueCatEvent(ev, uid) {
  * 🔁 Idempotencia (devs/tasks/remix/11): feldolgoztuk-e MÁR ezt az esemény-id-t?
  * BEST-EFFORT — a `sb` injektálható (tesztelhető); bármilyen hiba / hiányzó tábla
  * esetén `false` (a legitim eseményt SOHA nem blokkoljuk a dedup miatt).
+ * @param {import('@supabase/supabase-js').SupabaseClient | null | undefined} sb
+ * @param {string | null} id
+ * @returns {Promise<boolean>}
  */
 async function webhookEventSeen(sb, id) {
   if (!sb || !id) {
@@ -201,7 +259,13 @@ async function webhookEventSeen(sb, id) {
   }
 }
 
-/** Egy feldolgozott esemény-id rögzítése (SIKER UTÁN). Best-effort, sosem dob. */
+/**
+ * Egy feldolgozott esemény-id rögzítése (SIKER UTÁN). Best-effort, sosem dob.
+ * @param {import('@supabase/supabase-js').SupabaseClient | null | undefined} sb
+ * @param {string | null} id
+ * @param {string | null | undefined} type
+ * @returns {Promise<void>}
+ */
 async function recordWebhookEvent(sb, id, type) {
   if (!sb || !id) {
     return;
@@ -224,9 +288,10 @@ async function recordWebhookEvent(sb, id, type) {
  * UTÁN történik: ha a grant elhasal, az esemény NEM lesz „feldolgozott"-ként
  * megjelölve, így a retry újra megpróbálja (pénz-út: inkább újra, mint elveszett).
  * A dedup teljesen best-effort → ha a tábla nincs/hibázik, a régi viselkedés megy.
+ * @param {{event?: RcEvent | null} | null | undefined} body
  */
 async function handleRevenueCatEvent(body) {
-  const ev = (body && body.event) || {};
+  const ev = /** @type {RcEvent} */ ((body && body.event) || {});
   const uid = ev.app_user_id;
   if (!uid) {
     throw new Error('app_user_id hiányzik az eseményből.');
@@ -247,6 +312,7 @@ async function handleRevenueCatEvent(body) {
 /**
  * 💶 Stripe-esemény végrehajtása (C1.5) — a tiszta `planStripeEvent` terve szerint.
  * Idempotens: a `stripe:<event id>` csak egyszer dolgozódik fel (a rögzítés SIKER UTÁN).
+ * @param {{id?: string, type?: string}} event
  */
 async function handleStripeEvent(event) {
   const { planStripeEvent } = require('./stripe');
@@ -255,7 +321,7 @@ async function handleStripeEvent(event) {
   if (eventId && (await webhookEventSeen(sb, eventId))) {
     return { duplicate: true, id: eventId };
   }
-  const plan = planStripeEvent(event);
+  const plan = /** @type {StripePlan} */ (planStripeEvent(event));
   let result;
   if (plan.action === 'coins') {
     await grantCoins(plan.userId, plan.cents, 'purchased', 'topup', `stripe:${plan.ref}`);
@@ -298,6 +364,8 @@ async function handleStripeEvent(event) {
 /**
  * A HITELES (szerver-oldali) AKTÍV tier, vagy `'free'`, ha nincs érvényes előfizetés.
  * Egy forrás az összes tier-gate-nek (isPro/isPaid) — így a 4→5-tier modellel sem csúszik.
+ * @param {unknown} userId
+ * @returns {Promise<string>}
  */
 async function activeTier(userId) {
   const sb = adminClient();
@@ -321,12 +389,20 @@ async function activeTier(userId) {
   }
 }
 
-/** Pro-szintű hozzáférés? rang ≥ `pro` → pro/ultra/business is (JAVÍTVA: eddig csak a 'pro' ment át). */
+/**
+ * Pro-szintű hozzáférés? rang ≥ `pro` → pro/ultra/business is (JAVÍTVA: eddig csak a 'pro' ment át).
+ * @param {unknown} userId
+ * @returns {Promise<boolean>}
+ */
 async function isPro(userId) {
   return tierMeetsMin(await activeTier(userId), 'pro');
 }
 
-/** Fizető (min Amatőr) hozzáférés? rang ≥ `basic` → a worker/felhő-render/R2-gate ehhez kötött (TECH-TOP §6). */
+/**
+ * Fizető (min Amatőr) hozzáférés? rang ≥ `basic` → a worker/felhő-render/R2-gate ehhez kötött (TECH-TOP §6).
+ * @param {unknown} userId
+ * @returns {Promise<boolean>}
+ */
 async function isPaid(userId) {
   return isPaidTier(await activeTier(userId));
 }

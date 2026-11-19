@@ -1,3 +1,4 @@
+// @ts-check
 const { logCaught } = require('../lib/caught');
 // 📝 Audit- és security-event napló (devs/tasks/remix/14).
 //
@@ -14,10 +15,19 @@ const fs = require('fs');
 const AUDIT_FILE = (process.env.AUDIT_LOG_FILE || '').trim();
 
 /**
- * Egy napló-bejegyzés kanonikus JSON-sora. @param nowIso ISO-időbélyeg (kívülről
- * adva → tesztelhető). @returns {string}
+ * Egy napló-esemény (a hívók tetszőleges actor/target/result értéket adhatnak).
+ * @typedef {{kind?: string, type?: string, actor?: unknown, target?: unknown,
+ *            result?: unknown, meta?: unknown}} AuditEvent
+ */
+
+/**
+ * Egy napló-bejegyzés kanonikus JSON-sora.
+ * @param {AuditEvent | null | undefined} event
+ * @param {string} nowIso ISO-időbélyeg (kívülről adva → tesztelhető)
+ * @returns {string}
  */
 function formatAuditEntry(event, nowIso) {
+  /** @type {{ts: string, kind: string, type: string, actor: unknown, target: unknown, result: unknown, meta?: object}} */
   const entry = {
     ts: nowIso,
     kind: event && event.kind === 'security' ? 'security' : 'audit',
@@ -32,7 +42,10 @@ function formatAuditEntry(event, nowIso) {
   return JSON.stringify(entry);
 }
 
-/** a sor kiírása: stdout + opcionális fájl (best-effort, sosem dob) */
+/**
+ * a sor kiírása: stdout + opcionális fájl (best-effort, sosem dob)
+ * @param {string} line
+ */
 function write(line) {
   try {
     console.log(`[audit] ${line}`);
@@ -50,7 +63,10 @@ function write(line) {
   }
 }
 
-/** Általános audit-bejegyzés. A naplózás SOHA ne buktasson el egy kérést. */
+/**
+ * Általános audit-bejegyzés. A naplózás SOHA ne buktasson el egy kérést.
+ * @param {AuditEvent} event
+ */
 function audit(event) {
   try {
     write(formatAuditEntry(event, new Date().toISOString()));
@@ -62,7 +78,8 @@ function audit(event) {
 
 /**
  * Security-esemény (rate-limit-találat, BOLA-elutasítás, SSRF-blokk, auth-hiba).
- * @param type pl. 'render.denied' | 'ratelimit.block' | 'ssrf.block'
+ * @param {string} type pl. 'render.denied' | 'ratelimit.block' | 'ssrf.block'
+ * @param {{actor?: unknown, target?: unknown, result?: unknown, meta?: unknown}} [opts]
  */
 function securityEvent(type, opts = {}) {
   audit({

@@ -1,0 +1,34 @@
+{
+  // 🔒 A worker (CommonJS JS) típusellenőrzése JSDoc-kal — fokozatos bevezetés (QUALITY 3. fázis).
+  // Csak a `// @ts-check`-kel jelölt fájlok hibái számítanak (checkJs: false); új fájl felvétele: a fájl elejére
+  // `// @ts-check`, és ide az `include`-ba.
+  // Futtatás: npm run typecheck (a gyökérből — a kliens és a worker együtt).
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": true,
+    "target": "ES2022",
+    "module": "node16",
+    "moduleResolution": "node16",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": [
+    "types/*.d.ts",
+    "security/*.js",
+    "tiers.js",
+    "billing.js",
+    "coinSettle.js",
+    "queue.js",
+    "payouts.js",
+    "payoutRunner.js",
+    "quota.js",
+    "usage.js"
+  ],
+  "exclude": ["node_modules", "**/*.test.js"]
+}

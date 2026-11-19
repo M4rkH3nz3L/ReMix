@@ -1,24 +1,42 @@
+// @ts-check
 // 💠 Tier-rangsor — a kliens src/lib/tiers.ts SZERVER-tükre (függőség-mentes).
 // A kettőt a src/lib/contract.test.ts zárolja. A gate-logika rang szerint dönt:
 // free < basic < pro < ultra < business. (Csomag-nevek: Free/Amatőr/Haladó/Profi/Vállalati.)
 const TIER_ORDER = ['free', 'basic', 'pro', 'ultra', 'business'];
 
+/**
+ * @param {string} tier
+ * @returns {number}
+ */
 function tierRank(tier) {
   const i = TIER_ORDER.indexOf(tier);
   return i < 0 ? 0 : i;
 }
 
-/** Eléri-e a userTier legalább a minTier-t? */
+/**
+ * Eléri-e a userTier legalább a minTier-t?
+ * @param {string} userTier
+ * @param {string} minTier
+ * @returns {boolean}
+ */
 function tierMeetsMin(userTier, minTier) {
   return tierRank(userTier) >= tierRank(minTier);
 }
 
-/** Fizetős szint-e (bármi a free fölött)? */
+/**
+ * Fizetős szint-e (bármi a free fölött)?
+ * @param {string} tier
+ * @returns {boolean}
+ */
 function isPaidTier(tier) {
   return tierRank(tier) > 0;
 }
 
-/** Normalizálás ismeretlen bemenetről a legközelebbi érvényes tierre (free). */
+/**
+ * Normalizálás ismeretlen bemenetről a legközelebbi érvényes tierre (free).
+ * @param {unknown} value
+ * @returns {string}
+ */
 function asTier(value) {
   return typeof value === 'string' && TIER_ORDER.includes(value) ? value : 'free';
 }
@@ -30,6 +48,9 @@ const ACTIVE_STATUSES = ['active', 'trialing'];
  * A HITELES aktív szint egy `subscriptions`-sorból (a DB `active_tier_for` tükre):
  * aktív státusz ÉS nem lejárt periódus → a sor szintje; FAIL-CLOSED: hiányzó/hibás
  * lejárat, ismeretlen státusz → 'free'. A kliens tükre: src/lib/tiers.ts `activeTierFromRow`.
+ * @param {{status: string, current_period_end?: string | null, tier?: unknown} | null | undefined} row
+ * @param {number} [nowMs]
+ * @returns {string}
  */
 function activeTierFromRow(row, nowMs = Date.now()) {
   if (!row || !ACTIVE_STATUSES.includes(row.status)) {

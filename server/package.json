@@ -36,5 +36,8 @@
     "three": "^0.185.1",
     "toqr": "^0.1.1",
     "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5"
   }
 }

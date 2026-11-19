@@ -1,3 +1,4 @@
+// @ts-check
 // 🧪 Média-upload policy (OWASP File Upload Cheat Sheet + API4).
 //
 // A worker ma globális `upload.any()`-vel fogad BÁRMIT (2 GB, típus-/darab-/
@@ -11,13 +12,17 @@
 
 // ───────────────────────────────────────────────── magic-byte detektálás
 
-/** egy buffer kezdő-bájtjaiból a médiatípus: 'image' | 'video' | 'audio' | 'document' | null */
+/**
+ * egy buffer kezdő-bájtjaiból a médiatípus: 'image' | 'video' | 'audio' | 'document' | null
+ * @param {Buffer | null | undefined} buf
+ * @returns {'image' | 'video' | 'audio' | 'document' | 'font' | null}
+ */
 function detectKind(buf) {
   if (!buf || buf.length < 12) {
     return null;
   }
   const b = buf;
-  const ascii = (start, len) => b.slice(start, start + len).toString('latin1');
+  const ascii = (/** @type {number} */ start, /** @type {number} */ len) => b.slice(start, start + len).toString('latin1');
 
   // --- dokumentum ---
   if (ascii(0, 4) === '%PDF') return 'document'; // PDF (oldal-import)
@@ -67,8 +72,20 @@ function detectKind(buf) {
 const MB = 1024 * 1024;
 
 /**
+ * Egy endpoint-profil.
+ * @typedef {{exts: string[], kinds: string[], maxBytes: number, maxCount: number,
+ *            textExts?: string[], allowEmpty?: boolean}} MediaProfile
+ */
+
+/**
+ * Validációs eredmény (a `kind` csak sikernél).
+ * @typedef {{ok: boolean, status?: number, error?: string, kind?: string}} ValidationResult
+ */
+
+/**
  * Endpoint-profilok: milyen kiterjesztés + melyik média-kind engedett, mekkora
  * a max fájlméret és darab. A `kinds` a detektált tartalom-kinddel kell egyezzen.
+ * @type {Record<string, MediaProfile>}
  */
 const MEDIA_PROFILES = {
   image: { exts: ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif', 'bmp'], kinds: ['image'], maxBytes: 40 * MB, maxCount: 8 },
@@ -98,10 +115,18 @@ const MEDIA_PROFILES = {
   },
 };
 
+/**
+ * @param {string} kind
+ * @returns {MediaProfile}
+ */
 function profileFor(kind) {
   return MEDIA_PROFILES[kind] || MEDIA_PROFILES.media;
 }
 
+/**
+ * @param {unknown} name
+ * @returns {string}
+ */
 function extOf(name) {
   const m = /\.([a-z0-9]+)$/i.exec(String(name || '').trim());
   return m ? m[1].toLowerCase() : '';
@@ -111,7 +136,11 @@ function extOf(name) {
 
 /**
  * Egy fájl ellenőrzése a profil ellen. `file`: { originalname, size }, `header`:
- * az első bájtok buffere (a magic-byte-hoz). @returns {{ok, status?, error?}}
+ * az első bájtok buffere (a magic-byte-hoz).
+ * @param {{originalname?: string, size?: number}} file
+ * @param {Buffer | null | undefined} header
+ * @param {MediaProfile} profile
+ * @returns {ValidationResult}
  */
 function validateFile(file, header, profile) {
   const name = file.originalname || '';
@@ -155,7 +184,10 @@ function validateFile(file, header, profile) {
 
 /**
  * Több fájl ellenőrzése egy profil ellen. `files`: [{ originalname, size, header }].
- * Darabszám + fájlonkénti validáció. @returns {{ok, status?, error?}}
+ * Darabszám + fájlonkénti validáció.
+ * @param {Array<{originalname?: string, size?: number, header?: Buffer | null}>} files
+ * @param {string} kind
+ * @returns {ValidationResult}
  */
 function validateUploads(files, kind) {
   const profile = profileFor(kind);
@@ -178,19 +210,33 @@ function validateUploads(files, kind) {
 const ACTIVE_EXTS = ['html', 'htm', 'xhtml', 'svg', 'xml', 'js', 'mjs'];
 const ACTIVE_HEAD = /^\s*(<!doctype html|<html|<svg|<script|<\?xml)/i;
 
-/** Böngészőben futó tartalom: a tár nyilvános, ilyen fájl ott tárolt XSS lenne. */
+/**
+ * Böngészőben futó tartalom: a tár nyilvános, ilyen fájl ott tárolt XSS lenne.
+ * @param {unknown} name
+ * @param {Buffer | null | undefined} header
+ * @returns {boolean}
+ */
 function isActiveContent(name, header) {
   return ACTIVE_EXTS.includes(extOf(name)) || ACTIVE_HEAD.test(Buffer.from(header || []).toString('latin1', 0, 256));
 }
 
-/** A tárolt típus a tartalomból jön: a kliens MIME-ja csak akkor marad, ha egyezik a valódi fajtával. */
+/**
+ * A tárolt típus a tartalomból jön: a kliens MIME-ja csak akkor marad, ha egyezik a valódi fajtával.
+ * @param {unknown} clientMime
+ * @param {Buffer | null | undefined} header
+ * @returns {string}
+ */
 function safeContentType(clientMime, header) {
   const kind = detectKind(header);
   const mime = String(clientMime || '');
   return kind && mime.startsWith(`${kind}/`) ? mime : 'application/octet-stream';
 }
 
-/** A kiterjesztés csak betű és szám lehet, aktív tartalom nem tárolható. */
+/**
+ * A kiterjesztés csak betű és szám lehet, aktív tartalom nem tárolható.
+ * @param {unknown} name
+ * @returns {string}
+ */
 function safeExt(name) {
   const ext = extOf(name);
   return ext && !ACTIVE_EXTS.includes(ext) ? `.${ext}` : '.bin';

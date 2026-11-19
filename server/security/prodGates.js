@@ -1,3 +1,4 @@
+// @ts-check
 // 🔒 Prod-kapu assert (04-security §04.1). A három dev-kapu auth/rate-limit/billing
 // védelmet kapcsol KI — production-ben SOHA nem lehetnek bekapcsolva (go-live blokkoló,
 // DEPLOY.md:74). Pure selector → tesztelhető; az index.js az indulásnál refuse-ol.
@@ -29,6 +30,8 @@ function prodGateViolations(env = process.env) {
 /**
  * Indulás-idejű ellenőrzés: prod-ban bekapcsolt dev-kapura HIBA + `exit(1)` (az indulás
  * megtagadva). Injektálható `exit`/`log` → hálózat/process nélkül tesztelhető.
+ * @param {NodeJS.ProcessEnv} [env]
+ * @param {{exit?: (code: number) => void, log?: (message: string) => void}} [deps]
  * @returns {boolean} true, ha nincs sértés (indulhat)
  */
 function assertProdGates(env = process.env, { exit = (c) => process.exit(c), log = console.error } = {}) {

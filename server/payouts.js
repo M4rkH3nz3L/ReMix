@@ -1,3 +1,4 @@
+// @ts-check
 const { logCaught } = require('./lib/caught');
 // 💸 Kifizetés (megkeresett Coin → euró) — provideres, automata utalás.
 //
@@ -17,6 +18,7 @@ function payoutsConfigured() {
   return !!(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_SECRET);
 }
 
+/** @returns {Promise<string>} */
 async function paypalToken() {
   const basic = Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`).toString(
     'base64'
@@ -33,7 +35,11 @@ async function paypalToken() {
   return data.access_token;
 }
 
-/** euró-cent → a PayPal által várt két tizedes szöveg ("60.00"). */
+/**
+ * euró-cent → a PayPal által várt két tizedes szöveg ("60.00").
+ * @param {number} amountEurCents
+ * @returns {string}
+ */
 function eurValue(amountEurCents) {
   return (Math.trunc(amountEurCents) / 100).toFixed(2);
 }
@@ -41,6 +47,10 @@ function eurValue(amountEurCents) {
 /**
  * Kifizetés a célszámlára. Visszaadja a provider-referenciát (batch id).
  * `account`: { provider, email }. `amountEurCents`: egész euró-cent (PRO-CASH: EUR-ban fizetünk).
+ * @param {{provider?: string, email?: string | null} | null | undefined} account
+ * @param {number} amountEurCents
+ * @param {string | null} [note]
+ * @returns {Promise<string | null>}
  */
 async function sendPayout(account, amountEurCents, note) {
   if (!account || account.provider !== 'paypal') {

@@ -1,3 +1,4 @@
+// @ts-check
 // 🔔 Értesítés-küldés jogosultsága (OWASP API1 — BOLA / API5 — BFLA).
 //
 // A `/notify` végpont eddig BÁRMELY hitelesített usernek engedte, hogy a kérés
@@ -20,7 +21,7 @@
  * Minden más esetben tilos (idegen usernek nem lehet értesítést küldeni).
  *
  * @param {{callerId?:string|null, recipientId?:string|null,
- *          shareProject?:boolean, followEdge?:boolean}} ctx
+ *          shareProject?:boolean, followEdge?:boolean, blocked?:boolean}} ctx
  * @returns {boolean}
  */
 function decideNotify(ctx = {}) {
@@ -38,6 +39,10 @@ function decideNotify(ctx = {}) {
 const ROUTE_PREFIXES = ['/chat/', '/channel/', '/live/', '/collab/'];
 const ROUTE_EXACT = ['/devices', '/schedules'];
 
+/**
+ * @param {unknown} route
+ * @returns {boolean}
+ */
 function isSafeRoute(route) {
   if (typeof route !== 'string' || route.includes('..') || route.includes('://') || route.startsWith('//')) {
     return false;

@@ -1,3 +1,4 @@
+// @ts-check
 const { logCaught } = require('./lib/caught');
 // 🗄️ Tárhely-kvóta — a MI tárhelyünkön (Supabase `renders` bucket / szerver-média)
 // fekvő bájtok elszámolása és a KEMÉNY limit-tiltás szerver-oldali fele.
@@ -11,6 +12,7 @@ const { adminClient } = require('./notify');
 
 /** A limit-túllépés jelzője → az endpoint 507-et ad rá. */
 class QuotaExceededError extends Error {
+  /** @param {unknown} usage */
   constructor(usage) {
     super('quota_exceeded');
     this.name = 'QuotaExceededError';
@@ -22,7 +24,10 @@ function quotaAvailable() {
   return !!adminClient();
 }
 
-/** A user aktuális használata/kvótája (jsonb), vagy null, ha nincs service_role. */
+/**
+ * A user aktuális használata/kvótája (jsonb), vagy null, ha nincs service_role.
+ * @param {unknown} userId
+ */
 async function usageFor(userId) {
   const sb = adminClient();
   const uid = String(userId || '').trim();
@@ -40,6 +45,8 @@ async function usageFor(userId) {
  * A fájl felvétele a naplóba KVÓTA-ELLENŐRZÉSSEL. A `record_storage_object_for`
  * atomikusan ellenőriz + beszúr; limit-túllépéskor `quota_exceeded`-et dob, amit
  * `QuotaExceededError`-ré fordítunk. Visszaadja a friss használatot.
+ * @param {unknown} userId
+ * @param {{projectId?: string | null, bucket?: string, key: string, bytes: unknown, source?: string}} obj
  */
 async function recordObject(userId, { projectId = null, bucket = 'renders', key, bytes, source = 'server' }) {
   const sb = adminClient();
@@ -68,6 +75,8 @@ async function recordObject(userId, { projectId = null, bucket = 'renders', key,
  * Előzetes ellenőrzés a feltöltés ELŐTT (hogy ne töltsünk fel feleslegesen): a
  * jelenlegi használat + a bejövő bájt túllépné-e a kvótát. Nem hiteles enforcement
  * (az a `recordObject`), csak gyors, felhasználóbarát elutasítás.
+ * @param {unknown} userId
+ * @param {unknown} incomingBytes
  */
 async function wouldExceed(userId, incomingBytes) {
   const usage = await usageFor(userId).catch((caught) => { logCaught('quota.js:wouldExceed', caught); return null; });
@@ -82,6 +91,10 @@ async function wouldExceed(userId, incomingBytes) {
 /**
  * Törölt objektum kivétele a naplóból (a hely felszabadul). Csak a user SAJÁT
  * sorát érinti (user_id + bucket + key). Service_role nélkül no-op.
+ * @param {unknown} userId
+ * @param {string} bucket
+ * @param {string} key
+ * @returns {Promise<void>}
  */
 async function forgetObject(userId, bucket, key) {
   const sb = adminClient();
@@ -95,7 +108,14 @@ async function forgetObject(userId, bucket, key) {
   }
 }
 
-/** Átnevezett/áthelyezett objektum kulcsának követése (a bájt változatlan). */
+/**
+ * Átnevezett/áthelyezett objektum kulcsának követése (a bájt változatlan).
+ * @param {unknown} userId
+ * @param {string} bucket
+ * @param {string} fromKey
+ * @param {string} toKey
+ * @returns {Promise<void>}
+ */
 async function moveObject(userId, bucket, fromKey, toKey) {
   const sb = adminClient();
   const uid = String(userId || '').trim();

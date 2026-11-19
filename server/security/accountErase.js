@@ -1,3 +1,4 @@
+// @ts-check
 const { logCaught } = require('../lib/caught');
 // 🗑️ GDPR hard-erasure (devs/tasks/remix/09). A soft-delete (profiles.deleted_at)
 // VISSZAÁLLÍTHATÓ; ez a VÉGLEGES törlés a visszavonási (cooldown) idő letelte után:
@@ -37,7 +38,8 @@ const PAGE = 1000;
  * sorát a szerver írja a hitelesített feltöltőhöz, ezért idegen fájl nem kerülhet bele; a korábbi,
  * projekt-ID-ból épített előtag szabadon írható volt, és más user mappájára is mutathatott.
  * Lapoz, így 1000 fájl fölött sem marad ki semmi. A sorokat nem törli: a fiókkal együtt mennek.
- * @param {object} sb service_role kliens
+ * @param {import('@supabase/supabase-js').SupabaseClient} sb service_role kliens
+ * @param {string} uid a törlendő fiók azonosítója
  * @param {(key: string) => Promise<void>} removeObject a tárból töröl
  * @returns {Promise<{purged:number, failed:number}>}
  */

@@ -1,3 +1,4 @@
+// @ts-check
 const { logCaught } = require('../lib/caught');
 // 🧰 Upload-guard middleware a mediaPolicy köré.
 //
@@ -15,7 +16,11 @@ const { isActiveContent, validateUploads } = require('./mediaPolicy');
 
 const HEADER_BYTES = 32; // elég a ftyp-brandig (offset 8–11)
 
-/** egy fájl első bájtjai a lemezről (magic-byte-hoz); hibánál üres buffer */
+/**
+ * egy fájl első bájtjai a lemezről (magic-byte-hoz); hibánál üres buffer
+ * @param {string} filePath
+ * @returns {Buffer}
+ */
 function readHeader(filePath) {
   let fd;
   try {
@@ -38,7 +43,10 @@ function readHeader(filePath) {
   }
 }
 
-/** a (rossz) feltöltött fájlok törlése a lemezről */
+/**
+ * a (rossz) feltöltött fájlok törlése a lemezről
+ * @param {Array<{path?: string} | null | undefined> | null | undefined} files
+ */
 function cleanup(files) {
   for (const f of files || []) {
     if (f && f.path) {
@@ -55,6 +63,8 @@ function cleanup(files) {
 /**
  * Express-middleware: a `req.files` (multer upload.any() kimenete) tartalmi
  * validálása a `kind` profil ellen. Siker → next(); hiba → 4xx + cleanup.
+ * @param {string} kind
+ * @returns {ExpressLite.Handler}
  */
 function mediaGuard(kind) {
   return (req, res, next) => {
@@ -78,7 +88,10 @@ function mediaGuard(kind) {
   };
 }
 
-/** 🛡️ Általános feltöltés: bármilyen projektfájl jöhet, de böngészőben futó tartalom nem. */
+/**
+ * 🛡️ Általános feltöltés: bármilyen projektfájl jöhet, de böngészőben futó tartalom nem.
+ * @type {ExpressLite.Handler}
+ */
 function blockActiveContent(req, res, next) {
   const bad = (req.files || []).find((f) => isActiveContent(f.originalname, readHeader(f.path)));
   if (bad) {

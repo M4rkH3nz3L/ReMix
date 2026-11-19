@@ -1,3 +1,4 @@
+// @ts-check
 const { logCaught } = require('../lib/caught');
 // 🔐 PRO-LIVE L7 — RTMP(S) cél-URL validáció (SSRF elleni védelem).
 //
@@ -13,7 +14,11 @@ const net = require('net');
 
 const ALLOWED_PORTS = new Set([1935, 1936, 443, 80, 8443, 4443]);
 
-/** privát / fenntartott / belső IPv4 vagy IPv6 cím-e */
+/**
+ * privát / fenntartott / belső IPv4 vagy IPv6 cím-e
+ * @param {string} ip
+ * @returns {boolean}
+ */
 function isPrivateIp(ip) {
   if (net.isIPv4(ip)) {
     const [a, b] = ip.split('.').map(Number);
@@ -50,7 +55,16 @@ function isPrivateIp(ip) {
   return true;
 }
 
-/** szintaktikai + statikus ellenőrzés (DNS nélkül) → { ok, host?, error? } */
+/**
+ * A cél-URL ellenőrzésének eredménye.
+ * @typedef {{ok: true, host: string} | {ok: false, error: string}} RtmpCheck
+ */
+
+/**
+ * szintaktikai + statikus ellenőrzés (DNS nélkül) → { ok, host?, error? }
+ * @param {unknown} raw
+ * @returns {RtmpCheck}
+ */
 function validateRtmpUrl(raw) {
   const s = String(raw || '').trim();
   if (!s || s.length > 1024) return { ok: false, error: 'Üres vagy túl hosszú RTMP-cím.' };
@@ -75,7 +89,12 @@ function validateRtmpUrl(raw) {
   return { ok: true, host };
 }
 
-/** teljes ellenőrzés DNS-feloldással (az egress-indítás előtt) */
+/**
+ * teljes ellenőrzés DNS-feloldással (az egress-indítás előtt)
+ * @param {unknown} raw
+ * @param {(host: string) => Promise<Array<{address: string}>>} [lookup]
+ * @returns {Promise<RtmpCheck>}
+ */
 async function resolveSafe(raw, lookup = (h) => dns.lookup(h, { all: true })) {
   const v = validateRtmpUrl(raw);
   if (!v.ok) return v;

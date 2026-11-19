@@ -1,4 +1,7 @@
-import { asTier, isPaidTier, TIER_ORDER, tierMeetsMin, tierRank, type Tier } from '@/lib/tiers';
+import { asTier, isPaidTier, TIER_ORDER, tierLabelKey, tierMeetsMin, tierRank, type Tier } from '@/lib/tiers';
+import hu from '@/i18n/locales/hu.json';
+import en from '@/i18n/locales/en.json';
+import de from '@/i18n/locales/de.json';
 
 describe('tiers — előfizetési szint-modell (audit §2.1)', () => {
   test('a sorrend növekvő: free < basic < pro < ultra < business', () => {
@@ -51,5 +54,16 @@ describe('tiers — előfizetési szint-modell (audit §2.1)', () => {
 
   test('tierRank ismeretlen → free-rang (0)', () => {
     expect(tierRank('xxx' as Tier)).toBe(0);
+  });
+});
+
+describe('tierLabelKey', () => {
+  test('minden szintnek van címkéje mindhárom nyelven', () => {
+    for (const tier of TIER_ORDER) {
+      expect(tierLabelKey(tier)).toBe(`lib.tiers.label.${tier}`);
+      for (const dict of [hu, en, de]) {
+        expect((dict.lib.tiers.label as Record<string, string>)[tier]).toBeTruthy();
+      }
+    }
   });
 });

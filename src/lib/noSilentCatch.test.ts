@@ -19,7 +19,7 @@ const EXEMPT = [
   /src\/lib\/bugReporter\.ts$/,
   /src\/lib\/bugReport\.ts$/,
   /src\/lib\/workerAuth\.ts$/,
-  /src\/lib\/imageSmoke\.tsx$/,
+  /src\/dev\/smoke\//,
   /src\/app\/dev-/,
   /Smoke/,
   /server\/scripts\//,

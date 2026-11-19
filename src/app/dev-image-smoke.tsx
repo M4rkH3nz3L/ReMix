@@ -15,6 +15,13 @@ const TAG = '[IMG-SMOKE]';
 const SMOKE_KILL_ID = 'smoke_image_kill';
 /** ennyi idő után a tesztképernyő magától bezárul (képernyőképhez elég) */
 const AUTO_EXIT_MS = 10000;
+/**
+ * 📦 A ~14k soros füstteszt-kód betöltője. A feltétel és az `import()` SZÓSZERINT egy kifejezésben áll: az éles
+ * Metro-transzform a `__DEV__`-t és az `EXPO_PUBLIC_*`-t konstansra cseréli, a feltételes kifejezést még a
+ * függőség-gyűjtés ELŐTT összehajtja — így a sima release-bundle-be a `@/dev/smoke` be sem kerül, a mérésre
+ * épített release-buildbe (EXPO_PUBLIC_RELEASE_SMOKE=1) igen. (Egy korai `return` mögötti import NEM esik ki.)
+ */
+const loadSmoke = __DEV__ || process.env.EXPO_PUBLIC_RELEASE_SMOKE === '1' ? () => import('@/dev/smoke') : null;
 
 export default function ImageSmokeScreen() {
   const { phase = 'all' } = useLocalSearchParams<{ phase?: string }>();
@@ -57,8 +64,11 @@ function Smoke({ phase }: { phase: string }) {
     if (!smokeEnabled()) {
       return;
     }
+    if (!loadSmoke) {
+      return;
+    }
     void (async () => {
-      const m = await import('@/lib/imageSmoke');
+      const m = await loadSmoke();
       await m.runImageSmoke(phase, log, setHarness, PixelRatio.get(), SMOKE_KILL_ID);
       console.log(`${TAG} DONE phase=${phase}`);
       send(`${TAG} DONE phase=${phase}`);

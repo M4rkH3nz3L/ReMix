@@ -37,6 +37,14 @@ function isPrivateIp(ip) {
     if (v.startsWith('fe8') || v.startsWith('fe9') || v.startsWith('fea') || v.startsWith('feb')) return true;
     const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v);
     if (mapped) return isPrivateIp(mapped[1]);
+    // a WHATWG URL a [::ffff:127.0.0.1] literált hex alakra normalizálja (::ffff:7f00:1) → visszaalakítva
+    // ugyanúgy a v4-szabály dönt; minden más ::ffff:-alak tiltott (fail-closed)
+    const hex = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(v);
+    if (hex) {
+      const [hi, lo] = [parseInt(hex[1], 16), parseInt(hex[2], 16)];
+      return isPrivateIp(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`);
+    }
+    if (v.startsWith('::ffff:')) return true;
     return false;
   }
   return true;

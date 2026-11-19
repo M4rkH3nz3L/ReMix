@@ -1,6 +1,5 @@
 /** 📏 A19: a telefonos keverés-mérés (LUFS, true-peak, LRA) = az ffmpeg `ebur128`-a (valódi ffmpeg-gel) */
-/* eslint-disable @typescript-eslint/no-require-imports */
-// a kliens tsconfig-jában nincsenek Node-típusok: a Node-modulok require-rel
+/* eslint-disable @typescript-eslint/no-require-imports -- a kliens-tsconfig-ban nincs Node-típus: a Node-beépített modulok require-rel töltődnek */
 import { describeIfRenderer } from '../../server/testing/renderer';
 const { spawnSync } = require('child_process');
 const fs = require('fs');

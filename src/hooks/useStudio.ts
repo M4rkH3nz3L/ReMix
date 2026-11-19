@@ -184,8 +184,7 @@ export function useStudio() {
       })
       .catch((e: Error) => { logCaught('hooks/useStudio.ts:useStudio', e); return Alert.alert(t('common.error'), e.message); })
       .finally(() => router.setParams({ openLoc: undefined, openPath: undefined, openUri: undefined }));
-    // a resetCreateForm stabil setterekből áll; a paraméter-kulcs a valódi trigger
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a paraméter-kulcsok a valódi trigger; a resetCreateForm stabil setterekből áll, a t stabil
   }, [openParams.openLoc, openParams.openPath, openParams.openUri]);
 
   // 🗂️ egy támogatott forrás-fájl hozzáadása a leendő projekt forrás-mappájához

@@ -48,7 +48,7 @@ export function AudioAssistantBar({ onActions, onClose }: { onActions: (a: Audio
   const project = useEditorStore((s) => s.project);
   const playhead = useEditorStore((s) => s.playhead);
   const selected = useEditorStore((s) => s.selectedClipId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- a parseNow getState()-ből olvas: a project/playhead/selected szándékos újraszámolási trigger
   const result = useMemo(() => parseNow(text, t), [text, project, playhead, selected, t]);
   const typed = text.trim().length > 0;
   const runnable = result.steps.some((s) => s.commands.length > 0) || result.actions.length > 0;

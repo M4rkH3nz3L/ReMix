@@ -319,8 +319,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     } else {
       player.pause();
     }
-    // a klip-adat a store-ból jön; az indítás csak a lejátszás / fókusz váltására fut
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a klip-adat a store-ból jön; az indítás csak lejátszás/fókusz/klip-id váltásra fut
   }, [player, isPlaying, videoClip?.id, isFocused]);
 
   // 🎬 T1: klipváltás UGYANABBÓL a fájlból (nincs forráscsere): a lejátszó a régi helyről
@@ -341,7 +340,7 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     } catch (caught) {
       logCaught('components/preview/PreviewSurface.tsx:clipSwitch', caught);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- csak klip-váltáskor (id) seekel; a player/playbackUri/videoClip friss értéke a renderből jön, újrafutás nem kell
   }, [videoClip?.id]);
 
   // 🔒 a natív lejátszó néha MAGÁTÓL elindul (iOS AVPlayer seek után) — ilyenkor a

@@ -1,6 +1,6 @@
 import { buildFxChain } from './audioDsp';
 import { FX_STAGES, fxStageOrder, isDefaultOrder, moveStage } from './fxOrder';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- a server/ CommonJS JS-modulja (típus nélkül), a kliens–worker szerződésteszt require-rel tölti
 const worker = require('../../server/voicechain');
 
 describe('fxOrder (R3)', () => {

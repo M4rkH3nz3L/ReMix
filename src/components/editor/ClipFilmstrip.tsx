@@ -52,8 +52,7 @@ export function ClipFilmstrip({ clip, widthPx, heightPx }: Props) {
       cancelled = true;
       clearTimeout(timer);
     };
-    // a timesKey lefedi a times tartalmát — identitás-váltásra nem kell újragenerálni
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a timesKey lefedi a times tartalmát; identitás-váltásra nem kell újragenerálni
   }, [clip.kind, clip.uri, timesKey, pending]);
 
   if (clip.kind === 'image') {

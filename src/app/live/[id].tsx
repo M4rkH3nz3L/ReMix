@@ -503,8 +503,7 @@ export default function LiveRoomScreen() {
         }
       }
     };
-    // az importVod a refekből dolgozik — a cleanup csak a session/host-váltásra fusson újra
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- az importVod a refekből dolgozik; a cleanup csak session/host-váltásra fusson újra
   }, [isHost, session, projectParam]);
 
   // 🔆 L36: adás közben a képernyő NEM zárolódik (különben az iOS leállítja a kamerát, a

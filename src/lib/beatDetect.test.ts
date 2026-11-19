@@ -1,7 +1,7 @@
 import { analyzeBeatsFromPcm, BEAT_SR } from '@/lib/beatDetect';
 
 /** 🥁 AP3: a telefonos tempó-felismerés = a szerveré (szerződés), és ismert tempón pontos. */
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- a server/ CommonJS JS-modulja (típus nélkül), a kliens–worker szerződésteszt require-rel tölti
 const server = require('../../server/beats.js') as { analyzeBeatsFromPcm: (pcm: Float32Array, sr: number) => unknown; SR: number };
 
 /** klikk-sáv: `bpm`-en rövid lecsengő ütések, minden 4. hangosabb (downbeat) */

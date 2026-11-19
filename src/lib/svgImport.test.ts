@@ -1,6 +1,5 @@
 import { parseSvg } from '@/lib/svgImport';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const first = (svg: string) => parseSvg(svg).layers[0] as any;
 
 describe('svgImport — doksi-méret / viewBox', () => {

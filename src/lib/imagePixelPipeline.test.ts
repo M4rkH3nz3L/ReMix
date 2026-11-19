@@ -8,7 +8,7 @@ import { LUT_DRAFT_SIZE, buildLutBytes, hasColorOps, hasDetail, layerDetail, sam
 import type { PhotoLayer } from '@/types/project';
 import { itIfRenderer } from '../../server/testing/renderer';
 
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-require-imports -- Node-beépített modulok és a server/ CommonJS JS-moduljai require-rel (a kliens-tsconfig-ban nincs Node-típus) */
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');

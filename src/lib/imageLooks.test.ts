@@ -2,7 +2,6 @@ import { flattenAdjustments } from '@/lib/adjustmentStack';
 import { IMAGE_LOOKS, applyLook, isLook, lookFromLayer } from '@/lib/imageLooks';
 import type { PhotoLayer } from '@/types/project';
 
-/* eslint-disable @typescript-eslint/no-require-imports */
 const hu = require('../i18n/locales/hu.json');
 const en = require('../i18n/locales/en.json');
 const de = require('../i18n/locales/de.json');

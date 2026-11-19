@@ -42,7 +42,7 @@ export function PreviewPlayButton({
   // szerkesztés közben: az új minta azonnal, a helyéről folytatva
   useEffect(() => {
     if (playing) void start(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- csak a version (szerkesztés) váltására indul újra; a playing-et az aktuális renderből olvassa
   }, [version]);
   // a lap megnyitásakor a hangkontextus előkészül (az első koppintás is azonnal szól)
   useEffect(() => {

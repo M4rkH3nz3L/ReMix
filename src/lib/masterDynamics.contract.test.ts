@@ -1,6 +1,5 @@
 /** 🗜️🔥 R4: a master-kompresszor és -szaturáció a telefonon = a szerveren (valódi ffmpeg-gel) */
-/* eslint-disable @typescript-eslint/no-require-imports */
-// a kliens tsconfig-jában nincsenek Node-típusok: a Node-modulok require-rel (mint a szerver-modulok)
+/* eslint-disable @typescript-eslint/no-require-imports -- Node-beépített modulok és a server/ CommonJS JS-moduljai require-rel (a kliens-tsconfig-ban nincs Node-típus) */
 import { describeIfRenderer } from '../../server/testing/renderer';
 const { execFileSync } = require('child_process');
 const fs = require('fs');

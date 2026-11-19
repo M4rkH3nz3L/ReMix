@@ -71,7 +71,7 @@ export function VodProcessingOverlay() {
       active = false;
       clearInterval(id);
     };
-  }, [pendingKey, dismissed]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendingKey, dismissed]); // eslint-disable-line react-hooks/exhaustive-deps -- a pendingKey (id-lista) fedi a pending tartalmát; az új tömb-identitás nem indíthat új pollt
 
   if (dismissed || pending.length === 0) {
     return null;

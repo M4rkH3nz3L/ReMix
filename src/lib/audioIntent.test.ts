@@ -141,7 +141,7 @@ describe('🔢 számszavak a mértékegység előtt (a kimondott parancs átirat
 describe('🎙️ a felület példamondatai (hu, en, de) maradék nélkül értelmeződnek', () => {
   const locales = ['hu', 'en', 'de'] as const;
   it.each(locales)('%s', (lang) => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- nyelvenként dinamikus útvonalú JSON-betöltés (statikus import nem paraméterezhető)
     const a = require(`../i18n/locales/${lang}.json`).studio.audio.assistant;
     for (const k of ['example1', 'example2', 'example3']) {
       const r = parseAudioIntent(a[k], ctx());

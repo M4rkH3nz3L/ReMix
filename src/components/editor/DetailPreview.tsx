@@ -88,8 +88,7 @@ export function DetailPreview({ trigger = 0, showButton = true }: { trigger?: nu
       lastTrigger.current = trigger;
       void run();
     }
-    // a `run` minden renderben új — csak a trigger-váltás számít
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a run minden renderben új; csak a trigger-váltás számít
   }, [trigger]);
 
   const close = () => {

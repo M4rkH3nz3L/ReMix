@@ -99,7 +99,7 @@ export function AiCharacterPicker({ task }: { task: AiTask }) {
       alive = false;
       stopTimer();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a playIntro minden renderben új; a betöltés és a bemutatkozás csak a feladat váltására fut
   }, [task]);
 
   const choose = (id: string | null) => {

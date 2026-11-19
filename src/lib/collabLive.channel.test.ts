@@ -66,7 +66,7 @@ const fakeClient = {
 
 jest.mock('@/lib/supabase', () => ({ supabase: fakeClient }));
 
-// eslint-disable-next-line import/first
+// eslint-disable-next-line import/first -- a tesztelt modul importja szándékosan a jest.mock után áll (a mock-beállítás a függőség előtt olvasható)
 import { openLiveChannel } from '@/lib/collabLive';
 
 const self = { id: 'u1', name: 'Anna', avatar: null };

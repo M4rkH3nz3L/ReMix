@@ -70,7 +70,7 @@ export function TutorialOverlay() {
   // eredményt fogadunk el, különben marad a középre igazított kártya.
   useEffect(() => {
     let alive = true;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lépésváltáskor a régi kiemelést azonnal töröljük, hogy ne villanjon a korábbi elemre
     setRect(null);
     if (!measureFn) {
       return () => {

@@ -1,6 +1,6 @@
 import { formantCorrect } from '@/lib/formant';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- a server/ CommonJS JS-modulja (típus nélkül), a kliens–worker szerződésteszt require-rel tölti
 const worker = require('../../server/lib/formant');
 
 /** 🗣️ V7.3 szerződés: a telefon és a szerver formáns-korrekciója bitre azonos. */

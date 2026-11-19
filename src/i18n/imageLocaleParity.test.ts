@@ -7,7 +7,7 @@ import de from '@/i18n/locales/de.json';
 import en from '@/i18n/locales/en.json';
 import hu from '@/i18n/locales/hu.json';
 
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-require-imports -- a kliens-tsconfig-ban nincs Node-típus: a Node-beépített modulok require-rel töltődnek */
 const fs = require('fs');
 const path = require('path');
 /* eslint-enable @typescript-eslint/no-require-imports */

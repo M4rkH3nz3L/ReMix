@@ -1,6 +1,6 @@
 import { borderAlignOf, shapeOutlineD, strokeJoinOf, strokeSpec } from '@/lib/shapeStroke';
 
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-require-imports -- a server/ CommonJS JS-modulja (típus nélkül), a kliens–worker szerződésteszt require-rel tölti */
 const server = require('../../server/shapeStroke');
 
 const SHAPES = [

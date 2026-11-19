@@ -51,9 +51,7 @@ function detectDeviceLanguage(): LanguageCode {
 }
 
 if (!i18n.isInitialized) {
-  // i18next dual-export idiom: az `i18n.use(...)` a helyes hívás; a named `use`
-  // a React 19 `use`-hook szabályába ütközne (rules-of-hooks).
-  // eslint-disable-next-line import/no-named-as-default-member
+  // eslint-disable-next-line import/no-named-as-default-member -- i18next dual-export idióma: az i18n.use() a helyes hívás; a named use a React 19 use-hook szabályába ütközne
   void i18n.use(initReactI18next).init({
     resources,
     lng: detectDeviceLanguage(),

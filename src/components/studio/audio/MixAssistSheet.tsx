@@ -73,8 +73,8 @@ export function MixAssistSheet() {
   const analyzeRef = useRef(analyze);
   analyzeRef.current = analyze;
 
-  const suggestions = useMemo<MixSuggestion[]>(() => (analysis && project ? mixSuggestions(project, analysis.tracks) : []), [analysis]); // eslint-disable-line react-hooks/exhaustive-deps
-  const proposal = useMemo(() => (analysis ? masterProposal(analysis.mix, target, project?.audioMaster?.duckTrigger) : null), [analysis, target]); // eslint-disable-line react-hooks/exhaustive-deps
+  const suggestions = useMemo<MixSuggestion[]>(() => (analysis && project ? mixSuggestions(project, analysis.tracks) : []), [analysis]); // eslint-disable-line react-hooks/exhaustive-deps -- a javaslat az elemzés pillanatának projektjéből készül; szerkesztésre nem számol újra
+  const proposal = useMemo(() => (analysis ? masterProposal(analysis.mix, target, project?.audioMaster?.duckTrigger) : null), [analysis, target]); // eslint-disable-line react-hooks/exhaustive-deps -- a duckTrigger az elemzéskori értékből; csak elemzés/cél váltására számol újra
 
   /**
    * a javaslatok parancsai MINDIG a mostani projektből számolódnak (sorban): ugyanarra a klipre

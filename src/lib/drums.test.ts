@@ -71,7 +71,7 @@ describe('drums — step-sequencer mag', () => {
 });
 
 describe('🥁 velocity + swing (R7)', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- a server/ CommonJS JS-modulja (típus nélkül), a kliens–worker szerződésteszt require-rel tölti
   const server = require('../../server/drums.js') as { drumHitChains: (h: unknown[], o: object) => { chains: string[] } };
   const SR = 44100;
   const peak = (x: Float32Array) => x.reduce((m, v) => Math.max(m, Math.abs(v)), 0);

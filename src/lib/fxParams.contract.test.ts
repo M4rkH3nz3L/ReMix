@@ -1,7 +1,7 @@
 import { delayTimeMs, eqBandParams } from '@/lib/fxParams';
 import type { AudioFx } from '@/types/project';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- a server/ CommonJS JS-modulja (típus nélkül), a kliens–worker szerződésteszt require-rel tölti
 const worker = require('../../server/voicechain');
 
 /** 🎛️ V7 szerződés: a kliens DSP és a szerver ffmpeg-lánca ugyanazt az EQ-t és delay-időt kapja. */

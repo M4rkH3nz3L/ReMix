@@ -30,7 +30,7 @@ function httpError(status, message, opts = {}) {
 
 /** A kérés végén álló hiba-middleware. Négy-paraméteres → Express ezt
  *  hiba-handlerként ismeri fel. */
-// eslint-disable-next-line no-unused-vars
+// eslint-disable-next-line no-unused-vars -- az Express a 4-paraméteres aláírásból ismeri fel a hiba-handlert; a _next kötelező, bár nem használt
 function errorHandler(err, _req, res, _next) {
   // ha a válasz már elindult (pl. sendFile közben hiba), Express zárja le
   if (res.headersSent) {

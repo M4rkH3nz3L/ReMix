@@ -203,8 +203,7 @@ export function AssistantPanel() {
     return () => {
       alive = false;
     };
-    // csak mount-kor futó worker-diagnosztika; a `t` stabil referencia (i18next)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- csak mount-kor futó worker-diagnosztika; a t stabil referencia (i18next)
   }, []);
 
   // 🪝 kiemelt AI-módok busy-állapota: a MEGLÉVŐ busyLabel-aggregációt megőrizve

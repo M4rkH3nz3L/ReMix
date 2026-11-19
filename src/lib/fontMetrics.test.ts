@@ -8,8 +8,7 @@ import {
   tightLeadingShift,
 } from '@/lib/fontMetrics';
 
-/* eslint-disable @typescript-eslint/no-require-imports */
-// a kliens-tsconfig-ban nincs node-típus → a bevált minta (TextOverlay.test.ts)
+/* eslint-disable @typescript-eslint/no-require-imports -- a kliens-tsconfig-ban nincs Node-típus: a Node-beépített modulok require-rel töltődnek */
 const fs = require('fs');
 const path = require('path');
 const { DEFAULT_FONT, FONT_FILES } = require('../../server/fonts');

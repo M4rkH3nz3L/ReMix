@@ -3,7 +3,7 @@ import { useEntitlement } from '@/store/entitlementStore';
 import { usePaywall } from '@/store/paywallStore';
 import { nudgeUpsell, useUpsell } from '@/store/upsellStore';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- a jest.mock gyári függvényében csak require használható (hoisting: az import ott nem érhető el)
 jest.mock('@react-native-async-storage/async-storage', () => require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
 beforeEach(() => {

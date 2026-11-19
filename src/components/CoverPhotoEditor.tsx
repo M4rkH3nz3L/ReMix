@@ -129,7 +129,7 @@ export function CoverPhotoEditor({
     setZoom(1);
     setTx((frame.w - bdW) / 2);
     setTy((frame.h - bdH) / 2);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a frame/nat a méreteken át, a baseScale belőlük számolva számít; a centeredRef-kulcs véd az ismétléstől
   }, [uri, frame?.w, frame?.h, nat?.width, nat?.height]);
 
   // — húzás (pan) — a scroll/gesztus elől is elveszi a fókuszt

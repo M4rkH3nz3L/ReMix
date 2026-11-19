@@ -67,7 +67,7 @@ jest.mock('@/store/entitlementStore', () => ({
 }));
 jest.mock('@/lib/externalStorage', () => ({ hasOwnStorageTarget: async () => false }));
 
-/* eslint-disable import/first */
+/* eslint-disable import/first -- a tesztelt modulok importja szándékosan a jest.mock-ok után áll (a mock-beállítás a függőségek előtt olvasható) */
 import { backupProjectToCloud, deleteCloudProject, syncProjectsFromCloud } from '@/lib/cloudSync';
 import { deletedProjectIds, deleteProject, listProjects, saveProject } from '@/lib/storage';
 import { createEmptyProject } from '@/lib/projectUtils';

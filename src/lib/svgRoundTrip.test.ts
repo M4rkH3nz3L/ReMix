@@ -8,7 +8,7 @@ import { parseSvg } from '@/lib/svgImport';
 import type { ImageDoc, ImageLayer, ShapeLayer } from '@/types/project';
 import { chromiumPath, itIfRenderer } from '../../server/testing/renderer';
 
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-require-imports -- Node-beépített modulok és a server/ CommonJS JS-moduljai require-rel (a kliens-tsconfig-ban nincs Node-típus) */
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');

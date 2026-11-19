@@ -91,9 +91,7 @@ export function BottomSheet({
       if (!visible) return; // zárva indult — nincs mit animálni
     }
     if (visible) {
-      // szándékos: a lap mount-ja a belépő animációhoz. A `[visible]` dep miatt
-      // nem ciklizál (rendered váltása nem futtatja újra az effektet).
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- szándékos: a lap mount-ja a belépő animációhoz; a [visible] dep miatt nem ciklizál
       setRendered(true);
       // ha már mértünk (nem az első nyitás), rögtön rugózunk; különben az onLayout
       // indítja a belépő rugót a VALÓS magassággal (lásd onSheetLayout)
@@ -105,8 +103,7 @@ export function BottomSheet({
         if (finished) runOnJS(finishClose)();
       });
     }
-    // csak a `visible` váltására fusson — a `height`-et szándékosan snapshotoljuk
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- csak a visible váltására fusson; a progress stabil shared value, a magasságot szándékosan snapshotoljuk
   }, [visible]);
 
   const onSheetLayout = (e: LayoutChangeEvent) => {

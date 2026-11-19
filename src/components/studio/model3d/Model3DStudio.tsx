@@ -713,8 +713,7 @@ export function Model3DStudio({ projectId, importUri }: { projectId: string; imp
       // hibás %-kódolás → a nyers név
     }
     void importFromFile({ uri, name });
-    // az import egyszeri — a függőségek közül csak a projekt megérkezése számít
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- az import egyszeri; a függőségek közül csak a projekt megérkezése számít
   }, [importUri, project?.id, projectId]);
 
   /** 🥽 AR Gyorsnézet: a modell USDZ-ként (forgatással) a valós térbe — valós méretben */

@@ -38,7 +38,6 @@ describe('denoiseStereo', () => {
   it('a szünetekben a zajt legalább 9 dB-lel csökkenti, a hangot alig érinti, gyorsan', async () => {
     const t0 = Date.now();
     const [yl, yr] = await denoiseStereo(noisyL, noisyR);
-    // eslint-disable-next-line no-console
     console.log(`zajszűrés: ${((Date.now() - t0) / 6).toFixed(0)} ms / sztereó hang-mp (Node)`);
     expect(yl.length).toBe(n);
     expect(rmsDb(seg(yl, 3.6, 3.9)) - rmsDb(seg(noisyL, 3.6, 3.9))).toBeLessThan(-9);

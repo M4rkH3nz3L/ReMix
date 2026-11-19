@@ -7,7 +7,6 @@
 import { shapePatternSvgDef, type ShapePattern } from './shapePattern';
 
 // a worker sima CommonJS JS — a jest-expo babellel betölti; a `require` any-t ad
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const worker = require('../../server/text-render.js');
 
 const CASES: { label: string; p: ShapePattern; boxW: number; boxH: number }[] = [

@@ -53,7 +53,7 @@ export function HistogramView({ layer, uri, height = 56 }: { layer: ColorFields;
     }
     const timer = setTimeout(() => setHist(layerHistogram(image, layer)), DEBOUNCE_MS);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a layer a key-en (a színmezők JSON-ja) át számít; új objektum-identitásra nem számolunk újra
   }, [image, key]);
 
   const paths = useMemo(

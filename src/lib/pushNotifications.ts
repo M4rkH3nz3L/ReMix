@@ -53,7 +53,7 @@ function notif(): typeof NotificationsModule | null {
   }
   triedRequire = true;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- lusta natív modul: Expo Go-ban/natív modul nélkül a require eldobhat, ezt try-catch kezeli
     moduleRef = require('expo-notifications') as typeof NotificationsModule;
     // előtérben is legyen banner + listába kerüljön (a régi shouldShowAlert helyett)
     moduleRef.setNotificationHandler({

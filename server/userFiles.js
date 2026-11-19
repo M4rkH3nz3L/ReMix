@@ -54,7 +54,7 @@ function cleanSegment(raw) {
   if (!seg || seg === '.' || seg === '..' || seg === MARKER) {
     throw badPath('Érvénytelen név.');
   }
-  // eslint-disable-next-line no-control-regex
+  // eslint-disable-next-line no-control-regex -- szándékosan a vezérlőkaraktereket (U+0000–U+001F, U+007F) tiltja a név-szegmensben
   if (seg.length > MAX_SEGMENT || /[\u0000-\u001f\u007f\\]/.test(seg)) {
     throw badPath('Érvénytelen név.');
   }

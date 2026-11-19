@@ -1,7 +1,6 @@
 import { isStudioRoute, PUBLIC_WEB_SCREENS } from '@/lib/webSurface';
 
-// a kliens-tsconfig-ban nincs node-típus → require (mint a contract.test.ts-ben)
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-require-imports -- a kliens-tsconfig-ban nincs Node-típus: a Node-beépített modulok require-rel töltődnek */
 const { readdirSync, existsSync } = require('fs');
 const { join, relative } = require('path');
 /* eslint-enable @typescript-eslint/no-require-imports */

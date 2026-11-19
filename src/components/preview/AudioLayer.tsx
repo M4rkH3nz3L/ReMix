@@ -603,8 +603,7 @@ function ClipAudioPlayer({
         player.pause();
       }
     } catch (caught) { logCaught('components/preview/AudioLayer.tsx:ClipAudioPlayer', caught); }
-    // a klip-adat (trimIn/start) a store-ból jön; az indítás csak a play/pause váltásra fut
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a klip-adat (trimIn/start) a store-ból jön; az indítás csak play/pause váltásra fut
   }, [player, isPlaying]);
 
   // a klip inaktívvá válásakor elhallgat; layout-effekt, mert a hook sima effektje addigra

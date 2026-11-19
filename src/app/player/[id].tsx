@@ -83,7 +83,7 @@ export default function PlayerScreen() {
       setPlaying(true);
     }
     return () => setPlaying(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a setPlayhead/setPlaying stabil store-setterek; csak belépéskor (mount) fut
   }, []);
 
   const duration = project ? projectDuration(project) : 0;

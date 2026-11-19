@@ -87,7 +87,6 @@ describeIfRenderer('offlineMix ↔ szerveres render (A26)', { ffmpeg: true }, ()
     mixRange(plan, new Map([[vid, { channels: decode(vid, 2), sampleRate: SR }], [vidMono, { channels: decode(vidMono, 1), sampleRate: SR }]]), mine, 0, n);
     for (const c of [0, 1]) {
       const diff = server[c].map((x, i) => x - mine[c][i]);
-      // eslint-disable-next-line no-console
       console.log(`videó csatorna ${c}: jel ${rmsDb(server[c]).toFixed(1)} dB, különbség ${rmsDb(diff).toFixed(1)} dB`);
       expect(rmsDb(server[c]) - rmsDb(diff)).toBeGreaterThan(90);
     }
@@ -112,7 +111,6 @@ describeIfRenderer('offlineMix ↔ szerveres render (A26)', { ffmpeg: true }, ()
       const diff = server[c].map((v, i) => v - mine[c][i]);
       const signal = rmsDb(server[c]);
       const residual = rmsDb(diff);
-      // eslint-disable-next-line no-console
       console.log(`csatorna ${c}: jel ${signal.toFixed(1)} dB, különbség ${residual.toFixed(1)} dB`);
       expect(signal - residual).toBeGreaterThan(90);
     }
@@ -146,7 +144,6 @@ describeIfRenderer('offlineMix ↔ szerveres render (A26)', { ffmpeg: true }, ()
     }
     for (const c of [0, 1]) {
       const diff = server[c].map((v, i) => v - chunked[c][i]);
-      // eslint-disable-next-line no-console
       console.log(`FX csatorna ${c}: jel ${rmsDb(server[c]).toFixed(1)} dB, különbség ${rmsDb(diff).toFixed(1)} dB`);
       expect(rmsDb(server[c]) - rmsDb(diff)).toBeGreaterThan(80);
     }
@@ -202,7 +199,6 @@ describeIfRenderer('offlineMix ↔ szerveres render (A26)', { ffmpeg: true }, ()
     const before = seg(music, 0.5, 1.4) - seg(dry, 0.5, 1.4);
     const during = seg(music, 2.0, 2.9) - seg(dry, 2.0, 2.9);
     const after = seg(music, 3.6, 3.95) - seg(dry, 3.6, 3.95);
-    // eslint-disable-next-line no-console
     console.log(`halkítás: előtte ${before.toFixed(1)} dB, közben ${during.toFixed(1)} dB, utána ${after.toFixed(1)} dB`);
     expect(Math.abs(before)).toBeLessThan(0.1);
     expect(during).toBeLessThan(-6);
@@ -218,7 +214,6 @@ describeIfRenderer('offlineMix ↔ szerveres render (A26)', { ffmpeg: true }, ()
     const sKey = decode(await renderProject({ ...dp, tracks: dp.tracks.map((t) => (t.type === 'music' ? { ...t, clips: [] } : t)) }, fs.mkdtempSync(path.join(dir, 'wk-')), () => {}, { audioFormat: 'wav', audioBitDepth: 24 }), 2)[0];
     const sMusic = sFull.map((v, i) => v - (sKey[i] ?? 0));
     const sDuring = seg(sMusic, 2.0, 2.9) - seg(dry, 2.0, 2.9);
-    // eslint-disable-next-line no-console
     console.log(`szerver halkítás közben ${sDuring.toFixed(1)} dB`);
     expect(Math.abs(during - sDuring)).toBeLessThan(4);
   }, 120000);
@@ -247,7 +242,6 @@ describeIfRenderer('offlineMix ↔ szerveres render (A26)', { ffmpeg: true }, ()
     const { renderProject } = jest.requireActual('../../server/render');
     const server = decode(await renderProject(mp, fs.mkdtempSync(path.join(dir, 'wm-')), () => {}, { audioFormat: 'wav', audioBitDepth: 24 }), 2);
     const theirs = integratedLoudness(server[0], server[1], SR);
-    // eslint-disable-next-line no-console
     console.log(`master: telefon ${mine.toFixed(2)} LUFS (csúcs ${(20 * Math.log10(peak)).toFixed(2)} dB), szerver ${theirs.toFixed(2)} LUFS`);
     expect(Math.abs(mine - -14)).toBeLessThan(0.5);
     expect(20 * Math.log10(peak)).toBeLessThanOrEqual(-1 + 1e-3);
@@ -285,7 +279,6 @@ describeIfRenderer('offlineMix ↔ szerveres render (A26)', { ffmpeg: true }, ()
     for (const c of [0, 1]) {
       const ref = c === 0 ? mixL : mixR;
       const diff = Float32Array.from(ref, (v, i) => v - (out[c][i] ?? 0));
-      // eslint-disable-next-line no-console
       console.log(`feltöltött keverés csatorna ${c}: jel ${rmsDb(ref).toFixed(1)} dB, különbség ${rmsDb(diff).toFixed(1)} dB`);
       expect(rmsDb(ref) - rmsDb(diff)).toBeGreaterThan(90);
     }
@@ -293,7 +286,6 @@ describeIfRenderer('offlineMix ↔ szerveres render (A26)', { ffmpeg: true }, ()
     // épp ezért kell a feltöltés
     const own = decode(await renderProject(mp, fs.mkdtempSync(path.join(dir, 'wown-')), () => {}, { audioFormat: 'wav', audioBitDepth: 24 }), 2);
     const ownDiff = Float32Array.from(mixL, (v, i) => v - (own[0][i] ?? 0));
-    // eslint-disable-next-line no-console
     console.log(`a szerver saját keverése a telefonéhoz képest: ${(rmsDb(mixL) - rmsDb(ownDiff)).toFixed(1)} dB`);
   }, 120000);
 
@@ -313,7 +305,6 @@ describeIfRenderer('offlineMix ↔ szerveres render (A26)', { ffmpeg: true }, ()
     const got = decode(out, 2)[0];
     const ref = decode(mixWav, 2)[0];
     const lvl = rmsDb(got.subarray(SR / 2, 2 * SR)) - rmsDb(ref.subarray(SR / 2, 2 * SR));
-    // eslint-disable-next-line no-console
     console.log(`videó: a hang szintje a keveréshez képest ${lvl.toFixed(2)} dB`);
     expect(Math.abs(lvl)).toBeLessThan(0.5);
   }, 120000);
@@ -337,7 +328,6 @@ describeIfRenderer('offlineMix ↔ szerveres render (A26)', { ffmpeg: true }, ()
     expect(mine[0][a1] / mine[0][a0]).toBeCloseTo(1, 4);
     for (const c of [0, 1]) {
       const diff = server[c].map((v, i) => v - mine[c][i]);
-      // eslint-disable-next-line no-console
       console.log(`loop csatorna ${c}: jel ${rmsDb(server[c]).toFixed(1)} dB, különbség ${rmsDb(diff).toFixed(1)} dB`);
       expect(rmsDb(server[c]) - rmsDb(diff)).toBeGreaterThan(80);
     }

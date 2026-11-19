@@ -70,8 +70,7 @@ export function MulticamPanel() {
         }
       })
       .catch((caught) => { logCaught('components/editor/panels/MulticamPanel.tsx:MulticamPanel', caught); });
-    // szándékosan csak a szög-váltásra fut (a masterTime tekerést a scrub végzi)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- szándékosan csak a szög-váltásra fut (a masterTime tekerést a scrub végzi)
   }, [selected, angles.length]);
 
   // lejátszás-óra: a player idejéből visszaszámolt master-idő
@@ -103,7 +102,7 @@ export function MulticamPanel() {
         clockRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a player a komponens élete alatt ugyanaz (useVideoPlayer)
   }, [playing, selected, masterDuration, angles]);
 
   const addAngle = async () => {

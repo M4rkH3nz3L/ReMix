@@ -1,7 +1,7 @@
 import { docLimitProblem, MAX_DOC_LAYERS, MAX_DOC_POINTS } from '@/lib/imageDocLimits';
 import type { ImageDoc } from '@/types/project';
 
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-require-imports -- a server/ CommonJS JS-modulja (típus nélkül), a kliens–worker szerződésteszt require-rel tölti */
 const { imageDocGuard, MAX_LAYERS, MAX_TOTAL_POINTS } = require('../../server/imagedoc');
 
 const shapes = (n: number, extra: object = {}) => ({ layers: Array.from({ length: n }, (_, i) => ({ id: `${i}`, kind: 'shape', ...extra })) }) as unknown as ImageDoc;

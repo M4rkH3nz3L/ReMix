@@ -46,7 +46,7 @@ export function GroupCreateSheet({
       return;
     }
     // szándékos: a lap MEGNYÍLÁSAKOR reset + a jelöltek (követettek) betöltése
-    /* eslint-disable react-hooks/set-state-in-effect */
+    /* eslint-disable react-hooks/set-state-in-effect -- szándékos: a lap megnyílásakor reset + betöltés-jelzés */
     setTitle('');
     setSelected(new Set());
     setLoading(true);

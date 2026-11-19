@@ -41,7 +41,7 @@ function rc(): any | null {
   }
   triedRequire = true;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- lusta natív modul: Expo Go-ban/natív modul nélkül a require eldobhat, ezt try-catch kezeli
     const mod = require('react-native-purchases');
     purchasesRef = mod?.default ?? mod;
   } catch (caught) {

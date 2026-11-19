@@ -52,7 +52,7 @@ export function CameraRecorder({ visible, onClose }: { visible: boolean; onClose
         requestMic();
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- csak a felvevő megnyitásakor kérünk engedélyt; az engedély-állapot változása nem indíthat új kérést
   }, [visible]);
 
   /** ⏱️ a 3-2-1 visszaszámláló — külön ref, hogy bezáráskor törölhető legyen */

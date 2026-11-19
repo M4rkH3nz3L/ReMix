@@ -1,6 +1,6 @@
 import { STRAIGHTEN_MAX, straightenZoom } from '@/lib/imageStraighten';
 
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-require-imports -- a server/ CommonJS JS-modulja (típus nélkül), a kliens–worker szerződésteszt require-rel tölti */
 const server = require('../../server/imageFilters');
 
 describe('📐 S18: kiegyenesítés', () => {

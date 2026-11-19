@@ -1,6 +1,6 @@
 import { DEFAULT_CORNERS, applyMatrix, cornerPinMatrix, isIdentityCorners, normalizeCorners, squareToQuad, type Corners } from '@/lib/cornerPin';
 
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-require-imports -- a server/ CommonJS JS-modulja (típus nélkül), a kliens–worker szerződésteszt require-rel tölti */
 const server = require('../../server/imageFilters');
 
 const quad: Corners = [{ x: 0.1, y: 0.05 }, { x: 0.95, y: 0.2 }, { x: 0.85, y: 0.9 }, { x: 0.05, y: 0.8 }];

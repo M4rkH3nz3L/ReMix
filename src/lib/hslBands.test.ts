@@ -3,7 +3,7 @@ import { bandWeights, isNeutralHsl, shiftColor } from '@/lib/hslBands';
 import { layerOps, applyOps } from '@/lib/imagePixelPipeline';
 import type { PhotoLayer } from '@/types/project';
 
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-require-imports -- a server/ CommonJS JS-modulja (típus nélkül), a kliens–worker szerződésteszt require-rel tölti */
 const worker = require('../../server/hslBands');
 
 const red: [number, number, number] = [0.9, 0.1, 0.1];

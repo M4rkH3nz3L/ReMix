@@ -381,7 +381,7 @@ export function SkiaPhotoLayer({
   });
   // húzás közben a gyors rács fut, megálláskor a pontos: a csúszka nem akad
   const [fine, setFine] = useState<{ key: string; built: ReturnType<typeof build> } | null>(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- a build minden renderben új; a key fedi minden bemenetét, csak tartalom-változásra épül újra
   const draft = useMemo(() => build(LUT_DRAFT_SIZE), [key]);
   useEffect(() => {
     if (!draft.lut) {
@@ -389,7 +389,7 @@ export function SkiaPhotoLayer({
     }
     const timer = setTimeout(() => setFine({ key, built: build(LUT_SIZE) }), LUT_IDLE_MS);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a build/draft a key-ből származik; csak a key váltására ütemezzük a pontos LUT-ot
   }, [key]);
   const exact = fine?.key === key ? fine.built : null;
   if (!image) {

@@ -48,7 +48,6 @@ describeIfRenderer('integratedLoudness = ffmpeg ebur128', { ffmpeg: true }, () =
       let ref = Number.NaN;
       for (let hit = m.exec(String(res.stderr)); hit; hit = m.exec(String(res.stderr))) ref = Number(hit[1]);
       const mine = integratedLoudness(l, r, SR);
-      // eslint-disable-next-line no-console
       console.log(`${name}: ffmpeg ${ref} LUFS, saját ${mine.toFixed(2)} LUFS`);
       expect(Math.abs(mine - ref)).toBeLessThan(0.15);
     });

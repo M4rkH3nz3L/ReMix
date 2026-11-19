@@ -1227,7 +1227,7 @@ function runFfmpegWithProgress(args, totalSeconds, onProgress, signal) {
  * kész fájlra cseréli (a `comp`-ot törli) → onnantól sima videó-klip. Így a fő
  * render változatlan úton kompozitál. A rekurzió a levél-kompozícióknál megáll.
  */
-async function resolveCompounds(project, workDir, settings, signal) {
+async function resolveCompounds(project, workDir, settings, signal, report) {
   let idx = 0;
   const tracks = [];
   for (const tk of project.tracks) {
@@ -1247,14 +1247,16 @@ async function resolveCompounds(project, workDir, settings, signal) {
         const subDir = path.join(workDir, `comp_${idx++}`);
         try {
           fs.mkdirSync(subDir, { recursive: true });
-          await renderProject(sub, subDir, () => {}, settings, signal); // ← rekurzió (abort-tudatos)
+          await renderProject(sub, subDir, () => {}, settings, signal, report); // ← rekurzió (abort-tudatos)
           const mp4 = path.join(subDir, 'out.mp4');
           const dur = projectDuration(sub);
           clips.push({ ...c, uri: mp4, comp: undefined, trimIn: c.trimIn ?? 0, sourceDuration: dur, speed: c.speed ?? 1 });
           continue;
         } catch (err) {
           logCaught('render.js:resolveCompounds', err);
-          console.warn('pre-compose render kihagyva:', err.message); // → a nyers uri marad
+          if (signal && signal.aborted) throw err;
+          // 🛑 a beágyazott kompozíció helyén a nyers forrás állna — rossz tartalom: a render álljon meg
+          throw new RenderContentError('compound', err);
         }
       }
       clips.push(c);
@@ -1264,7 +1266,31 @@ async function resolveCompounds(project, workDir, settings, signal) {
   return { ...project, tracks };
 }
 
-async function renderProject(project, workDir, onProgress, settings = {}, signal) {
+/**
+ * 🛑 A render nem adhat ki hiányos tartalmat csendben: ha a szöveg / felirat / forma / beágyazott kompozíció nem
+ * készíthető el, a job érthető hibával bukik (eddig a videó „sikeresen" elkészült szöveg nélkül — MO-B2).
+ */
+class RenderContentError extends Error {
+  constructor(part, cause) {
+    const what = { text: 'a szövegek és feliratok', shape: 'a formák', compound: 'egy beágyazott kompozíció' }[part] || part;
+    super(`A videó nem készült el: ${what} nem renderelhetők (${cause && cause.message ? cause.message : 'ismeretlen hiba'}).`);
+    this.name = 'RenderContentError';
+    this.part = part;
+  }
+}
+
+/**
+ * Az effekt-szintű visszaesések listája (a videó elkészül, de egyszerűsítve) — a job eredménye hozza, a kliens
+ * jelzi. Kulcsok: textMotion (animált szöveg állóként), pathAnim (mozgó forma állóként), mask (animált maszk
+ * közelítéssel), particles (részecskék nélkül).
+ */
+function noteDegraded(report, key) {
+  if (!report) return;
+  report.degraded = report.degraded || [];
+  if (!report.degraded.includes(key)) report.degraded.push(key);
+}
+
+async function renderProject(project, workDir, onProgress, settings = {}, signal, report) {
   // export-beállítások (P0-design): felbontás/fps/minőség a kliens Export
   // paneljéről — a FPS a modul-konstans árnyékolásával jut el minden lánchoz
   const shortSide = Math.min(2160, Math.max(480, parseInt(settings.resolution, 10) || 1080));
@@ -1285,7 +1311,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
     throw new Error('render megszakítva');
   }
   // 🧱 compound clip / pre-compose: a beágyazott kompozíciók rekurzív renderje MP4-be
-  project = await resolveCompounds(project, workDir, settings, signal);
+  project = await resolveCompounds(project, workDir, settings, signal, report);
   const total = projectDuration(project);
   if (total <= 0) {
     throw new Error('Üres projekt — nincs mit renderelni.');
@@ -1310,17 +1336,18 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
   // (Korábban közös blokkban voltak, így egy rossz méretű forma miatt a videó
   // „sikeresen" elkészült — csak épp szöveg és felirat nélkül.)
   let texts = [];
+  // 🛑 hiányzó szöveg/forma = hibás videó → a render álljon meg érthető hibával (nem „siker" szöveg nélkül)
   try {
     texts.push(...(await renderShapePngs(shapeClips, canvas, workDir)));
   } catch (err) {
     logCaught('render.js:renderProject', err);
-    console.warn('Forma-rasterizálás kihagyva:', err.message);
+    throw new RenderContentError('shape', err);
   }
   try {
     texts.push(...(await renderTextPngs(textClips, canvas, workDir)));
   } catch (err) {
     logCaught('render.js:renderProject', err);
-    console.warn('Felirat-rasterizálás kihagyva:', err.message);
+    throw new RenderContentError('text', err);
   }
 
   const inputs = [];
@@ -1965,10 +1992,12 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
         );
         if (seqM) {
           maskSeqIdx[i] = addInput(['-framerate', String(FPS), '-i', seqM.pattern]);
+        } else {
+          noteDegraded(report, 'mask');
         }
       } catch (err) {
         logCaught('render.js:renderProject', err);
-        console.warn('mask-render kihagyva:', err.message); // → geq fallback
+        noteDegraded(report, 'mask'); // → geq-közelítés
       }
     }
   }
@@ -2361,7 +2390,7 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
       overlayBase = 'vpt';
     } catch (err) {
       logCaught('render.js:renderProject', err);
-      console.warn('particles kihagyva:', err.message);
+      noteDegraded(report, 'particles');
     }
   }
 
@@ -2442,8 +2471,9 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
         seq = await renderPathSequence(clip, canvas, psDir, FPS);
       } catch (err) {
         logCaught('render.js:renderProject', err);
-        console.warn('path-anim kihagyva:', err.message);
+        noteDegraded(report, 'pathAnim');
       }
+      if (!seq) noteDegraded(report, 'pathAnim');
       if (seq) {
         const from = clipStart;
         const to = clipEndT;
@@ -2486,8 +2516,9 @@ async function renderProject(project, workDir, onProgress, settings = {}, signal
         seq = await renderTextSequence(clip, canvas, tmDir, FPS);
       } catch (err) {
         logCaught('render.js:renderProject', err);
-        console.warn('kinetic text kihagyva:', err.message);
+        noteDegraded(report, 'textMotion'); // → álló szöveg (a normál state-kezelés)
       }
+      if (!seq) noteDegraded(report, 'textMotion');
       if (seq) {
         const from = clipStart;
         const to = clipEndT;

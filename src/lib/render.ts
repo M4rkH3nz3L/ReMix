@@ -28,6 +28,7 @@ import { useAuth } from '@/store/authStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import type { Project, RenderedVersion } from '@/types/project';
 import { projectMediaDir } from '@/lib/projectFolderClient';
+import { reportRenderDegraded } from '@/lib/renderNotices';
 import { logCaught } from '@/lib/logCaught';
 import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 
@@ -685,11 +686,13 @@ async function submitAndPollRender(
       }
       throw asCancelled(e, signal);
     });
-    const status = await readJson<{ state?: string; error?: string; progress?: number }>(
+    const status = await readJson<{ state?: string; error?: string; progress?: number; degraded?: string[] }>(
       res,
       tr('lib.render.renderError')
     );
     if (status.state === 'done') {
+      // 🛑 ha a szerver valamit egyszerűsítve renderelt, a felhasználó tudjon róla
+      reportRenderDegraded(status.degraded);
       onProgress?.({ phase: PHASE_DOWNLOAD, ratio: stages.ratioFor(PHASE_DOWNLOAD, 0) });
       return id;
     }

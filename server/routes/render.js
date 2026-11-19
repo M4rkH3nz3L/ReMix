@@ -231,6 +231,7 @@ router.post('/render', ...paidOnly, upload.any(), (req, res) => {
     logCaught('routes/render.js', caught);
     // beállítások nélkül alapértékekkel megy
   }
+  const report = {}; // 🛑 az effekt-szintű visszaesések (a kliens jelzi)
   renderProject(
     project,
     workDir,
@@ -241,10 +242,11 @@ router.post('/render', ...paidOnly, upload.any(), (req, res) => {
       }
     },
     settings,
-    controller.signal
+    controller.signal,
+    report
   )
     .then((file) => {
-      jobs.set(id, { state: 'done', file, dir: workDir, userId: uid });
+      jobs.set(id, { state: 'done', file, dir: workDir, userId: uid, degraded: report.degraded || [] });
     })
     .catch((err) => {
     logCaught('routes/render.js', err);
@@ -565,7 +567,7 @@ router.get('/render/:id', renderJobAuth, async (req, res) => {
       denyRenderJob(req, res, job.userId);
       return;
     }
-    res.json({ state: job.state, error: job.error, progress: job.progress });
+    res.json({ state: job.state, error: job.error, progress: job.progress, degraded: job.degraded });
     return;
   }
   if (queueEnabled()) {
@@ -580,6 +582,7 @@ router.get('/render/:id', renderJobAuth, async (req, res) => {
         state,
         progress: (j.progress || 0) / 100,
         error: state === 'error' ? j.failedReason : undefined,
+        degraded: state === 'done' ? j.returnvalue?.degraded : undefined,
       });
       return;
     }

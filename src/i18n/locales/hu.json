@@ -3112,7 +3112,8 @@
       "packagingStartFailed": "A csomagolás indítása nem sikerült.",
       "packagingError": "Csomagolás-hiba.",
       "packagingTimeout": "A csomagolás túl sokáig tartott — próbáld újra.",
-      "uploadFailed": "A feltöltés nem sikerült."
+      "uploadFailed": "A feltöltés nem sikerült.",
+      "degraded": {"title": "A videó elkészült, egyszerűsítve", "body": "Ezek nem készültek el a szerveren úgy, ahogy az előnézetben látszanak:", "textMotion": "az animált szöveg állóként jelenik meg", "pathAnim": "a mozgó forma állóként jelenik meg", "mask": "az animált maszk közelítéssel készült", "particles": "a részecske-effekt kimaradt", "retry": "Próbáld újra később; ha ismétlődik, jelezd nekünk."}
     },
     "speedRamp": {
       "presetHero": "🦸 Hero",

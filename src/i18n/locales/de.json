@@ -3112,7 +3112,8 @@
       "packagingStartFailed": "Das Verpacken konnte nicht gestartet werden.",
       "packagingError": "Verpackungsfehler.",
       "packagingTimeout": "Das Verpacken hat zu lange gedauert — versuch es noch mal.",
-      "uploadFailed": "Upload fehlgeschlagen."
+      "uploadFailed": "Upload fehlgeschlagen.",
+      "degraded": {"title": "Video fertig, vereinfacht", "body": "Diese Teile konnten auf dem Server nicht wie in der Vorschau gerendert werden:", "textMotion": "der animierte Text erscheint statisch", "pathAnim": "die bewegte Form erscheint statisch", "mask": "die animierte Maske wurde angenähert", "particles": "der Partikeleffekt fehlt", "retry": "Versuche es später erneut; wenn es wieder passiert, sag uns Bescheid."}
     },
     "speedRamp": {
       "presetHero": "🦸 Hero",

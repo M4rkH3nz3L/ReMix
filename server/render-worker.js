@@ -121,6 +121,7 @@ const worker = new Worker(
       // 2) renderelés (a valós ffmpeg-haladás 0-100) — a Redis-be a heartbeat
       //    írja ki (nem minden tick, hogy ne terheljük fölöslegesen)
       setPhase(job, 'render', 0);
+      const report = {}; // 🛑 az effekt-szintű visszaesések (a kliens jelzi)
       const out = await renderProject(
         project,
         workDir,
@@ -133,7 +134,8 @@ const worker = new Worker(
           }
         },
         settings || {},
-        controller.signal
+        controller.signal,
+        report
       );
       // 3) kész fájl feltöltése — a kiterjesztés a rendertől jön (videó VAGY
       //    hang-only export: wav/mp3/m4a/flac), a content-type ehhez igazodik
@@ -149,7 +151,7 @@ const worker = new Worker(
       };
       const outKey = `${job.id}/out${ext}`;
       await uploadFile(outKey, out, CTYPE[ext] || 'application/octet-stream');
-      return { outKey };
+      return { outKey, degraded: report.degraded || [] };
     } finally {
       clearInterval(cancelPoll);
       void clearJobCancel(job.id).catch((caught) => { logCaught('render-worker.js', caught); }); // a flag ne ragadjon a Redisben

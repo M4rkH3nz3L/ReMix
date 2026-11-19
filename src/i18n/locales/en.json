@@ -3112,7 +3112,8 @@
       "packagingStartFailed": "Could not start packaging.",
       "packagingError": "Packaging error.",
       "packagingTimeout": "Packaging took too long — try again.",
-      "uploadFailed": "Upload failed."
+      "uploadFailed": "Upload failed.",
+      "degraded": {"title": "Video ready, simplified", "body": "These could not be rendered on the server as the preview shows:", "textMotion": "the animated text appears static", "pathAnim": "the moving shape appears static", "mask": "the animated mask was approximated", "particles": "the particle effect was left out", "retry": "Try again later; if it keeps happening, let us know."}
     },
     "speedRamp": {
       "presetHero": "🦸 Hero",

@@ -74,3 +74,48 @@ test('idempotencia: ugyanaz az esemény-id másodszor nem ír jóvá', async () 
   await expect(send({ id: 'e7', type: 'NON_RENEWING_PURCHASE', product_id: 'coins_1' })).resolves.toEqual({ duplicate: true, id: 'e7' });
   expect(calls.filter((c) => c[0] === 'rpc').length).toBe(first);
 });
+
+test('Stripe: ugyanaz az esemény kétszer kézbesítve → egyszer ír jóvá', async () => {
+  const { handleStripeEvent } = require('./billing');
+  const event = { id: 'evt_1', type: 'checkout.session.completed', data: { object: { id: 'cs_1', payment_status: 'paid', metadata: { pack_id: 'coins_25', user_id: 'u1' } } } };
+  await expect(handleStripeEvent(event)).resolves.toEqual({ credited: 2500, bonus: 200 });
+  const grants = calls.filter((c) => c[1] === 'grant_coins').length;
+  await expect(handleStripeEvent(event)).resolves.toEqual({ duplicate: true, id: 'stripe:evt_1' });
+  expect(calls.filter((c) => c[1] === 'grant_coins').length).toBe(grants);
+});
+
+test('a feldolgozás hibája után az esemény NEM lesz feldolgozottnak jelölve (a retry újrapróbálja)', async () => {
+  const rpc = fakeSb.rpc;
+  fakeSb.rpc = async () => ({ data: null, error: { message: 'db down' } });
+  try {
+    await expect(send({ id: 'e8', type: 'NON_RENEWING_PURCHASE', product_id: 'coins_5' })).rejects.toThrow('db down');
+  } finally {
+    fakeSb.rpc = rpc;
+  }
+  expect(calls.filter((c) => c[1] === 'billing_webhook_events')).toEqual([]);
+  await expect(send({ id: 'e8', type: 'NON_RENEWING_PURCHASE', product_id: 'coins_5' })).resolves.toEqual({ credited: 500, bonus: 0 });
+});
+
+// KÉRDÉS: a Coin-csomag jóváírása két külön RPC (vásárolt + bónusz), az esemény pedig csak a végén
+// kerül a dedup-táblába. Ha a BÓNUSZ-írás bukik, a RevenueCat/Stripe retry a vásárolt részt MÁSODSZOR is
+// jóváírja (a grant_coins nem idempotens a hivatkozásra). Ugyanez két párhuzamos kézbesítésnél (a dedup
+// „ellenőriz, aztán ír”). Javítás DB-oldalon kellene (egy RPC a kettőre, vagy egyedi esemény-ref a
+// coin-naplóban) — ez a teszt a MAI viselkedést rögzíti.
+test('részleges hiba (bónusz bukik) → a retry a vásárolt Coint kétszer írja jóvá [mai viselkedés]', async () => {
+  const rpc = fakeSb.rpc;
+  fakeSb.rpc = async (name, args) => {
+    if (name === 'grant_coins' && args.p_bucket === 'bonus') {
+      calls.push(['rpc', name, args]);
+      return { data: null, error: { message: 'timeout' } };
+    }
+    return rpc(name, args);
+  };
+  try {
+    await expect(send({ id: 'e9', type: 'NON_RENEWING_PURCHASE', product_id: 'coins_25' })).rejects.toThrow('timeout');
+  } finally {
+    fakeSb.rpc = rpc;
+  }
+  await send({ id: 'e9', type: 'NON_RENEWING_PURCHASE', product_id: 'coins_25' });
+  const purchased = calls.filter((c) => c[1] === 'grant_coins' && c[2].p_bucket === 'purchased');
+  expect(purchased).toHaveLength(2);
+});

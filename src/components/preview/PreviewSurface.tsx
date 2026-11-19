@@ -29,10 +29,10 @@ import { TextOverlay } from '@/components/preview/TextOverlay';
 import { aspectValue, filters, palette } from '@/constants/editor';
 import { gradeTint } from '@/constants/grades';
 import {
+  gestureKeyframes,
   hasKeyframes,
   sampleChannel,
   sampleClipTransform,
-  setChannelKeyframe,
   shiftPositionKeyframes,
 } from '@/lib/keyframes';
 import { resolveClipUri } from '@/lib/assetResolve';
@@ -513,15 +513,8 @@ export function PreviewSurface({ mode, onHotspotPress }: Props) {
     gestureDY.value = 0;
     gestureRotation.value = 0;
     if (hasKeyframes(clip)) {
-      const k = clip.keyframes ?? {};
-      state.updateClip(visualId, {
-        keyframes: {
-          scale: setChannelKeyframe(k.scale, tInClip, scale, 'easeInOut'),
-          x: setChannelKeyframe(k.x, tInClip, x, 'easeInOut'),
-          y: setChannelKeyframe(k.y, tInClip, y, 'easeInOut'),
-          rotation: setChannelKeyframe(k.rotation, tInClip, rot.value, 'easeInOut'),
-        },
-      });
+      // a többi csatorna (átlátszóság, hangerő, effekt) megmarad (MO-B1)
+      state.updateClip(visualId, { keyframes: gestureKeyframes(clip.keyframes, tInClip, { scale, x, y, rotation: rot.value }) });
       return;
     }
     const t = clip.transform ?? IDENTITY;

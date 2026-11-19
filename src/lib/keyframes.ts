@@ -156,6 +156,42 @@ export function hasKeyframes(clip: Clip): boolean {
   return Boolean(k && KEYFRAME_CHANNELS.some((c) => (k[c]?.length ?? 0) > 0));
 }
 
+/**
+ * 🎬 A mozgás-csatornák (méret, hely, forgatás) cseréje úgy, hogy a többi csatorna (átlátszóság, hangerő,
+ * pan, effekt-automáció) MEGMARAD — a gesztus, a kamera-preset és az ütem-pulzus eddig az egész
+ * kulcskocka-készletet felülírta (MO-B1). A `motion`-ben meg nem adott mozgás-csatorna törlődik.
+ */
+export function replaceMotionKeyframes(existing: ClipKeyframes | undefined, motion: ClipKeyframes): ClipKeyframes {
+  const rest: ClipKeyframes = { ...existing };
+  for (const c of ['scale', 'x', 'y', 'rotation'] as const) {
+    delete rest[c];
+  }
+  const out: ClipKeyframes = { ...rest };
+  for (const c of ['scale', 'x', 'y', 'rotation'] as const) {
+    if (motion[c]?.length) out[c] = motion[c];
+  }
+  return out;
+}
+
+/**
+ * 🖐️ A vásznon végzett mozgatás/méretezés/forgatás kulcskockás klipen: a négy mozgás-csatornába a lejátszófej
+ * idején kulcskocka kerül, minden más csatorna változatlan (MO-B1).
+ */
+export function gestureKeyframes(
+  existing: ClipKeyframes | undefined,
+  tInClip: number,
+  v: { scale: number; x: number; y: number; rotation: number }
+): ClipKeyframes {
+  const k = existing ?? {};
+  return {
+    ...k,
+    scale: setChannelKeyframe(k.scale, tInClip, v.scale, 'easeInOut'),
+    x: setChannelKeyframe(k.x, tInClip, v.x, 'easeInOut'),
+    y: setChannelKeyframe(k.y, tInClip, v.y, 'easeInOut'),
+    rotation: setChannelKeyframe(k.rotation, tInClip, v.rotation, 'easeInOut'),
+  };
+}
+
 /** Kulcskocka beszúrása/cseréje (KF_EPS-en belül csere) — új, rendezett tömb. */
 export function setChannelKeyframe(
   kfs: Keyframe[] | undefined,

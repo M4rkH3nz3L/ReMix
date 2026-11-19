@@ -6,6 +6,7 @@ import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
 import { palette } from '@/constants/editor';
 import { requestCutout } from '@/lib/bgremove';
 import { CAMERA_PRESETS, buildCameraMove } from '@/lib/camera3d';
+import { replaceMotionKeyframes } from '@/lib/keyframes';
 import { requestDepthFocus, requestDepthParallax } from '@/lib/depthClient';
 import { makeId } from '@/lib/id';
 import { clamp } from '@/lib/time';
@@ -206,7 +207,8 @@ export function ThreeDSection({ clip }: { clip: VideoClip | ImageClip }) {
             onPress={() => {
               const move = buildCameraMove(preset.id, clip.duration);
               updateClip(clip.id, {
-                keyframes: move.keyframes,
+                // a preset a mozgást cseréli; az átlátszóság/hangerő-kulcskockák megmaradnak (MO-B1)
+                keyframes: replaceMotionKeyframes(clip.keyframes, move.keyframes),
                 tilt3d: move.tilt3d,
               });
             }}

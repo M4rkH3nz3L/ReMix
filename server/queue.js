@@ -91,8 +91,8 @@ async function getRenderJob(id) {
 }
 
 /**
- * 🛑 Best-effort render-job megszakítás a sorban: a VÁRAKOZÓ (waiting/delayed/
- * paused) jobot eltávolítja; az ÉPP FUTÓ (active) ffmpeg-et a külön worker-
+ * 🛑 Best-effort render-job megszakítás a sorban: a VÁRAKOZÓ (waiting/prioritized/
+ * delayed) jobot eltávolítja; az ÉPP FUTÓ (active) ffmpeg-et a külön worker-
  * folyamatból innen nem tudjuk leállítani (kooperatív abort = követő lépés). A
  * hívó (index.js) a `userId`-vel BOLA-ellenőriz. @returns {found,userId,removed,active}
  */
@@ -103,7 +103,8 @@ async function cancelRenderJob(id) {
   }
   const state = await job.getState();
   const userId = job.data?.userId ?? null;
-  if (state === 'waiting' || state === 'delayed' || state === 'paused') {
+  // a prioritással betett job (minden render-job: tier szerint 1–4) a BullMQ-ban `prioritized`, nem `waiting`
+  if (state === 'waiting' || state === 'prioritized' || state === 'delayed') {
     try {
       await job.remove();
       return { found: true, userId, removed: true, active: false };
@@ -184,12 +185,16 @@ function jobFields(job, state) {
  */
 async function listRenderJobs({ completedLimit = 25 } = {}) {
   const q = renderQueue();
-  const [active, waiting, completed, failed] = await Promise.all([
+  // a várakozók: előbb a prioritás nélküliek, utána a prioritásosak (a BullMQ ebben a sorrendben dolgoz fel;
+  // minden render-job prioritással kerül be, így ezek a `prioritized` listában vannak, nem a `waiting`-ben)
+  const [active, plain, prioritized, completed, failed] = await Promise.all([
     q.getActive(0, 50),
     q.getWaiting(0, 300),
+    q.getPrioritized(0, 300),
     q.getCompleted(0, completedLimit),
     q.getFailed(0, completedLimit),
   ]);
+  const waiting = [...plain, ...prioritized].slice(0, 300);
   return {
     concurrency: renderConcurrency(),
     active: active.map((j) => jobFields(j, 'active')),

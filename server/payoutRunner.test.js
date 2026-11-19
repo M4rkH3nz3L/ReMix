@@ -44,6 +44,15 @@ describe('executeApproved', () => {
     expect(end).toBe('processing');
     expect(sb.calls.map((c) => c[1])).toEqual(['processing', 'paid']);
   });
+  test('a „paid” írás nem-Error elutasítása (null) is processing-et ad, nem dob', async () => {
+    const sb = fakeSb();
+    sb.rpc = async (name, args) => {
+      sb.calls.push([name, args.p_to, null]);
+      if (args.p_to === 'paid') throw null; // eslint-ignored worker-teszt: szándékos nem-Error dobás
+      return { data: null, error: null };
+    };
+    await expect(executeApproved(sb, req, { provider: 'paypal', email: 'x' }, { paypal: async () => 'b' })).resolves.toBe('processing');
+  });
   test('a „processing” írás hibája: nincs utalás, nincs állapotváltás', async () => {
     const sb = fakeSb();
     sb.rpc = async (name, args) => {

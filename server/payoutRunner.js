@@ -44,7 +44,8 @@ async function executeApproved(sb, req, acct, senders = defaultSenders()) {
   try {
     await transition(sb, req.id, 'paid', ref || null);
   } catch (caught) {
-    logCaught('payoutRunner.js:executeApproved:paid', new Error(`utalva (${ref || 'nincs ref'}), de a paid-írás elbukott: ${caught.message}`));
+    const reason = String((caught && caught.message) || caught);
+    logCaught('payoutRunner.js:executeApproved:paid', new Error(`utalva (${ref || 'nincs ref'}), de a paid-írás elbukott: ${reason}`));
     return 'processing';
   }
   return 'paid';

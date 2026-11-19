@@ -24,22 +24,30 @@ async function transition(sb, id, to, ref = null, note = null) {
   }
 }
 
-/** Egy jóváhagyott kérés végrehajtása. Visszaadja a végállapotot ('paid' | 'failed' | 'approved'). */
+/** Egy jóváhagyott kérés végrehajtása. Visszaadja a végállapotot ('paid' | 'failed' | 'approved' | 'processing' = utalva, de a paid-írás elbukott). */
 async function executeApproved(sb, req, acct, senders = defaultSenders()) {
   const send = acct && senders[acct.provider];
   if (!send) {
     return 'approved'; // nincs bekötött partner → kézi teljesítés
   }
   await transition(sb, req.id, 'processing');
+  let ref;
   try {
-    const ref = await send(acct, req);
-    await transition(sb, req.id, 'paid', ref || null);
-    return 'paid';
+    ref = await send(acct, req);
   } catch (caught) {
     logCaught('payoutRunner.js:executeApproved', caught);
     await transition(sb, req.id, 'failed', null, String((caught && caught.message) || caught).slice(0, 300));
     return 'failed';
   }
+  // A pénz ELMENT: a „paid” írás hibája nem lehet „failed” (az visszaírná a Coint → dupla kifizetés).
+  // A kérés `processing`-ben marad a partner-azonosítóval a naplóban — kézi egyeztetés.
+  try {
+    await transition(sb, req.id, 'paid', ref || null);
+  } catch (caught) {
+    logCaught('payoutRunner.js:executeApproved:paid', new Error(`utalva (${ref || 'nincs ref'}), de a paid-írás elbukott: ${caught.message}`));
+    return 'processing';
+  }
+  return 'paid';
 }
 
 /** Az összes jóváhagyott (pl. kézi ellenőrzésen átment) kérés feldolgozása — az ütemező hívja. */

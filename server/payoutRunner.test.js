@@ -34,6 +34,26 @@ describe('executeApproved', () => {
     expect(end).toBe('failed');
     expect(sb.calls.map((c) => c[1])).toEqual(['processing', 'failed']);
   });
+  test('sikeres utalás után a „paid” írás hibája NEM ad failed-et (különben a DB visszaírná a Coint: dupla kifizetés)', async () => {
+    const sb = fakeSb();
+    sb.rpc = async (name, args) => {
+      sb.calls.push([name, args.p_to, args.p_provider_ref ?? null]);
+      return args.p_to === 'paid' ? { data: null, error: { message: 'connection reset' } } : { data: null, error: null };
+    };
+    const end = await executeApproved(sb, req, { provider: 'paypal', email: 'x' }, { paypal: async () => 'batch_1' });
+    expect(end).toBe('processing');
+    expect(sb.calls.map((c) => c[1])).toEqual(['processing', 'paid']);
+  });
+  test('a „processing” írás hibája: nincs utalás, nincs állapotváltás', async () => {
+    const sb = fakeSb();
+    sb.rpc = async (name, args) => {
+      sb.calls.push([name, args.p_to, null]);
+      return { data: null, error: { message: 'invalid_transition:processing->processing' } };
+    };
+    const send = jest.fn(async () => 'x');
+    await expect(executeApproved(sb, req, { provider: 'paypal', email: 'x' }, { paypal: send })).rejects.toThrow('invalid_transition');
+    expect(send).not.toHaveBeenCalled();
+  });
   test('bekötött partner nélkül approved marad (kézi teljesítés)', async () => {
     const sb = fakeSb();
     await expect(executeApproved(sb, req, { provider: 'paypal' }, { paypal: null })).resolves.toBe('approved');

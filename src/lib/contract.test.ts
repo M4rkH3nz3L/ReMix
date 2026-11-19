@@ -14,7 +14,7 @@
 import { COIN_PACKS, FEE_PCT, MIN_PAYOUT_CENTS, TIER_PRICE_CENTS, COIN_PAYOUT_EUR } from '@/lib/coins';
 import { ADDONS } from '@/lib/subscriptionPlan';
 import { STORE_TIERS, parseStoreProductId, storeProductId } from '@/lib/storeProducts';
-import { TIER_ORDER, activeTierFromRow, isPaidTier, tierMeetsMin, type Tier } from '@/lib/tiers';
+import { ACTIVE_STATUSES, TIER_ORDER, activeTierFromRow, asTier, isPaidTier, tierMeetsMin, type Tier } from '@/lib/tiers';
 import {
   TIER_QUOTAS,
   USAGE_METRICS,
@@ -43,7 +43,7 @@ import {
 import { developToFilterPlan, isNeutralDevelop, neutralDevelop, type PhotoDevelop } from '@/lib/photoDevelop';
 import type { VideoEffect } from '@/types/project';
 
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-require-imports -- a server/ CommonJS JS-modulja (típus nélkül), a kliens–worker szerződésteszt require-rel tölti */
 const workerUsage = require('../../server/usage');
 const workerRender = require('../../server/render');
 const workerImageDoc = require('../../server/imagedoc');
@@ -369,6 +369,23 @@ describe('contract: tier-rangsor (tiers.ts ⇄ server/tiers.js)', () => {
       }
     }
   });
+  it('a hiteles (fail-closed) szint azonos MINDEN státusz × szint × lejárat kombinációra', () => {
+    expect(workerTiers.ACTIVE_STATUSES).toEqual([...ACTIVE_STATUSES]);
+    const now = Date.parse('2026-11-19T12:00:00Z');
+    const statuses = [...ACTIVE_STATUSES, 'canceled', 'past_due', 'expired', '', undefined, 7];
+    const tiers = [...TIER_ORDER, 'gold', '', null, undefined, 3];
+    const ends = ['2026-11-20T00:00:00Z', '2026-11-19T12:00:00Z', '2026-11-01T00:00:00Z', 'nem dátum', '', null, undefined];
+    for (const status of statuses) {
+      for (const tier of tiers) {
+        for (const current_period_end of ends) {
+          const row = { status, tier, current_period_end } as Parameters<typeof activeTierFromRow>[0];
+          expect(workerTiers.activeTierFromRow(row, now)).toBe(activeTierFromRow(row, now));
+        }
+      }
+    }
+    for (const row of [null, undefined, {}]) expect(workerTiers.activeTierFromRow(row, now)).toBe(activeTierFromRow(row, now));
+    for (const v of [...tiers, {}, []]) expect(workerTiers.asTier(v)).toBe(asTier(v));
+  });
 });
 
 describe('contract: mirror-TELJESSÉG (drift-őr — egyoldali bővítés piros, 06-contract §06.1)', () => {
@@ -401,7 +418,7 @@ describe('contract: mirror-TELJESSÉG (drift-őr — egyoldali bővítés piros,
 });
 
 describe('értesítés-útvonal: kliens = worker', () => {
-  /* eslint-disable @typescript-eslint/no-require-imports */
+  /* eslint-disable @typescript-eslint/no-require-imports -- a server/ CommonJS JS-modulja (típus nélkül), a kliens–worker szerződésteszt require-rel tölti */
   const { isSafeRoute } = require('../../server/security/notifyPolicy');
   const { isSafeNotificationRoute } = require('@/lib/notificationRoute');
 
@@ -562,7 +579,6 @@ describe('contract: előfizetési ciklus (subscriptionPlan.ts / usageMeter.ts �
 
 describe('kattogásmentes vágás — kliens = worker (mikro-fade szabály)', () => {
   it('ugyanaz a fade-hossz és ugyanaz a split-felismerés', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { edgeFades: clientEdgeFades, EDGE_FADE_SEC } = require('./offlineMix');
     const c = (id: string, start: number, duration: number, trimIn: number, extra = {}) =>
       ({ kind: 'audio', id, uri: 'u', start, duration, trimIn, volume: 1, fadeIn: 0, fadeOut: 0, ...extra });

@@ -4,10 +4,10 @@
  * Forrás: 2 s 440 Hz, majd 2 s 880 Hz. 2×-es klipnél az idővonalon 1 s 440 Hz + 1 s 880 Hz
  * (hangmagasság-tartás nélkül 880 + 1760 Hz lenne).
  */
+import { describeIfRenderer } from '../../server/testing/renderer';
 type Bytes = { buffer: ArrayBuffer; byteOffset: number; byteLength: number };
-const { execFileSync, spawnSync } = jest.requireActual('child_process') as {
+const { execFileSync } = jest.requireActual('child_process') as {
   execFileSync: (cmd: string, args: string[], opts?: object) => Bytes;
-  spawnSync: (cmd: string, args: string[]) => { status: number | null };
 };
 const fs = jest.requireActual('fs') as { mkdtempSync: (p: string) => string; rmSync: (p: string, o: object) => void };
 const os = jest.requireActual('os') as { tmpdir: () => string };
@@ -17,10 +17,6 @@ import { edgeFades, offlineMixPlan, sliceSource, stretchJobs } from '@/lib/offli
 import { createEmptyProject, cropClip } from '@/lib/projectUtils';
 import type { AudioClip, Project } from '@/types/project';
 
-const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
-if (process.env.CI && !hasFfmpeg) {
-  throw new Error('A CI-ben kötelező az ffmpeg (a hang-minőségkapukhoz).');
-}
 const SR = 44100;
 
 function decodeMono(file: string): Float32Array {
@@ -77,7 +73,7 @@ describe('⏩ gyorsított hangklip — pure részek', () => {
   });
 });
 
-(hasFfmpeg ? describe : describe.skip)('⏩ gyorsított hangklip a szerveres renderben', () => {
+describeIfRenderer('⏩ gyorsított hangklip a szerveres renderben', { ffmpeg: true }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aspeed-'));
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
   const src = path.join(dir, 'two-tones.wav');

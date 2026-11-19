@@ -6,8 +6,13 @@ const path = require('path');
 
 const { renderImageDoc } = require('./imagedoc');
 const { innerEffectsFilters } = require('./imageFilters');
+const { itIfRenderer } = require('./testing/renderer');
 
 jest.setTimeout(60000);
+
+/** Chromium-raszter + ffmpeg-visszaolvasás: lokálisan hiányukban átugrik, CI-ben kötelező */
+const RASTER = { chromium: true, ffmpeg: true };
+const itRaster = itIfRenderer(RASTER);
 
 let dir;
 beforeEach(() => {
@@ -68,7 +73,7 @@ describe('🎨 S13: belső réteg-stílusok a szerver-renderben', () => {
     expect(out.at(100, 100)[0]).toBeLessThan(10);
   });
 
-  it('forma is kapja (a forgatás előtt, a saját terében)', async () => {
+  itRaster('forma is kapja (a forgatás előtt, a saját terében)', async () => {
     const shape = { kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5, fill: '#808080', colorOverlay: { color: '#00ff00', opacity: 1 } };
     const out = await render(shape, 'sh');
     expect(out.at(100, 100).slice(0, 3)).toEqual([0, 255, 0]);

@@ -9,6 +9,7 @@ import { customExportSize, estimateExportBytes, formatBytes } from '@/lib/imageE
 import { canvasToLayerBox, healRegionFromPoints } from '@/lib/imageLayerGeometry';
 import { keepsAlpha } from '@/lib/imageIntake';
 import type { ImageDoc, PhotoLayer, ShapeLayer } from '@/types/project';
+import { itIfRenderer } from '../../server/testing/renderer';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { execFileSync } = require('child_process');
@@ -21,6 +22,10 @@ const { maskToBox } = require('../../server/imageMask');
 
 // valódi ffmpeg/Chromium fut — párhuzamos teszt-terhelésnél az 5 mp-es alap kevés
 jest.setTimeout(60000);
+
+/** Chromium-raszter + ffmpeg-visszaolvasás: lokálisan hiányukban átugrik, CI-ben kötelező */
+const RASTER = { chromium: true, ffmpeg: true };
+const itRaster = itIfRenderer(RASTER);
 
 let dir: string;
 beforeEach(() => {
@@ -91,7 +96,7 @@ describe('I17 — kivágás: a kimenet pixelre ugyanaz marad', () => {
       expect(Math.abs(cropped.at(x - 100, y - 100)[3] - full.at(x, y)[3])).toBeLessThan(30);
     }
   });
-  it('vetett árnyék: az eltolás pixelben azonos', async () => {
+  itRaster('vetett árnyék: az eltolás pixelben azonos', async () => {
     const d = doc([shape({ dropShadow: { color: '#0000ff', dx: 0.05, dy: 0.05, blur: 0.002, opacity: 1 } })]);
     const full = await render(d, 'a');
     const cropped = await render(cropImageDoc(d, rect), 'b');

@@ -6,8 +6,12 @@ const os = require('os');
 const path = require('path');
 
 const { renderImageDoc } = require('./imagedoc');
+const { describeIfRenderer } = require('./testing/renderer');
 
 jest.setTimeout(120000);
+
+/** Chromium-raszter + ffmpeg-visszaolvasás: lokálisan hiányukban átugrik, CI-ben kötelező */
+const RASTER = { chromium: true, ffmpeg: true };
 
 let dir;
 beforeEach(() => {
@@ -39,7 +43,7 @@ async function redCount(shape) {
   return { inside, outside };
 }
 
-describe('🖊️ S18: körvonal-igazítás a szerver-renderben', () => {
+describeIfRenderer('🖊️ S18: körvonal-igazítás a szerver-renderben', RASTER, () => {
   it('téglalap: belül csak a dobozon belül, kívül a doboz körül, középen mindkét oldalon', async () => {
     const inside = await redCount({ shape: 'rectangle', borderAlign: 'inside' });
     const outside = await redCount({ shape: 'rectangle', borderAlign: 'outside' });

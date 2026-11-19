@@ -10,8 +10,13 @@ const { PNG } = require('pngjs');
 
 const { renderImageDoc } = require('./imagedoc');
 const { buildPsdFromImageDoc } = require('./psdExport');
+const { itIfRenderer } = require('./testing/renderer');
 
 jest.setTimeout(120000);
+
+/** Chromium-raszter + ffmpeg-visszaolvasás: lokálisan hiányukban átugrik, CI-ben kötelező */
+const RASTER = { chromium: true, ffmpeg: true };
+const itRaster = itIfRenderer(RASTER);
 
 let dir;
 beforeEach(() => {
@@ -29,14 +34,14 @@ const white = { id: 's', kind: 'shape', shape: 'rectangle', position: { x: 0.5, 
 const doc = (groups) => ({ id: 'd', name: 'd', aspectRatio: '1:1', width: 100, height: 100, layers: [{ id: 'bg', kind: 'fill', fill: '#000000' }, white], groups });
 
 describe('🗂️ S18: beágyazott csoportok a szerveren', () => {
-  it('a szülő áttetszősége a beágyazott csoport tagjára is hat (0,5 × 0,5)', async () => {
+  itRaster('a szülő áttetszősége a beágyazott csoport tagjára is hat (0,5 × 0,5)', async () => {
     const at = decode(await renderImageDoc(doc([{ id: 'G', name: 'G', opacity: 0.5 }, { id: 'H', name: 'H', parentId: 'G', opacity: 0.5 }]), 100, fs.mkdtempSync(path.join(dir, 'a'))));
     const v = at(50, 50)[0];
     expect(v).toBeGreaterThan(50);
     expect(v).toBeLessThan(80); // ≈ 64 (25%)
   });
 
-  it('a rejtett szülő a beágyazott csoport tagját is elrejti', async () => {
+  itRaster('a rejtett szülő a beágyazott csoport tagját is elrejti', async () => {
     const at = decode(await renderImageDoc(doc([{ id: 'G', name: 'G', hidden: true }, { id: 'H', name: 'H', parentId: 'G' }]), 100, fs.mkdtempSync(path.join(dir, 'b'))));
     expect(at(50, 50)[0]).toBeLessThan(10);
   });

@@ -5,13 +5,10 @@ const path = require('path');
 
 const { prepareFormantClip, writeWavF32, readStereo, needsFormantPrep } = require('./formantPrep');
 const { pitchFilters } = require('./voicechain');
+const { describeIfRenderer } = require('./testing/renderer');
 
 /** 🗣️ V7.3: a szerveres formáns-előkészítés valódi ffmpeg-gel — a tolt magánhangzó hangszíne visszaáll. */
 const SR = 44100;
-const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
-if (process.env.CI && !hasFfmpeg) {
-  throw new Error('A CI-ben kötelező az ffmpeg (a hang-minőségkapukhoz).');
-}
 
 function vowel(f0, formants, n) {
   const src = new Float64Array(n);
@@ -57,7 +54,7 @@ describe('needsFormantPrep', () => {
   });
 });
 
-(hasFfmpeg ? describe : describe.skip)('prepareFormantClip (ffmpeg)', () => {
+describeIfRenderer('prepareFormantClip (ffmpeg)', { ffmpeg: true }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'formant-'));
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 

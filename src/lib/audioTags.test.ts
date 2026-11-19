@@ -2,10 +2,10 @@
  * 🏷️ PRO-AUDIO 17/1: a cím és az előadó a fájl címkéjéből (ID3v2, MP4, FLAC, WAV), valódi
  * ffmpeg-gel címkézett fájlokon, ékezetes szöveggel.
  */
+import { describeIfRenderer } from '../../server/testing/renderer';
 type Bytes = { buffer: ArrayBuffer; byteOffset: number; byteLength: number };
-const { execFileSync, spawnSync } = jest.requireActual('child_process') as {
+const { execFileSync } = jest.requireActual('child_process') as {
   execFileSync: (cmd: string, args: string[], opts?: object) => Bytes;
-  spawnSync: (cmd: string, args: string[]) => { status: number | null };
 };
 const fs = jest.requireActual('fs') as { mkdtempSync: (p: string) => string; rmSync: (p: string, o: object) => void; readFileSync: (p: string) => Bytes };
 const os = jest.requireActual('os') as { tmpdir: () => string };
@@ -13,14 +13,10 @@ const path = jest.requireActual('path') as { join: (...p: string[]) => string };
 
 import { readAudioTags, tagLabel } from '@/lib/audioTags';
 
-const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
-if (process.env.CI && !hasFfmpeg) {
-  throw new Error('A CI-ben kötelező az ffmpeg (a hang-minőségkapukhoz).');
-}
 const bytes = (b: Bytes) => new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
 const headTail = (all: Uint8Array) => ({ head: all.subarray(0, 256 * 1024), tail: all.subarray(Math.max(0, all.length - 256 * 1024)) });
 
-(hasFfmpeg ? describe : describe.skip)('readAudioTags — valódi fájlok', () => {
+describeIfRenderer('readAudioTags — valódi fájlok', { ffmpeg: true }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tags-'));
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
   const make = (ext: string, extra: string[] = []) => {

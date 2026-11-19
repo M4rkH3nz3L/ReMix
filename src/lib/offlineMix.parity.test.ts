@@ -4,10 +4,10 @@
  * forrásokat ugyanúgy, 44,1 kHz-en dekódolva keveri. A kettő különbsége a mérés.
  */
 // a Node-modulok a jest futtatókörnyezetéből (a kliens tsconfig nem ismeri a Node-típusokat)
+import { describeIfRenderer } from '../../server/testing/renderer';
 type Bytes = { buffer: ArrayBuffer; byteOffset: number; byteLength: number };
-const { execFileSync, spawnSync } = jest.requireActual('child_process') as {
+const { execFileSync } = jest.requireActual('child_process') as {
   execFileSync: (cmd: string, args: string[], opts?: object) => Bytes;
-  spawnSync: (cmd: string, args: string[]) => { status: number | null };
 };
 const fs = jest.requireActual('fs') as { mkdtempSync: (p: string) => string; rmSync: (p: string, o: object) => void };
 const os = jest.requireActual('os') as { tmpdir: () => string };
@@ -18,11 +18,6 @@ import { integratedLoudness } from '@/lib/loudness';
 import { createEmptyProject, splitClip } from '@/lib/projectUtils';
 import type { AudioClip, Project } from '@/types/project';
 
-const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
-// CI-ben kötelező: egy csendben átugrott minőségkapu nem kapu
-if (process.env.CI && !hasFfmpeg) {
-  throw new Error('A CI-ben kötelező az ffmpeg (a hang-minőségkapukhoz).');
-}
 const SR = OFFLINE_SAMPLE_RATE;
 
 function decode(file: string, channels: number): Float32Array[] {
@@ -32,7 +27,7 @@ function decode(file: string, channels: number): Float32Array[] {
 }
 const rmsDb = (xs: Float32Array) => 10 * Math.log10(xs.reduce((s, v) => s + v * v, 0) / Math.max(1, xs.length) + 1e-30);
 
-(hasFfmpeg ? describe : describe.skip)('offlineMix ↔ szerveres render (A26)', () => {
+describeIfRenderer('offlineMix ↔ szerveres render (A26)', { ffmpeg: true }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'offmix-'));
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 

@@ -1,6 +1,7 @@
 /** 📏 A19: a telefonos keverés-mérés (LUFS, true-peak, LRA) = az ffmpeg `ebur128`-a (valódi ffmpeg-gel) */
 /* eslint-disable @typescript-eslint/no-require-imports */
 // a kliens tsconfig-jában nincsenek Node-típusok: a Node-modulok require-rel
+import { describeIfRenderer } from '../../server/testing/renderer';
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -9,8 +10,6 @@ const path = require('path');
 import { LiveLoudness } from '@/lib/liveLoudness';
 import { encodeWav16 } from '@/lib/offlineMix';
 
-const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
-if (process.env.CI && !hasFfmpeg) throw new Error('A CI-ben kötelező az ffmpeg (a hang-paritáshoz).');
 const SR = 44100;
 
 /** 20 s: 1 kHz-es szinusz, hangossága 5 s-onként lépcsőzve (−30 / −20 / −12 / −24 dBFS) — ismert LRA */
@@ -20,7 +19,7 @@ function stepped(): [Float32Array, Float32Array] {
   return [x, Float32Array.from(x, (v) => v * 0.7)];
 }
 
-(hasFfmpeg ? describe : describe.skip)('📏 telefonos mérés = ffmpeg ebur128', () => {
+describeIfRenderer('📏 telefonos mérés = ffmpeg ebur128', { ffmpeg: true }, () => {
   it('integrált LUFS ±0,3 LU, true-peak ±0,3 dB, LRA ±1 LU', () => {
     const [l, r] = stepped();
     const meter = new LiveLoudness(SR);

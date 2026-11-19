@@ -4,7 +4,7 @@ const os = require('os');
 const path = require('path');
 
 const { renderSvgToPdf, sanitizeSvg } = require('../svgPdf');
-const { findChromium } = require('../text-render');
+const { itIfRenderer } = require('../testing/renderer');
 const { validateUploads } = require('./mediaPolicy');
 const { ownedMediaKey } = require('./ownedKey');
 
@@ -28,8 +28,7 @@ describe('I44 — sanitizeSvg', () => {
 });
 
 describe('I44 — a Chromium nem ér el hálózatot', () => {
-  const chromium = findChromium();
-  (chromium ? it : it.skip)('a beágyazott külső kép nem kér a belső címről, a PDF elkészül', async () => {
+  itIfRenderer({ chromium: true })('a beágyazott külső kép nem kér a belső címről, a PDF elkészül', async () => {
     let hits = 0;
     const server = http.createServer((_req, res) => {
       hits += 1;

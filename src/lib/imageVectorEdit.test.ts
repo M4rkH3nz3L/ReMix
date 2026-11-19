@@ -5,6 +5,7 @@ import { compositionGuides, mergeGuides } from '@/lib/rulers';
 import { booleanCombineInDoc } from '@/lib/imageBoolean';
 import { dragHandle, nodeType, pathEditPatch, pathEditView } from '@/lib/vectorPath';
 import type { ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer, TextLayer } from '@/types/project';
+import { itIfRenderer } from '../../server/testing/renderer';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { execFileSync } = require('child_process');
@@ -15,6 +16,10 @@ const { renderImageDoc } = require('../../server/imagedoc');
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 jest.setTimeout(60000);
+
+/** Chromium-raszter + ffmpeg-visszaolvasás: lokálisan hiányukban átugrik, CI-ben kötelező */
+const RASTER = { chromium: true, ffmpeg: true };
+const itRaster = itIfRenderer(RASTER);
 
 const canvas = { width: 300, height: 200 };
 const placed = { position: { x: 0.4, y: 0.6 }, w: 0.3, h: 0.5, rotation: 37, flipH: true };
@@ -36,7 +41,7 @@ describe('I28 — réteg-geometria', () => {
     expect((b.y - a.y) * 200).toBeCloseTo(0);
   });
 
-  it('dobozból kilógó pont után a forma a kész képen pixelre a helyén marad', async () => {
+  itRaster('dobozból kilógó pont után a forma a kész képen pixelre a helyén marad', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vec-'));
     const shape = {
       kind: 'shape', id: 's', shape: 'path', closed: true, fill: '#ff0000',

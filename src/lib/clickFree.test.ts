@@ -3,10 +3,10 @@
  * hirtelen (mikro-fade), a kettévágott klip illesztése viszont folytonos marad. A szerveres
  * renderen (ffmpeg) mérve; a telefonos keverő ugyanezt a szabályt követi (paritás-teszt).
  */
+import { describeIfRenderer } from '../../server/testing/renderer';
 type Bytes = { buffer: ArrayBuffer; byteOffset: number; byteLength: number };
-const { execFileSync, spawnSync } = jest.requireActual('child_process') as {
+const { execFileSync } = jest.requireActual('child_process') as {
   execFileSync: (cmd: string, args: string[], opts?: object) => Bytes;
-  spawnSync: (cmd: string, args: string[]) => { status: number | null };
 };
 const fs = jest.requireActual('fs') as { mkdtempSync: (p: string) => string; rmSync: (p: string, o: object) => void };
 const os = jest.requireActual('os') as { tmpdir: () => string };
@@ -16,11 +16,6 @@ import { createEmptyProject } from '@/lib/projectUtils';
 import { EDGE_FADE_SEC, offlineMixPlan } from '@/lib/offlineMix';
 import type { AudioClip, Project } from '@/types/project';
 
-const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
-// CI-ben kötelező: egy csendben átugrott minőségkapu nem kapu
-if (process.env.CI && !hasFfmpeg) {
-  throw new Error('A CI-ben kötelező az ffmpeg (a hang-minőségkapukhoz).');
-}
 const SR = 44100;
 const decode = (file: string): Float32Array => {
   const raw = execFileSync('ffmpeg', ['-v', 'error', '-i', file, '-f', 'f32le', '-ac', '1', '-ar', String(SR), '-'], { maxBuffer: 1 << 26 });
@@ -52,7 +47,7 @@ describe('mikro-fade terv (telefonos keverő)', () => {
   });
 });
 
-(hasFfmpeg ? describe : describe.skip)('kattogásmentes vágás a szerveres renderben', () => {
+describeIfRenderer('kattogásmentes vágás a szerveres renderben', { ffmpeg: true }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'click-'));
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
   const src = path.join(dir, 'sine.wav');

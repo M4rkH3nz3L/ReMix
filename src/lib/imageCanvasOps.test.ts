@@ -5,6 +5,7 @@
 import { flattenTargets, flipCanvasDoc, mergeDownTargets, rasterSubDoc, replaceWithRaster, resampleDoc, resizeCanvasDoc, rotateCanvasDoc } from '@/lib/imageCanvasOps';
 import { aspectCropRect, resizeCropCorner } from '@/lib/imageCrop';
 import type { ImageDoc, ImageLayer, PhotoLayer } from '@/types/project';
+import { describeIfRenderer, itIfRenderer } from '../../server/testing/renderer';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { execFileSync } = require('child_process');
@@ -15,6 +16,10 @@ const { renderImageDoc } = require('../../server/imagedoc');
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 jest.setTimeout(90000);
+
+/** Chromium-raszter + ffmpeg-visszaolvasás: lokálisan hiányukban átugrik, CI-ben kötelező */
+const RASTER = { chromium: true, ffmpeg: true };
+const itRaster = itIfRenderer(RASTER);
 
 let dir: string;
 let photoUri: string;
@@ -61,7 +66,7 @@ const scene = (): ImageDoc => ({
 } as unknown as ImageDoc);
 
 describe('vászon-forgatás és -tükrözés a kész képen', () => {
-  it.each([
+  itRaster.each([
     ['90° jobbra', (d: ImageDoc) => rotateCanvasDoc(d, 90), 'transpose=1'],
     ['90° balra', (d: ImageDoc) => rotateCanvasDoc(d, -90), 'transpose=2'],
     ['180°', (d: ImageDoc) => rotateCanvasDoc(d, 180), 'hflip,vflip'],
@@ -73,12 +78,12 @@ describe('vászon-forgatás és -tükrözés a kész képen', () => {
     const actual = decode(await render(op(scene())));
     expect(diff(actual, expected)).toBeLessThan(0.016); // élsimítás + a szöveg 1 px-es kerekítése
   });
-  it('a szöveg pontosan egyszer forog', async () => {
+  itRaster('a szöveg pontosan egyszer forog', async () => {
     const text = { ...scene(), layers: [{ kind: 'text', id: 't', text: 'Lllll', color: '#ffffff', fontSize: 16, position: { x: 0.5, y: 0.5 } }] } as unknown as ImageDoc;
     expect(diff(decode(await render(rotateCanvasDoc(text, 90))), decode(await render(text), 'transpose=1'))).toBeLessThan(0.012);
     expect(diff(decode(await render(flipCanvasDoc(text, 'horizontal'))), decode(await render(text), 'hflip'))).toBeLessThan(0.012);
   });
-  it('a forgatott réteg nem vágódik le', async () => {
+  itRaster('a forgatott réteg nem vágódik le', async () => {
     const bar = { ...scene(), width: 400, height: 400, layers: [{ kind: 'shape', id: 'r', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.8, h: 0.1, fill: '#ff0000', rotation: 90 }] } as unknown as ImageDoc;
     const img = decode(await render(bar));
     const alphaAt = (x: number, y: number) => img.d[(y * img.w + x) * 4 + 3];
@@ -103,7 +108,7 @@ describe('vászon-forgatás és -tükrözés a kész képen', () => {
   });
 });
 
-describe('vászonméret horgonnyal', () => {
+describeIfRenderer('vászonméret horgonnyal', RASTER, () => {
   it.each([
     ['bal felső', { x: 0, y: 0 }, 0, 0],
     ['közép', { x: 0.5, y: 0.5 }, 100, 80],
@@ -132,13 +137,13 @@ describe('egyesítés / lapítás', () => {
     const png = await render(sub);
     return replaceWithRaster(d, ids, png, 'rst', 'Egyesítve');
   };
-  it('a lapított kép pixelre ugyanaz', async () => {
+  itRaster('a lapított kép pixelre ugyanaz', async () => {
     const d = scene();
     const flat = await merged(d, flattenTargets(d));
     expect(flat.layers).toHaveLength(1);
     expect(diff(decode(await render(flat)), decode(await render(d)))).toBeLessThan(0.01);
   });
-  it('az egyesítés lefelé megtartja a többi réteget és a sorrendet', async () => {
+  itRaster('az egyesítés lefelé megtartja a többi réteget és a sorrendet', async () => {
     const d = scene();
     const pair = mergeDownTargets(d, 't')!;
     expect(pair).toEqual(['s', 't']);

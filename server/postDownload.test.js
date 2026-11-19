@@ -6,6 +6,7 @@ const os = require('os');
 const path = require('path');
 const { PNG } = require('pngjs');
 const pd = require('./postDownload');
+const { describeIfRenderer } = require('./testing/renderer');
 
 describe('downloadVariant (D11)', () => {
   test('tisztát csak a fizetős tulajdonos kap', () => {
@@ -37,8 +38,7 @@ describe('média-kulcs és aláírt link', () => {
   });
 });
 
-const hasFfmpeg = (() => { try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); return true; } catch { return false; } })();
-(hasFfmpeg ? describe : describe.skip)('burnWatermark — valódi ffmpeg', () => {
+describeIfRenderer('burnWatermark — valódi ffmpeg', { ffmpeg: true }, () => {
   jest.setTimeout(60000);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wm-test-'));
   const src = path.join(tmp, 'src.mp4');

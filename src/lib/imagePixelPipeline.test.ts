@@ -6,6 +6,7 @@ import { applyOps, correctHex, correctPaint, correctionsAbove, layerOps, maskedC
 import { parseCubeLut } from '@/lib/lutImport';
 import { LUT_DRAFT_SIZE, buildLutBytes, hasColorOps, hasDetail, layerDetail, sampleLut } from '@/lib/imagePreviewLut';
 import type { PhotoLayer } from '@/types/project';
+import { itIfRenderer } from '../../server/testing/renderer';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { execFileSync } = require('child_process');
@@ -16,6 +17,10 @@ const { renderImageDoc } = require('../../server/imagedoc');
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 jest.setTimeout(180000);
+
+/** Chromium-raszter + ffmpeg-visszaolvasás: lokálisan hiányukban átugrik, CI-ben kötelező */
+const RASTER = { chromium: true, ffmpeg: true };
+const itRaster = itIfRenderer(RASTER);
 
 const COLORS = [[200, 60, 40], [40, 160, 80], [50, 70, 200], [128, 128, 128], [230, 220, 200], [30, 25, 40], [240, 200, 60], [90, 40, 120]];
 const CELL = 40;
@@ -156,7 +161,7 @@ describe('.cube LUT', () => {
 });
 
 describe('szöveg és forma színe a korrekciók után', () => {
-  it('a forma színe a korrekciós réteggel az exportot adja', async () => {
+  itRaster('a forma színe a korrekciós réteggel az exportot adja', async () => {
     const W = 200;
     const w = fs.mkdtempSync(path.join(dir, 'r-'));
     const shape = { kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fill: '#3070d0' };

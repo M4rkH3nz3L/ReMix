@@ -6,8 +6,12 @@ const os = require('os');
 const path = require('path');
 
 const { renderImageDoc } = require('./imagedoc');
+const { describeIfRenderer } = require('./testing/renderer');
 
 jest.setTimeout(60000);
+
+/** Chromium-raszter + ffmpeg-visszaolvasás: lokálisan hiányukban átugrik, CI-ben kötelező */
+const RASTER = { chromium: true, ffmpeg: true };
 
 let dir;
 beforeEach(() => {
@@ -45,7 +49,7 @@ function mixedInRow(img) {
   return n;
 }
 
-describe('👾 S15: pixel-art réteg a szerver-renderben', () => {
+describeIfRenderer('👾 S15: pixel-art réteg a szerver-renderben', RASTER, () => {
   it('a jelzett réteg éles: a két szín közt nincs átmenet', async () => {
     const out = await renderImageDoc(doc(layer(twoPixels(), { pixelArt: 1 })), 200, dir);
     expect(mixedInRow(decode(out))).toBe(0);

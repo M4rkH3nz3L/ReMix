@@ -4,6 +4,7 @@ import { polygonFor, regularPolygon, shapeToPathPoints, starPolygon } from '@/li
 import { textSize } from '@/lib/imageLayerLayout';
 import { selectionMenu } from '@/lib/imageMenu';
 import type { ImageDoc, ImageLayer, ShapeLayer, TextLayer } from '@/types/project';
+import { describeIfRenderer, itIfRenderer } from '../../server/testing/renderer';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { execFileSync } = require('child_process');
@@ -15,6 +16,10 @@ const worker = require('../../server/shapeGeometry');
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 jest.setTimeout(90000);
+
+/** Chromium-raszter + ffmpeg-visszaolvasás: lokálisan hiányukban átugrik, CI-ben kötelező */
+const RASTER = { chromium: true, ffmpeg: true };
+const itRaster = itIfRenderer(RASTER);
 
 const W = 400;
 const H = 200;
@@ -42,7 +47,7 @@ const countInk = (i: Img) => { let n = 0; for (let k = 3; k < i.d.length; k += 4
 const text = (extra: Partial<TextLayer>) => ({ kind: 'text', id: 't', text: 'Hosszu elso sor\nRovid', color: '#ffffff', backgroundColor: null, fontSize: 14, fontWeight: 'normal', fontFamily: 'Poppins', position: { x: 0.5, y: 0.5 }, ...extra }) as unknown as ImageLayer;
 const shape = (extra: Partial<ShapeLayer>) => ({ kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.8, fill: '#ff0000', ...extra }) as unknown as ImageLayer;
 
-describe('szöveg-igazítás a kész képen', () => {
+describeIfRenderer('szöveg-igazítás a kész képen', RASTER, () => {
   const secondLine = async (textAlign: TextLayer['textAlign']) => {
     const img = await render([text({ textAlign })]);
     return inkX(img, 102, 130);
@@ -55,7 +60,7 @@ describe('szöveg-igazítás a kész képen', () => {
   });
 });
 
-describe('szövegdoboz', () => {
+describeIfRenderer('szövegdoboz', RASTER, () => {
   it('a megadott szélességbe tördel, és a keret ezt becsüli', async () => {
     const long = 'Egy jo hosszu mondat ami biztosan nem fer ki egy sorba';
     const img = await render([text({ text: long, boxWidth: 0.5, textAlign: 'left', fontSize: 10 })], 400, 400);
@@ -71,7 +76,7 @@ describe('szövegdoboz', () => {
   });
 });
 
-describe('dőlt és betűtípus', () => {
+describeIfRenderer('dőlt és betűtípus', RASTER, () => {
   it('a dőlt tényleg megváltoztatja a képet', async () => {
     const plain = await render([text({})]);
     const italic = await render([text({ fontStyle: 'italic' })]);
@@ -103,13 +108,13 @@ describe('sokszög és csillag', () => {
     expect(polygonFor({ shape: 'star' })).toEqual(worker.polygonFor({ shape: 'star' }));
     expect(polygonFor({ shape: 'star' })![0]).toEqual([50, 0]);
   });
-  it('a háromszög kitölti a dobozát, és háromszög alakú a kész képen', async () => {
+  itRaster('a háromszög kitölti a dobozát, és háromszög alakú a kész képen', async () => {
     const img = await render([shape({ shape: 'polygon', sides: 3 })]);
     expect(alpha(img, 200, 30)).toBeGreaterThan(200); // felül a csúcs
     expect(alpha(img, 110, 170)).toBeGreaterThan(200); // alul a sarok
     expect(alpha(img, 110, 30)).toBe(0); // felül a sarok üres
   });
-  it('a csillag belső sugara a kész képen is számít', async () => {
+  itRaster('a csillag belső sugara a kész képen is számít', async () => {
     const fat = countInk(await render([shape({ shape: 'star', starPoints: 5, innerRadius: 0.8 })]));
     const thin = countInk(await render([shape({ shape: 'star', starPoints: 5, innerRadius: 0.25 })]));
     expect(fat).toBeGreaterThan(thin * 1.5);
@@ -117,7 +122,7 @@ describe('sokszög és csillag', () => {
 });
 
 describe('forma → görbe', () => {
-  it.each(['rectangle', 'ellipse', 'arrow', 'star', 'polygon'] as const)('%s: a kinézet nem változik', async (kind) => {
+  itRaster.each(['rectangle', 'ellipse', 'arrow', 'star', 'polygon'] as const)('%s: a kinézet nem változik', async (kind) => {
     const before = shape({ shape: kind, sides: 5 } as Partial<ShapeLayer>);
     const points = shapeToPathPoints(before as ShapeLayer)!;
     const after = { ...before, shape: 'path', points, closed: true } as unknown as ImageLayer;
@@ -127,7 +132,7 @@ describe('forma → görbe', () => {
     for (let k = 3; k < a.d.length; k += 4) if (Math.abs(a.d[k] - b.d[k]) > 110) diff += 1;
     expect(diff / (W * H)).toBeLessThan(0.01);
   });
-  it('S18: a lekerekített téglalap sarka a görbén is megmarad (nem négyzetes dobozban)', async () => {
+  itRaster('S18: a lekerekített téglalap sarka a görbén is megmarad (nem négyzetes dobozban)', async () => {
     const before = shape({ cornerRadius: 0.3 });
     const aspect = (0.5 * W) / (0.8 * H);
     const points = shapeToPathPoints(before as ShapeLayer, aspect)!;

@@ -5,9 +5,14 @@ const os = require('os');
 const path = require('path');
 
 const { renderImageDoc } = require('./imagedoc');
+const { describeIfRenderer, itIfRenderer } = require('./testing/renderer');
 
 // valódi ffmpeg/Chromium fut — párhuzamos teszt-terhelésnél az 5 mp-es alap kevés
 jest.setTimeout(60000);
+
+/** Chromium-raszter + ffmpeg-visszaolvasás: lokálisan hiányukban átugrik, CI-ben kötelező */
+const RASTER = { chromium: true, ffmpeg: true };
+const itRaster = itIfRenderer(RASTER);
 
 let dir;
 beforeEach(() => {
@@ -122,7 +127,7 @@ describe('átlátszóság a teljes láncon (az eredeti hiba regressziója)', () 
     expect(out.at(100, 100)[3]).toBe(255);
     expect(out.at(60, 60)[3]).toBe(0);
   });
-  it('alakzat és szöveg mellett is átlátszó marad a vászon', async () => {
+  itRaster('alakzat és szöveg mellett is átlátszó marad a vászon', async () => {
     const shape = { kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.4, h: 0.4, fill: '#00ff00' };
     const text = { kind: 'text', id: 't', text: 'Hello', color: '#ffffff', fontSize: 8, position: { x: 0.5, y: 0.2 } };
     const out = decode(await renderImageDoc(doc([shape, text]), 200, dir));
@@ -185,7 +190,7 @@ describe('I14 — távoli (PSD/PDF) rétegképek', () => {
   });
 });
 
-describe('alakzat-kompozit (SVG-összevetésből kiderült hibák)', () => {
+describeIfRenderer('alakzat-kompozit (SVG-összevetésből kiderült hibák)', RASTER, () => {
   const rect = (extra = {}) => ({ kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.5, y: 0.5 }, w: 0.6, h: 0.6, fill: '#ff0000', ...extra });
   it('az 50%-os alakzat 50%, nem 25%', async () => {
     const out = decode(await renderImageDoc(doc([rect({ opacity: 0.5 })]), 200, dir));
@@ -203,7 +208,7 @@ describe('alakzat-kompozit (SVG-összevetésből kiderült hibák)', () => {
   });
 });
 
-describe('I29 — PSD: a rétegek valódi tartalommal', () => {
+describeIfRenderer('I29 — PSD: a rétegek valódi tartalommal', RASTER, () => {
   const { buildPsdFromImageDoc } = require('./psdExport');
   const agPsd = require('ag-psd');
   const rasterize = (d) => async (layer) => {
@@ -236,7 +241,7 @@ describe('I29 — PSD: a rétegek valódi tartalommal', () => {
   });
 });
 
-describe('ellipszis nem négyzetes dobozban', () => {
+describeIfRenderer('ellipszis nem négyzetes dobozban', RASTER, () => {
   it('valódi ellipszis, nem lekerekített téglalap', async () => {
     const e = { kind: 'shape', id: 'e', shape: 'ellipse', position: { x: 0.5, y: 0.5 }, w: 0.9, h: 0.4, fill: '#ff0000' };
     const out = decode(await renderImageDoc(doc([e]), 200, dir));
@@ -246,7 +251,7 @@ describe('ellipszis nem négyzetes dobozban', () => {
   });
 });
 
-describe('szöveg körvonala', () => {
+describeIfRenderer('szöveg körvonala', RASTER, () => {
   it('valódi betű-kontúr: a sziluett felnagyítása nélkül a betű közepénél is van keret', async () => {
     const text = { kind: 'text', id: 't', text: 'I', position: { x: 0.5, y: 0.5 }, fontSize: 60, color: '#ffffff', fontWeight: '900' };
     const img = decode(await renderImageDoc(doc([{ kind: 'fill', id: 'f', fill: '#000000' }, { ...text, stroke: { color: '#ff0000', width: 0.02 } }]), 200, dir));

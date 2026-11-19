@@ -2,6 +2,7 @@
  * 📏 A saját BS.1770 mérő az ffmpeg `ebur128`-ával szemben (valódi ffmpeg, rózsaszín zaj és
  * szinusz, különböző szinteken). CI-ben az ffmpeg kötelező.
  */
+import { describeIfRenderer } from '../../server/testing/renderer';
 type Bytes = { buffer: ArrayBuffer; byteOffset: number; byteLength: number };
 const { execFileSync, spawnSync } = jest.requireActual('child_process') as {
   execFileSync: (cmd: string, args: string[], opts?: object) => Bytes;
@@ -13,10 +14,6 @@ const path = jest.requireActual('path') as { join: (...p: string[]) => string };
 
 import { integratedLoudness } from '@/lib/loudness';
 
-const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
-if (process.env.CI && !hasFfmpeg) {
-  throw new Error('A CI-ben kötelező az ffmpeg (a hang-minőségkapukhoz).');
-}
 const SR = 44100;
 
 describe('integratedLoudness — tiszta esetek', () => {
@@ -30,7 +27,7 @@ describe('integratedLoudness — tiszta esetek', () => {
   });
 });
 
-(hasFfmpeg ? describe : describe.skip)('integratedLoudness = ffmpeg ebur128', () => {
+describeIfRenderer('integratedLoudness = ffmpeg ebur128', { ffmpeg: true }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lufs-'));
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
   const cases: [string, string][] = [

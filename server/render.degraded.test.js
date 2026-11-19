@@ -4,8 +4,13 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { itIfRenderer } = require('./testing/renderer');
 
 jest.setTimeout(180000);
+
+/** Chromium-raszter + ffmpeg-visszaolvasás: lokálisan hiányukban átugrik, CI-ben kötelező */
+const RASTER = { chromium: true, ffmpeg: true };
+const itRaster = itIfRenderer(RASTER);
 
 const project = (textClip) => ({
   id: 'p', name: 'p', aspectRatio: '1:1', schemaVersion: 10, createdAt: '', updatedAt: '', assets: [],
@@ -47,7 +52,7 @@ test('a forma-raszter hibája: a render bukik, a hiba a formát nevezi meg', asy
   await expect(renderProject(project({}), dir, () => {}, { resolution: 480 })).rejects.toThrow(/formák/);
 });
 
-test('az animált szöveg hibája: a videó elkészül álló szöveggel, a jelentés hozza (textMotion)', async () => {
+itRaster('az animált szöveg hibája: a videó elkészül álló szöveggel, a jelentés hozza (textMotion)', async () => {
   jest.doMock('./text-motion', () => ({ renderTextSequence: jest.fn().mockRejectedValue(new Error('képsor hiba')) }));
   const { renderProject } = require('./render');
   const report = {};
@@ -57,7 +62,7 @@ test('az animált szöveg hibája: a videó elkészül álló szöveggel, a jele
   expect(brightPixels(out)).toBeGreaterThan(200); // a szöveg ott van, csak animáció nélkül
 });
 
-test('hiba nélkül nincs visszaesés', async () => {
+itRaster('hiba nélkül nincs visszaesés', async () => {
   const { renderProject } = require('./render');
   const report = {};
   const out = await renderProject(project({}), dir, () => {}, { resolution: 480 }, undefined, report);

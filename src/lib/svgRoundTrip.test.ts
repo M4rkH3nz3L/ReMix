@@ -6,6 +6,7 @@
 import { imageDocToSvg } from '@/lib/svgExport';
 import { parseSvg } from '@/lib/svgImport';
 import type { ImageDoc, ImageLayer, ShapeLayer } from '@/types/project';
+import { chromiumPath, itIfRenderer } from '../../server/testing/renderer';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { execFileSync } = require('child_process');
@@ -13,7 +14,6 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { chromium } = require('../../server/node_modules/playwright-core');
-const { findChromium } = require('../../server/text-render');
 const { renderImageDoc } = require('../../server/imagedoc');
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -23,8 +23,9 @@ const W = 200;
 const H = 200;
 let dir: string;
 let browser: { newPage: (o: object) => Promise<any>; close: () => Promise<void> };
-const exe = findChromium();
-const it2 = exe ? it : it.skip;
+const exe = chromiumPath();
+/** Chromium + ffmpeg: lokálisan hiányukban átugrik, CI-ben kötelező */
+const it2 = itIfRenderer({ chromium: true, ffmpeg: true });
 
 beforeAll(async () => {
   if (exe) browser = await chromium.launch({ executablePath: exe });

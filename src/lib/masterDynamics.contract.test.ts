@@ -1,7 +1,8 @@
 /** 🗜️🔥 R4: a master-kompresszor és -szaturáció a telefonon = a szerveren (valódi ffmpeg-gel) */
 /* eslint-disable @typescript-eslint/no-require-imports */
 // a kliens tsconfig-jában nincsenek Node-típusok: a Node-modulok require-rel (mint a szerver-modulok)
-const { execFileSync, spawnSync } = require('child_process');
+import { describeIfRenderer } from '../../server/testing/renderer';
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -10,8 +11,6 @@ import { buildMasterChain, saturationDrive, Saturator } from './audioDsp';
 const worker = require('../../server/voicechain');
 
 const SR = 44100;
-const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
-if (process.env.CI && !hasFfmpeg) throw new Error('A CI-ben kötelező az ffmpeg (a hang-paritáshoz).');
 
 const sine = (amp: number, sec = 1, hz = 1000) => Float32Array.from({ length: Math.round(sec * SR) }, (_, i) => amp * Math.sin((2 * Math.PI * hz * i) / SR));
 const rms = (x: Float32Array, from = 0) => {
@@ -60,7 +59,7 @@ describe('master-szaturáció (tiszta mag)', () => {
   });
 });
 
-(hasFfmpeg ? describe : describe.skip)('🤝 telefon = szerver (ffmpeg)', () => {
+describeIfRenderer('🤝 telefon = szerver (ffmpeg)', { ffmpeg: true }, () => {
   it('szaturáció: mintára egyezik (aeval tanh ↔ Saturator)', () => {
     const x = sine(0.5);
     const a = clientMaster({ saturation: 0.5, truePeak: -1 }, x);

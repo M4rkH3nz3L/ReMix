@@ -30,7 +30,11 @@ function makeProject(): Project {
 }
 
 const store = () => useEditorStore.getState();
-beforeEach(() => store().loadProject(makeProject()));
+beforeEach(() => {
+  // a detent-memória szándékosan túléli a projektváltást (nincs a SESSION_RESET-ben) → tesztenként tiszta lap
+  useEditorStore.setState({ panelDetentMemory: {} });
+  store().loadProject(makeProject());
+});
 afterEach(() => store().closeProject());
 
 describe('panel felület-szint (store)', () => {

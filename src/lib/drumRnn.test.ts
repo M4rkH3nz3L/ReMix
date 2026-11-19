@@ -49,8 +49,8 @@ describe('drumRnn — V8 AI-dob (Magenta Drums RNN, tiszta JS)', () => {
 
   test('a figyelem-bias kapcsoló számít (TF-hű út ≠ bias nélkül)', () => {
     const v = tinyVars();
-    const a = new DrumRnn(v, { attnLength: 3 }).continue([1, 2], 4, undefined, Math.random, true).probs[0];
-    const b = new DrumRnn(v, { attnLength: 3, attentionBias: false }).continue([1, 2], 4, undefined, Math.random, true).probs[0];
+    const a = new DrumRnn(v, { attnLength: 3 }).continue([1, 2], 4, undefined, seededRandom(1), true).probs[0];
+    const b = new DrumRnn(v, { attnLength: 3, attentionBias: false }).continue([1, 2], 4, undefined, seededRandom(1), true).probs[0];
     expect(Math.max(...a.map((x, i) => Math.abs(x - b[i])))).toBeGreaterThan(1e-6);
   });
 

@@ -51,9 +51,23 @@ jest.mock('react-native-reanimated', () => {
 const layer: PhotoLayer = { kind: 'photo', id: 'p', uri: 'file:///a.png', position: { x: 0.5, y: 0.5 }, w: 0.5, h: 0.5, fit: 'cover' };
 const box = { w: 300, h: 300 };
 
+// minden fát lebontunk a teszt után: a gesture-handler testID-regisztere globális, egy
+// bent maradt régi vászon kezelője különben átszivárog a következő tesztbe (sorrendfüggés)
+const mounted: ReactTestRenderer[] = [];
+function mount(el: React.ReactElement): ReactTestRenderer {
+  const tree = create(el);
+  mounted.push(tree);
+  return tree;
+}
+afterEach(() => {
+  act(() => {
+    for (const tree of mounted.splice(0)) tree.unmount();
+  });
+});
+
 function render(el: React.ReactElement) {
   act(() => {
-    create(el);
+    mount(el);
   });
 }
 
@@ -225,12 +239,12 @@ describe('réteg-sorrend húzással', () => {
     ] as ImageLayer[];
     for (const k of kinds) {
       act(() => {
-        tree = create(<LayerThumb layer={k} />);
+        tree = mount(<LayerThumb layer={k} />);
       });
       expect(tree!.toJSON()).toBeTruthy();
     }
     act(() => {
-      tree = create(<LayerThumb layer={layer} />);
+      tree = mount(<LayerThumb layer={layer} />);
     });
     expect(JSON.stringify(tree!.toJSON())).toContain('file:///a.png');
   });
@@ -394,7 +408,7 @@ describe('hosszú nyomás a vásznon', () => {
   const press = async (onLayerLongPress: (id: string) => void, x: number, y: number) => {
     let tree!: ReactTestRenderer;
     act(() => {
-      tree = create(<ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} onLayerLongPress={onLayerLongPress} />);
+      tree = mount(<ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} onLayerLongPress={onLayerLongPress} />);
     });
     const stage = tree.root.findAll((n) => typeof n.props.onLayout === 'function')[0];
     await act(async () => stage.props.onLayout({ nativeEvent: { layout: { width: 200, height: 200 } } }));
@@ -420,7 +434,7 @@ describe('≥44 pt célterület', () => {
     let tree: ReturnType<typeof create> | undefined;
     const doc = { id: 'd', name: 'D', aspectRatio: '1:1', width: 100, height: 100, layers: [layer] } as unknown as ImageDoc;
     act(() => {
-      tree = create(<LayerPanel doc={doc} selectedId={null} onSelect={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={() => {}} onClose={() => {}} />);
+      tree = mount(<LayerPanel doc={doc} selectedId={null} onSelect={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={() => {}} onClose={() => {}} />);
     });
     const icons = tree!.root.findAll((n) => typeof n.type === 'string' && n.props.accessibilityRole === 'button');
     const sized = icons.map((n) => StyleSheet.flatten(n.props.style)).filter((s) => s?.width != null);
@@ -438,7 +452,7 @@ describe('rács-illesztés a vásznon', () => {
     let last: ImageDoc | null = null;
     let root: ReactTestRenderer | undefined;
     act(() => {
-      root = create(<ImageCanvas doc={docWith(grid)} selectedId="p" onSelect={() => {}} commit={(d) => (last = d)} />);
+      root = mount(<ImageCanvas doc={docWith(grid)} selectedId="p" onSelect={() => {}} commit={(d) => (last = d)} />);
     });
     const host = root!.root.findAll((n) => typeof n.props.onLayout === 'function')[0];
     act(() => host.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 320, height: 320 } } }));

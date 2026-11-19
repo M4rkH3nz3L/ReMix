@@ -30,14 +30,15 @@ duplikálja.
 | [README.md](README.md) | Mit tud az app, hogyan indítom? | belépő |
 | [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md) | Milyen szabályok kötnek kód írásakor? | konvenció |
 | [docs/hu/](docs/hu/) | Rétegenkénti, kód-alapú fejlesztői doksik + **ADR-ek** | architektúra (részletes) |
-| [devs/tasks/](devs/tasks/) | Stúdió- és platform-fejlesztési tervek (video/audio/image/MISSING) | feature-terv |
-| [devs/tasks/remix/](devs/tasks/remix/) | 🛡️ Security + production-readiness terv · **go-live blokkolók** | minőség / kiadás |
+| `devs/tasks/` *(lokális, gitignored — nincs a repóban)* | Stúdió- és platform-fejlesztési tervek (video/audio/image/MISSING) | feature-terv |
+| `devs/tasks/remix/` *(lokális)* | 🛡️ Security + production-readiness terv · **go-live blokkolók** | minőség / kiadás |
+| [docs/hu/development/quality-report.md](docs/hu/development/quality-report.md) | Mérhető minőség-állapot, nyitott kérdések | minőség |
 | [ops/SERVER.md](ops/SERVER.md) | Mit és hogyan üzemeltetünk (deploy) | üzemeltetés |
 | [docs/hu/development/release.md](docs/hu/development/release.md) | Hogyan készül kiadható build | kiadás |
 
 **Olvasási sorrend új fejlesztőnek:** README → **Arch.md (1–7. szakasz)** →
 AGENTS.md → a réteg-doksik ([docs/hu/](docs/hu/)) → a feature-hez tartozó terv
-([devs/tasks/](devs/tasks/)).
+(`devs/tasks/`).
 
 ---
 
@@ -417,7 +418,7 @@ sosem self-grantol Pro-t/kreditet — csak szinkronizál.
 A nyilvános worker-API + storage jelenlegi hardening-hiányai (auth-perimeter,
 rate-limit, upload/SSRF-policy, storage-RLS ownership, render-BOLA, webhook-
 idempotency, CI-security) **számozott, prioritált tervben** élnek:
-[devs/tasks/remix/](devs/tasks/remix/) (forrás-audit: [devs/source/remix.md](devs/source/remix.md),
+`devs/tasks/remix/` (forrás-audit: `devs/source/remix.md`,
 OWASP **ASVS 5.0 / MASVS / API Top-10** alapon). Ez a **go-live blokkolók**
 kanonikus helye (P0 → P1 → P2).
 
@@ -455,12 +456,14 @@ visszavonás az egész AI-köteget törli.
 
 ## 11. Minőség-kapuk és tesztelhetőség
 
-- **`npm run audit`** = `tsc --noEmit` + `expo lint` + `jest`
+- **`npm run audit`** = `tsc --noEmit` (kliens + a `// @ts-check`-es worker-fájlok) + `expo lint` + `jest`
   ([package.json](package.json)). Ez a merge-kapu.
-- **Expo-mentes magok** → önmagukban tesztelhetők. Van is rájuk teszt:
-  `frames`, `keyframes`, `trimEdit`, `rangeEdit`, `projectUtils`, `preCompose`,
-  `safeZone`, `lruCache`, `netRetry`, `secureStorage`, `eventLog`,
-  `captionFormats`, `parseGuards`, `cancel`, `autoVersion` (`*.test.ts`).
+- **CI-kapuk** a fentieken túl: coverage-ratchet (a padló csak felfelé mozdulhat), fájlméret-kapu (új
+  fájl ≤ 1000 sor, a meglévő óriásfájlok nem nőhetnek), renderer-kötelezés (Chromium + ffmpeg 8.1),
+  éjszakai mutációs teszt a pénz- és projektintegritás-magokra. Részletek:
+  [docs/hu/development/testing.md](docs/hu/development/testing.md).
+- **Expo-mentes magok** → önmagukban tesztelhetők; a reducerre és a pénz-utakra property-alapú
+  (fast-check) és mutációs (Stryker) tesztek is futnak.
 - **Szándékos lint-kivételek:** `react-hooks/immutability` és `react-hooks/refs`
   kikapcsolva — Reanimated shared value-k és expo-video/audio player-mutációk
   miatt ([AGENTS.md](AGENTS.md)).
@@ -499,14 +502,14 @@ prioritált teendők:
    `server/*.js` séma-egyezésére), hogy a felhő-verzióváltás ne törjön csendben.
 8. **Observability terv** (naplózás/metrika a workeren, render-queue-egészség) — az
    [ops/SERVER.md](ops/SERVER.md) kiegészítéseként; a security-event/audit-log a
-   [devs/tasks/remix/14](devs/tasks/remix/14-security-baseline-docs.md) alatt.
+   `devs/tasks/remix/14` alatt.
 
 **🛡️ Production & security — a következő nagy lépés (go-live előtt kötelező)**
 9. **Security-baseline.** A kód-mag már pro-szintű; a **hiányzó réteg a
    security-perimeter**: worker-auth/rate-limit/upload/SSRF-policy, storage-RLS
    ownership, render-BOLA, webhook-hardening, CI-security. Számozott, prioritált
-   terv (P0→P2): [devs/tasks/remix/](devs/tasks/remix/) — belépő a
-   [00-README](devs/tasks/remix/00-README.md).
+   terv (P0→P2): `devs/tasks/remix/` — belépő a
+   `devs/tasks/remix/00-README.md`.
 
 ### Dokumentum-struktúra (Meta-minta) — ✅ megvalósult a `docs/hu/` alatt
 
@@ -531,7 +534,7 @@ docs/
 ```
 
 > **Elv:** a `docs/hu/architecture/*` a *miért* és a *hogyan együtt* — a
-> feature-listákat/terveket ([devs/tasks/](devs/tasks/)) és az ops-részleteket
+> feature-listákat/terveket (`devs/tasks/`) és az ops-részleteket
 > ([ops/SERVER.md](ops/SERVER.md)) nem ismételjük, csak linkeljük.
 
 ---
@@ -539,8 +542,8 @@ docs/
 ## 13. ADR-index — ✅ rögzítve
 
 Architecture Decision Record = *döntés + kontextus + a mérlegelt, elvetett
-alternatívák*. Az alábbi 10 döntés **rögzítve** van a
-[docs/hu/decisions/](docs/hu/decisions/) alatt (ADR-001 … ADR-010). Minta (a
+alternatívák*. Az alábbi 13 döntés **rögzítve** van a
+[docs/hu/decisions/](docs/hu/decisions/) alatt (ADR-001 … ADR-013). Minta (a
 `command bus`-ra):
 
 > **ADR-001 — Minden szerkesztés command buson megy.**
@@ -566,6 +569,9 @@ Kezdő ADR-lista (mind valós döntés a mai kódból):
 | 008 | Proxy nem-destruktív; a render mindig az eredetivel | [proxy.ts](src/lib/proxy.ts) |
 | 009 | Egyetlen backend-router a címért és a Pro-kapuért | [backend.ts](src/lib/backend.ts) |
 | 010 | BYOK task-alapú AI-provider routing | [aiProviders.ts](src/lib/aiProviders.ts) |
+| 011 | Fix kanonikus sávmodell (nincs szabad több-lane) | [projectUtils.ts](src/lib/projectUtils.ts) (`CANONICAL_TRACKS`) |
+| 012 | Asset-architektúra: `uri → assetId` (az asset a forrás-igazság) | [assetResolve.ts](src/lib/assetResolve.ts) |
+| 013 | Tárhely-szintek: Free = eszközön, fizetős = R2 (mért) | [ADR-013](docs/hu/decisions/ADR-013-storage-tiers-free-local-pro-r2.md) |
 
 ---
 

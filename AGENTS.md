@@ -2,7 +2,7 @@
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
 
-# vided — projekt-jegyzetek
+# ReMix — projekt-jegyzetek
 
 Interaktív videószerkesztő; architektúra és állapot a README.md-ben.
 
@@ -24,7 +24,7 @@ Interaktív videószerkesztő; architektúra és állapot a README.md-ben.
   A `react-hooks/immutability` és `react-hooks/refs` szabályok szándékosan
   kikapcsolva — Reanimated shared value-k és expo-video/audio player-mutációk
   miatt. Új teszt: `src/**/*.test.ts` (kliens) vagy `server/**/*.test.js` (worker).
-- A nyitott technikai adósság és a fejlesztési terv (funkcionalitás + go-live):
-  `devs/tasks/` (témánként számozott TODO-fájlok, index: `devs/tasks/00-README.md`,
-  forrás-audit: `devs/source/audit-2026-10-main.md`). A korábbi security/production-
-  readiness backlog (`devs/tasks/remix/`) a git-historyban él; a P0 abba is beleér.
+- A nyitott technikai adósság és a fejlesztési terv: a `devs/` mappa **lokális, gitignored**
+  munkajegyzet (nincs a repóban — auditból újragenerálható). A repóban követett minőség-állapot:
+  `docs/hu/development/quality-report.md` (nyitott kérdések, következő lépések) és
+  `docs/hu/development/testing.md` (tesztelési szabályok, kapuk).

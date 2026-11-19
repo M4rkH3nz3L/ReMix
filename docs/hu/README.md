@@ -6,7 +6,7 @@ az itteni fájlok azt bontják rétegenként részletes, **kód-alapú** doksikr
 
 > **Elv.** Minden állítás a *kódból* van levezetve, fájl:sor horgonyokkal. A
 > `docs/architecture/*` a *miért* és a *hogyan* együtt — a feature-listákat és
-> fejlesztési terveket ([README.md](../../README.md), [devs/tasks/](../../devs/tasks/))
+> fejlesztési terveket ([README.md](../../README.md), `devs/tasks/`)
 > és az ops-részleteket ([ops/SERVER.md](../../ops/SERVER.md)) nem ismételjük,
 > csak linkeljük.
 
@@ -41,13 +41,15 @@ Jelmagyarázat: ✅ kész · 🚧 vázlat, kitöltésre vár
 | [ADR-011](decisions/ADR-011-fixed-canonical-tracks.md) | Fix kanonikus sávmodell (nem szabad több-lane) | ✅ |
 | **development/** | | |
 | [coding-standards.md](development/coding-standards.md) | Kódolási szabályok (AGENTS.md-ből) | ✅ |
-| [testing.md](development/testing.md) | Tesztelés, `npm run audit` | ✅ |
+| [testing.md](development/testing.md) | Tesztelés, `npm run audit`, CI-kapuk (ratchet, fájlméret, mutációs teszt) | ✅ |
+| [quality-baseline.md](development/quality-baseline.md) | Minőségi kiinduló mérés (2026-11-19) | ✅ |
+| [quality-report.md](development/quality-report.md) | Minőség előtte/utána, feltárt hibák, nyitott kérdések | ✅ |
 | [release.md](development/release.md) | EAS build, worker deploy | ✅ |
 | [ui-motion-plan.md](development/ui-motion-plan.md) | „Motion-first" fejlesztési terv (pro iOS-editor) | ✅ |
 | **kapcsolódó tervek** (repo-gyökér) | | |
-| [devs/tasks/remix/](../../devs/tasks/remix/) | 🛡️ Security + production-readiness terv (P0–P2, számozott) | 🚧 |
-| [devs/tasks/](../../devs/tasks/) | Stúdió- és platform-fejlesztési tervek (video/audio/image/MISSING) | 🚧 |
-| [devs/source/remix.md](../../devs/source/remix.md) | A security-terv forrás-auditja (OWASP ASVS/MASVS/API-Top10) | ✅ |
+| `devs/tasks/remix/` *(a `devs/` lokális, gitignored munkajegyzet — nincs a repóban)* | 🛡️ Security + production-readiness terv (P0–P2, számozott) | 🚧 |
+| `devs/tasks/` | Stúdió- és platform-fejlesztési tervek (video/audio/image/MISSING) | 🚧 |
+| `devs/source/remix.md` | A security-terv forrás-auditja (OWASP ASVS/MASVS/API-Top10) | ✅ |
 
 > **Új fejlesztések (studio-social ág).** Az app a videó-editoron túl **multi-stúdió
 > platformmá** nőtt (image/audio stúdiók + Creator OS platform-mag), **social
@@ -55,7 +57,7 @@ Jelmagyarázat: ✅ kész · 🚧 vázlat, kitöltésre vár
 > (shop-marketplace, coin-wallet, Pro-előfizetés) és **auth/RBAC/GDPR** alapokkal.
 > Ezek architektúráját az [Arch.md](../../Arch.md) 8–10. szakasza + a
 > [README.md](../../README.md) foglalja össze; a hozzájuk tartozó
-> production-hardening a [devs/tasks/remix/](../../devs/tasks/remix/).
+> production-hardening a `devs/tasks/remix/`.
 
 ## Olvasási sorrend új fejlesztőnek
 
@@ -63,10 +65,10 @@ Jelmagyarázat: ✅ kész · 🚧 vázlat, kitöltésre vár
 2. [Arch.md](../../Arch.md) — a rendszer madártávlatból (1–7. szakasz)
 3. [architecture/runtime.md](architecture/runtime.md) →
    [state.md](architecture/state.md) → [commands.md](architecture/commands.md) — a **Shared Core**
-4. A feature-hez tartozó terv (pl. [devs/tasks/](../../devs/tasks/)) + a vonatkozó
+4. A feature-hez tartozó terv (pl. `devs/tasks/`) + a vonatkozó
    `architecture/*` fájl
 5. [decisions/](decisions/) — *miért* épp így épül a rendszer
-6. Production/security előtt: [devs/tasks/remix/00-README](../../devs/tasks/remix/00-README.md)
+6. Production/security előtt: `devs/tasks/remix/00-README`
    — a go-live blokkolók prioritás- és sorrend-mátrixa
 
 ## Térkép — melyik doksi mire válaszol

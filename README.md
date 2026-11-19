@@ -201,7 +201,7 @@ Lokális **release**-build (prod-viselkedés eszközön, Xcode-dal, nem store):
 
 A videó-editor a **közös alkotó-mag** első stúdiója; a `studio-social` ágon a ReMix
 multi-stúdió creator platformmá nőtt. A részletes architektúra az [Arch.md](Arch.md)
-8–10. szakaszában, a fejlesztési tervek a [devs/tasks/](devs/tasks/) alatt.
+8–10. szakaszában, a fejlesztési tervek a `devs/tasks/` alatt.
 
 - **Három stúdió + Creator OS.** A `Project.kind` (`video`/`image`/`audio` —
   [src/types/project.ts](src/types/project.ts)) mellett egy **platform-mag**
@@ -211,7 +211,7 @@ multi-stúdió creator platformmá nőtt. A részletes architektúra az [Arch.md
   (writer/producer/music/gamer/photo/design/vocal/code) és a közös rendszerek
   (planner/versions/workflow/analytics/retention) **tesztelt, expo-mentes magként**
   készek; a UI/worker/natív bekötés a következő fázis. Backlog:
-  [devs/tasks/MISSING.md](devs/tasks/MISSING.md).
+  `devs/tasks/MISSING.md`.
 - **Social réteg (Supabase).** Fiók = csatorna + TikTok-szerű feed; a poszt egy
   **projekt nézete** (snapshot → egy koppintásos remix, lineage-gel); kedvelés/
   mentés/követés/komment/értesítés, riport + moderáció, **üzenetek** (DM/csoport/
@@ -226,8 +226,8 @@ multi-stúdió creator platformmá nőtt. A részletes architektúra az [Arch.md
   byte-ledger + user-kvóta) és **külső tár-providerek** (Drive/Dropbox/WebDAV/S3).
 - **🛡️ Production & security.** A go-live előtti hardening (auth-perimeter,
   rate-limit, upload/SSRF, storage-RLS, render-BOLA, webhook, CI-security)
-  számozott, prioritált terve: [devs/tasks/remix/](devs/tasks/remix/) (belépő:
-  [00-README](devs/tasks/remix/00-README.md)).
+  számozott, prioritált terve: `devs/tasks/remix/` (belépő:
+  `devs/tasks/remix/00-README.md`).
 
 ## Architektúra
 
@@ -423,8 +423,8 @@ viszi a friss számot), **RLS mindenhol** (moderáció/privacy a DB-ben), és **
 (`get_feed` keyset-lapozással + `get_for_you` hot-rank, a poszt+szerző+liked/saved
 egy körben). A videó/borító a `videos`/`posters` Storage-bucketbe tölt.
 A kliens-belépési pontok: **Feed** a kezdőképernyőn, **Közzététel** az editor
-fejlécében, `/auth` és `/profile` képernyők. Nyitott social-tételek: [devs/tasks/MISSING.md](devs/tasks/MISSING.md); a
-production-hardening (moderáció, rate-limit, auth-perimeter): [devs/tasks/remix/](devs/tasks/remix/).
+fejlécében, `/auth` és `/profile` képernyők. Nyitott social-tételek: `devs/tasks/MISSING.md`; a
+production-hardening (moderáció, rate-limit, auth-perimeter): `devs/tasks/remix/`.
 
 Fizikai eszközön: a Supabase-t 0.0.0.0-ra kell kötni (`supabase/config.toml`), és az
 `EXPO_PUBLIC_SUPABASE_URL`-t a gép LAN-IP-jére állítani.
@@ -442,9 +442,9 @@ Fizikai eszközön: a Supabase-t 0.0.0.0-ra kell kötni (`supabase/config.toml`)
   vizuális átmenet-render a Skia-réteggel együtt érkezik.
 - **Közösségi réteg**: ✅ megvalósult **Supabase**-en (feed, fiók, remix, üzenetek,
   profil — lásd fent); a production-hardening (auth-perimeter, moderáció, rate-limit,
-  storage-RLS) a [devs/tasks/remix/](devs/tasks/remix/) tervben.
+  storage-RLS) a `devs/tasks/remix/` tervben.
 - **Production & security**: a nyilvános worker-API + storage perimeter go-live
-  előtti megerősítése (P0–P2, számozott): [devs/tasks/remix/](devs/tasks/remix/).
+  előtti megerősítése (P0–P2, számozott): `devs/tasks/remix/`.
 
 ## Parancsok
 

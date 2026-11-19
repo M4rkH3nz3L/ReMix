@@ -50,6 +50,16 @@ export type LocalRenderGap =
   | 'pan'
   | 'audioAutomation';
 
+/** az összes rés-kulcs (a UI a nevüket mutatja: mit kell kivenni a telefonos exporthoz) — a típussal zárolva */
+const GAP_KEYS: Record<LocalRenderGap, true> = {
+  text: true, image: true, shape: true, adjustLayer: true, interactive: true, effects: true, adjust: true,
+  filter: true, filterIntensity: true, transition: true, keyframes: true, transform: true, opacity: true,
+  mask: true, matte: true, chromaKey: true, fade: true, reversed: true, nestedComp: true, particles: true,
+  audioMaster: true, pip: true, videoFx: true, voiceFx: true, audioFx: true, audioFade: true, pan: true,
+  audioAutomation: true,
+};
+export const LOCAL_RENDER_GAPS = Object.keys(GAP_KEYS) as LocalRenderGap[];
+
 /** az identitás-transzform (alap pozíció/skála) nem számít eltérésnek */
 function isNonDefaultTransform(t: VideoClip['transform']): boolean {
   if (!t) {

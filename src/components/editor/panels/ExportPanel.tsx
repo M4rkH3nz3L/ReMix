@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -9,7 +9,8 @@ import { Chip, PanelSection, PrimaryButton } from '@/components/ui/controls';
 import { AudioOnlyExportSection } from '@/components/editor/panels/AudioOnlyExportSection';
 import { aspectValue, palette } from '@/constants/editor';
 import { deactivateProDev } from '@/lib/billing';
-import { isNativeRenderAvailable } from '@/lib/nativeRender';
+import { registerDevAction } from '@/lib/devActions';
+import { isNativeRenderAvailable, localRenderBlockers } from '@/lib/nativeRender';
 import { nudgeUpsell } from '@/store/upsellStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
@@ -31,6 +32,7 @@ import {
   PLATFORM_PRESETS,
   renderAndPost,
   renderAndShareMp4,
+  settingsNeedCloud,
 } from '@/lib/render';
 import type { ExportPlatform, PostTarget, RenderMode, RenderSettings } from '@/lib/render';
 import { planBatchExport } from '@/lib/batchExport';
@@ -79,6 +81,9 @@ export function ExportPanel() {
   const isPro = useEntitlement((s) => s.isPro());
   const proUntil = useEntitlement((s) => s.proUntil);
   const openPaywall = usePaywall((s) => s.open);
+  // 🧪 füstteszt: a telefonos export ugyanazon az úton indul, mint a gombról (az érték lent, az exportLocal után)
+  const exportLocalRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => registerDevAction('video.exportLocal', () => exportLocalRef.current()), []);
   const [renderStatus, setRenderStatus] = useState<string | null>(null);
   const [collectStatus, setCollectStatus] = useState<string | null>(null);
   const [cloudStatus, setCloudStatus] = useState<string | null>(null);
@@ -202,17 +207,34 @@ export function ExportPanel() {
   // amit a szerkesztő mutat (szöveg/effekt/átmenet…), NEM adunk néma, hiányos
   // videót — a user választ: felhő-render (teljes paritás) vagy mégse.
   const resolveLocalMode = (): Promise<'local' | 'cloud' | null> => {
-    const gaps = localRenderGaps(project, Platform.OS === 'android' ? 'android' : 'ios');
+    // minden ok, ami miatt a telefon nem adná vissza a látottat: paritás-rés, a motor korlátja, felhős kodek
+    const gaps: string[] = [
+      ...localRenderGaps(project, Platform.OS === 'android' ? 'android' : 'ios'),
+      ...localRenderBlockers(project, buildSettings()),
+      ...(settingsNeedCloud(buildSettings()) ? ['codec'] : []),
+    ];
     if (gaps.length === 0) {
       return Promise.resolve('local');
     }
+    // 🚪 nincs zsákutca: a lista NÉVEN mondja, mit kell kivenni az ingyenes telefonos exporthoz; a felhő Pro
+    // nélkül a Pro-ajánlatot nyitja (nem nyers hibaüzenetet a render indítása után)
+    const pro = useEntitlement.getState().isPro();
+    const list = gaps.map((g) => `• ${t(`panels.export.gap.${g}`)}`).join('\n');
     return new Promise((resolve) => {
       Alert.alert(
         t('panels.export.parityTitle'),
-        t('panels.export.parityMsg', { count: gaps.length }),
+        t('panels.export.parityMsgList', { list }),
         [
           { text: t('common.cancel'), style: 'cancel', onPress: () => resolve(null) },
-          { text: t('panels.export.parityCloudCta'), onPress: () => resolve('cloud') },
+          pro
+            ? { text: t('panels.export.parityCloudCta'), onPress: () => resolve('cloud') }
+            : {
+                text: t('panels.export.parityProCta'),
+                onPress: () => {
+                  usePaywall.getState().open('cloudRender');
+                  resolve(null);
+                },
+              },
         ],
         { cancelable: false }
       );
@@ -229,19 +251,25 @@ export function ExportPanel() {
       return;
     }
     setRenderStatus(t('common.processing'));
-    withCancellableProgress(t('panels.export.exportOnDevice'), (report, signal) =>
-      renderAndShareMp4(project, report, buildSettings(), { mode, signal })
-    )
-      // 💡 C2.3: a Free export vízjeles → az export UTÁN (nem közben) ajánlat, ha a motor engedi
-      .then(() => { void nudgeUpsell('export_watermark', 'export_done'); })
-      .catch((err: Error) => {
-      logCaught('components/editor/panels/ExportPanel.tsx:exportLocal', err);
+    // a Pro-hiány (pl. felhő-tartalék) a Pro-ajánlatot nyitja, nem nyers hibát (guardPro)
+    void guardPro(
+      async () => {
+        await withCancellableProgress(t('panels.export.exportOnDevice'), (report, signal) =>
+          renderAndShareMp4(project, report, buildSettings(), { mode, signal })
+        );
+        // 💡 C2.3: a Free export vízjeles → az export UTÁN (nem közben) ajánlat, ha a motor engedi
+        void nudgeUpsell('export_watermark', 'export_done');
+      },
+      (err) => {
+        logCaught('components/editor/panels/ExportPanel.tsx:exportLocal', err);
         if (!isRenderCancelledError(err)) {
           Alert.alert(t('panels.export.exportOnDevice'), err.message);
         }
-      })
-      .finally(() => setRenderStatus(null));
+      }
+    ).finally(() => setRenderStatus(null));
   };
+
+  exportLocalRef.current = exportLocal;
 
   // 📦 Batch-export: a kiválasztott platformok deduplikált jobjai SORBAN (mindegyik a saját
   // aspect + settings beállítással renderel + megoszt). A pure terv: `planBatchExport` (tesztelt).
@@ -259,22 +287,24 @@ export function ExportPanel() {
       return;
     }
     setRenderStatus(t('common.processing'));
-    try {
-      for (const job of jobs) {
-        const jobProject = { ...project, aspectRatio: job.aspect as typeof project.aspectRatio };
-        // SORBAN rendereljük (párhuzamosan túlterhelné az eszközt)
-        await withCancellableProgress(`${t('panels.export.exportOnDevice')} · ${job.label}`, (report, signal) =>
-          renderAndShareMp4(jobProject, report, job.settings, { mode, signal })
-        );
+    // a Pro-hiány a Pro-ajánlatot nyitja, nem nyers hibát (guardPro)
+    await guardPro(
+      async () => {
+        for (const job of jobs) {
+          const jobProject = { ...project, aspectRatio: job.aspect as typeof project.aspectRatio };
+          // SORBAN rendereljük (párhuzamosan túlterhelné az eszközt)
+          await withCancellableProgress(`${t('panels.export.exportOnDevice')} · ${job.label}`, (report, signal) =>
+            renderAndShareMp4(jobProject, report, job.settings, { mode, signal })
+          );
+        }
+      },
+      (err) => {
+        logCaught('components/editor/panels/ExportPanel.tsx:exportBatch', err);
+        if (!isRenderCancelledError(err)) {
+          Alert.alert(t('panels.export.batchTitle', { defaultValue: 'Batch export' }), err.message);
+        }
       }
-    } catch (err) {
-      logCaught('components/editor/panels/ExportPanel.tsx:exportBatch', err);
-      if (!isRenderCancelledError(err as Error)) {
-        Alert.alert(t('panels.export.batchTitle', { defaultValue: 'Batch export' }), (err as Error).message);
-      }
-    } finally {
-      setRenderStatus(null);
-    }
+    ).finally(() => setRenderStatus(null));
   };
 
   // ☁️ Felhő HD render (Pro) — a fizetős workereken; Pro-hiánynál paywall

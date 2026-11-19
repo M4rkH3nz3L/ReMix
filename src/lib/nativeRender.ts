@@ -231,33 +231,50 @@ export function buildRenderPlan(
  * plan-builder ezeket némán eldobta, és a kész videóból hiányzott a felirat meg
  * az effekt — a WYSIWYG-szabály miatt ilyenkor NEM választható az eszköz-motor.
  */
-export function canRenderLocally(project: Project, settings: RenderSettings): boolean {
-  if (buildRenderPlan(project, settings).video.length === 0) {
-    return false;
+/** a natív motor saját korlátai a paritás-réseken túl (a UI néven mondja, mi kéri a felhőt) */
+export type LocalBlocker = 'noNative' | 'emptyVideo' | 'stillSegments' | 'audioSpeed' | 'audioReverse' | 'textHost';
+export const LOCAL_BLOCKERS: readonly LocalBlocker[] = ['noNative', 'emptyVideo', 'stillSegments', 'audioSpeed', 'audioReverse', 'textHost'];
+
+/**
+ * Miért NEM megy az eszközön-render (üres lista = megy): a paritás-rések (`localRenderGaps`) után a motor
+ * saját korlátai. A `canRenderLocally` ebből dönt, az export-panel pedig ezt sorolja fel.
+ */
+export function localRenderBlockers(project: Project, settings: RenderSettings): LocalBlocker[] {
+  const out: LocalBlocker[] = [];
+  if (Native == null) {
+    out.push('noNative');
   }
-  const platform = Platform.OS === 'android' ? 'android' : 'ios';
+  const plan = buildRenderPlan(project, settings);
+  if (plan.video.length === 0) {
+    out.push('emptyVideo');
+  }
   // 🖼️ az álló-szegmenst (kép-klip) csak az ezt jelző build tudja — a régi build a felhőre küldi
-  if (Native?.supportsStillSegments !== true && buildRenderPlan(project, settings).video.some((v) => v.still)) {
-    return false;
-  }
-  if (!localRenderMatchesPreview(project, platform)) {
-    return false;
+  if (Native?.supportsStillSegments !== true && plan.video.some((v) => v.still)) {
+    out.push('stillSegments');
   }
   // ⏩ a gyorsított hangklipet az ezt jelző motor skálázza (`supportsAudioSpeed`, iOS,
   // hangmagasság-tartással); a régi build és az Android-motor nem → ott a felhő-út szól helyesen
   if (Native?.supportsAudioSpeed !== true && project.tracks.some((tr) => tr.clips.some((c) => c.kind === 'audio' && audioSpeedOf(c) !== 1))) {
-    return false;
+    out.push('audioSpeed');
   }
   // ⏪ visszafelé szóló hangot az AVFoundation-kompozíció nem tud — a felhő areverse-e szól helyesen
   if (project.tracks.some((tr) => tr.clips.some((c) => c.kind === 'audio' && (c as AudioClip).reversed))) {
-    return false;
+    out.push('audioReverse');
   }
   // 🖼️ szöveg-overlay kell → csak raszter-hosttal megy (a szerkesztő adja); host
   // nélkül (pl. feed-posztolás háttérből) a felhő-út a helyes
   if (deviceTextClips(project).length > 0 && !hasOverlayRasterHost()) {
+    out.push('textHost');
+  }
+  return out;
+}
+
+export function canRenderLocally(project: Project, settings: RenderSettings): boolean {
+  const platform = Platform.OS === 'android' ? 'android' : 'ios';
+  if (!localRenderMatchesPreview(project, platform)) {
     return false;
   }
-  return true;
+  return localRenderBlockers(project, settings).filter((b) => b !== 'noNative').length === 0;
 }
 
 /**

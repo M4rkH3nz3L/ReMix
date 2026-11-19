@@ -6,7 +6,7 @@ import { File, Paths } from 'expo-file-system';
 import type { ReactNode, RefObject } from 'react';
 import { createRef, Profiler, useEffect, useRef } from 'react';
 import { createAudioPlayer, getRecordingPermissionsAsync, RecordingPresets, useAudioRecorder, type AudioRecorder } from 'expo-audio';
-import { AppState, Dimensions, Modal, PixelRatio, Platform, View } from 'react-native';
+import { Alert, AppState, Dimensions, Modal, PixelRatio, Platform, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
 import { BrushOverlay, type BrushHandle, renderStrokes } from '@/components/studio/image/BrushOverlay';
@@ -205,6 +205,8 @@ import Constants from 'expo-constants';
 import { deleteProject, listProjects, loadProject, loadVersions, readRecovery, recoveryIsFresher, saveProjectAndEvents, saveProject, writeRecovery, clearRecovery } from '@/lib/storage';
 import { findMissingMedia } from '@/lib/videdFile';
 import { useEditorStore } from '@/store/editorStore';
+import { usePaywall } from '@/store/paywallStore';
+import { useEntitlement } from '@/store/entitlementStore';
 import type { AudioClip, AudioFx, ClipMask, ImageClip, VideoClip, ImageDoc, ImageLayer, PhotoLayer, Project, ShapeLayer } from '@/types/project';
 
 type Log = (ok: boolean | null, name: string, detail?: string) => void;
@@ -9088,6 +9090,67 @@ async function smokeQuickCreate(log: Log) {
   }
 }
 
+/** 🚪 VIDEO-PROD E1: a felhőt kérő telefonos export nem zsákutca — néven mondja az okot, Free-ben a Pro-ajánlatot nyitja */
+async function smokeExportFree(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  let n = 0;
+  const base = addImageDocToVideo(createEmptyProject('smoke export free', '9:16', undefined, 'video'), createImageDoc('t', '9:16', () => `ef${++n}`), 'file:///smoke.png');
+  const text = { kind: 'text', id: 'eft', start: 0, duration: 3, text: 'Felirat', color: '#ffffff', backgroundColor: null, fontSize: 12, fontWeight: 'bold', position: { x: 0.5, y: 0.5 } };
+  const project = { ...base, tracks: base.tracks.map((t) => (t.type === 'text' ? { ...t, clips: [text] } : t)) } as unknown as Project;
+  await saveProject(project);
+  const ent = useEntitlement.getState();
+  const prev = { tier: ent.tier, proUntil: ent.proUntil, devPro: ent.devPro };
+  const origAlert = Alert.alert;
+  type Seen = { title: string; msg: string; buttons: { text?: string; onPress?: () => void }[] };
+  const box: { seen: Seen | null } = { seen: null };
+  Alert.alert = ((title: string, msg?: string, buttons?: { text?: string; onPress?: () => void }[]) => {
+    box.seen = { title, msg: msg ?? '', buttons: buttons ?? [] };
+  }) as typeof Alert.alert;
+  const s = () => useEditorStore.getState();
+  const runExport = async (): Promise<Seen | null> => {
+    box.seen = null;
+    void runDevAction('video.exportLocal');
+    for (let i = 0; i < 40 && !box.seen; i++) await sleep(100);
+    return box.seen;
+  };
+  try {
+    router.push(`/editor/${project.id}` as Href);
+    for (let i = 0; i < 40 && s().project?.id !== project.id; i++) await sleep(200);
+    await sleep(1500);
+    s().setPanel('export');
+    await sleep(1500);
+    // Free: a választó néven mondja, mi kéri a felhőt, és a Pro-ajánlatot kínálja
+    useEntitlement.setState({ tier: 'free', proUntil: null, devPro: false });
+    const free = await runExport();
+    const labels = free?.buttons.map((b) => b.text) ?? [];
+    log(!!free && free.title === i18nT('panels.export.parityTitle'), 'Free: a felhőt kérő export választót ad (nem nyers hibát)', free?.title ?? 'nincs ablak');
+    log(!!free && free.msg.includes(i18nT('panels.export.gap.text')), 'az ok néven: „szöveg / felirat”', (free?.msg ?? '').split('\n').filter((l) => l.startsWith('• ')).join(' '));
+    log(labels.includes(i18nT('panels.export.parityProCta')) && !labels.includes(i18nT('panels.export.parityCloudCta')), 'Free-ben a gomb a Pro-ajánlat (nem egy bukó felhő-render)', labels.join(' · '));
+    usePaywall.getState().close();
+    free?.buttons.find((b) => b.text === i18nT('panels.export.parityProCta'))?.onPress?.();
+    await sleep(800);
+    const pw = usePaywall.getState();
+    log(pw.visible && pw.capability === 'cloudRender', 'a Pro gomb a Pro-ajánlatot nyitja (felhő-render)', `látható: ${pw.visible}, ok: ${pw.capability}`);
+    log(true, 'FOTÓZHATÓ', 'Pro-ajánlat a felhő-renderhez');
+    await sleep(5000);
+    usePaywall.getState().close();
+    // Pro: ugyanott a felhő-render a választás
+    useEntitlement.setState({ devPro: true });
+    const pro = await runExport();
+    const proLabels = pro?.buttons.map((b) => b.text) ?? [];
+    log(proLabels.includes(i18nT('panels.export.parityCloudCta')), 'Pro-ban a gomb a felhő-render', proLabels.join(' · '));
+    pro?.buttons.find((b) => b.text === i18nT('common.cancel'))?.onPress?.();
+  } finally {
+    Alert.alert = origAlert;
+    useEntitlement.setState(prev);
+    usePaywall.getState().close();
+    s().setPanel(null);
+    router.back();
+    await sleep(1200);
+    await deleteProject(project.id).catch((caught) => logCaught('lib/imageSmoke.tsx:exportfree-del', caught));
+  }
+}
+
 /** ✂️🔤 S18: vágás szövegbe — a fotó a betűk alakjában; telefon = szerver; a szöveg átírására a vágás követ */
 async function smokeClipText(log: Log, setHarness: (n: ReactNode) => void) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
@@ -13081,6 +13144,10 @@ export async function runImageSmoke(
   }
   if (phase === 'cliptext') {
     await step(phase, () => smokeClipText(log, setHarness));
+    return;
+  }
+  if (phase === 'exportfree') {
+    await step(phase, () => smokeExportFree(log));
     return;
   }
   if (phase === 'quickcreate') {

@@ -14,6 +14,10 @@
  *            npm run test:watch
  */
 module.exports = {
+  // V8-alapú coverage: nem írja át a forrást. Az alapértelmezett (babel/istanbul) a
+  // `page.evaluate`-nek átadott függvényekbe is `cov_…` számlálót injektál, ami a Chromiumban
+  // nem létezik → a renderer-tesztek a coverage-futásban hamisan buktak (ReferenceError).
+  coverageProvider: 'v8',
   projects: [
     {
       displayName: 'client',

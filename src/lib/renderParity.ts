@@ -174,13 +174,19 @@ function audioClipGaps(clip: AudioClip, out: Set<LocalRenderGap>): void {
   }
 }
 
-function clipKindGap(clip: Clip, platform: RenderPlatform): LocalRenderGap | null {
+/** a natív motor build-függő képességei (a régi build kevesebbet tud → felhő) */
+export interface EngineCaps {
+  /** 🔤 VIDEO-PROD E2: az iOS-motor rajzolja a szöveg-overlay-t (`supportsTextOverlays`) */
+  iosTextOverlays?: boolean;
+}
+
+function clipKindGap(clip: Clip, platform: RenderPlatform, caps: EngineCaps): LocalRenderGap | null {
   switch (clip.kind) {
     case 'text':
-      // 🖼️ Androidon a szöveg az overlay-úton (preview-snapshot PNG + natív
-      // belépő-animáció) eszközön megy — csak az idő-függő tartalmú klip rés;
-      // iOS-en a natív motor még nem tud overlay-t → minden szöveg felhő-út
-      return platform === 'ios' || textClipUnsupportedOnDevice(clip) ? 'text' : null;
+      // 🖼️ a szöveg az overlay-úton (preview-snapshot PNG + natív belépő-animáció) eszközön megy — Androidon mindig,
+      // iOS-en az ezt jelző buildtől; az idő-függő tartalmú klip (gépelés, karaoke, mozgás-pálya) mindig rés
+      if (textClipUnsupportedOnDevice(clip)) return 'text';
+      return platform === 'ios' && !caps.iosTextOverlays ? 'text' : null;
     case 'image':
       return 'image';
     case 'shape':
@@ -199,7 +205,7 @@ function clipKindGap(clip: Clip, platform: RenderPlatform): LocalRenderGap | nul
  * Üres lista = az eszköz-motor bitre pontosan vissza tudja adni a tartalmat
  * (vágás/sebesség/hang/Android-filter) → mehet lokálisan. Determinista.
  */
-export function localRenderGaps(project: Project, platform: RenderPlatform): LocalRenderGap[] {
+export function localRenderGaps(project: Project, platform: RenderPlatform, caps: EngineCaps = {}): LocalRenderGap[] {
   const out = new Set<LocalRenderGap>();
   for (const track of project.tracks) {
     for (const clip of track.clips) {
@@ -208,7 +214,7 @@ export function localRenderGaps(project: Project, platform: RenderPlatform): Loc
         imageClipGaps(clip as ImageClip, out);
         continue;
       }
-      const kindGap = clipKindGap(clip, platform);
+      const kindGap = clipKindGap(clip, platform, caps);
       if (kindGap) {
         out.add(kindGap);
         continue;
@@ -242,6 +248,6 @@ export function localRenderGaps(project: Project, platform: RenderPlatform): Loc
 }
 
 /** Igaz, ha az eszköz-motor a LÁTOTT tartalmat hiánytalanul vissza tudja adni. */
-export function localRenderMatchesPreview(project: Project, platform: RenderPlatform): boolean {
-  return localRenderGaps(project, platform).length === 0;
+export function localRenderMatchesPreview(project: Project, platform: RenderPlatform, caps: EngineCaps = {}): boolean {
+  return localRenderGaps(project, platform, caps).length === 0;
 }

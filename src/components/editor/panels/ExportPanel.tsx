@@ -3,14 +3,14 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Chip, PanelSection, PrimaryButton } from '@/components/ui/controls';
 import { AudioOnlyExportSection } from '@/components/editor/panels/AudioOnlyExportSection';
 import { aspectValue, palette } from '@/constants/editor';
 import { deactivateProDev } from '@/lib/billing';
 import { registerDevAction } from '@/lib/devActions';
-import { isNativeRenderAvailable, localRenderBlockers } from '@/lib/nativeRender';
+import { deviceRenderGaps, isNativeRenderAvailable, localRenderBlockers } from '@/lib/nativeRender';
 import { nudgeUpsell } from '@/store/upsellStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { guardPro, usePaywall } from '@/store/paywallStore';
@@ -38,7 +38,6 @@ import type { ExportPlatform, PostTarget, RenderMode, RenderSettings } from '@/l
 import { planBatchExport } from '@/lib/batchExport';
 import { CloudMediaSection } from '@/components/editor/panels/CloudMediaSection';
 import { ExportLintList } from '@/components/editor/panels/ExportLintList';
-import { localRenderGaps } from '@/lib/renderParity';
 import { shareRpFile } from '@/lib/rpFile';
 import { shareVidedFile } from '@/lib/videdFile';
 import { publishRenderedProject } from '@/lib/feed';
@@ -209,7 +208,7 @@ export function ExportPanel() {
   const resolveLocalMode = (): Promise<'local' | 'cloud' | null> => {
     // minden ok, ami miatt a telefon nem adná vissza a látottat: paritás-rés, a motor korlátja, felhős kodek
     const gaps: string[] = [
-      ...localRenderGaps(project, Platform.OS === 'android' ? 'android' : 'ios'),
+      ...deviceRenderGaps(project),
       ...localRenderBlockers(project, buildSettings()),
       ...(settingsNeedCloud(buildSettings()) ? ['codec'] : []),
     ];

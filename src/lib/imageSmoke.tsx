@@ -79,7 +79,8 @@ import { getPayload, listShopItems, purchaseItem, storeSoundPack, syncOwnedSound
 import { useSoundPacks } from '@/store/soundPackStore';
 import { denoiseStereo } from '@/lib/denoise';
 import { formantCorrect } from '@/lib/formant';
-import { canRenderLocally, renderLocal } from '@/lib/nativeRender';
+import { buildRenderPlan, canRenderLocally, deviceRenderGaps, renderLocal } from '@/lib/nativeRender';
+import { rasterTextOverlays } from '@/lib/overlayRasterBridge';
 import * as StillThumbs from 'expo-video-thumbnails';
 import { previewEngine } from '@/lib/previewEngine';
 import { barsBeatsLabel, beatSplitTimes } from '@/lib/audioTransport';
@@ -9090,13 +9091,170 @@ async function smokeQuickCreate(log: Log) {
   }
 }
 
+/**
+ * 🔤 VIDEO-PROD E2: szöveg a telefonos videó-exportban iOS-en. A valódi motor renderel; a kész videó kockáin mérve:
+ * nyugalomban a szöveg = az előnézet raszterje a háttér fölött (hely, méret, fejjel felfelé), a fade félúton félig
+ * átlátszó, a slide lentebbről indul, a klip előtt és után nincs szöveg.
+ */
+async function smokeTextOverlay(log: Log) {
+  log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
+  const BG = [24, 40, 120];
+  const surf = Skia.Surface.MakeOffscreen(1080, 1920)!;
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color(`rgb(${BG.join(',')})`));
+  surf.getCanvas().drawRect(Skia.XYWHRect(0, 0, 1080, 1920), paint);
+  surf.flush();
+  const bg = new File(projectMediaDir(), `smoke_textov_${Date.now().toString(36)}.png`);
+  bg.write(surf.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const base = createEmptyProject('smoke text overlay', '9:16', undefined, 'video');
+  const txt = (id: string, text: string, y: number, animation: string) => ({ kind: 'text', id, start: 0.5, duration: 2, text, color: '#ffffff', backgroundColor: null, fontSize: 14, fontWeight: 'bold', position: { x: 0.5, y }, animation });
+  const project = {
+    ...base,
+    tracks: base.tracks.map((t) =>
+      t.type === 'video' ? { ...t, clips: [{ kind: 'image', id: 'bgimg', start: 0, duration: 3, uri: bg.uri, filterId: 'none' }] }
+        : t.type === 'text' ? { ...t, clips: [txt('tfade', 'FADE', 0.25, 'fade'), txt('tpop', 'POP', 0.5, 'pop'), txt('tslide', 'SLIDE', 0.75, 'slide')] }
+          : t),
+  } as unknown as Project;
+  const settings = { resolution: 720, fps: 30, quality: 'high', codec: 'h264' } as const;
+  await saveProject(project);
+  const s = () => useEditorStore.getState();
+  let out: File | null = null;
+  try {
+    router.push(`/editor/${project.id}` as Href);
+    for (let i = 0; i < 40 && s().project?.id !== project.id; i++) await sleep(200);
+    await sleep(1500);
+    // a mentés a projekten kívüli médiát a projekt mappájába költözteti → a betöltött projekt a mérvadó
+    const live = s().project ?? project;
+    const gaps = deviceRenderGaps(live);
+    const local = canRenderLocally(live, settings as never);
+    log(gaps.length === 0 && local, 'a feliratos videó a telefonon renderelhető (nincs felhő-rés)', `rések: ${gaps.join(',') || '—'}, helyi: ${local}`);
+    if (!local) return;
+    const t0 = Date.now();
+    out = await renderLocal(live, settings as never);
+    log(true, 'render a telefonon', `${Date.now() - t0} ms`);
+    // az előnézet raszterje (ugyanaz az út, amit a motor kap) — a referencia
+    const plan = buildRenderPlan(live, settings as never);
+    const pr = PixelRatio.get();
+    const pngs = await rasterTextOverlays({ project: live, width: plan.width / pr, height: plan.height / pr, clipIds: ['tfade', 'tpop', 'tslide'] });
+    const ref = await Promise.all(['tfade', 'tpop', 'tslide'].map((id) => decode(pngs.get(id)!)));
+    const rgba = (img: SkImage) => ({ w: img.width(), h: img.height(), d: img.readPixels(0, 0, { width: img.width(), height: img.height(), colorType: ColorType.RGBA_8888, alphaType: AlphaType.Unpremul })! });
+    const frame = async (sec: number) => rgba(await decode((await StillThumbs.getThumbnailAsync(out!.uri, { time: Math.round(sec * 1000) })).uri));
+    const refs = ref.map(rgba);
+    // a várt kép (nyugalomban): a két raszter a háttér fölött
+    const expected = (fx: number, fy: number) => {
+      let c = [...BG];
+      for (const r of refs) {
+        const x = Math.min(r.w - 1, Math.floor(fx * r.w));
+        const y = Math.min(r.h - 1, Math.floor(fy * r.h));
+        const i = (y * r.w + x) * 4;
+        const a = r.d[i + 3] / 255;
+        c = [0, 1, 2].map((k) => c[k] * (1 - a) + r.d[i + k] * a);
+      }
+      return c;
+    };
+    const at = (f: { w: number; h: number; d: Uint8Array | Float32Array }, fx: number, fy: number) => {
+      const i = (Math.min(f.h - 1, Math.floor(fy * f.h)) * f.w + Math.min(f.w - 1, Math.floor(fx * f.w))) * 4;
+      return [f.d[i], f.d[i + 1], f.d[i + 2]];
+    };
+    const lum = (c: number[]) => (c[0] + c[1] + c[2]) / 3;
+    // 1) nyugalomban = előnézet (200×200 pont)
+    const rest = await frame(1.6);
+    let sum = 0;
+    let sumBg = 0;
+    let n = 0;
+    let textPts = 0;
+    for (let i = 0; i < 200; i++) for (let j = 0; j < 200; j++) {
+      const fx = (j + 0.5) / 200;
+      const fy = (i + 0.5) / 200;
+      const e = expected(fx, fy);
+      const g = at(rest, fx, fy);
+      sum += (Math.abs(e[0] - g[0]) + Math.abs(e[1] - g[1]) + Math.abs(e[2] - g[2])) / 3;
+      sumBg += (Math.abs(BG[0] - g[0]) + Math.abs(BG[1] - g[1]) + Math.abs(BG[2] - g[2])) / 3;
+      n += 1;
+      if (lum(e) > 200) textPts += 1;
+    }
+    const restDiff = sum / n;
+    // ellenpróba: ugyanez szöveg nélküli referenciával — a mérőszám érzékeny-e a szöveg hiányára / helyére
+    const bgDiff = sumBg / n;
+    log(restDiff <= 8 && textPts > 100 && bgDiff > restDiff * 2, 'nyugalomban a szöveg = az előnézet raszterje (hely, méret, fejjel felfelé)', `átlag ${restDiff.toFixed(2)}/255 · ellenpróba szöveg nélkül ${bgDiff.toFixed(2)} · szöveg-pont ${textPts}`);
+    // 2) a klip előtt és után nincs szöveg
+    const bright = (f: { w: number; h: number; d: Uint8Array | Float32Array }) => {
+      let b = 0;
+      for (let i = 0; i < 120; i++) for (let j = 0; j < 120; j++) if (lum(at(f, (j + 0.5) / 120, (i + 0.5) / 120)) > 180) b += 1;
+      return b;
+    };
+    const before = bright(await frame(0.25));
+    const after = bright(await frame(2.8));
+    log(before === 0 && after === 0 && bright(rest) > 50, 'a szöveg csak a klip idején látszik', `előtte ${before}, közben ${bright(rest)}, utána ${after} világos pont`);
+    // 3) fade: 0,2 s-nál (a 0,4 s-os belépő fele) félig átlátszó — a felső sáv (FADE) szöveg-pontjain mérve
+    const half = await frame(0.7);
+    let ratioSum = 0;
+    let ratioN = 0;
+    for (let i = 0; i < 200; i++) for (let j = 0; j < 200; j++) {
+      const fx = (j + 0.5) / 200;
+      const fy = (i + 0.5) / 200;
+      if (fy > 0.38) continue;
+      const e = expected(fx, fy);
+      if (lum(e) < 220) continue;
+      ratioSum += (lum(at(half, fx, fy)) - lum(BG)) / (lum(e) - lum(BG));
+      ratioN += 1;
+    }
+    const ratio = ratioN ? ratioSum / ratioN : 0;
+    log(ratio > 0.3 && ratio < 0.7, 'fade: félúton félig átlátszó (mint az előnézetben)', `átlátszóság ≈ ${ratio.toFixed(2)} (várt ~0,5), ${ratioN} pont`);
+    // 4) slide: a SLIDE sáv tinta-teteje 0,2 s-nál lejjebb van, mint nyugalomban
+    const inkTop = (f: { w: number; h: number; d: Uint8Array | Float32Array }) => {
+      for (let y = Math.floor(f.h * 0.62); y < f.h; y++) {
+        for (let x = 0; x < f.w; x += 2) {
+          const i = (y * f.w + x) * 4;
+          if ((f.d[i] + f.d[i + 1] + f.d[i + 2]) / 3 > 120) return y;
+        }
+      }
+      return -1;
+    };
+    const shift = inkTop(half) - inkTop(rest);
+    const expShift = 0.5 * (30 / (plan.height / pr)) * rest.h;
+    log(shift > 0 && Math.abs(shift - expShift) <= 4, 'slide: lentebbről úszik be (az előnézet amplitúdójával)', `eltolás ${shift} px, várt ≈ ${expShift.toFixed(1)} px`);
+    // 5) pop: 0,15 s-nál (p = 0,5) a skála 1,2·0,5·1,5 = 0,9 — a POP sáv tinta-szélessége a nyugalmihoz mérve
+    const inkWidth = (f: { w: number; h: number; d: Uint8Array | Float32Array }) => {
+      let l = f.w;
+      let r = -1;
+      for (let y = Math.floor(f.h * 0.44); y < Math.floor(f.h * 0.56); y++) {
+        for (let x = 0; x < f.w; x++) {
+          const i = (y * f.w + x) * 4;
+          if ((f.d[i] + f.d[i + 1] + f.d[i + 2]) / 3 > 140) {
+            l = Math.min(l, x);
+            r = Math.max(r, x);
+          }
+        }
+      }
+      return r >= l ? r - l : 0;
+    };
+    // pontos képkocka-időn mérünk (30 fps: a 20. kocka = 0,667 s → a klipben 0,167 s), a várt érték a képletből
+    const popT = 20 / 30 - 0.5;
+    const popP = Math.min(1, popT / 0.3);
+    const popExp = 1.2 * popP * (2 - popP);
+    const popRatio = inkWidth(await frame(20 / 30)) / Math.max(1, inkWidth(rest));
+    log(Math.abs(popRatio - popExp) <= 0.03, 'pop: rugós belépő a képlet szerint (mint az előnézetben)', `szélesség-arány ${popRatio.toFixed(3)} (várt ${popExp.toFixed(3)} a ${popT.toFixed(3)} s-os kockán)`);
+    log(true, 'FOTÓZHATÓ', 'feliratos videó-szerkesztő');
+    await sleep(3000);
+  } catch (caught) {
+    log(false, 'textoverlay', (caught as Error).message);
+  } finally {
+    router.back();
+    await sleep(1200);
+    if (out) removeFile(out.uri);
+    removeFile(bg.uri);
+    await deleteProject(project.id).catch((caught) => logCaught('lib/imageSmoke.tsx:textoverlay-del', caught));
+  }
+}
+
 /** 🚪 VIDEO-PROD E1: a felhőt kérő telefonos export nem zsákutca — néven mondja az okot, Free-ben a Pro-ajánlatot nyitja */
 async function smokeExportFree(log: Log) {
   log(null, 'eszköz', `${Platform.OS} ${Dimensions.get('screen').width}×${Dimensions.get('screen').height}`);
   let n = 0;
   const base = addImageDocToVideo(createEmptyProject('smoke export free', '9:16', undefined, 'video'), createImageDoc('t', '9:16', () => `ef${++n}`), 'file:///smoke.png');
-  const text = { kind: 'text', id: 'eft', start: 0, duration: 3, text: 'Felirat', color: '#ffffff', backgroundColor: null, fontSize: 12, fontWeight: 'bold', position: { x: 0.5, y: 0.5 } };
-  const project = { ...base, tracks: base.tracks.map((t) => (t.type === 'text' ? { ...t, clips: [text] } : t)) } as unknown as Project;
+  // a félig átlátszó kép-klip ma is felhőt kér (a szöveg iOS-en már a telefonon megy, VIDEO-PROD E2)
+  const project = { ...base, tracks: base.tracks.map((t) => (t.type === 'video' ? { ...t, clips: t.clips.map((c) => ({ ...c, opacity: 0.5 })) } : t)) } as unknown as Project;
   await saveProject(project);
   const ent = useEntitlement.getState();
   const prev = { tier: ent.tier, proUntil: ent.proUntil, devPro: ent.devPro };
@@ -9124,7 +9282,7 @@ async function smokeExportFree(log: Log) {
     const free = await runExport();
     const labels = free?.buttons.map((b) => b.text) ?? [];
     log(!!free && free.title === i18nT('panels.export.parityTitle'), 'Free: a felhőt kérő export választót ad (nem nyers hibát)', free?.title ?? 'nincs ablak');
-    log(!!free && free.msg.includes(i18nT('panels.export.gap.text')), 'az ok néven: „szöveg / felirat”', (free?.msg ?? '').split('\n').filter((l) => l.startsWith('• ')).join(' '));
+    log(!!free && free.msg.includes(i18nT('panels.export.gap.opacity')), 'az ok néven: „átlátszóság”', (free?.msg ?? '').split('\n').filter((l) => l.startsWith('• ')).join(' '));
     log(labels.includes(i18nT('panels.export.parityProCta')) && !labels.includes(i18nT('panels.export.parityCloudCta')), 'Free-ben a gomb a Pro-ajánlat (nem egy bukó felhő-render)', labels.join(' · '));
     usePaywall.getState().close();
     free?.buttons.find((b) => b.text === i18nT('panels.export.parityProCta'))?.onPress?.();
@@ -13144,6 +13302,10 @@ export async function runImageSmoke(
   }
   if (phase === 'cliptext') {
     await step(phase, () => smokeClipText(log, setHarness));
+    return;
+  }
+  if (phase === 'textoverlay') {
+    await step(phase, () => smokeTextOverlay(log));
     return;
   }
   if (phase === 'exportfree') {

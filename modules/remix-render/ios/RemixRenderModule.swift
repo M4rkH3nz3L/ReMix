@@ -45,6 +45,20 @@ struct RenderAudioSegment: Codable {
   let speed: Double?
 }
 
+// 🔤 szöveg/felirat-overlay (VIDEO-PROD E2): a preview-komponensből raszterizált, TELJES-vásznas PNG + idő-ablak +
+// a belépő animáció paraméterei — ugyanaz a terv, amit az Android OverlayRender kap (`overlayPlan.ts`)
+struct RenderOverlay: Codable {
+  let png: String
+  let clipId: String
+  let atSec: Double
+  let durationSec: Double
+  let opacity: Double
+  let anim: String
+  let ampNorm: Double
+  let anchorX: Double
+  let anchorY: Double
+}
+
 struct RenderPlan: Codable {
   let width: Int
   let height: Int
@@ -54,6 +68,7 @@ struct RenderPlan: Codable {
   let audio: [RenderAudioSegment]
   // opcionális terv-mezők — a JS csak akkor küldi, ha van (régi tervek is érvényesek)
   let watermark: Bool?
+  let overlays: [RenderOverlay]?
   let codec: String?
   let bitRate: Int?
 }
@@ -148,6 +163,8 @@ public class RemixRenderModule: Module {
     Constant("supportsAudioSpeed") { true }
     // 🖼️ képesség-jelző: ez a build a kép-klipet (állókép-szegmens) is rendereli; a régi build nem
     Constant("supportsStillSegments") { true }
+    // 🔤 VIDEO-PROD E2: a szöveg/felirat-overlay-ket (PNG + belépő animáció) ez a motor rajzolja — a régi build felhőre küld
+    Constant("supportsTextOverlays") { true }
 
     Events("onProgress")
 
@@ -583,6 +600,76 @@ public class RemixRenderModule: Module {
     return ["frames": outFrames, "channels": channels]
   }
 
+  /// A preview belépő-görbéinek mása (TextOverlay.tsx `animatedProps`; OverlayRender.kt `curve`), t mp-ben:
+  /// (átlátszóság, skála, lefelé-eltolás a vászon-magasság arányában).
+  static func overlayCurve(anim: String, t: Double, ampNorm: Double) -> (Double, Double, Double) {
+    func clamp01(_ v: Double) -> Double { min(1, max(0, v)) }
+    switch anim {
+    case "fade":
+      return (clamp01(t / 0.4), 1, 0)
+    case "slide":
+      let e = clamp01(t / 0.4)
+      return (e, 1, (1 - e) * ampNorm)
+    case "pop":
+      let p = clamp01(t / 0.3)
+      let scale = p < 1 ? 1.2 * p * (2 - p) : 1
+      return (clamp01(p * 2), scale, 0)
+    case "pulse":
+      return (1, 1 + 0.05 * sin(t * Double.pi * 3), 0)
+    case "shake":
+      return (1, 1, sin(t * Double.pi * 14) * ampNorm)
+    default:
+      return (1, 1, 0)
+    }
+  }
+
+  /// Egy szöveg-overlay rétege: a teljes-vásznas PNG a horgony (a szöveg-doboz közepe) körül skálázva/eltolva, csak a
+  /// klip idő-ablakában látható (a modell-átlátszóság 0, az animáció adja az értéket, utána visszaáll 0-ra).
+  static func overlayLayer(_ ov: RenderOverlay, renderSize: CGSize, fps: Int, url: URL) throws -> CALayer {
+    guard let image = UIImage(contentsOfFile: url.path)?.cgImage else {
+      // 🛑 hiányzó felirat-kép: nem adunk hiányos videót csendben
+      throw RenderError.badSegment("felirat-kép: \(ov.clipId)")
+    }
+    let layer = CALayer()
+    layer.contents = image
+    layer.contentsGravity = .resize
+    // horgony a szöveg közepén: a kép-tér y lefelé nő, a CoreAnimation-fáé felfelé
+    layer.anchorPoint = CGPoint(x: ov.anchorX, y: 1 - ov.anchorY)
+    layer.bounds = CGRect(origin: .zero, size: renderSize)
+    layer.position = CGPoint(x: ov.anchorX * renderSize.width, y: (1 - ov.anchorY) * renderSize.height)
+    layer.opacity = 0
+    let dur = max(0.001, ov.durationSec)
+    let steps = max(2, Int(ceil(dur * Double(max(1, fps)))) + 1)
+    var times: [NSNumber] = []
+    var alphas: [Double] = []
+    var transforms: [NSValue] = []
+    for i in 0..<steps {
+      let t = min(dur, Double(i) / Double(max(1, fps)))
+      let (a, sc, ty) = overlayCurve(anim: ov.anim, t: t, ampNorm: ov.ampNorm)
+      times.append(NSNumber(value: t / dur))
+      alphas.append(a * max(0, min(1, ov.opacity)))
+      // előbb skála a horgony körül, utána lefelé-eltolás (a CA-fában lefelé = −y)
+      let m = CATransform3DConcat(CATransform3DMakeScale(CGFloat(sc), CGFloat(sc), 1), CATransform3DMakeTranslation(0, CGFloat(-ty) * renderSize.height, 0))
+      transforms.append(NSValue(caTransform3D: m))
+    }
+    let begin = ov.atSec > 0 ? ov.atSec : AVCoreAnimationBeginTimeAtZero
+    let fadeAnim = CAKeyframeAnimation(keyPath: "opacity")
+    fadeAnim.values = alphas
+    fadeAnim.keyTimes = times
+    let moveAnim = CAKeyframeAnimation(keyPath: "transform")
+    moveAnim.values = transforms
+    moveAnim.keyTimes = times
+    for a in [fadeAnim, moveAnim] {
+      a.beginTime = begin
+      a.duration = dur
+      a.calculationMode = .linear
+      a.fillMode = .removed
+      a.isRemovedOnCompletion = false
+      layer.add(a, forKey: a.keyPath)
+    }
+    return layer
+  }
+
   private func fileURL(_ uri: String) -> URL {
     if uri.hasPrefix("file://") { return URL(string: uri)! }
     return URL(fileURLWithPath: uri)
@@ -752,35 +839,42 @@ public class RemixRenderModule: Module {
     videoComposition.frameDuration = CMTime(value: 1, timescale: CMTimeScale(fps))
     videoComposition.instructions = instructions
 
-    // 🏷️ ReMix-vízjel (exportPolicy: ingyen on-device + nem-fizető tier) — a
-    // kompozíció jobb-alsó sarkára, CoreAnimation réteggel (origó: bal-alsó)
-    if plan.watermark == true {
+    // 🔤 szöveg-overlay-k + 🏷️ ReMix-vízjel egy CoreAnimation-fán (origó: bal-alsó). A szöveg a videó fölé, a vízjel
+    // mindennek a tetejére kerül. Az overlay-k a preview belépő-görbéit játsszák (TextOverlay.tsx ↔ OverlayRender.kt).
+    let overlays = plan.overlays ?? []
+    if plan.watermark == true || !overlays.isEmpty {
       let parent = CALayer()
       parent.frame = CGRect(origin: .zero, size: renderSize)
       let videoLayer = CALayer()
       videoLayer.frame = parent.frame
       parent.addSublayer(videoLayer)
 
-      let fontSize = max(14, renderSize.height * 0.032)
-      let margin = renderSize.height * 0.02
-      let text = CATextLayer()
-      text.string = "ReMix"
-      text.font = "HelveticaNeue-Bold" as CFTypeRef
-      text.fontSize = fontSize
-      text.alignmentMode = .right
-      text.foregroundColor = UIColor(white: 1.0, alpha: 0.72).cgColor
-      text.shadowColor = UIColor.black.cgColor
-      text.shadowOpacity = 0.6
-      text.shadowOffset = CGSize(width: 0, height: 1)
-      text.shadowRadius = 2
-      text.contentsScale = 2
-      let boxWidth = renderSize.width * 0.5
-      text.frame = CGRect(
-        x: renderSize.width - boxWidth - margin,
-        y: margin,
-        width: boxWidth,
-        height: fontSize * 1.4)
-      parent.addSublayer(text)
+      for ov in overlays {
+        parent.addSublayer(try Self.overlayLayer(ov, renderSize: renderSize, fps: fps, url: self.fileURL(ov.png)))
+      }
+
+      if plan.watermark == true {
+        let fontSize = max(14, renderSize.height * 0.032)
+        let margin = renderSize.height * 0.02
+        let text = CATextLayer()
+        text.string = "ReMix"
+        text.font = "HelveticaNeue-Bold" as CFTypeRef
+        text.fontSize = fontSize
+        text.alignmentMode = .right
+        text.foregroundColor = UIColor(white: 1.0, alpha: 0.72).cgColor
+        text.shadowColor = UIColor.black.cgColor
+        text.shadowOpacity = 0.6
+        text.shadowOffset = CGSize(width: 0, height: 1)
+        text.shadowRadius = 2
+        text.contentsScale = 2
+        let boxWidth = renderSize.width * 0.5
+        text.frame = CGRect(
+          x: renderSize.width - boxWidth - margin,
+          y: margin,
+          width: boxWidth,
+          height: fontSize * 1.4)
+        parent.addSublayer(text)
+      }
       videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
         postProcessingAsVideoLayer: videoLayer, in: parent)
     }

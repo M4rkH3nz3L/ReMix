@@ -8,7 +8,7 @@ import { resolveClipUri } from '@/lib/assetResolve';
 import { deviceTextClips, deviceTextOverlaySpecs } from '@/lib/overlayPlan';
 import { hasOverlayRasterHost, rasterTextOverlays } from '@/lib/overlayRasterBridge';
 import type { RenderSettings } from '@/lib/render';
-import { localRenderMatchesPreview } from '@/lib/renderParity';
+import { localRenderGaps, localRenderMatchesPreview, type EngineCaps, type LocalRenderGap } from '@/lib/renderParity';
 import type { AudioClip, Project } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
 import { AUDIO_TRACKS } from '@/lib/audioTracks';
@@ -43,6 +43,8 @@ interface RemixRenderModule {
   readonly supportsAudioSpeed?: boolean;
   /** 🖼️ a kép-klipet (állókép-szegmens) is rendereli — S5 */
   readonly supportsStillSegments?: boolean;
+  /** 🔤 VIDEO-PROD E2: a szöveg-overlay-ket (PNG + belépő animáció) a motor rajzolja (iOS) */
+  readonly supportsTextOverlays?: boolean;
   addListener(
     event: 'onProgress',
     listener: (e: NativeProgressEvent) => void
@@ -269,9 +271,19 @@ export function localRenderBlockers(project: Project, settings: RenderSettings):
   return out;
 }
 
+/** ennek a buildnek a motor-képességei (a paritás-kapu ezzel dönt) */
+export function engineCaps(): EngineCaps {
+  return { iosTextOverlays: Native?.supportsTextOverlays === true };
+}
+
+/** a paritás-rések EZEN az eszközön, ezzel a builddel (a UI és a render-út ezt használja) */
+export function deviceRenderGaps(project: Project): LocalRenderGap[] {
+  return localRenderGaps(project, Platform.OS === 'android' ? 'android' : 'ios', engineCaps());
+}
+
 export function canRenderLocally(project: Project, settings: RenderSettings): boolean {
   const platform = Platform.OS === 'android' ? 'android' : 'ios';
-  if (!localRenderMatchesPreview(project, platform)) {
+  if (!localRenderMatchesPreview(project, platform, engineCaps())) {
     return false;
   }
   return localRenderBlockers(project, settings).filter((b) => b !== 'noNative').length === 0;
@@ -302,7 +314,7 @@ export async function renderLocal(
   // raszterizált PNG-k + a belépő animáció paraméterei a natív újrajátszáshoz.
   // A raszter-vászon dp-mérete úgy van megválasztva, hogy a capture pixel-mérete
   // a kimenettel egyezzen (dp × pixelRatio ≈ plan px).
-  if (Platform.OS === 'android') {
+  if (Platform.OS === 'android' || Native.supportsTextOverlays === true) {
     const specs = deviceTextOverlaySpecs(project, plan.height / PixelRatio.get());
     if (specs.length > 0) {
       const pngByClip = await rasterTextOverlays({

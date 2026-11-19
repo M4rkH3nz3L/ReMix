@@ -9,6 +9,7 @@ import { localizeRemoteMedia } from '@/lib/remoteMediaClient';
 import { exportPolicy } from '@/lib/exportPolicy';
 import {
   canRenderLocally,
+  deviceRenderGaps,
   isNativeRenderAvailable,
   LocalRenderUnavailableError,
   renderLocal,
@@ -18,7 +19,6 @@ import { weightedStages, type ProgressUpdate } from '@/lib/progress';
 import { projectDuration } from '@/lib/projectUtils';
 import { cloudRenderBlocked, cloudRenderStalled, type RenderHealth } from '@/lib/renderPreflight';
 import { renderCacheKey } from '@/lib/projectHash';
-import { localRenderGaps } from '@/lib/renderParity';
 import { addBreadcrumb, reportBug } from '@/lib/bugReporter';
 import { StorageQuotaError } from '@/lib/storageQuota';
 import { mediaFormData, uploadFetch } from '@/lib/upload';
@@ -309,7 +309,7 @@ export async function renderMp4(
     if (needCloud) {
       throw new Error(tr('lib.render.codecNeedsCloud'));
     }
-    const gaps = localRenderGaps(project, Platform.OS === 'android' ? 'android' : 'ios');
+    const gaps = deviceRenderGaps(project);
     if (gaps.length > 0) {
       throw new Error(tr('lib.render.contentNeedsCloud', { count: gaps.length }));
     }

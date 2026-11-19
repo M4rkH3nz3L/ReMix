@@ -66,10 +66,13 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^10.1.1",
+    "@stryker-mutator/jest-runner": "^10.1.1",
     "@types/jest": "29.5.14",
     "@types/react": "~19.2.2",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
+    "fast-check": "^4.10.3",
     "jest": "~29.7.0",
     "jest-expo": "~57.0.6",
     "typescript": "~6.0.3"
@@ -86,7 +89,8 @@
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit",
     "audit": "npm run typecheck && npm run lint && npm test",
-    "test:rls": "set -o pipefail; for f in supabase/tests/*.sql; do echo \"── $f\"; docker exec -i supabase_db_ReMix psql -U postgres -d postgres -q < \"$f\" | grep -E 'FAIL|rendben' || exit 1; done; for f in supabase/tests/*.sh; do echo \"── $f\"; bash \"$f\" | grep -E 'FAIL|rendben' || exit 1; done"
+    "test:rls": "set -o pipefail; for f in supabase/tests/*.sql; do echo \"── $f\"; docker exec -i supabase_db_ReMix psql -U postgres -d postgres -q < \"$f\" | grep -E 'FAIL|rendben' || exit 1; done; for f in supabase/tests/*.sh; do echo \"── $f\"; bash \"$f\" | grep -E 'FAIL|rendben' || exit 1; done",
+    "test:mutation": "REMIX_ROOT=$PWD stryker run"
   },
   "private": true
 }

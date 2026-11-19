@@ -97,3 +97,5 @@ devs/
 
 # 🔇 V8: az Android natív (CMake) build-gyorsítótára
 .cxx/
+/reports/
+/coverage/

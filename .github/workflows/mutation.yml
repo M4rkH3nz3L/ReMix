@@ -1,0 +1,33 @@
+name: Mutációs teszt (éjszakai)
+
+# 🧬 Stryker a pénz- és projektintegritás-kritikus magokra (stryker.config.mjs `mutate`). Lassú, ezért nem
+# minden pushra fut: éjszakánként és kézzel indítva. A küszöb (thresholds.break = 80) alatt bukik.
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  stryker:
+    name: Stryker (kritikus magok)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Függőségek (kliens)
+        run: npm ci || (echo '⚠️ npm ci újrapróbálkozás (átmeneti regiszter-hiba?)' && sleep 20 && npm ci)
+      - name: Függőségek (worker)
+        run: npm ci || (echo '⚠️ npm ci újrapróbálkozás (átmeneti regiszter-hiba?)' && sleep 20 && npm ci)
+        working-directory: server
+      - name: Stryker
+        run: npm run test:mutation -- --concurrency 4
+      - name: Jelentés
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: reports/mutation/

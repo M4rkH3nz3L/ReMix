@@ -52,7 +52,16 @@ jobs:
       - name: Tesztek (kliens + worker)
         run: |
           chown -R node:node .
-          su node -c "CI=true CHROMIUM_PATH=/usr/bin/chromium npm test -- --ci --maxWorkers=3"
+          su node -c "CI=true CHROMIUM_PATH=/usr/bin/chromium npm test -- --ci --maxWorkers=3 --coverage --coverageReporters=json-summary --coverageReporters=text-summary"
+
+      # 📈 Coverage-ratchet: a padló (scripts/quality/coverage-floor.json) alá nem eshet; emelni a
+      # `node scripts/quality/coverage-ratchet.js --update`-tel lehet (csak felfelé)
+      - name: Coverage-ratchet
+        run: node scripts/quality/coverage-ratchet.js coverage/coverage-summary.json
+
+      # 📏 új forrásfájl max. 1000 sor; a meglévő óriásfájlok (scripts/quality/large-files.json) nem nőhetnek
+      - name: Fájlméret-kapu
+        run: node scripts/quality/file-size.js
 
       - name: Worker syntax-ellenőrzés
         run: for f in server/*.js; do node -c "$f" || exit 1; done

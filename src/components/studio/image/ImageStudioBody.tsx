@@ -1,16 +1,11 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Directory, File, Paths } from 'expo-file-system';
-import { router } from 'expo-router';
-import * as Sharing from 'expo-sharing';
+import { File } from 'expo-file-system';
 import type { SkImage } from '@shopify/react-native-skia';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Image, PixelRatio, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { captureRef } from 'react-native-view-shot';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
 import { NewerSchemaBanner } from '@/components/NewerSchemaBanner';
-import { keepRenderedInProject, RenderStage, type RenderStageHandle, ensureTextClipMasks } from '@/components/studio/image/RenderStage';
-import { Chip } from '@/components/ui/controls';
+import { keepRenderedInProject, RenderStage, ensureTextClipMasks } from '@/components/studio/image/RenderStage';
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
 import { ImageAdjustStrip } from '@/components/studio/image/ImageAdjustStrip';
 import { EmptyCanvasHint } from '@/components/studio/image/EmptyCanvasHint';
@@ -22,34 +17,31 @@ import {
 } from '@/components/studio/image/body/ImageStudioSheets';
 import { AssistantBar } from '@/components/studio/image/body/AssistantBar';
 import { BrushBar } from '@/components/studio/image/body/BrushBar';
+import { CornerPinBar, CropBar, GuidesBar, LassoBar, PathEditBar, PenBar, WandBar } from '@/components/studio/image/body/ModeBars';
+import { PageStrip } from '@/components/studio/image/body/PageStrip';
+import { ActiveSelectionRow, ExportingRow, StatusHintRow } from '@/components/studio/image/body/StatusRows';
+import { StudioTopBar } from '@/components/studio/image/body/StudioTopBar';
+import { useImageExport } from '@/components/studio/image/body/useImageExport';
+import { useImageImports } from '@/components/studio/image/body/useImageImports';
+import { useImagePages } from '@/components/studio/image/body/useImagePages';
+import { useLayerRasterOps } from '@/components/studio/image/body/useLayerRasterOps';
+import { useSelectionOps } from '@/components/studio/image/body/useSelectionOps';
 import { applyImageCommands, type ImageCommand } from '@/lib/imageIntent';
 import { type SelectionAction, SelectionBar, type SelectTool } from '@/components/studio/image/body/SelectionBar';
-import { requestCutout } from '@/lib/bgremove';
-import { foregroundMask } from '@/lib/foregroundMask';
 import { docFromTemplate, type ImageTemplate } from '@/lib/imageTemplates';
-import { useBrandStyle } from '@/store/brandStyleStore';
+import { useBrandStyle, copyBrandLogoInto } from '@/store/brandStyleStore';
 import { haptics } from '@/design';
 import { type LayerMenuAction } from '@/components/studio/image/LayerMenuSheet';
 import { MultiSelectBar, type MultiAction } from '@/components/studio/image/body/MultiSelectBar';
 import { duplicateLayers, removeLayers, toggleId } from '@/lib/imageMulti';
-import { alignLayersInDoc } from '@/lib/imageLayerLayout';
+import { alignLayersInDoc, canAlignLayer } from '@/lib/imageLayerLayout';
 import { pixelLayerBox, type PixelArt } from '@/lib/pixelArt';
 import { variantDoc } from '@/lib/imageVariants';
-import { customExportSize, exportSize } from '@/lib/imageExport';
-import { EXPORT_PACK_SCALES, expectsAlpha, layerOnlyDoc, selectionOnlyDoc } from '@/lib/imageExportCheck';
-import { DEFAULT_GRID, GRID_SIZES } from '@/lib/imageGrid';
+import { layerOnlyDoc } from '@/lib/imageExportCheck';
+import { DEFAULT_GRID } from '@/lib/imageGrid';
 import { projectMediaDir } from '@/lib/projectFolderClient';
-import { canvasToLayerBox, layerBoxToCanvas, photoBoxFor } from '@/lib/imageLayerGeometry';
-import {
-  adjustSelection,
-  copySelectionToLayer,
-  deleteSelection,
-  maskFromSelection,
-  needsRasterForSelection,
-  rasterSubForSelection,
-  replaceWithSelectionRaster,
-  selectionTarget,
-} from '@/lib/imageSelectionOps';
+import { centeredPhotoLayer, defaultLayer, defaultShapeLayer, fullCanvasImageMask, paintedPhotoLayer } from '@/lib/imageLayerDefaults';
+import { selectionTarget } from '@/lib/imageSelectionOps';
 import { applyRing, invertSelection, type Point, type Selection, type SelectionMode } from '@/lib/selection';
 import { DEFAULT_BRUSH, isPaintLayer } from '@/lib/brushEngine';
 import { ImageStudioToolbar } from '@/components/studio/image/body/ImageStudioToolbar';
@@ -67,7 +59,7 @@ import { aspectCropRect, type CropRect, cropImageDoc } from '@/lib/imageCrop';
 // (régi dev-kliens) ne crash-eltesse az EGÉSZ kép-stúdiót; a vászon/forma/szöveg/
 // gradient/export Skia nélkül is megy, csak a varázspálca igényli.
 import { type CanvasPoint, pathShapeFromCanvasPoints } from '@/lib/penPath';
-import { flattenTargets, mergeDownTargets, rasterSubDoc, replaceWithRaster } from '@/lib/imageCanvasOps';
+import { flattenTargets, mergeDownTargets } from '@/lib/imageCanvasOps';
 import { compositionGuides, mergeGuides } from '@/lib/rulers';
 import { deleteAnchor, type NodeType, pathEditPatch, pathEditView, reversePath, setNodeType } from '@/lib/vectorPath';
 import {
@@ -76,21 +68,13 @@ import {
   createImageDoc,
   docIsEmpty,
   duplicateLayer,
-  layerLabel,
   moveLayerTo,
   removeLayer,
   reorderLayer,
   toggleLayerLocked,
   updateLayer,
 } from '@/lib/imageDoc';
-import { canAlignLayer } from '@/lib/imageLayerLayout';
-import { canRemovePage, duplicatePage, pageIndexAfterRemoval, reorderPages } from '@/lib/imageProjectPages';
-import { publishImageProject } from '@/lib/feed';
-import type { ImageShareMode } from '@/lib/imageShare';
-import { ExportCancelled, exportPsd, importPdf, importPsd, renderImageDoc, renderSvgPdf } from '@/lib/imageDocClient';
-import { ImageRenderRejected, imageDocContentKey, isRenderFresh } from '@/lib/imageExport';
-import { jpegToPdf } from '@/lib/rasterPdf';
-import { chooseImageRenderRoute } from '@/lib/imageRenderRoute';
+import { imageDocContentKey } from '@/lib/imageExport';
 import { type ImageWorkspace, railGroups, type ToolKey, selectionMenu } from '@/lib/imageMenu';
 import { registerDevAction } from '@/lib/devActions';
 import { loadProjectFonts } from '@/lib/projectFontsClient';
@@ -100,24 +84,12 @@ import { useEditorPrefs } from '@/store/editorPrefsStore';
 import { EdgeTab } from '@/components/studio/image/body/PanelChrome';
 import { LayerPanel } from '@/components/studio/image/LayerPanel';
 import { StudioSheetFrameContext } from '@/components/studio/image/StudioSheet';
-import { healRegionFromPoints } from '@/lib/imageLayerGeometry';
 import { makeId } from '@/lib/id';
-import { pickImage, pickImageFile, pickPdf, pickPsd, pickSvg, saveImageToPhotos } from '@/lib/media';
-import { imageDocToSvg, svgDocSize } from '@/lib/svgExport';
-import { parseSvg } from '@/lib/svgImport';
-import { listProjects, loadProject } from '@/lib/storage';
-import { sendStillToVideo } from '@/lib/linkedAssetClient';
-import { flushProjectSave } from '@/hooks/useProjectAutosave';
-import { useActionMenu } from '@/store/actionMenuStore';
-import { copyBrandLogoInto } from '@/store/brandStyleStore';
+import { pickImage } from '@/lib/media';
 import { brandLogoLayer } from '@/lib/imageBrand';
-import { logCswcr, studioKindOf } from '@/lib/cswcrClient';
 import { useEditorStore } from '@/store/editorStore';
 import { useEntitlement } from '@/store/entitlementStore';
-import { guardPro, usePaywall } from '@/store/paywallStore';
-import { useSeoGate } from '@/store/seoGateStore';
 import type { Asset, ClipMask, ImageDoc, ImageGrid, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
-import type { PostVisibility } from '@/types/social';
 import { logCaught } from '@/lib/logCaught';
 
 // a Skia csak megnyitáskor töltődik be, mint az ecsetnél
@@ -143,21 +115,6 @@ const DOCKED_FRAME = { inline: true, docked: true, detents: { peek: 0, half: 0, 
 /** ecset-színek + -méretek (px) a sávban */
 /** ennyi tétlenség után frissül a lap bélyegképe */
 const THUMB_IDLE_MS = 2000;
-/** varázspálca-tűrés: mennyire eltérő színek tartoznak még a kijelölésbe */
-const WAND_TOLERANCES = [
-  { value: 16, labelKey: 'studio.image.wand.tight' },
-  { value: 32, labelKey: 'studio.image.wand.normal' },
-  { value: 64, labelKey: 'studio.image.wand.wide' },
-];
-
-/** kivágás-arány presetek (pixel-arány w:h; null = szabad/teljes) */
-const CROP_PRESETS: { label: string; labelKey?: string; ratio: number | null }[] = [
-  { label: '', labelKey: 'studio.image.crop.free', ratio: null },
-  { label: '1:1', ratio: 1 },
-  { label: '4:5', ratio: 4 / 5 },
-  { label: '16:9', ratio: 16 / 9 },
-  { label: '9:16', ratio: 9 / 16 },
-];
 
 /**
  * 🖼️ A Kép Stúdió TÖRZSE — store-vezérelt, UI-only, a hang-stúdióval AZONOS
@@ -302,106 +259,10 @@ export function ImageStudioBody({
   const brushRef = useRef<BrushHandle>(null);
   const canvasRef = useRef<View>(null);
 
-  /**
-   * 🖼️ A dokumentum raszterizálása — OFFLINE FIRST (CORE K1): elsőként a TELEFON renderel
-   * (`RenderStage`: a vászon réteg-fája rejtetten, a kért pixelméreten, bármely lapra). A
-   * worker csak a telefonon nem rajzolható effektekért kell (`serverOnlyEffects`), illetve
-   * tartalék, ha a telefonos render nem sikerült.
-   */
   const canUndo = useEditorStore((s) => s.past.length > 0);
   const canRedo = useEditorStore((s) => s.future.length > 0);
   const undo = () => useEditorStore.getState().undo();
   const redo = () => useEditorStore.getState().redo();
-  const rejectedRef = useRef(false);
-  const renderStageRef = useRef<RenderStageHandle>(null);
-  const exportAbort = useRef<AbortController | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const rasterize = async (
-    target: ImageDoc,
-    opts?: { format?: 'png' | 'jpg' | 'webp'; height?: number; quality?: number; signal?: AbortSignal }
-  ): Promise<string | null> => {
-    rejectedRef.current = false;
-    const height = opts?.height ?? target.height ?? 1280;
-    // 🧭 CORE K1: offline first — a worker csak a telefonon nem rajzolható effektekért kell
-    const needsWorker = chooseImageRenderRoute(target, true) === 'worker';
-    if (needsWorker) {
-      const viaWorker = await rasterizeOnWorker(target, height, opts);
-      if (viaWorker || rejectedRef.current) {
-        return viaWorker;
-      }
-    }
-    if (opts?.signal?.aborted) {
-      throw new ExportCancelled();
-    }
-    // a telefon renderel, BÁRMELY lapot, a kért pixelméreten (a vászon paritás-mért réteg-fája)
-    const onDevice = (await renderStageRef.current?.render(target, height, { format: opts?.format, quality: opts?.quality })) ?? null;
-    if (opts?.signal?.aborted) {
-      throw new ExportCancelled();
-    }
-    if (onDevice) {
-      if (needsWorker) {
-        Alert.alert(t('studio.image.deviceRenderGaps.title'), t('studio.image.deviceRenderGaps.body'));
-      }
-      return onDevice;
-    }
-    // tartalék: a worker (ha a telefonos render nem sikerült)
-    return needsWorker ? null : rasterizeOnWorker(target, height, opts);
-  };
-
-  /** a worker-render (pontos, teljes felbontás) — `null`, ha nem érhető el */
-  const rasterizeOnWorker = async (
-    target: ImageDoc,
-    height: number,
-    opts?: { format?: 'png' | 'jpg' | 'webp'; quality?: number; signal?: AbortSignal }
-  ): Promise<string | null> => {
-    try {
-      return await renderImageDoc(target, height, {
-        format: opts?.format,
-        quality: opts?.quality,
-        signal: opts?.signal,
-        fonts: useEditorStore.getState().project?.fonts,
-        onMissingLayers: (count) =>
-          Alert.alert(t('studio.image.missingInExport.title'), t('studio.image.missingInExport.body', { count })),
-      });
-    } catch (e) {
-      // 🚫 I13: szándékos elutasítás — a tartalék a user elől rejtené el az okot
-      if (e instanceof ImageRenderRejected) {
-        rejectedRef.current = true;
-        Alert.alert(t('studio.image.renderFailTitle'), e.message);
-        return null;
-      }
-      throw e;
-    }
-  };
-
-  /** A vászon képe az eszközön, a dokumentum felbontásán, vízjel és kijelölés-króm nélkül. */
-  const captureCanvas = async (target: ImageDoc, height: number, opts?: { format?: 'png' | 'jpg' | 'webp'; quality?: number }) => {
-    setCapturing(true);
-    await new Promise((r) => setTimeout(r, 90)); // egy render-kör, kijelölés-króm nélkül
-    try {
-      const canvas = effectiveCanvas(target);
-      const ratio = PixelRatio.get();
-      // a view-shot a méretet képpontban várja — a dokumentum felbontására kérjük a képet
-      return await captureRef(canvasRef, {
-        format: opts?.format === 'jpg' ? 'jpg' : 'png',
-        quality: opts?.quality ?? 1,
-        width: Math.round((height * (canvas.width / canvas.height)) / ratio),
-        height: Math.round(height / ratio),
-      });
-    } catch (caught) {
-      logCaught('components/studio/image/ImageStudioBody.tsx:rasterize', caught);
-      return null;
-    } finally {
-      setCapturing(false);
-    }
-  };
-
-  /** az általános hibaablak — ha a szerver már megmondta az okot, nem duplázzuk */
-  const alertRenderFail = () => {
-    if (!rejectedRef.current) {
-      Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.renderFailBody'));
-    }
-  };
 
   // project módban gondoskodunk róla, hogy legyen legalább egy kép-dokumentum
   useEffect(() => {
@@ -441,15 +302,24 @@ export function ImageStudioBody({
   const commit = (next: ImageDoc, label?: string) =>
     useEditorStore.getState().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: next, label });
 
-  // 💾 I4: a kész renderelt kép a store FRISS doc-jára kerül — a render alatt tett
-  // szerkesztések nem állnak vissza az `await` előtt elkapott állapotra
-  const commitRendered = (docIdToUpdate: string, renderedUri: string) => {
-    const s = useEditorStore.getState();
-    const fresh = s.project?.imageDocs?.find((d) => d.id === docIdToUpdate);
-    if (fresh) {
-      s.dispatch({ type: 'UPSERT_IMAGE_DOC', doc: { ...fresh, renderedUri, renderedKey: imageDocContentKey(fresh) }, label: 'render' });
-    }
-  };
+  const {
+    renderStageRef,
+    exportAbort,
+    exporting,
+    rasterize,
+    captureCanvas,
+    exportPart,
+    exportPack,
+    exportImage,
+    exportSvg,
+    exportPdf,
+    exportVectorPdf,
+    exportPsdFile,
+    insertIntoVideo,
+    confirmShare,
+    saveScoped,
+  } = useImageExport({ doc, project, pages, busy, setBusy, setCapturing, canvasRef, onSave, onExit });
+
 
   // 🖼️ I41: élő bélyegkép az aktív lapról, szerkesztési szünetben (a régi fájl törlődik)
   const activeThumbKey = doc && mode === 'project' ? imageDocContentKey(doc) : null;
@@ -474,8 +344,7 @@ export function ImageStudioBody({
         .catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:timer', caught); });
     }, THUMB_IDLE_MS);
     return () => clearTimeout(timer);
-    // a doc a kulcson át számít: csak valódi tartalom-változásra indul újra
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a doc a kulcson át számít: csak valódi tartalom-változásra indul újra
   }, [activeThumbKey]);
 
   // a kijelölés levezetve — ha a réteg eltűnik (törlés/undo), null-ra esik
@@ -484,12 +353,12 @@ export function ImageStudioBody({
   // ↩️ a gyors korrekció-sáv csak fotó-kijelölésnél látszik — a vissza is csak akkor nyeli el
   useBackLayer(quickAdjust && selectedLayer?.kind === 'photo' ? () => setQuickAdjust(false) : null);
 
-  // ── 🖼️📄 Galéria-lapok (project mód): új/duplikál/töröl/mozgat az aktív lapon ──
-  const addDocPage = (nd: ImageDoc) => {
-    useEditorStore.getState().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: nd });
-    setActivePageId(nd.id);
-    setSelectedId(null);
-  };
+  const { addDocPage, addPage, duplicateActivePage, deleteActivePage, movePage, activeIdx } = useImagePages({
+    doc,
+    pages,
+    setActivePageId,
+    setSelectedId,
+  });
   // 🏷️ S11: a márka-logó a lapra — a projektbe MÁSOLVA (a márka-fájl a helyén marad), egy visszavonás
   const insertBrandLogo = (uri: string) => {
     if (!doc) return;
@@ -516,66 +385,6 @@ export function ImageStudioBody({
     }
   };
 
-  const addPage = () => {
-    const s = useEditorStore.getState();
-    if (!s.project) {
-      return;
-    }
-    const size = effectiveCanvas({ aspectRatio: s.project.aspectRatio });
-    const nd = createImageDoc(t('studio.image.pageName', { n: pages.length + 1 }), s.project.aspectRatio, () => makeId('lyr'), {
-      width: size.width,
-      height: size.height,
-    });
-    s.dispatch({ type: 'UPSERT_IMAGE_DOC', doc: nd });
-    setActivePageId(nd.id);
-    setSelectedId(null);
-  };
-
-  const duplicateActivePage = () => {
-    if (!doc) {
-      return;
-    }
-    const dup = duplicatePage(doc, makeId('img'));
-    useEditorStore.getState().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: dup, label: t('studio.image.pageDuplicated', { name: dup.name }) });
-    setActivePageId(dup.id);
-    setSelectedId(null);
-  };
-
-  const deleteActivePage = () => {
-    if (!doc || !canRemovePage({ imageDocs: pages })) {
-      return;
-    }
-    const idx = pages.findIndex((d) => d.id === doc.id);
-    const remaining = pages.filter((d) => d.id !== doc.id);
-    const nextIdx = pageIndexAfterRemoval(idx, pages.length);
-    Alert.alert(t('common.delete'), t('studio.image.pageDeleteConfirm', { name: doc.name }), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => {
-          useEditorStore.getState().dispatch({ type: 'REMOVE_IMAGE_DOC', docId: doc.id });
-          setActivePageId(remaining[nextIdx]?.id ?? null);
-          setSelectedId(null);
-        },
-      },
-    ]);
-  };
-
-  const movePage = (dir: -1 | 1) => {
-    if (!doc) {
-      return;
-    }
-    const idx = pages.findIndex((d) => d.id === doc.id);
-    const reordered = reorderPages(pages, idx, idx + dir);
-    if (reordered === pages) {
-      return;
-    }
-    useEditorStore.getState().dispatch({ type: 'REORDER_IMAGE_DOCS', order: reordered.map((d) => d.id) });
-  };
-
-  const activeIdx = doc ? pages.findIndex((d) => d.id === doc.id) : -1;
-
   const add = (kind: ImageLayer['kind']) => {
     if (!doc) {
       return;
@@ -585,50 +394,14 @@ export function ImageStudioBody({
         if (!picked) {
           return;
         }
-        const l: PhotoLayer = {
-          kind: 'photo',
-          id: makeId('lyr'),
-          uri: picked.uri,
-          position: { x: 0.5, y: 0.5 },
-          w: 0.7,
-          h: 0.5,
-          fit: 'cover',
-        };
+        const l: PhotoLayer = centeredPhotoLayer(makeId('lyr'), picked.uri);
         commit(addLayer(doc, l), t('studio.image.undoAddPhoto'));
         setSelectedId(l.id);
       });
       return;
     }
     const id = makeId('lyr');
-    const l: ImageLayer =
-      kind === 'text'
-        ? {
-            kind: 'text',
-            id,
-            text: t('studio.image.newText'),
-            color: '#ffffff',
-            backgroundColor: null,
-            fontSize: 9,
-            fontWeight: 'bold',
-            // saját font: a rendszer-font az előnézetben és az exportban eltérő lenne
-            fontFamily: 'Poppins',
-            position: { x: 0.5, y: 0.5 },
-            stylePreset: 'outline',
-          }
-        : kind === 'fill'
-          ? { kind: 'fill', id, fill: '#12121a' }
-          : kind === 'adjust'
-            ? { kind: 'adjust', id, adjust: {} }
-            : {
-                kind: 'shape',
-                id,
-                shape: 'rectangle',
-                position: { x: 0.5, y: 0.5 },
-                w: 0.4,
-                h: 0.24,
-                fill: '#ff2d95',
-                cornerRadius: 0.12,
-              };
+    const l: ImageLayer = defaultLayer(kind, id, t('studio.image.newText'));
     commit(addLayer(doc, l), t('studio.image.undoAddLayer'));
     setSelectedId(id);
   };
@@ -639,13 +412,7 @@ export function ImageStudioBody({
       return;
     }
     const id = makeId('lyr');
-    const base = { kind: 'shape' as const, id, position: { x: 0.5, y: 0.5 }, fill: '#ff2d95' };
-    const l: ShapeLayer =
-      shape === 'line'
-        ? ({ ...base, shape: 'line', w: 0.6, h: 0.02, fill: '#ffffff', strokeWidth: 0.012 } as ShapeLayer)
-        : shape === 'rectangle'
-          ? ({ ...base, shape: 'rectangle', w: 0.4, h: 0.28, cornerRadius: 0.12 } as ShapeLayer)
-          : ({ ...base, shape, w: 0.4, h: 0.4, ...(shape === 'polygon' ? { sides: 6 } : {}) } as ShapeLayer);
+    const l: ShapeLayer = defaultShapeLayer(shape, id);
     commit(addLayer(doc, l), t('studio.image.undoAddLayer'));
     setSelectedId(id);
     setSheet(null);
@@ -656,173 +423,23 @@ export function ImageStudioBody({
     if (!doc || asset.kind !== 'image') {
       return;
     }
-    const l: PhotoLayer = {
-      kind: 'photo',
-      id: makeId('lyr'),
-      uri: asset.uri,
-      assetId: asset.id,
-      position: { x: 0.5, y: 0.5 },
-      w: 0.7,
-      h: 0.5,
-      fit: 'cover',
-    };
+    const l: PhotoLayer = centeredPhotoLayer(makeId('lyr'), asset.uri, asset.id);
     commit(addLayer(doc, l), t('studio.image.undoAddPhoto'));
     setSelectedId(l.id);
     setSheet(null);
   };
 
-  /**
-   * 📥 SVG-fájl importja rétegekké (`svgImport` mag): a `.svg`-t beolvassuk,
-   * ImageDoc-rétegekre bontjuk, és EGY köteg-műveletként (egy undo-lépés) a
-   * command-buson betesszük — a vászonon azonnal megjelennek.
-   */
-  // 🖼️ raszterkép a Fájlokból: a hibás fájl üzenetet ad, a réteg a kép saját arányában jön létre
-  const importImageFile = async () => {
-    if (!doc || busy) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const picked = await pickImageFile();
-      if (!picked) {
-        return;
-      }
-      if (picked.status === 'invalid') {
-        Alert.alert(t('studio.image.importFile.invalidTitle'), t('studio.image.importFile.invalidBody'));
-        return;
-      }
-      const l: PhotoLayer = { kind: 'photo', id: makeId('lyr'), uri: picked.uri, position: { x: 0.5, y: 0.5 }, ...photoBoxFor(picked.width, picked.height, effectiveCanvas(doc)), fit: 'stretch' };
-      commit(addLayer(doc, l), t('studio.image.undoAddPhoto'));
-      setSelectedId(l.id);
-      setSheet(null);
-      if (picked.width < picked.originalWidth) {
-        Alert.alert(t('studio.image.importFile.scaledTitle'), t('studio.image.importFile.scaledBody', { from: picked.originalWidth, to: picked.width }));
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const importSvg = async () => {
-    if (!doc || busy) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const svg = await pickSvg();
-      if (svg == null) {
-        return;
-      }
-      const { layers, unsupported } = parseSvg(svg);
-      if (layers.length === 0) {
-        Alert.alert(t('studio.image.svgFailTitle'), t('studio.image.svgFailBody'));
-        return;
-      }
-      // ⚠️ I25: amit nem tudtunk beolvasni, azt megmondjuk (nem tűnik el csendben)
-      const skipped = Object.entries(unsupported).map(([tag, count]) => `<${tag}> ×${count}`);
-      if (skipped.length > 0) {
-        Alert.alert(t('studio.image.svgPartialTitle'), t('studio.image.svgPartialBody', { items: skipped.join(', ') }));
-      }
-      let next = doc;
-      for (const l of layers) {
-        next = addLayer(next, l);
-      }
-      commit(next, t('studio.image.undoImportSvg'));
-      setSelectedId(layers[layers.length - 1].id);
-      setSheet('layers');
-    } catch (caught) {
-      logCaught('components/studio/image/ImageStudioBody.tsx:importSvg', caught);
-      Alert.alert(t('studio.image.svgFailTitle'), t('studio.image.svgFailBody'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  /**
-   * 🖼️ PSD-import (IMAGE 01.1): egy .psd-t a workerrel réteges `ImageDoc`-ká
-   * olvasunk (ag-psd, réteg-megőrzés), és EGY `UPSERT_IMAGE_DOC` parancsként
-   * tesszük a projektbe (undo-barát) — a meglévő dokumentumok érintetlenek. Pro-
-   * gated: free usernél a gomb letiltva, de ha mégis ide jutunk, a `guardPro`
-   * elkapja a `ProRequiredError`-t és felhozza a paywallt.
-   */
-  const importPsdDoc = async () => {
-    if (busy) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const file = await pickPsd();
-      if (!file) {
-        return;
-      }
-      const psdDoc = await guardPro(
-        () => importPsd(file, project?.id),
-        (e) => Alert.alert(t('studio.image.psdFailTitle'), e.message || t('studio.image.psdFailBody'))
-      );
-      if (!psdDoc) {
-        return; // lemondás / Pro-paywall / hiba (a guardPro már jelzett)
-      }
-      // EGY command: a réteges doc a projektbe (sosem közvetlen doc-írás)
-      useEditorStore.getState().dispatch({ type: 'UPSERT_IMAGE_DOC', doc: psdDoc, label: t('studio.image.undoImportPsd') });
-      // I22: az importált lapra ugrunk, különben úgy tűnik, nem történt semmi
-      if (mode === 'project') {
-        setActivePageId(psdDoc.id);
-        setSelectedId(null);
-      }
-      setSheet('layers');
-    } catch (e) {
-      logCaught('components/studio/image/ImageStudioBody.tsx:importPsdDoc', e);
-      Alert.alert(t('studio.image.psdFailTitle'), (e as Error)?.message || t('studio.image.psdFailBody'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  /**
-   * 📄 PDF-import (IMAGE 01.3): egy .pdf-et a workerrel OLDALANKÉNT egy `ImageDoc`-ká
-   * olvasunk (pdf-lib struktúra + pdfjs+canvas raszter), és a kész lapokat EGY
-   * `applyBatch` köteg-paranccsal tesszük a projekt-galériába (az egész import EGY
-   * undo-lépés — a meglévő lapok érintetlenek). Pro-gated: free usernél a gomb
-   * letiltva, de ha mégis ide jutunk, a `guardPro` felhozza a paywallt.
-   */
-  const importPdfDocs = async () => {
-    if (busy) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const file = await pickPdf();
-      if (!file) {
-        return;
-      }
-      const pdfDocs = await guardPro(
-        () => importPdf(file, project?.id),
-        (e) => Alert.alert(t('studio.image.pdfFailTitle'), e.message || t('studio.image.pdfFailBody'))
-      );
-      if (!pdfDocs || pdfDocs.length === 0) {
-        return; // lemondás / Pro-paywall / hiba / üres (a guardPro már jelzett)
-      }
-      // EGY köteg-command (applyBatch): oldalanként egy UPSERT_IMAGE_DOC, de az
-      // egész import EGY undo-lépés (sosem közvetlen doc-írás)
-      useEditorStore
-        .getState()
-        .applyBatch(
-          pdfDocs.map((d) => ({ type: 'UPSERT_IMAGE_DOC', doc: d, label: t('studio.image.undoImportPdf') })),
-          'user'
-        );
-      // az ÚJ első lapra ugrunk (project módban), hogy a felhasználó rögtön lássa
-      if (mode === 'project') {
-        setActivePageId(pdfDocs[0].id);
-        setSelectedId(null);
-      }
-      setSheet('layers');
-    } catch (e) {
-      logCaught('components/studio/image/ImageStudioBody.tsx:importPdfDocs', e);
-      Alert.alert(t('studio.image.pdfFailTitle'), (e as Error)?.message || t('studio.image.pdfFailBody'));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const { importImageFile, importSvg, importPsdDoc, importPdfDocs } = useImageImports({
+    mode,
+    doc,
+    project,
+    busy,
+    setBusy,
+    commit,
+    setSelectedId,
+    setSheet,
+    setActivePageId,
+  });
 
   const onTool = (key: ToolKey) => {
     if (!doc) {
@@ -1176,102 +793,15 @@ export function ImageStudioBody({
     setPenPoints(null);
   };
 
-  // 🪄 varázspálca: a koppintott fotó-régió szín-szelekciója (Skia) → ZÁRT path-forma
-  //    a fotó dobozán (féligátlátszó kiemelés). A mag tesztelt; a Skia glue új build után fut.
-  const onWandSeed = (
-    uri: string,
-    u: number,
-    v: number,
-    source: PhotoLayer
-  ) => {
-    if (!doc || busy) {
-      return;
-    }
-    setBusy(true);
-    void (async () => {
-      try {
-        // Skia-függő mag → lustán töltjük; ha a natív modul hiányzik, a catch kezeli
-        const { colorRangeSelect, magicWandSelect } = await import('@/lib/magicWandClient');
-        const canvas = effectiveCanvas(doc);
-        const boxAspect = (source.w * canvas.width) / (source.h * canvas.height);
-        if (!wandContiguous && selectTool === 'wand') {
-          const rings = await colorRangeSelect(uri, u, v, wandTolerance, { boxAspect, fit: source.fit });
-          if (rings && rings.length > 0) {
-            applyRangeRings(rings.map((r) => ({ op: r.op, points: r.points.map((p) => layerBoxToCanvas(p, source, canvas)) })));
-          } else {
-            Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.wand.failBody'));
-          }
-          return;
-        }
-        const outline = await magicWandSelect(uri, u, v, wandTolerance, { boxAspect, fit: source.fit });
-        if (outline && outline.length >= 3 && selectTool === 'wand') {
-          addSelectionRing(outline.map((p) => layerBoxToCanvas(p, source, canvas)));
-        } else if (outline && outline.length >= 3 && doc) {
-          const shape: ShapeLayer = {
-            kind: 'shape',
-            id: makeId('lyr'),
-            shape: 'path',
-            points: outline,
-            closed: true,
-            position: source.position,
-            w: source.w,
-            h: source.h,
-            rotation: source.rotation,
-            flipH: source.flipH,
-            flipV: source.flipV,
-            fill: '#7c5cff',
-            opacity: 0.5,
-          };
-          commit(addLayer(doc, shape), t('studio.image.undoWand'));
-          setSelectedId(shape.id);
-        } else {
-          Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.wand.failBody'));
-        }
-      } catch (caught) {
-        logCaught('components/studio/image/ImageStudioBody.tsx:onWandSeed', caught);
-        // a @shopify/react-native-skia natív modul hiányzik a dev-kliensből → új build kell
-        Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.skiaMissing'));
-      } finally {
-        setBusy(false);
-        setWandActive(false);
-      }
-    })();
-  };
-
-  /**
-   * 🧱 Rétegek egyesítése / raszterizálása. Offline first (CORE K1): a telefon rendereli,
-   * vízjel nélkül, minden szinten (ami a telefonon fut, ingyenes). Csak ha a rétegeken
-   * telefonon nem rajzolható effekt van, kell a worker — annak Free-renderje vízjeles, és
-   * az a réteg pixeleibe égne, ezért az az eset marad Pro.
-   */
-  const mergeLayers = async (ids: string[], label: string) => {
-    if (!doc || busy || ids.length === 0) {
-      return;
-    }
-    const sub = rasterSubDoc(doc, ids);
-    if (!isPro && chooseImageRenderRoute(sub, true) === 'worker') {
-      usePaywall.getState().open();
-      return;
-    }
-    setBusy(true);
-    try {
-      const rendered = await rasterize(sub, { format: 'png', height: effectiveCanvas(doc).height });
-      const uri = rendered ? keepRenderedInProject(rendered, `merge_${makeId('r')}`) : null;
-      if (!uri) {
-        Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.renderFailBody'));
-        return;
-      }
-      const fresh = useEditorStore.getState().project?.imageDocs?.find((d) => d.id === doc.id) ?? doc;
-      const id = makeId('lyr');
-      commit(replaceWithRaster(fresh, ids, uri, id, label), label);
-      setSelectedId(id);
-    } catch (e) {
-      logCaught('components/studio/image/ImageStudioBody.tsx:mergeLayers', e);
-      Alert.alert(t('studio.image.renderFailTitle'), (e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const { mergeLayers, removeBackground, pathOperation } = useLayerRasterOps({
+    doc,
+    busy,
+    setBusy,
+    isPro,
+    commit,
+    rasterize,
+    setSelectedId,
+  });
 
   // 🖌️ ecset: a Skia-festés pillanatképe PNG-fájlként → FOTÓ-réteg a vásznon
   const commitBrush = () => {
@@ -1280,7 +810,7 @@ export function ImageStudioBody({
       const uri = brushRef.current.exportPng(canvas.width, canvas.height);
       if (brushMaskMode && brushLayerId) {
         if (uri) {
-          const mask: ClipMask = { shape: 'rectangle', x: 0.5, y: 0.5, w: 1, h: 1, feather: 0, image: uri };
+          const mask: ClipMask = fullCanvasImageMask(uri);
           commit(updateLayer<PhotoLayer>(doc, brushLayerId, { mask }), t('studio.image.undoMaskPaint'));
         } else {
           Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.maskPaintFail'));
@@ -1290,84 +820,12 @@ export function ImageStudioBody({
         commit({ ...doc, layers: doc.layers.map((l) => (l.id === brushLayerId ? { ...l, uri, paint: true } : l)) } as ImageDoc, t('studio.image.undoBrush'));
         setSelectedId(brushLayerId);
       } else if (uri) {
-        const l: PhotoLayer = {
-          kind: 'photo',
-          id: makeId('lyr'),
-          uri,
-          paint: true,
-          position: { x: 0.5, y: 0.5 },
-          w: 1,
-          h: 1,
-          fit: 'contain',
-        };
+        const l: PhotoLayer = paintedPhotoLayer(makeId('lyr'), uri);
         commit(addLayer(doc, l), t('studio.image.undoBrush'));
         setSelectedId(l.id);
       }
     }
     setBrushActive(false);
-  };
-
-  // ✂️ háttér ki: eszközön, ha lehet (ingyenes); különben a felhő-út. A maszk festett maszkként
-  // kerül a rétegre, így roncsolásmentes és ecsettel javítható.
-  const removeBackground = async (layer: PhotoLayer) => {
-    if (!doc || busy) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const { Skia } = await import('@shopify/react-native-skia');
-      const { projectMaskToCanvas } = await import('@/components/studio/image/projectMask');
-      const output = new File(projectMediaDir(), `fg_${Date.now().toString(36)}.png`).uri;
-      const local = await foregroundMask(layer.uri, output);
-      if (local.status === 'no-subject') {
-        Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.bgRemove.noSubject'));
-        return;
-      }
-      let maskUri: string | null = local.status === 'ok' ? local.uri : null;
-      if (local.status !== 'ok') {
-        if (!isPro) {
-          Alert.alert(t('studio.image.bgRemove.proTitle'), t('studio.image.bgRemove.proBody'));
-          return;
-        }
-        maskUri = (await requestCutout(layer.uri))?.uri ?? null;
-      }
-      const [photo, mask] = await Promise.all([Skia.Data.fromURI(layer.uri), maskUri ? Skia.Data.fromURI(maskUri) : null]);
-      const [photoImg, maskImg] = [Skia.Image.MakeImageFromEncoded(photo), mask ? Skia.Image.MakeImageFromEncoded(mask) : null];
-      const canvas = effectiveCanvas(doc);
-      const image = photoImg && maskImg ? projectMaskToCanvas(maskImg, layer, { width: photoImg.width(), height: photoImg.height() }, canvas, local.status !== 'ok') : null;
-      if (!image) {
-        Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.bgRemove.failBody'));
-        return;
-      }
-      const next: ClipMask = { shape: 'rectangle', x: 0.5, y: 0.5, w: 1, h: 1, feather: 0, image };
-      commit(updateLayer<PhotoLayer>(doc, layer.id, { mask: next }), t('studio.image.bgRemove.undo'));
-    } catch (caught) {
-      logCaught('components/studio/image/ImageStudioBody.tsx:removeBackground', caught);
-      Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.bgRemove.failBody'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // 🔷 vonalból forma és eltolt útvonal: az eredmény szerkeszthető összetett forma
-  const pathOperation = async (layer: ShapeLayer, op: 'outlineStroke' | 'offsetOut' | 'offsetIn') => {
-    if (!doc) {
-      return;
-    }
-    try {
-      const { offsetToResult, strokeToResult, withResult } = await import('@/components/studio/image/skiaVector');
-      const canvas = effectiveCanvas(doc);
-      const step = Math.round(canvas.width * 0.01) * (op === 'offsetIn' ? -1 : 1);
-      const result = op === 'outlineStroke' ? strokeToResult(layer, canvas) : offsetToResult(layer, canvas, step);
-      if (!result) {
-        Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.pen.outlineFail'));
-        return;
-      }
-      commit(updateLayer<ShapeLayer>(doc, layer.id, withResult(layer, result)), t(`studio.imageTools.${op}`));
-    } catch (caught) {
-      logCaught('components/studio/image/ImageStudioBody.tsx:pathOperation', caught);
-      Alert.alert(t('studio.image.wand.failTitle'), t('studio.image.pen.outlineFail'));
-    }
   };
 
   const updateGrid = (patch: Partial<ImageGrid>) => {
@@ -1451,22 +909,6 @@ export function ImageStudioBody({
   };
 
   // ✂️ kijelölés: eszköz választása; a többi mód bezárul, a meglévő kijelölés megmarad
-  const addSelectionRing = (ring: Point[]) => setSelection((sel) => applyRing(sel, ring, selectMode));
-  // 🎯 S17: a színtartomány gyűrűi — új kijelölésként pontosan (régió + lyuk + sziget); a meglévőhöz
-  // adva / kivonva / metszve a régiók körvonalaival (a lyukak ilyenkor nem számítanak)
-  const applyRangeRings = (rings: { op: 'add' | 'subtract'; points: Point[] }[]) =>
-    setSelection((sel) => {
-      const fresh = selectMode === 'new' || !sel;
-      let next: Selection | null = fresh ? null : sel;
-      rings.forEach((r, i) => {
-        if (fresh) {
-          next = applyRing(i === 0 ? null : next, r.points, i === 0 ? 'new' : r.op);
-        } else if (r.op === 'add') {
-          next = applyRing(next, r.points, selectMode);
-        }
-      });
-      return next;
-    });
   const openSelectTool = (tool: SelectTool) => {
     setSelectTool(tool);
     setLassoActive(tool === 'lasso');
@@ -1495,109 +937,28 @@ export function ImageStudioBody({
     setSelection(null);
     closeSelectTool();
   };
-  // a dev-akció (füstteszt) a kijelölést és a célt közvetlenül adja; a gombok az állapotot
-  const selectionState = selection;
-  const selectTargetIdState = selectTargetId;
-  const selectionAction = (action: SelectionAction, selection: Selection | null = selectionState, selectTargetId: string | null = selectTargetIdState) => {
-    if (!doc || !selection) {
-      return;
-    }
-    // 🔠 S17: szövegen / formán a képpont-művelet előtt a telefon fotóvá raszterizálja a réteget (egy
-    // visszavonási lépés a művelettel együtt) — a művelet utána ugyanaz, mint a fotón
-    const pixelOp = action === 'copy' || action === 'delete' || action === 'mask' || action === 'export';
-    if (pixelOp && selectTargetId && needsRasterForSelection(doc, selectTargetId)) {
-      if (busy) {
-        return;
-      }
-      const targetId = selectTargetId;
-      setBusy(true);
-      void (async () => {
-        try {
-          const rendered = await rasterize(rasterSubForSelection(doc, targetId), { format: 'png', height: effectiveCanvas(doc).height });
-          const uri = rendered ? keepRenderedInProject(rendered, `sel_${makeId('r')}`) : null;
-          if (!uri) {
-            Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.renderFailBody'));
-            return;
-          }
-          const fresh = useEditorStore.getState().project?.imageDocs?.find((d) => d.id === doc.id) ?? doc;
-          const rasterId = makeId('lyr');
-          setSelectTargetId(rasterId);
-          runSelectionAction(action, replaceWithSelectionRaster(fresh, targetId, uri, rasterId), rasterId, selection);
-        } catch (caught) {
-          logCaught('components/studio/image/ImageStudioBody.tsx:selectionRaster', caught);
-          Alert.alert(t('studio.image.renderFailTitle'), (caught as Error).message);
-        } finally {
-          setBusy(false);
-        }
-      })();
-      return;
-    }
-    runSelectionAction(action, doc, selectTargetId, selection);
-  };
-  const runSelectionAction = (action: SelectionAction, base: ImageDoc, targetId: string | null, selection: Selection) => {
-    if (action === 'export') {
-      void exportPart(targetId ? selectionOnlyDoc(base, selection, targetId) : null);
-      return;
-    }
-    const doc = base;
-    const selectTargetId = targetId;
-    const id = makeId('lyr');
-    let next: ImageDoc | null = null;
-    if (action === 'copy') {
-      next = copySelectionToLayer(doc, selectTargetId, selection, id);
-    } else if (action === 'delete') {
-      next = deleteSelection(doc, selectTargetId, selection);
-    } else if (action === 'mask') {
-      next = maskFromSelection(doc, selectTargetId, selection);
-    } else if (action === 'adjust') {
-      next = adjustSelection(doc, selection, id);
-    } else if (selection.ops.length === 1 && !selection.invert) {
-      const shape = pathShapeFromCanvasPoints(selection.ops[0].points, true, id);
-      next = shape ? addLayer(doc, shape) : null;
-    }
-    if (!next) {
-      Alert.alert(t('studio.image.select.failTitle'), t('studio.image.select.failBody'));
-      return;
-    }
-    commit(next, t('studio.image.select.undo'));
-    // a törlés után a kijelölés marad (mehet a következő lépés), a többi egy új réteget szerkeszt tovább
-    if (action !== 'delete') {
-      clearSelection();
-      setSelectedId(action === 'mask' ? selectTargetId : id);
-    }
-  };
-
-  // 🧲 S17: él-finomítás — a kijelölés a cél-fotó valódi éleire húzva (a kijelölés állapot, nem undo-lépés)
-  const refineSelection = () => {
-    if (!doc || !selection || busy) {
-      return;
-    }
-    const target = doc.layers.find((l) => l.id === selectTargetId);
-    if (target?.kind !== 'photo') {
-      Alert.alert(t('studio.image.select.failTitle'), t('studio.image.select.refineNeedsPhoto'));
-      return;
-    }
-    setBusy(true);
-    void (async () => {
-      try {
-        const { refineSelectionToEdges } = await import('@/lib/magicWandClient');
-        const canvas = effectiveCanvas(doc);
-        const boxAspect = (target.w * canvas.width) / (target.h * canvas.height);
-        const rings = selection.ops.map((o) => o.points.map((p) => canvasToLayerBox(p, target, canvas)));
-        const refined = await refineSelectionToEdges(target.uri, rings, { boxAspect, fit: target.fit });
-        if (!refined) {
-          Alert.alert(t('studio.image.select.failTitle'), t('studio.image.select.failBody'));
-          return;
-        }
-        const ops = selection.ops.map((o, i) => ({ ...o, points: refined[i].map((p) => layerBoxToCanvas(p, target, canvas)) }));
-        setSelection((sel) => (sel === selection ? { ...sel, ops } : sel));
-      } catch (caught) {
-        logCaught('components/studio/image/ImageStudioBody.tsx:refineSelection', caught);
-      } finally {
-        setBusy(false);
-      }
-    })();
-  };
+  const { onWandSeed, addSelectionRing, selectionAction, refineSelection, commitLasso } = useSelectionOps({
+    doc,
+    busy,
+    setBusy,
+    commit,
+    rasterize,
+    exportPart,
+    setSelectedId,
+    selection,
+    setSelection,
+    selectTool,
+    selectMode,
+    selectTargetId,
+    setSelectTargetId,
+    clearSelection,
+    wandTolerance,
+    wandContiguous,
+    setWandActive,
+    maskTarget,
+    setMaskTarget,
+    setLassoActive,
+  });
   useEffect(() => registerDevAction('image.selectionRefine', (arg) => {
     const a = arg as { ring: Point[]; targetId: string };
     setSelectTargetId(a.targetId);
@@ -1665,70 +1026,6 @@ export function ImageStudioBody({
     setSheet(null); // a panel bezárul, hogy a vászon látsszon a rajzoláshoz
   };
 
-  // 🪢 lasszó: a szabadkézi pontokból ZÁRT path-forma — VAGY (maszk-módban) a kijelölt réteg maszkja
-  const commitLasso = (points: CanvasPoint[]) => {
-    if (selectTool === 'lasso') {
-      addSelectionRing(points);
-      return;
-    }
-    if (doc && points.length >= 3 && maskTarget) {
-      // 🎭 szelekció → maszk (poligon): a vászon-normalizált pontok + bbox
-      const xs = points.map((p) => p.x);
-      const ys = points.map((p) => p.y);
-      const minX = Math.min(...xs);
-      const maxX = Math.max(...xs);
-      const minY = Math.min(...ys);
-      const maxY = Math.max(...ys);
-      if (maskTarget.target === 'heal') {
-        // 🩹 folt-javítás: a lasszó bbox-át a FOTÓ dobozába transzformáljuk (0–1 box-lokális) → heal-régió
-        const cur = doc.layers.find((l) => l.id === maskTarget.id);
-        if (cur && cur.kind === 'photo') {
-          // I18: a réteg forgatása/tükrözése is számít — a heal a réteg saját terében fut
-          const region = healRegionFromPoints(points, cur, effectiveCanvas(doc));
-          commit(
-            updateLayer<PhotoLayer>(doc, maskTarget.id, { heal: [...(cur.heal ?? []), region] }),
-            t('studio.image.undoHeal', { defaultValue: 'Folt-javítás' })
-          );
-        }
-        setMaskTarget(null);
-        setLassoActive(false);
-        return;
-      }
-      const mask: ClipMask = {
-        shape: 'polygon',
-        points: points.map((p) => ({ x: p.x, y: p.y })),
-        x: (minX + maxX) / 2,
-        y: (minY + maxY) / 2,
-        w: Math.max(0.02, maxX - minX),
-        h: Math.max(0.02, maxY - minY),
-        feather: 0.02,
-      };
-      if (maskTarget.target === 'local') {
-        // a meglévő lokális grade/adjust megmarad, csak a maszk cserélődik
-        const cur = doc.layers.find((l) => l.id === maskTarget.id);
-        const prev = cur && 'localAdjust' in cur ? (cur as PhotoLayer).localAdjust : undefined;
-        commit(
-          updateLayer(doc, maskTarget.id, { localAdjust: { ...prev, mask } } as Partial<ImageLayer>),
-          t('studio.image.undoMask', { defaultValue: 'Maszk' })
-        );
-      } else {
-        commit(updateLayer(doc, maskTarget.id, { mask } as Partial<ImageLayer>), t('studio.image.undoMask', { defaultValue: 'Maszk' }));
-      }
-      setMaskTarget(null);
-      setLassoActive(false);
-      return;
-    }
-    if (doc && points.length >= 3) {
-      const shape = pathShapeFromCanvasPoints(points, true, makeId('lyr'));
-      if (shape) {
-        commit(addLayer(doc, shape), t('studio.image.undoLasso'));
-        setSelectedId(shape.id);
-      }
-    }
-    setMaskTarget(null);
-    setLassoActive(false);
-  };
-
   // ✏️ v3: a KIJELÖLT node típusa (görbe/sarok) — bezier-fogók létrehozása/törlése
   const pe = pathEditId && doc ? doc.layers.find((l) => l.id === pathEditId) ?? null : null;
   const rawPathShape = pe && pe.kind === 'shape' && pe.shape === 'path' ? pe : null;
@@ -1767,424 +1064,7 @@ export function ImageStudioBody({
     }
   };
 
-  /** ✅ minőségkapu: a kész fájlt visszaolvassuk, a hibát a felhasználó is látja */
-  /** 📊 CSWCR (CORE K4): a Kép Stúdió exportja befejezi a láncot (export / poszt / csomag) */
-  const markExported = () => {
-    if (project) logCswcr({ type: 'export', projectId: project.id, kind: studioKindOf(project.kind) });
-  };
-  const reportProblems = async (uri: string, target: ImageDoc, height: number, format: 'png' | 'jpg' | 'webp') => {
-    markExported();
-    const { verifyExport } = await import('@/components/studio/image/exportVerify');
-    const problems = await verifyExport(uri, { ...customExportSize(target, height), format, wantsAlpha: expectsAlpha(target, format) });
-    if (problems.length > 0) {
-      logCaught('components/studio/image/ImageStudioBody.tsx:quality', new Error(`export minőségkapu: ${problems.join(',')}`));
-      Alert.alert(t('studio.image.export.problemTitle'), problems.map((p) => t(`studio.image.export.problem.${p}`)).join('\n'));
-    }
-    return problems;
-  };
-
-  /** Egy réteg vagy kijelölés önálló képként, átlátszó háttéren. */
-  const exportPart = async (part: ImageDoc | null) => {
-    if (!doc || !part || busy) {
-      return;
-    }
-    setBusy(true);
-    exportAbort.current = new AbortController();
-    setExporting(true);
-    try {
-      const height = effectiveCanvas(doc).height;
-      const uri = await rasterize(part, { format: 'png', height, signal: exportAbort.current.signal });
-      if (!uri) {
-        alertRenderFail();
-        return;
-      }
-      await reportProblems(uri, part, height, 'png');
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri);
-      }
-    } catch (caught) {
-      if (!(caught instanceof ExportCancelled)) {
-        logCaught('components/studio/image/ImageStudioBody.tsx:exportPart', caught);
-        alertRenderFail();
-      }
-    } finally {
-      exportAbort.current = null;
-      setExporting(false);
-      setBusy(false);
-    }
-  };
-
-  /** Méretcsomag: ugyanaz a kép több méretben a Fotókba. */
-  const exportPack = async (opts: { format: 'png' | 'jpg' | 'webp'; quality: number }) => {
-    if (!doc || busy) {
-      return;
-    }
-    setBusy(true);
-    exportAbort.current = new AbortController();
-    setExporting(true);
-    try {
-      let saved = 0;
-      for (const scale of EXPORT_PACK_SCALES) {
-        const { height } = exportSize(doc, scale);
-        const uri = await rasterize(doc, { ...opts, height, signal: exportAbort.current.signal });
-        if (!uri) {
-          alertRenderFail();
-          return;
-        }
-        await reportProblems(uri, doc, height, opts.format);
-        const res = await saveImageToPhotos(uri);
-        if (res !== 'saved') {
-          Alert.alert(t('studio.image.wand.failTitle'), t(res === 'denied' ? 'studio.image.export.saveDenied' : 'studio.image.export.saveFailed'));
-          return;
-        }
-        saved += 1;
-      }
-      Alert.alert(t('studio.image.export.savedTitle'), t('studio.image.export.packDone', { count: saved }));
-    } catch (caught) {
-      if (!(caught instanceof ExportCancelled)) {
-        logCaught('components/studio/image/ImageStudioBody.tsx:exportPack', caught);
-        alertRenderFail();
-      }
-    } finally {
-      exportAbort.current = null;
-      setExporting(false);
-      setBusy(false);
-    }
-  };
-
-  const exportImage = async (opts?: { format?: 'png' | 'jpg' | 'webp'; height?: number; quality?: number; target?: 'share' | 'photos' }) => {
-    if (!doc || busy) {
-      return;
-    }
-    setBusy(true);
-    exportAbort.current = new AbortController();
-    setExporting(true);
-    try {
-      const uri = await rasterize(doc, { ...opts, signal: exportAbort.current.signal });
-      if (!uri) {
-        alertRenderFail();
-        return;
-      }
-      commitRendered(doc.id, uri);
-      await reportProblems(uri, doc, opts?.height ?? effectiveCanvas(doc).height, opts?.format ?? 'png');
-      if (opts?.target === 'photos') {
-        const saved = await saveImageToPhotos(uri);
-        if (saved === 'saved') {
-          Alert.alert(t('studio.image.export.savedTitle'), t('studio.image.export.savedBody'));
-        } else {
-          Alert.alert(t('studio.image.wand.failTitle'), t(saved === 'denied' ? 'studio.image.export.saveDenied' : 'studio.image.export.saveFailed'));
-        }
-        return;
-      }
-      const canShare = await Sharing.isAvailableAsync().catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportImage', caught); return false; });
-      if (canShare) {
-        await Sharing.shareAsync(uri).catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportImage', caught); });
-      } else {
-        Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
-      }
-    } catch (caught) {
-      // a felhasználó leállította: nincs hibaablak
-      if (!(caught instanceof ExportCancelled)) {
-        logCaught('components/studio/image/ImageStudioBody.tsx:exportImage', caught);
-        alertRenderFail();
-      }
-    } finally {
-      exportAbort.current = null;
-      setExporting(false);
-      setBusy(false);
-    }
-  };
-
-  /**
-   * 🧩 ÖNÁLLÓ SVG a dokumentumból ([svgExport](@/lib/svgExport)): a fotó-rétegeket
-   * base64 data-URI-ba ágyazzuk, hogy a kimenet önmagában megálljon (SVG + PDF közös).
-   */
-  const buildExportSvg = (d: ImageDoc): string => {
-    const embedded = {
-      ...d,
-      layers: d.layers.map((l) => {
-        if (l.kind === 'photo' && typeof l.uri === 'string' && l.uri.startsWith('file://')) {
-          try {
-            const src = new File(l.uri);
-            if (src.exists) {
-              const ext = (l.uri.split('.').pop() ?? 'jpg').toLowerCase();
-              const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-              return { ...l, uri: `data:${mime};base64,${src.base64()}` };
-            }
-          } catch (caught) {
-            logCaught('components/studio/image/ImageStudioBody.tsx:buildExportSvg', caught);
-            // nem olvasható fotó → marad a hivatkozás (nem self-contained)
-          }
-        }
-        return l;
-      }),
-    };
-    return imageDocToSvg(embedded);
-  };
-
-  /**
-   * 🧩 VEKTOR-export: a dokumentum SVG-ként, hogy a formák/szöveg/gradiensek
-   * vektorként maradjanak (nem raszter-PNG-be égetve) → ÖNÁLLÓ, megosztható .svg.
-   */
-  const exportSvg = async () => {
-    if (!doc || busy) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const svg = buildExportSvg(doc);
-      const dir = new Directory(Paths.cache, 'export');
-      if (!dir.exists) {
-        dir.create();
-      }
-      const safe = (doc.name || 'image').replace(/[^\w.-]+/g, '_');
-      const file = new File(dir, `${safe}.svg`);
-      try {
-        if (file.exists) {
-          file.delete();
-        }
-      } catch (caught) {
-        logCaught('components/studio/image/ImageStudioBody.tsx:exportSvg', caught);
-        // a write úgyis felülírja
-      }
-      file.write(svg);
-      markExported();
-      const canShare = await Sharing.isAvailableAsync().catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportSvg', caught); return false; });
-      if (canShare) {
-        await Sharing.shareAsync(file.uri, { mimeType: 'image/svg+xml', dialogTitle: t('studio.export') }).catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportSvg', caught); });
-      } else {
-        Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  /**
-   * 📄 VEKTOR-PDF export: ugyanaz az önálló SVG → a worker Chromiumja nyomdakész
-   * PDF-be nyomtatja (`renderSvgPdf` → `/svg/pdf`). A lap pontosan a vászon mérete.
-   */
-  // 📄 S14: PDF a TELEFONON — a kész kép (JPEG, doc-felbontáson) egy PDF-oldalon: offline, Free-ben is,
-  // pixelre a vászon, a betűk beégetve. A vektoros PDF a szerveres út (`exportVectorPdf`).
-  const exportPdf = async () => {
-    if (!doc || busy) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const height = Math.min(4096, effectiveCanvas(doc).height);
-      const jpg = await rasterize(doc, { format: 'jpg', quality: 0.92, height });
-      if (!jpg) {
-        alertRenderFail();
-        return;
-      }
-      const pdf = jpegToPdf(await new File(jpg).bytes(), { title: doc.name || project?.name || 'ReMix' });
-      const dir = new Directory(Paths.cache, 'export');
-      if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
-      const out = new File(dir, `${(doc.name || 'image').replace(/[^\p{L}\p{N}_-]+/gu, '_')}.pdf`);
-      if (out.exists) out.delete();
-      out.write(pdf);
-      markExported();
-      const canShare = await Sharing.isAvailableAsync().catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPdf', caught); return false; });
-      if (canShare) {
-        await Sharing.shareAsync(out.uri, { mimeType: 'application/pdf', dialogTitle: t('studio.export') }).catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPdf', caught); });
-      } else {
-        Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
-      }
-    } catch (caught) {
-      logCaught('components/studio/image/ImageStudioBody.tsx:exportPdf', caught);
-      alertRenderFail();
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const exportVectorPdf = async () => {
-    if (!doc || busy) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const svg = buildExportSvg(doc);
-      const { width, height } = svgDocSize(doc);
-      const uri = await renderSvgPdf(svg, width, height);
-      if (!uri) {
-        Alert.alert(t('studio.image.renderFailTitle'), t('studio.image.renderFailBody'));
-        return;
-      }
-      markExported();
-      const canShare = await Sharing.isAvailableAsync().catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPdf', caught); return false; });
-      if (canShare) {
-        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: t('studio.export') }).catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPdf', caught); });
-      } else {
-        Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  /**
-   * 🖼️ PSD-export (IMAGE 01.2): a réteg-fát a workerrel RÉTEG-MEGŐRZÉSSEL (NEM
-   * flatten!) .psd-vé építjük (`exportPsd` → `/psd/export`), és megosztjuk. Pro-
-   * gated: free usernél az ExportSheet gombja letiltva (`canPsd`), de ha ide jutunk,
-   * a `guardPro` elkapja a `ProRequiredError`-t és felhozza a paywallt.
-   */
-  const exportPsdFile = async () => {
-    if (!doc || busy) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const uri = await guardPro(
-        () => exportPsd(doc, project?.id),
-        (e) => Alert.alert(t('studio.image.psdExportFailTitle'), e.message || t('studio.image.psdExportFailBody'))
-      );
-      if (!uri) {
-        return; // lemondás / Pro-paywall / hiba (a guardPro már jelzett)
-      }
-      markExported();
-      const canShare = await Sharing.isAvailableAsync().catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPsdFile', caught); return false; });
-      if (canShare) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'image/vnd.adobe.photoshop',
-          dialogTitle: t('studio.export'),
-        }).catch((caught) => { logCaught('components/studio/image/ImageStudioBody.tsx:exportPsdFile', caught); });
-      } else {
-        Alert.alert(t('studio.image.exportedTitle'), t('studio.image.exportedBody'));
-      }
-    } catch (e) {
-      logCaught('components/studio/image/ImageStudioBody.tsx:exportPsdFile', e);
-      Alert.alert(t('studio.image.psdExportFailTitle'), (e as Error)?.message || t('studio.image.psdExportFailBody'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // 🖼️→🎬 CORE K2 (IMAGE-PROD C2): a lap HIVATKOZÁSKÉNT egy új vagy meglévő videó-projektbe. A kép a
-  // telefonon készül, a klip a rétegeket is hordozza; a lap későbbi módosítása a videóban
-  // „Frissítés elérhető” → egy koppintás, egy visszavonás.
-  const sendToVideo = async (target: Awaited<ReturnType<typeof loadProject>>) => {
-    if (!doc || !project || busy) {
-      return;
-    }
-    setBusy(true);
-    try {
-      // előbb a kép-projekt mentése: a hivatkozás verziója a TÁROLT laphoz igazodjon
-      await flushProjectSave();
-      const fresh = useEditorStore.getState().project?.imageDocs?.find((d) => d.id === doc.id) ?? doc;
-      const uri = await rasterize(fresh);
-      if (!uri) {
-        alertRenderFail();
-        return;
-      }
-      const vid = await sendStillToVideo(project, fresh, uri, target, { newName: t('studio.image.videoName', { name: project.name }) });
-      router.replace(`/editor/${vid.id}`);
-    } catch (caught) {
-      logCaught('components/studio/image/ImageStudioBody.tsx:sendToVideo', caught);
-      Alert.alert(t('studio.image.toVideo.title'), (caught as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const pickVideoProject = async () => {
-    const metas = (await listProjects()).filter((m) => (m.kind ?? 'video') === 'video' && m.id !== project?.id).slice(0, 8);
-    if (metas.length === 0) {
-      Alert.alert(t('studio.image.toVideo.title'), t('studio.image.toVideo.noVideos'));
-      return;
-    }
-    useActionMenu.getState().open(
-      t('studio.image.toVideo.pickTitle'),
-      metas.map((m) => ({
-        label: m.name,
-        icon: 'videocam-outline',
-        onPress: () => {
-          void loadProject(m.id).then((p) => (p ? sendToVideo(p) : undefined));
-        },
-      }))
-    );
-  };
-  const insertIntoVideo = () => {
-    useActionMenu.getState().open(t('studio.image.toVideo.title'), [
-      { label: t('studio.image.toVideo.newLinked'), icon: 'link-outline', onPress: () => void sendToVideo(null) },
-      { label: t('studio.image.toVideo.existing'), icon: 'film-outline', onPress: () => void pickVideoProject() },
-    ]);
-  };
-
-  /**
-   * 🖼️➡️📲 A galéria megosztása a FEEDBE — diavetítés (videó) vagy lapozható (carousel).
-   * Előbb MINDEN lapot rasterizálunk (renderelt PNG), majd a `publishImageProject` a megfelelő
-   * poszttá alakítja. (Felhő-funkció: a render/feltöltés a workert/tárat igényli — a free a
-   * telefonon marad; a hiba barátságosan jelenik meg.)
-   */
-  // I43: a megosztás nem azonnal nyilvános — a user választ láthatóságot
-  const confirmShare = (shareMode: ImageShareMode) => {
-    Alert.alert(t('studio.image.shareFeed.confirmTitle'), t('studio.image.shareFeed.confirmBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('studio.image.shareFeed.followers'), onPress: () => void shareToFeed(shareMode, 'followers') },
-      { text: t('studio.image.shareFeed.public'), onPress: () => void shareToFeed(shareMode, 'public') },
-    ]);
-  };
-
-  const shareToFeed = async (shareMode: ImageShareMode, visibility: PostVisibility) => {
-    const s = useEditorStore.getState();
-    if (!s.project || busy) {
-      return;
-    }
-    // 📣 S22: a SEO a megosztáskor kell (létrehozáskor elhagyható volt) — hiányzik → bekéri
-    if (!(await useSeoGate.getState().ensureSeo(s.project))) {
-      return;
-    }
-    setBusy(true);
-    try {
-      for (const p of pages) {
-        // I41: a szerkesztés után elavult képet nem osztjuk meg
-        if (!isRenderFresh(p)) {
-          const uri = await rasterize(p);
-          if (!uri) {
-            // I12: inkább nem osztunk meg semmit, mint rossz lapot
-            alertRenderFail();
-            return;
-          }
-          commitRendered(p.id, uri);
-        }
-      }
-      const fresh = useEditorStore.getState().project;
-      if (!fresh) {
-        return;
-      }
-      await publishImageProject(fresh, shareMode, { visibility });
-      Alert.alert(
-        t('studio.image.shareFeed.doneTitle', { defaultValue: 'Megosztva' }),
-        t('studio.image.shareFeed.doneBody', { defaultValue: 'A poszt felkerült a feedbe.' })
-      );
-    } catch (e) {
-      logCaught('components/studio/image/ImageStudioBody.tsx:shareToFeed', e);
-      Alert.alert(t('common.error'), (e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const openExportMenu = () => setSheet('export');
-
-  const saveScoped = async () => {
-    if (!doc || busy) {
-      onExit();
-      return;
-    }
-    if (!onSave) {
-      onExit();
-      return;
-    }
-    setBusy(true);
-    try {
-      const uri = await rasterize(doc);
-      await onSave(doc, uri);
-    } finally {
-      setBusy(false);
-    }
-  };
 
   // I42: a videóból nyitott szerkesztő X-e sem hagyhatja a klipet a régi képen
   const exitStudio = () => {
@@ -2246,140 +1126,35 @@ export function ImageStudioBody({
       <RenderStage ref={renderStageRef} />
       <NewerSchemaBanner />
       {/* felső sáv */}
-      <View style={[styles.topBar, precisionMode ? styles.hidden : null]}>
-        <Pressable accessibilityRole="button" accessibilityLabel={t(mode === 'scoped' ? 'common.close' : 'common.back')} onPress={exitStudio} hitSlop={10} style={styles.topBtn}>
-          <Ionicons name={mode === 'scoped' ? 'close' : 'chevron-back'} size={26} color={palette.text} />
-        </Pressable>
-        <View style={styles.titleWrap}>
-          {/* 🎨 munkaterület-váltó (IMAGE-PROD S8): Kép ↔ Design — ugyanaz a dokumentum, más szerszám-sorrend */}
-          <Pressable
-            style={styles.kindTag}
-            onPress={() => setWorkspaceTab((w) => (w === 'design' ? 'image' : 'design'))}
-            hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel={`${t('studio.image.workspace.label')}: ${t(`studio.image.workspace.${workspaceTab}`)}`}
-            testID="image-workspace-toggle"
-          >
-            <Ionicons name={workspaceTab === 'design' ? 'color-palette' : 'image'} size={12} color={palette.accent} />
-            <Text maxFontSizeMultiplier={1.3} style={styles.kindTagText}>{t(`studio.image.workspace.${workspaceTab}`)}</Text>
-            <Ionicons name="swap-horizontal" size={11} color={palette.textDim} />
-          </Pressable>
-          <Text maxFontSizeMultiplier={1.3} style={styles.title} numberOfLines={1}>
-            {title}
-          </Text>
-        </View>
-        {doc ? (
-          <Pressable
-            onPress={() => setSheet('history')}
-            hitSlop={8}
-            style={styles.canvasBtn}
-            accessibilityRole="button"
-            accessibilityLabel={t('studio.image.historyTitle', { defaultValue: 'Előzmények' })}
-          >
-            <Ionicons name="time-outline" size={15} color={palette.textDim} />
-          </Pressable>
-        ) : null}
-        {doc ? (
-          <Pressable
-            onPress={() => setSheet('canvas')}
-            hitSlop={8}
-            style={styles.canvasBtn}
-            accessibilityRole="button"
-            accessibilityLabel={t('studio.image.canvasTitle')}
-          >
-            <Ionicons name="resize-outline" size={14} color={palette.textDim} />
-            <Text maxFontSizeMultiplier={1.3} style={styles.canvasBtnText}>
-              {effectiveCanvas(doc).width}×{effectiveCanvas(doc).height}
-              {doc.format === 'vector' ? ' · SVG' : ''}
-            </Text>
-          </Pressable>
-        ) : null}
-        <Pressable
-          onPress={mode === 'scoped' ? saveScoped : openExportMenu}
-          hitSlop={10}
-          style={styles.exportBtn}
-          disabled={busy}
-        >
-          {busy ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Ionicons name={mode === 'scoped' ? 'checkmark' : 'share-outline'} size={16} color="#fff" />
-          )}
-          <Text maxFontSizeMultiplier={1.3} style={styles.exportText}>
-            {mode === 'scoped' ? t('common.done') : t('studio.export')}
-          </Text>
-        </Pressable>
-      </View>
+      <StudioTopBar
+        mode={mode}
+        title={title}
+        doc={doc}
+        workspaceTab={workspaceTab}
+        busy={busy}
+        hidden={precisionMode}
+        onExit={exitStudio}
+        onToggleWorkspace={() => setWorkspaceTab((w) => (w === 'design' ? 'image' : 'design'))}
+        onHistory={() => setSheet('history')}
+        onCanvas={() => setSheet('canvas')}
+        onPrimary={mode === 'scoped' ? saveScoped : openExportMenu}
+      />
 
       {/* 🖼️📄 galéria lap-strip (project mód): több kép → diavetítés/lapozható megosztás */}
       {mode === 'project' && pages.length > 0 && !precisionMode ? (
-        <View style={styles.pageStrip}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.pageStripContent}
-          >
-            {pages.map((p, i) => {
-              const active = p.id === doc?.id;
-              return (
-                <Pressable
-                  key={p.id}
-                  onPress={() => {
-                    setActivePageId(p.id);
-                    setSelectedId(null);
-                  }}
-                  style={[styles.pageChip, active && styles.pageChipActive]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${p.name} (${i + 1})`}
-                >
-                  {p.thumbUri ?? p.renderedUri ? (
-                    <Image source={{ uri: p.thumbUri ?? p.renderedUri }} style={styles.pageThumb} resizeMode="cover" />
-                  ) : (
-                    <View style={styles.pageThumbEmpty}>
-                      <Ionicons name="image-outline" size={16} color={palette.textDim} />
-                    </View>
-                  )}
-                  <Text maxFontSizeMultiplier={1.3} style={styles.pageChipNum}>{i + 1}</Text>
-                </Pressable>
-              );
-            })}
-            <Pressable onPress={addPage} style={styles.pageAdd} accessibilityRole="button" accessibilityLabel={t('common.add')}>
-              <Ionicons name="add" size={22} color={palette.accent} />
-            </Pressable>
-          </ScrollView>
-          <View style={styles.pageActions}>
-            <Pressable accessibilityRole="button" accessibilityLabel={t('studio.image.a11y.pagePrev')} onPress={() => movePage(-1)} disabled={activeIdx <= 0} hitSlop={6} style={styles.pageActionBtn}>
-              <Ionicons name="chevron-back" size={16} color={activeIdx <= 0 ? palette.border : palette.textDim} />
-            </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={t('studio.image.a11y.pageNext')}
-              onPress={() => movePage(1)}
-              disabled={activeIdx < 0 || activeIdx >= pages.length - 1}
-              hitSlop={6}
-              style={styles.pageActionBtn}
-            >
-              <Ionicons
-                name="chevron-forward"
-                size={16}
-                color={activeIdx < 0 || activeIdx >= pages.length - 1 ? palette.border : palette.textDim}
-              />
-            </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={t('studio.image.a11y.pageDuplicate')} onPress={duplicateActivePage} hitSlop={6} style={styles.pageActionBtn}>
-              <Ionicons name="copy-outline" size={15} color={palette.textDim} />
-            </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={t('studio.image.a11y.pageDelete')}
-              onPress={deleteActivePage}
-              disabled={!canRemovePage({ imageDocs: pages })}
-              hitSlop={6}
-              style={styles.pageActionBtn}
-            >
-              <Ionicons
-                name="trash-outline"
-                size={15}
-                color={canRemovePage({ imageDocs: pages }) ? palette.textDim : palette.border}
-              />
-            </Pressable>
-          </View>
-        </View>
+        <PageStrip
+          pages={pages}
+          activeId={doc?.id}
+          activeIdx={activeIdx}
+          onSelect={(id) => {
+            setActivePageId(id);
+            setSelectedId(null);
+          }}
+          onAdd={addPage}
+          onMove={movePage}
+          onDuplicate={duplicateActivePage}
+          onDelete={deleteActivePage}
+        />
       ) : null}
 
       {/* 📐 munkaterület: vászon + mód-sávok + inline lap — a mért magasság a detentek alapja */}
@@ -2463,190 +1238,69 @@ export function ImageStudioBody({
           ) : null}
           </View>
 
-          {exporting ? (
-            <View style={styles.statusRow}>
-              <ActivityIndicator size="small" color={palette.accent} />
-              <Text maxFontSizeMultiplier={1.3} style={styles.statusText} numberOfLines={1}>
-                {t('studio.image.export.exporting')}
-              </Text>
-              <Pressable onPress={() => exportAbort.current?.abort()} hitSlop={8} accessibilityRole="button">
-                <Text maxFontSizeMultiplier={1.3} style={styles.selectLink}>{t('studio.image.export.cancel')}</Text>
-              </Pressable>
-            </View>
-          ) : null}
+          {exporting ? <ExportingRow onCancel={() => exportAbort.current?.abort()} /> : null}
 
           {selection && !selectTool ? (
             /* ✂️ a kijelölés a többi eszköz alatt is él: innen szerkeszthető vagy szüntethető meg */
-            <View style={styles.statusRow}>
-              <Ionicons name="scan-outline" size={12} color={palette.accent} />
-              <Text maxFontSizeMultiplier={1.3} style={styles.statusText} numberOfLines={1}>
-                {t('studio.image.select.active')}
-              </Text>
-              <Pressable onPress={() => startSelect('rect')} hitSlop={6} accessibilityRole="button">
-                <Text maxFontSizeMultiplier={1.3} style={styles.selectLink}>{t('studio.image.select.edit')}</Text>
-              </Pressable>
-              <Pressable onPress={clearSelection} hitSlop={6} accessibilityRole="button">
-                <Text maxFontSizeMultiplier={1.3} style={styles.selectLink}>{t('studio.image.select.clear')}</Text>
-              </Pressable>
-            </View>
+            <ActiveSelectionRow onEdit={() => startSelect('rect')} onClear={clearSelection} />
           ) : null}
 
           {/* kijelölés-jelző */}
-          <View style={styles.statusRow}>
-            <Ionicons
-              name={selectedLayer ? 'ellipse' : 'ellipse-outline'}
-              size={9}
-              color={selectedLayer ? palette.accent : palette.textDim}
-            />
-            <Text maxFontSizeMultiplier={1.3} style={styles.statusText} numberOfLines={2}>
-              {guidesActive
-                ? t('studio.image.guides.hint')
-                : brushActive
-                ? brush.tool
-                  ? t(needSource ? 'studio.image.retouch.pickHint' : 'studio.image.retouch.hint')
-                  : t('studio.image.brush.hint')
-                : selectTool === 'rect' || selectTool === 'ellipse'
-                ? t('studio.image.select.hint')
-                : wandActive
-                ? t('studio.image.wand.hint')
-                : lassoActive
-                ? t('studio.image.lasso.hint')
-                : pathEditId
-                  ? t('studio.image.pen.editHint')
-                  : penPoints
-                    ? t('studio.image.pen.hint')
-                    : cropRect
-                      ? t('studio.image.crop.hint')
-                      : selectedLayer
-                        ? t('studio.image.selected', { name: layerLabel(selectedLayer) })
-                        : t('studio.image.tapToSelect')}
-            </Text>
-            {/* ↩️ mindig kézre esik, a precíziós módokban is */}
-            <Pressable style={styles.historyBtn} onPress={undo} disabled={!canUndo} accessibilityRole="button" accessibilityLabel={t('studio.image.undo')} accessibilityState={{ disabled: !canUndo }}>
-              <Ionicons name="arrow-undo" size={20} color={canUndo ? palette.text : palette.border} />
-            </Pressable>
-            <Pressable style={styles.historyBtn} onPress={redo} disabled={!canRedo} accessibilityRole="button" accessibilityLabel={t('studio.image.redo')} accessibilityState={{ disabled: !canRedo }}>
-              <Ionicons name="arrow-redo" size={20} color={canRedo ? palette.text : palette.border} />
-            </Pressable>
-          </View>
+          <StatusHintRow
+            selectedLayer={selectedLayer}
+            guidesActive={guidesActive}
+            brushActive={brushActive}
+            retouch={!!brush.tool}
+            needSource={needSource}
+            selectTool={selectTool}
+            wandActive={wandActive}
+            lassoActive={lassoActive}
+            pathEditing={!!pathEditId}
+            penDrawing={!!penPoints}
+            cropping={!!cropRect}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onUndo={undo}
+            onRedo={redo}
+          />
 
           {/* ✂️ kivágás-sáv (crop-módban a toolbar HELYETT) */}
           {cropRect ? (
-            <View style={styles.cropBar}>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('common.cancel')} onPress={() => setCropRect(null)} style={styles.cropBtn} hitSlop={6}>
-                <Ionicons name="close" size={20} color={palette.text} />
-              </Pressable>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cropPresets}>
-                {CROP_PRESETS.map((p) => (
-                  <Chip
-                    key={p.labelKey ?? p.label}
-                    label={p.labelKey ? t(p.labelKey) : p.label}
-                    active={cropPreset === p.ratio}
-                    onPress={() => {
-                      setCropPreset(p.ratio);
-                      if (doc) {
-                        setCropRect(aspectCropRect(doc, p.ratio));
-                      }
-                    }}
-                  />
-                ))}
-              </ScrollView>
-              <Pressable onPress={applyCrop} style={styles.cropApply} hitSlop={6}>
-                <Ionicons name="checkmark" size={16} color="#fff" />
-                <Text maxFontSizeMultiplier={1.3} style={styles.cropApplyText}>{t('common.apply')}</Text>
-              </Pressable>
-            </View>
+            <CropBar
+              cropPreset={cropPreset}
+              onPreset={(ratio) => {
+                setCropPreset(ratio);
+                if (doc) {
+                  setCropRect(aspectCropRect(doc, ratio));
+                }
+              }}
+              onCancel={() => setCropRect(null)}
+              onApply={applyCrop}
+            />
           ) : penPoints ? (
-            /* ✏️ toll-sáv (toll-módban a toolbar HELYETT) */
-            <View style={styles.cropBar}>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('common.cancel')} onPress={() => setPenPoints(null)} style={styles.cropBtn} hitSlop={6}>
-                <Ionicons name="close" size={20} color={palette.text} />
-              </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('studio.image.a11y.penUndoPoint')}
-                onPress={() => setPenPoints((prev) => (prev && prev.length ? prev.slice(0, -1) : prev))}
-                style={styles.cropBtn}
-                hitSlop={6}
-                disabled={!penPoints.length}
-              >
-                <Ionicons
-                  name="arrow-undo-outline"
-                  size={18}
-                  color={penPoints.length ? palette.text : palette.border}
-                />
-              </Pressable>
-              <View style={{ flex: 1 }} />
-              <Pressable
-                onPress={() => commitPen(true)}
-                style={[styles.penClose, penPoints.length < 3 ? styles.penDisabled : null]}
-                hitSlop={6}
-                disabled={penPoints.length < 3}
-              >
-                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.pen.close')}</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => commitPen(false)}
-                style={[styles.cropApply, penPoints.length < 2 ? styles.penDisabled : null]}
-                hitSlop={6}
-                disabled={penPoints.length < 2}
-              >
-                <Ionicons name="checkmark" size={16} color="#fff" />
-                <Text maxFontSizeMultiplier={1.3} style={styles.cropApplyText}>{t('common.done')}</Text>
-              </Pressable>
-            </View>
+            <PenBar
+              pointCount={penPoints.length}
+              onCancel={() => setPenPoints(null)}
+              onUndoPoint={() => setPenPoints((prev) => (prev && prev.length ? prev.slice(0, -1) : prev))}
+              onClosePath={() => commitPen(true)}
+              onDone={() => commitPen(false)}
+            />
           ) : pathEditId ? (
-            /* ✏️ node-szerkesztő sáv (toll v2/v3 — a toolbar HELYETT) */
-            <View style={styles.cropBar}>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('common.close')} onPress={() => setPathEditId(null)} style={styles.cropBtn} hitSlop={6}>
-                <Ionicons name="close" size={20} color={palette.text} />
-              </Pressable>
-              <View style={{ flex: 1 }} />
-              {/* ✏️ v4: a kijelölt node törlése */}
-              <Pressable accessibilityRole="button" accessibilityLabel={t('studio.image.a11y.deleteNode')}
-                onPress={deleteNode}
-                style={[styles.cropBtn, pathEditNode == null ? styles.penDisabled : null]}
-                hitSlop={6}
-                disabled={pathEditNode == null}
-              >
-                <Ionicons name="trash-outline" size={18} color={palette.danger} />
-              </Pressable>
-              {/* ✏️ a kijelölt node típusa, az útvonal iránya és nyitása */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.brushScroll}>
-                {(['smooth', 'mirrored', 'broken', 'corner'] as const).map((type) => (
-                  <Pressable
-                    key={type}
-                    onPress={() => setNodeKind(type)}
-                    style={[styles.penClose, pathEditNode == null ? styles.penDisabled : null]}
-                    hitSlop={6}
-                    disabled={pathEditNode == null}
-                  >
-                    <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t(`studio.image.pen.${type}`)}</Text>
-                  </Pressable>
-                ))}
-                {ringCount > 1 ? (
-                  <Pressable
-                    onPress={() => {
-                      setPathEditRing((r) => (r + 1) % ringCount);
-                      setPathEditNode(null);
-                    }}
-                    style={styles.penClose}
-                    hitSlop={6}
-                  >
-                    <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.pen.ring', { n: (pathEditRing % ringCount) + 1, total: ringCount })}</Text>
-                  </Pressable>
-                ) : ringCount === 0 ? (
-                  <Pressable onPress={togglePathClosed} style={styles.penClose} hitSlop={6}>
-                    <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t(pathEditShape?.closed ? 'studio.image.pen.open' : 'studio.image.pen.closePath')}</Text>
-                  </Pressable>
-                ) : null}
-                <Pressable onPress={reverseEditedPath} style={styles.penClose} hitSlop={6}>
-                  <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.pen.reverse')}</Text>
-                </Pressable>
-              </ScrollView>
-              <Pressable onPress={() => setPathEditId(null)} style={styles.cropApply} hitSlop={6}>
-                <Ionicons name="checkmark" size={16} color="#fff" />
-                <Text maxFontSizeMultiplier={1.3} style={styles.cropApplyText}>{t('common.done')}</Text>
-              </Pressable>
-            </View>
+            <PathEditBar
+              nodeSelected={pathEditNode != null}
+              ringCount={ringCount}
+              ring={pathEditRing}
+              closed={!!pathEditShape?.closed}
+              onClose={() => setPathEditId(null)}
+              onDeleteNode={deleteNode}
+              onNodeKind={setNodeKind}
+              onNextRing={() => {
+                setPathEditRing((r) => (r + 1) % ringCount);
+                setPathEditNode(null);
+              }}
+              onToggleClosed={togglePathClosed}
+              onReverse={reverseEditedPath}
+            />
           ) : assistantOpen && doc ? (
             <AssistantBar doc={doc} selectedId={selectedId} onApply={applyAssistant} onClose={() => setAssistantOpen(false)} />
           ) : selectTool ? (
@@ -2666,31 +1320,17 @@ export function ImageStudioBody({
               onDone={closeSelectTool}
             />
           ) : lassoActive ? (
-            /* 🪢 lasszó-sáv (húzás a vásznon rajzol; felengedésre zár) */
-            <View style={styles.cropBar}>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('common.cancel')} onPress={cancelLasso} style={styles.cropBtn} hitSlop={6}>
-                <Ionicons name="close" size={20} color={palette.text} />
-              </Pressable>
-              <Text maxFontSizeMultiplier={1.3} style={styles.lassoLabel} numberOfLines={1}>
-                {t('studio.image.lasso.hint')}
-              </Text>
-            </View>
+            <LassoBar onCancel={cancelLasso} />
           ) : wandActive ? (
-            /* 🪄 varázspálca-sáv (fotóra koppintva szín-szelekció) */
-            <View style={styles.cropBar}>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('common.close')} onPress={() => setWandActive(false)} style={styles.cropBtn} hitSlop={6}>
-                <Ionicons name="close" size={20} color={palette.text} />
-              </Pressable>
-              {busy ? <ActivityIndicator size="small" color={palette.accent} /> : null}
-              <View style={styles.brushRow}>
-                {WAND_TOLERANCES.map((w) => (
-                  <Chip key={w.value} label={t(w.labelKey)} active={wandTolerance === w.value} onPress={() => setWandTolerance(w.value)} />
-                ))}
-                {selectTool === 'wand' ? (
-                  <Chip label={t('studio.image.wand.contiguous')} active={wandContiguous} onPress={() => setWandContiguous((c) => !c)} />
-                ) : null}
-              </View>
-            </View>
+            <WandBar
+              busy={busy}
+              tolerance={wandTolerance}
+              onTolerance={setWandTolerance}
+              showContiguous={selectTool === 'wand'}
+              contiguous={wandContiguous}
+              onToggleContiguous={() => setWandContiguous((c) => !c)}
+              onClose={() => setWandActive(false)}
+            />
           ) : brushActive ? (
             <BrushBar
               brush={brush}
@@ -2706,56 +1346,18 @@ export function ImageStudioBody({
               onPickSource={() => brushRef.current?.pickSource()}
             />
           ) : cornerPinId && doc ? (
-            /* 🔲 S18: 4-sarkos perspektíva sáv (alaphelyzet + kész) */
-            <View style={styles.cropBar}>
-              <Pressable
-                onPress={() => commit(updateLayer<PhotoLayer>(doc, cornerPinId, { corners: undefined }), t('studio.image.cornerPin.reset'))}
-                style={styles.penClose}
-                hitSlop={6}
-                accessibilityRole="button"
-              >
-                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.cornerPin.reset')}</Text>
-              </Pressable>
-              <Text maxFontSizeMultiplier={1.3} style={styles.lassoLabel} numberOfLines={1}>
-                {t('studio.image.cornerPin.hint')}
-              </Text>
-              <Pressable onPress={() => setCornerPinId(null)} style={styles.penClose} hitSlop={6} accessibilityRole="button">
-                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('common.done')}</Text>
-              </Pressable>
-            </View>
+            <CornerPinBar
+              onReset={() => commit(updateLayer<PhotoLayer>(doc, cornerPinId, { corners: undefined }), t('studio.image.cornerPin.reset'))}
+              onDone={() => setCornerPinId(null)}
+            />
           ) : guidesActive ? (
-            /* 📐 vonalzók/segédvonalak sáv (Harmadok / Törlés + kilépés) */
-            <View style={styles.cropBar}>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('common.close')} onPress={() => setGuidesActive(false)} style={styles.cropBtn} hitSlop={6}>
-                <Ionicons name="close" size={20} color={palette.text} />
-              </Pressable>
-              <Pressable
-                onPress={() => doc && commit({ ...doc, guides: mergeGuides(doc.guides, compositionGuides()) }, t('studio.image.undoGuides'))}
-                style={styles.penClose}
-                hitSlop={6}
-              >
-                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.guides.thirds')}</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => doc && commit({ ...doc, guides: [] }, t('studio.image.undoGuides'))}
-                style={styles.penClose}
-                hitSlop={6}
-              >
-                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.guides.clear')}</Text>
-              </Pressable>
-              <Pressable onPress={() => updateGrid({ show: !(doc?.grid?.show ?? false) })} style={[styles.penClose, doc?.grid?.show ? styles.toggleOn : null]} hitSlop={6} accessibilityRole="button" accessibilityState={{ selected: !!doc?.grid?.show }}>
-                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.guides.grid')}</Text>
-              </Pressable>
-              <Pressable onPress={() => updateGrid({ snap: !(doc?.grid?.snap ?? false) })} style={[styles.penClose, doc?.grid?.snap ? styles.toggleOn : null]} hitSlop={6} accessibilityRole="button" accessibilityState={{ selected: !!doc?.grid?.snap }}>
-                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.guides.snap')}</Text>
-              </Pressable>
-              <Pressable onPress={() => updateGrid({ size: GRID_SIZES[(GRID_SIZES.indexOf(doc?.grid?.size ?? 32) + 1) % GRID_SIZES.length] })} style={styles.penClose} hitSlop={6} accessibilityRole="button">
-                <Text maxFontSizeMultiplier={1.3} style={styles.penCloseText}>{t('studio.image.guides.gridSize', { size: doc?.grid?.size ?? DEFAULT_GRID.size })}</Text>
-              </Pressable>
-              <Text maxFontSizeMultiplier={1.3} style={styles.lassoLabel} numberOfLines={1}>
-                {t('studio.image.guides.hint')}
-              </Text>
-            </View>
+            <GuidesBar
+              grid={doc?.grid}
+              onClose={() => setGuidesActive(false)}
+              onThirds={() => doc && commit({ ...doc, guides: mergeGuides(doc.guides, compositionGuides()) }, t('studio.image.undoGuides'))}
+              onClearGuides={() => doc && commit({ ...doc, guides: [] }, t('studio.image.undoGuides'))}
+              onGrid={updateGrid}
+            />
           ) : isInlineSheet(sheet) ? null : quickAdjust && doc && selectedLayer?.kind === 'photo' ? (
             <ImageAdjustStrip
               doc={doc}
@@ -2838,156 +1440,5 @@ const styles = StyleSheet.create({
   overlayRight: { position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 6, backgroundColor: palette.surface },
   overlayDragging: { opacity: 0.55 },
   inlineRight: { alignSelf: 'stretch', backgroundColor: palette.surface, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: palette.border },
-  hidden: { display: 'none' },
-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  // 🖼️📄 galéria lap-strip
-  pageStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: palette.border,
-  },
-  pageStripContent: { alignItems: 'center', gap: 8, paddingRight: 8 },
-  pageChip: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: palette.border,
-    overflow: 'hidden',
-    backgroundColor: '#0d0f16',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pageChipActive: { borderColor: palette.accent },
-  pageThumb: { width: '100%', height: '100%' },
-  pageThumbEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  pageChipNum: {
-    position: 'absolute',
-    bottom: 1,
-    right: 3,
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
-    textShadowColor: '#000',
-    textShadowRadius: 2,
-  },
-  pageAdd: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: palette.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pageActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  pageActionBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  topBtn: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  titleWrap: { flex: 1, gap: 2 },
-  kindTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  kindTagText: { color: palette.accent, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
-  title: { color: palette.text, fontSize: 17, fontWeight: '700' },
-  exportBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: palette.accent,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    minWidth: 84,
-    justifyContent: 'center',
-  },
-  exportText: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  canvasBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 9,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    backgroundColor: palette.surface,
-  },
-  canvasBtnText: { color: palette.textDim, fontSize: 11, fontWeight: '700' },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingLeft: 16,
-    paddingRight: 8,
-    paddingVertical: 0,
-  },
-  historyBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  statusText: { flex: 1, color: palette.textDim, fontSize: 11, fontWeight: '600' },
-  cropBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderTopWidth: 1,
-    borderTopColor: palette.border,
-    backgroundColor: palette.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  cropBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surfaceHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cropPresets: { alignItems: 'center', gap: 8, paddingHorizontal: 2 },
-  cropApply: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: palette.accent,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    height: 40,
-    justifyContent: 'center',
-  },
-  cropApplyText: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  penClose: {
-    paddingHorizontal: 14,
-    height: 40,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surfaceHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  penCloseText: { color: palette.text, fontSize: 13, fontWeight: '700' },
-  penDisabled: { opacity: 0.4 },
-  lassoLabel: { flex: 1, color: palette.textDim, fontSize: 12, fontWeight: '600', paddingLeft: 4 },
-  brushRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  brushScroll: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 6 },
-  brushDotHit: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  brushDot: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: palette.border },
-  brushDotActive: { borderColor: palette.text, borderWidth: 3 },
-  toggleOn: { borderColor: palette.accent, backgroundColor: `${palette.accent}33` },
-  selectLink: { color: palette.accent, fontSize: 12, fontWeight: '700' },
-  brushSizeBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surfaceHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brushSizeActive: { borderColor: palette.accent, backgroundColor: `${palette.accent}22` },
 });

@@ -3,7 +3,6 @@
   "src/app/editor/[id].tsx": 1460,
   "src/app/live/studio/[id].tsx": 1138,
   "src/components/editor/panels/ExportPanel.tsx": 1060,
-  "src/components/preview/PreviewSurface.tsx": 1424,
   "src/components/studio/image/ImageStudioBody.tsx": 1445,
   "src/components/studio/image/LayerInspector.tsx": 1106,
   "src/components/studio/model3d/Model3DStudio.tsx": 1366,

@@ -48,6 +48,20 @@ const MUST_BE_MEMOIZED = [
   ['src/components/editor/panels/assistant/InstructionSection.tsx', 'InstructionSection'],
   ['src/components/editor/panels/assistant/SocialPresetsSection.tsx', 'SocialPresetsSection'],
   ['src/components/editor/panels/assistant/SuggestionSection.tsx', 'SuggestionSection'],
+  // REFACTOR: a PreviewSurface.tsx-ből kiemelt renderelő részek
+  ['src/components/preview/surface/CanvasMarkers.tsx', 'MaskShade'],
+  ['src/components/preview/surface/CanvasMarkers.tsx', 'FaceBlurMarker'],
+  ['src/components/preview/surface/CanvasMarkers.tsx', 'BlackScrim'],
+  ['src/components/preview/surface/CanvasMarkers.tsx', 'SmartGuideLines'],
+  ['src/components/preview/surface/CanvasMarkers.tsx', 'StrokePreview'],
+  ['src/components/preview/surface/CompareSlider.tsx', 'CompareSlider'],
+  ['src/components/preview/surface/LookLayers.tsx', 'FilterLookLayer'],
+  ['src/components/preview/surface/LookLayers.tsx', 'LightingTintLayer'],
+  ['src/components/preview/surface/LookLayers.tsx', 'AdjustTintLayers'],
+  ['src/components/preview/surface/LookLayers.tsx', 'AdjustTrackTintLayers'],
+  ['src/components/preview/surface/PreviewMedia.tsx', 'BlurBackdrop'],
+  ['src/components/preview/surface/PreviewMedia.tsx', 'MediaLayer'],
+  ['src/components/preview/surface/PreviewToolbar.tsx', 'PreviewToolbar'],
 ];
 
 /**
@@ -63,7 +77,7 @@ const KNOWN_BAILS = [
   ['src/components/editor/Timeline.tsx', 'Timeline', 'a virtualizációs ablak renderben olvassa a lastScrollX refet'],
   // a komponens neve a forrásban TimelineClipInner; a `TimelineClip` a memo() burkolat
   ['src/components/editor/TimelineClip.tsx', 'TimelineClipInner', 'Reanimated shared value mutációk'],
-  ['src/components/preview/PreviewSurface.tsx', 'PreviewSurface', 'expo-video player-mutáció'],
+  ['src/components/preview/PreviewSurface.tsx', 'PreviewSurface', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
   ['src/components/preview/TextOverlay.tsx', 'TextOverlay', 'Reanimated shared value írása'],
 ];
 

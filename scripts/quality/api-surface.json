@@ -1547,6 +1547,75 @@
  "src/components/preview/TransitionLayer.tsx": {
   "TransitionLayer": "v:32c09e8e0b"
  },
+ "src/components/preview/surface/CanvasMarkers.tsx": {
+  "BlackScrim": "v:4d852b786b",
+  "FaceBlurMarker": "v:b1d8456735",
+  "MaskShade": "v:f4ee877aad",
+  "SmartGuideLines": "v:a0964347ec",
+  "StrokePreview": "v:a0cad330be"
+ },
+ "src/components/preview/surface/CompareSlider.tsx": {
+  "CompareSlider": "v:2f02cee8cd"
+ },
+ "src/components/preview/surface/LookLayers.tsx": {
+  "AdjustTintLayers": "v:a31cbdad46",
+  "AdjustTrackTintLayers": "v:6b257572d5",
+  "FilterLookLayer": "v:cc6807a079",
+  "LightingTintLayer": "v:0dde2ff691"
+ },
+ "src/components/preview/surface/PreviewMedia.tsx": {
+  "BlurBackdrop": "v:7e1e3592c1",
+  "MediaLayer": "v:cc2638b52f"
+ },
+ "src/components/preview/surface/PreviewToolbar.tsx": {
+  "PreviewToolbar": "v:ce4ad4a50b"
+ },
+ "src/components/preview/surface/canvasMath.ts": {
+  "GestureDelta": "t:346f04f1ff",
+  "IDENTITY": "v:7c4c59048c",
+  "compareSliderX": "v:95b63e4063",
+  "faceBlurRect": "v:8d935c1cfa",
+  "fitCanvasBox": "v:4f1b036636",
+  "gestureTransformTarget": "v:8b9231a722",
+  "maskShadeGeometry": "v:9a1f8b9a40",
+  "normalizedCanvasPoint": "v:d5d9dc00c3",
+  "pathShapeClip": "v:228468c0d6",
+  "snapAngle": "v:0808ff3d61"
+ },
+ "src/components/preview/surface/layerSelection.ts": {
+  "LIGHTING_TINTS": "v:333ed7a583",
+  "adjustClipStrength": "v:5d3e3d9058",
+  "isVideoAudible": "v:64cf11d7ba",
+  "previewAdjustClips": "v:87801c0c57",
+  "previewInteractiveClips": "v:bfc39cc110",
+  "previewShapeClips": "v:3976b1bd6c",
+  "previewTextClips": "v:4aa58a4f36",
+  "previewVisualClip": "v:1abbd8630a",
+  "shouldDimBase": "v:a823fbff1a",
+  "snapContextOf": "v:d86ef39a33",
+  "textOverlayTime": "v:ab0a8760f0",
+  "visualFadeOpacity": "v:ad80adb2d6",
+  "visualMediaOpacity": "v:cd6f03f6f1"
+ },
+ "src/components/preview/surface/useCanvasGestures.ts": {
+  "CanvasGestureValues": "t:2e876a3d5d",
+  "CanvasGesturesInput": "t:18e107e5bd",
+  "useCanvasGestureValues": "v:9c2f57c2fe",
+  "useCanvasGestures": "v:49e2a4285f"
+ },
+ "src/components/preview/surface/useCanvasTransformStyle.ts": {
+  "useCanvasTransformStyle": "v:5589806af4"
+ },
+ "src/components/preview/surface/usePreviewSources.ts": {
+  "usePreviewSources": "v:18baf163ff"
+ },
+ "src/components/preview/surface/usePreviewVideoPlayer.ts": {
+  "PreviewVideoPlayerInput": "t:a4e10855dc",
+  "usePreviewVideoPlayer": "v:743b4de669"
+ },
+ "src/components/preview/surface/useSmartGuides.ts": {
+  "useSmartGuides": "v:1b8a7a7f4d"
+ },
  "src/components/preview/videoFill.ts": {
   "videoFill": "v:466ecdee3e"
  },

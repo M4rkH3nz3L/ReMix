@@ -127,6 +127,9 @@ const MUST_BE_MEMOIZED = [
   ['src/components/editor/panels/precision/AppearanceSection.tsx', 'AppearanceSection'],
   ['src/components/editor/panels/precision/ImageTrackSection.tsx', 'ImageTrackSection'],
   ['src/components/editor/panels/precision/CompoundSection.tsx', 'CompoundSection'],
+  // REFACTOR: az AudioStudioBody.tsx-ből kiemelt renderelő részek (a gyökér maga kimarad: ref-írás renderben)
+  ['src/components/studio/audio/body/InstrumentOverlays.tsx', 'InstrumentOverlays'],
+  ['src/components/studio/audio/body/MultiSelectBar.tsx', 'MultiSelectBar'],
 ];
 
 /**

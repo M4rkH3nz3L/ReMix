@@ -2067,6 +2067,12 @@
  "src/components/studio/audio/body/AudioStudioToolbar.tsx": {
   "AudioStudioToolbar": "v:4c0854b41f"
  },
+ "src/components/studio/audio/body/InstrumentOverlays.tsx": {
+  "InstrumentOverlays": "v:b5c0c51be0"
+ },
+ "src/components/studio/audio/body/MultiSelectBar.tsx": {
+  "MultiSelectBar": "v:7d7d995397"
+ },
  "src/components/studio/audio/body/RecordingStrip.tsx": {
   "RecordingStrip": "v:1e40e39e00"
  },
@@ -2075,6 +2081,16 @@
  },
  "src/components/studio/audio/body/editActions.ts": {
   "audioEditActions": "v:2404ca8e49"
+ },
+ "src/components/studio/audio/body/sheetHandlers.ts": {
+  "openInstrumentOf": "v:505d7cba3d",
+  "studioSheetHandlers": "v:03d6824a11"
+ },
+ "src/components/studio/audio/body/studioActions.ts": {
+  "studioActions": "v:d13b708b6b"
+ },
+ "src/components/studio/audio/body/studioDevApi.ts": {
+  "studioDevApi": "v:f64827c05d"
  },
  "src/components/studio/audio/body/timelineMetrics.ts": {
   "HEADER_W": "v:511a418e72",
@@ -2096,6 +2112,12 @@
  },
  "src/components/studio/audio/body/useStudioRecording.ts": {
   "useStudioRecording": "v:31f4902016"
+ },
+ "src/components/studio/audio/body/useTimelineView.ts": {
+  "TimelineView": "t:af08626075",
+  "timelineScrollHandlers": "v:7db654c79f",
+  "timelineZoomActions": "v:03db18182d",
+  "useTimelineView": "v:ea11261426"
  },
  "src/components/studio/audio/exportParts.ts": {
   "exportParts": "v:d0061b6917"
@@ -3473,6 +3495,11 @@
   "drumModel": "v:40c6518891",
   "ensureAudioModel": "v:14359fdaba",
   "runAudioModelSmoke": "v:14359fdaba"
+ },
+ "src/lib/audioSheetLayout.ts": {
+  "inlineDetentOf": "v:fbd1e3ff84",
+  "inlineSheetOf": "v:26e10ccb42",
+  "sheetFrameOf": "v:4adc531691"
  },
  "src/lib/audioSilence.ts": {
   "SILENCE_WIN": "v:6ae529bf5a",

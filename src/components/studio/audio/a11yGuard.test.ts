@@ -2,7 +2,7 @@
  * ♿ A11Y-ŐRTESZT a Hang Stúdió lapjaira (AUDIO-PROD S8 — a Studio-szint 5. feltétele: „Érinthető":
  * VoiceOver / TalkBack minden gombot és csúszkát bemond).
  *
- * Statikus JSX-elemzés (babel-parser) a `src/components/studio/audio/*.tsx` és a közös vezérlők
+ * Statikus JSX-elemzés (babel-parser) a `src/components/studio/audio/*.tsx` (+ `body/*.tsx`) és a közös vezérlők
  * (`ui/controls.tsx`) forrásán — nem kell renderelni, így MINDEN lap és MINDEN ág számít:
  *
  *  • `Pressable` / `Touchable*`: kell `accessibilityLabel` (vagy `aria-label`), VAGY egy `Text`
@@ -103,9 +103,13 @@ function auditFile(file: string): string[] {
 }
 
 describe('♿ Hang Stúdió: minden érintő vezérlőnek van neve a képernyőolvasónak', () => {
-  const files: string[] = (fs.readdirSync(AUDIO_DIR) as string[])
-    .filter((f: string) => f.endsWith('.tsx') && !f.endsWith('.test.tsx'))
-    .map((f: string) => path.join(AUDIO_DIR, f))
+  // a törzsből kiemelt részek (body/) is ide tartoznak
+  const files: string[] = [AUDIO_DIR, path.join(AUDIO_DIR, 'body')]
+    .flatMap((dir: string) =>
+      (fs.readdirSync(dir) as string[])
+        .filter((f: string) => f.endsWith('.tsx') && !f.endsWith('.test.tsx'))
+        .map((f: string) => path.join(dir, f))
+    )
     .concat(EXTRA_FILES);
 
   it('a hang-lapok és a közös vezérlők forrása', () => {

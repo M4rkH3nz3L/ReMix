@@ -1,8 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, type GestureResponderEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { type GestureResponderEvent, ScrollView, StyleSheet, View } from 'react-native';
+import { GestureDetector } from 'react-native-gesture-handler';
 
 import { LANE_HEIGHTS, useAudioEditMode } from '@/store/audioEditModeStore';
 import { NewerSchemaBanner } from '@/components/NewerSchemaBanner';
@@ -11,12 +10,11 @@ import { MixAssistSheet } from '@/components/studio/audio/MixAssistSheet';
 import { UndoGestureArea } from '@/components/UndoGestureArea';
 import { audioLanes } from '@/components/studio/audio/audioLanes';
 import { nextExtraTrack } from '@/lib/audioTracks';
-import { SilenceReviewBar, startSilenceSearch } from '@/components/studio/audio/SilenceReview';
+import { SilenceReviewBar } from '@/components/studio/audio/SilenceReview';
 import { useSilenceReview } from '@/store/silenceReviewStore';
-import { SpeechEditBar, startSpeechEdit, upgradeSpeechModel } from '@/components/studio/audio/SpeechEditBar';
+import { SpeechEditBar } from '@/components/studio/audio/SpeechEditBar';
 import { useSpeechEdit } from '@/store/speechEditStore';
 import { AudioAssistantBar } from '@/components/studio/audio/AudioAssistantBar';
-import { runAudioSync, syncCandidates } from '@/components/studio/audio/audioSyncAction';
 import { snapToMarkers } from '@/lib/audioMarkers';
 import { selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { AudioStudioSheets } from '@/components/studio/audio/body/AudioStudioSheets';
@@ -29,19 +27,22 @@ import { useAlbumShare } from '@/components/studio/audio/body/useAlbumShare';
 import { clipAiActions } from '@/components/studio/audio/body/clipAiActions';
 import { audioEditActions } from '@/components/studio/audio/body/editActions';
 import { NOOP_DEV_API, useAudioStudioDevActions, type AudioStudioDevApi } from '@/components/studio/audio/body/useAudioStudioDevActions';
+import { timelineScrollHandlers, timelineZoomActions, useTimelineView } from '@/components/studio/audio/body/useTimelineView';
+import { studioActions } from '@/components/studio/audio/body/studioActions';
+import { studioDevApi } from '@/components/studio/audio/body/studioDevApi';
+import { openInstrumentOf, studioSheetHandlers } from '@/components/studio/audio/body/sheetHandlers';
+import { InstrumentOverlays } from '@/components/studio/audio/body/InstrumentOverlays';
+import { MultiSelectBar } from '@/components/studio/audio/body/MultiSelectBar';
 import { AudioStudioTopBar } from '@/components/studio/audio/AudioStudioTopBar';
 import { AudioLaneHeaders } from '@/components/studio/audio/AudioLaneHeaders';
 import { AudioTimelineContent } from '@/components/studio/audio/AudioTimelineContent';
 import { AudioEmptyGuide } from '@/components/studio/audio/AudioEmptyGuide';
-import { AudioTransportBar, type TransportInstrument } from '@/components/studio/audio/AudioTransportBar';
-import { SamplerMelodySheet } from '@/components/studio/audio/SamplerMelodySheet';
-import { ChordSheet } from '@/components/studio/audio/ChordSheet';
-import { LoopLibrarySheet } from '@/components/studio/audio/LoopLibrarySheet';
+import { AudioTransportBar } from '@/components/studio/audio/AudioTransportBar';
 import { instrumentDocOf } from '@/lib/instrumentDoc';
-import { palette } from '@/constants/editor';
 import { useLayout } from '@/hooks/useLayout';
-import { layoutBudget, type Detent } from '@/lib/panelLayout';
-import { AUDIO_SHEET_SPECS, type AudioSheetId } from '@/lib/panelSpecs';
+import type { Detent } from '@/lib/panelLayout';
+import type { AudioSheetId } from '@/lib/panelSpecs';
+import { inlineDetentOf, inlineSheetOf, sheetFrameOf } from '@/lib/audioSheetLayout';
 import {
   beatGridForTiming,
   bpmAt,
@@ -53,29 +54,18 @@ import {
   tempoMapWith,
   tempoMapWithout,
   nextMeter,
-  DEFAULT_ZOOM_INDEX,
-  fitPxPerSec,
-  followScrollX,
-  nearestZoomIndex,
   pxPerSecAt,
   rulerTicks,
   type SnapMode,
-  zoomIn,
-  zoomOut,
-  ZOOM_LEVELS,
 } from '@/lib/audioTransport';
-import { zoomIndexForPinch } from '@/lib/audioTimelineGestures';
-import { firstAudioClipWithUri, importedAudioClip, pasteTargetOf, timelineWindow } from '@/lib/audioStudioOps';
-import { editGridRate, snapToFrame } from '@/lib/frames';
-import { makeId } from '@/lib/id';
+import { pasteTargetOf, timelineWindow } from '@/lib/audioStudioOps';
+import { editGridRate } from '@/lib/frames';
 import { projectDuration } from '@/lib/projectUtils';
-import { detectBeats } from '@/lib/beats';
 import { beatLinesForClips } from '@/lib/beatMarkers';
 import { useEditorStore } from '@/store/editorStore';
 import { useEditorPrefs } from '@/store/editorPrefsStore';
 import { initialAudioMode, transportLayout, type AudioStudioMode } from '@/lib/audioStudioModes';
-import type { Asset, AudioClip } from '@/types/project';
-import { probeAudioDuration } from '@/lib/media';
+import type { AudioClip } from '@/types/project';
 import { logCaught } from '@/lib/logCaught';
 
 /* a sávok: `audioLanes(project)` (az alap három + a „+ Sáv”-val hozzáadottak) */
@@ -91,7 +81,9 @@ import { logCaught } from '@/lib/logCaught';
  * (`AudioTimelineContent`), transzport (`AudioTransportBar`), lapok (`body/AudioStudioSheets`);
  * a logika: felvétel (`body/useStudioRecording`), hangszerek (`body/useInstrumentStudio`),
  * AI-műveletek (`body/clipAiActions`), szerkesztés (`body/editActions`), album (`body/useAlbumShare`),
- * a tiszta számítások a `@/lib/audioStudioOps`-ban.
+ * nézet és nagyítás (`body/useTimelineView`), saját műveletek (`body/studioActions`), lap-kezelők
+ * (`body/sheetHandlers`), füstteszt-API (`body/studioDevApi`); a tiszta számítások a `@/lib/audioStudioOps`-ban
+ * és a `@/lib/audioSheetLayout`-ban.
  */
 export function AudioStudioBody({
   mode,
@@ -183,35 +175,11 @@ export function AudioStudioBody({
   const layoutRef = useRef<{ docked: boolean; workspaceTop: number | null; rootH: number }>({ docked: false, workspaceTop: null, rootH: 0 });
   const album = useAlbumShare(t);
   const [tlH, setTlH] = useState(0); // az idővonal-terület magassága (rács/playhead a teljes magasságot tölti)
-  const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
   const [snapMode, setSnapMode] = useState<SnapMode>('frame');
-  // 📏 A42: a vonalzó és a rács csak a látható ablakra (± egy képernyő) rajzolódik
-  const [view, setView] = useState({ x: 0, w: 0 });
-  const viewXRef = useRef(0);
   // 🎙️ felvétel (szünet, előszámlálás, metronóm, punch-in) — `body/useStudioRecording`
   const rec = useStudioRecording({ t, project, playhead });
-  // 🔍 pinch-zoom: a mindig friss zoom-index + a csippentés kezdő-indexe (ref, hogy a
-  // gesztus-callback ne stale state-et lásson)
-  const zoomIndexRef = useRef(DEFAULT_ZOOM_INDEX);
-  zoomIndexRef.current = zoomIndex;
-  const pinchStartRef = useRef(DEFAULT_ZOOM_INDEX);
-
-  // 🔍 „illeszd” nagyítás: folytonos px/mp (null = a lépcsős nagyítás él)
-  const [fitPps, setFitPps] = useState<number | null>(null);
-  const scrollRef = useRef<ScrollView>(null);
-  const scrollXRef = useRef(0);
-  // a követéshez a friss méretek (a hook a korai return előtt fut, ezért ref-ből olvas)
-  const followRef = useRef({ pps: 56, viewW: 0, contentW: 0 });
-  useEffect(() => {
-    if (!isPlaying) {
-      return;
-    }
-    const { pps, viewW, contentW } = followRef.current;
-    const x = followScrollX(playhead * pps, scrollXRef.current, viewW, contentW);
-    if (x !== null) {
-      scrollRef.current?.scrollTo({ x, animated: false });
-    }
-  }, [playhead, isPlaying]);
+  // 🔍 nagyítás, látható ablak, görgetés + követés lejátszás alatt — `body/useTimelineView`
+  const { zoomIndex, setZoomIndex, view, setView, viewXRef, zoomIndexRef, pinchStartRef, fitPps, setFitPps, scrollRef, scrollXRef, followRef } = useTimelineView({ playhead, isPlaying });
 
   // 🧪 a füstteszt a gombok mögötti függvényeket hívja (csak __DEV__)
   const devApi = useRef<AudioStudioDevApi>(NOOP_DEV_API);
@@ -293,157 +261,39 @@ export function AudioStudioBody({
   const seekAt = (e: GestureResponderEvent) =>
     useEditorStore.getState().setPlayhead(snapSecIn(Math.max(0, e.nativeEvent.locationX / pxPerSec)));
 
-  // 🔍 kétujjas csippentés = idővonal-zoom (a 7 szint közt lépked). A pinch a
-  // timelineWrap-en ül → a 2-ujjas zoom és az 1-ujjas vízszintes görgetés nem ütközik.
-  const timelinePinch = Gesture.Pinch()
-    .runOnJS(true)
-    .onStart(() => {
-      // az „illeszd” állapotból a legközelebbi lépcsőről indul a csippentés
-      pinchStartRef.current = fitPps !== null ? nearestZoomIndex(fitPps) : zoomIndexRef.current;
-    })
-    .onUpdate((e) => {
-      const next = zoomIndexForPinch(pinchStartRef.current, e.scale, ZOOM_LEVELS.length);
-      if (next !== zoomIndexRef.current || fitPps !== null) {
-        setFitPps(null);
-        setZoomIndex(next);
-      }
-    });
+  // 🔍 csippentés / ± lépés / „illeszd” — `body/useTimelineView`
+  const { timelinePinch, zoomStep, fitToView } = timelineZoomActions({ fitPps, zoomIndex, view, duration, setFitPps, setZoomIndex, scrollRef, pinchStartRef, zoomIndexRef });
 
-  const zoomStep = (dir: 1 | -1) => {
-    const from = fitPps !== null ? nearestZoomIndex(fitPps) : zoomIndex;
-    setFitPps(null);
-    setZoomIndex(dir > 0 ? zoomIn(from) : zoomOut(from));
-  };
-  const fitToView = () => {
-    setFitPps(fitPxPerSec(view.w || 1200, duration));
-    scrollRef.current?.scrollTo({ x: 0, animated: false });
-  };
+  // 🚪🥁🗂️ kilépés, tempó-felismerés, forrás beillesztése — `body/studioActions`
+  const { exitStudio, autoDetectBpm, insertSource } = studioActions({
+    t,
+    project,
+    playhead,
+    grid,
+    selClip,
+    bpmBusy,
+    setBpmBusy,
+    setDetectedBeats,
+    setSource,
+    finishIfRecording: rec.finishIfRecording,
+    onExit,
+  });
 
-  // kilépéskor a futó felvétel klip lesz, nem vész el
-  const exitStudio = () => {
-    void rec
-      .finishIfRecording()
-      .catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:exitStudio', caught); })
-      .then(onExit);
-  };
-
-  // 🥁🔎 tempó auto-felismerés: a kiválasztott (vagy az első hang-) klip beat-rácsából → BPM (a telefonon, offline; a worker tartalék)
-  const autoDetectBpm = async () => {
-    if (bpmBusy) {
-      return;
-    }
-    const sourceClip = selClip ?? firstAudioClipWithUri(project) ?? null;
-    const uri = sourceClip?.uri ?? null;
-    if (!uri) {
-      Alert.alert(t('studio.audio.autoBpm', { defaultValue: 'Tempó felismerése' }), t('studio.audio.autoBpmNoClip', { defaultValue: 'Nincs hang-klip az elemzéshez.' }));
-      return;
-    }
-    setBpmBusy(true);
-    try {
-      const grid = await detectBeats(uri);
-      if (grid && grid.bpm > 0) {
-        useEditorStore.getState().dispatch({ type: 'SET_BPM', bpm: Math.round(grid.bpm) });
-        // 🥁📍 a felismert beatek a forrás idejében maradnak, a vonalak a klipekből számolódnak
-        setDetectedBeats({ uri, beats: grid.beats ?? [] });
-      } else {
-        Alert.alert(t('studio.audio.autoBpm', { defaultValue: 'Tempó felismerése' }), t('studio.audio.autoBpmFail', { defaultValue: 'Nem sikerült felismerni a tempót.' }));
-      }
-    } finally {
-      setBpmBusy(false);
-    }
-  };
-
-  // 🗂️ forrás-mappából a sávra: a HANG-forrás klipként a 'music' sávon, a playheadnél
-  const insertSource = async (asset: Asset) => {
-    if (asset.kind !== 'audio') {
-      return;
-    }
-    const dur = asset.duration || (await probeAudioDuration(asset.uri));
-    if (!dur) {
-      Alert.alert(t('studio.audio.intake.unreadableTitle'), t('studio.audio.intake.unknownDuration'));
-      return;
-    }
-    const clip = importedAudioClip({ id: makeId('clip'), start: snapToFrame(playhead, grid), duration: dur, uri: asset.uri, label: asset.name ?? t('studio.kind.audio') });
-    useEditorStore.getState().addClip('music', clip, asset);
-    setSource(false);
-  };
-
-  devApi.current = {
-    fit: fitToView,
-    zoomIn: () => zoomStep(1),
-    marker: edit.markerAtPlayhead,
-    addLane: edit.addLane,
-    mixer: () => setMixerOpen(true),
-    copy: edit.copySelection,
-    paste: edit.pasteAtPlayhead,
-    duplicate: edit.duplicateSelection,
-    meter: () => useEditorStore.getState().dispatch({ type: 'SET_TIME_SIGNATURE', timeSignature: nextMeter(meter) }),
-    beatSplit: edit.beatSplitSelection,
-    silenceFind: async () => {
-      const st = useEditorStore.getState();
-      const c = selectedAudioClip(st.project, st.selectedClipId);
-      const tr = st.project?.tracks.find((x) => x.clips.some((y) => y.id === c?.id));
-      return c && tr ? startSilenceSearch(c, tr.type, grid, t) : null;
-    },
-    speechStart: async () => {
-      const st = useEditorStore.getState();
-      const tr = st.project?.tracks.find((x) => x.clips.some((y) => y.id === st.selectedClipId));
-      return tr ? startSpeechEdit(tr.type, t) : null;
-    },
-    speechUpgrade: () => upgradeSpeechModel(t, false),
-    syncSelected: async () => {
-      const st = useEditorStore.getState();
-      const c = selectedAudioClip(st.project, st.selectedClipId);
-      const ref = c ? syncCandidates(c)[0] : undefined;
-      return c && ref ? runAudioSync(c, ref, grid, t, true) : null;
-    },
-    openDrums: () => inst.setDrumMachine(true),
-    editClip: () => setEditing(true),
-    closeDrums: () => inst.setDrumMachine(false),
-    assistant: () => setAssistantOpen(true),
-    pianoRoll: (open) => inst.setPianoRoll(open),
-    autoBpm: autoDetectBpm,
-    insertSilence: edit.insertSilenceAt,
-    join: edit.joinSelected,
-    recordToggle: rec.toggleRecord,
-    recordPause: rec.pauseResumeRecording,
-    recordState: rec.recordState,
-    placeLoop: inst.placeLoopById,
-    placeCloud: inst.placeCloudTrack,
-    placeChords: (arg) => inst.placeChords(arg.key, arg.prog, arg.parts),
-    stems: ai.stemsOnDevice,
-    aiDrums: ai.aiDrumsAt,
-    aiDenoiseMany: ai.aiDenoiseClips,
-    aiDenoise: ai.applyAiDenoise,
-    resetAiDenoise: ai.resetAiDenoise,
-    humMelody: ai.humMelody,
-    applyTune: ai.applyTune,
-  };
+  devApi.current = studioDevApi({ t, grid, meter, fitToView, zoomStep, edit, ai, inst, rec, autoDetectBpm, setMixerOpen, setEditing, setAssistantOpen });
 
   // a nyitott inline lap (a többi workspace vagy modális — azok nem nyomják össze a sávokat)
-  const inlineSheet: AudioSheetId | null =
-    editing && selClip ? 'clipEdit' : mastering ? 'master' : mixerOpen ? 'mixer' : null;
-  const inlineDetent: Detent = inlineSheet
-    ? (detentById[inlineSheet] ?? AUDIO_SHEET_SPECS[inlineSheet].initialDetent ?? 'half')
-    : 'peek';
-  const sheetFrame =
-    rootH > 0
-      ? {
-          detents: layoutBudget({
-            bodyHeight: rootH - topBarH,
-            tier: 'sheet',
-            detent: inlineDetent,
-            hasTimeline: false,
-            transportHeight: transportH,
-          }).detents,
-          detent: inlineDetent,
-          onDetentChange: (d: Detent) =>
-            inlineSheet && setDetentById((m) => ({ ...m, [inlineSheet]: d })),
-          docked,
-          // 🎹 S14: iPad fekvőben a hangszer-szerkesztő a felület alsó ~58 %-án, a sávok fölötte látszanak
-          ...(docked ? { workspaceTop: topBarH + Math.round((rootH - topBarH) * 0.42) } : {}),
-        }
-      : null;
+  const inlineSheet = inlineSheetOf({ editing, hasSelClip: !!selClip, mastering, mixerOpen });
+  const inlineDetent = inlineDetentOf(inlineSheet, detentById);
+  // 📐 a lap-keret (detentek, dokkolás) — `@/lib/audioSheetLayout`
+  const sheetFrame = sheetFrameOf({
+    rootH,
+    topBarH,
+    transportH,
+    inlineDetent,
+    docked,
+    onDetentChange: (d: Detent) =>
+      inlineSheet && setDetentById((m) => ({ ...m, [inlineSheet]: d })),
+  });
   layoutRef.current = { docked, workspaceTop: sheetFrame?.workspaceTop ?? null, rootH };
   // dokkolt módban a nyitott inline lap a sávok mellé kerül (a workspace/modális lapok maradnak)
   const sheetsInDock = docked && inlineSheet !== null;
@@ -471,43 +321,10 @@ export function AudioStudioBody({
       setMixerOpen={setMixerOpen}
       setAdding={setAdding}
       setTts={setTts}
-      setPianoRoll={(v) => {
-        inst.setPianoRoll(v);
-        if (!v) inst.setEditDocId(null);
-      }}
-      setDrumMachine={(v) => {
-        inst.setDrumMachine(v);
-        if (!v) inst.setEditDocId(null);
-      }}
-      setSampler={(v) => {
-        inst.setSampler(v);
-        if (!v) inst.setEditDocId(null);
-      }}
       setSource={setSource}
       setAlbumOpen={setAlbumOpen}
-      onBakeSynth={(notes, wave, bars) => void inst.bakeSynth(notes, wave, bars)}
-      onBakeDrums={(hits, bars, src) => void inst.bakeDrums(hits, bars, src)}
       editDoc={instrumentDocOf(project, inst.editDocId ?? undefined)}
-      onEditInstrument={inst.editInstrument}
-      onOpenLoops={() => inst.setLoopsOpen(true)}
-      onTune={(id, s) => {
-        setEditing(false);
-        void ai.applyTune(id, s);
-      }}
-      onHumMelody={(id, k) => void ai.humMelody(id, k)}
-      onStemsOnDevice={(id) => void ai.stemsOnDevice(id)}
-      onAiDenoise={(id, strength) => void ai.applyAiDenoise(id, strength)}
-      onResetAiDenoise={ai.resetAiDenoise}
-      onResetTune={(id) => {
-        setEditing(false);
-        ai.resetTune(id);
-      }}
-      onBakeSamplerPads={(uri, slices, pads, bars, name) => void inst.bakeSamplerPads(uri, slices, pads, bars, name)}
-      onSamplerMelody={(uri, name, rootMidi) => {
-        inst.setSampler(false);
-        inst.setSamplerMelody({ sampleUri: uri, sampleName: name, rootMidi });
-      }}
-      onBakeSampler={(uri, pattern, bars, name) => void inst.bakeSampler(uri, pattern, bars, name)}
+      {...studioSheetHandlers({ inst, ai, setEditing })}
       onInsertSource={(asset) => {
         void insertSource(asset).catch((caught) => { logCaught('components/studio/audio/AudioStudioBody.tsx:insertSource', caught); });
       }}
@@ -516,13 +333,8 @@ export function AudioStudioBody({
     />
   );
 
-  const openInstrument = (which: TransportInstrument) => {
-    if (which === 'pianoRoll') inst.setPianoRoll(true);
-    else if (which === 'drums') inst.setDrumMachine(true);
-    else if (which === 'sampler') inst.setSampler(true);
-    else if (which === 'loops') inst.setLoopsOpen(true);
-    else inst.setChordsOpen(true);
-  };
+  const openInstrument = openInstrumentOf(inst);
+  const scroll = timelineScrollHandlers({ setView, scrollXRef, viewXRef, viewW });
 
   return (
     <UndoGestureArea>
@@ -567,19 +379,8 @@ export function AudioStudioBody({
             horizontal
             showsHorizontalScrollIndicator={false}
             scrollEventThrottle={16}
-            onLayout={(e) => {
-              const w = e.nativeEvent.layout.width;
-              setView((v) => (v.w === w ? v : { ...v, w }));
-            }}
-            onScroll={(e) => {
-              // csak negyed-képernyőnyi elmozdulásnál rajzol újra (nem minden képkockánál)
-              const x = e.nativeEvent.contentOffset.x;
-              scrollXRef.current = x;
-              if (Math.abs(x - viewXRef.current) > viewW / 4) {
-                viewXRef.current = x;
-                setView((v) => ({ ...v, x }));
-              }
-            }}
+            onLayout={scroll.onLayout}
+            onScroll={scroll.onScroll}
           >
             <AudioTimelineContent
               tracks={project.tracks}
@@ -648,18 +449,7 @@ export function AudioStudioBody({
       />
 
       {/* többes kijelölés: a koppintás hozzáad, innen lehet kilépni */}
-      {multiSelectMode ? (
-        <Pressable
-          testID="audio-multi-exit"
-          style={styles.multiBar}
-          onPress={() => useEditorStore.getState().setMultiSelectMode(false)}
-          accessibilityRole="button"
-          accessibilityLabel={t('common.cancel')}
-        >
-          <Text style={styles.multiText}>{t('editor.toolbar.multiSelectActive', { count: multiSelectIds.length + (selectedClipId ? 1 : 0) })}</Text>
-          <Ionicons name="close" size={20} color={palette.text} />
-        </Pressable>
-      ) : null}
+      {multiSelectMode ? <MultiSelectBar count={multiSelectIds.length + (selectedClipId ? 1 : 0)} /> : null}
 
       {/* 🎚️🤖 mixjavaslat / mastering-segéd */}
       <MixAssistSheet />
@@ -707,30 +497,13 @@ export function AudioStudioBody({
       )}
 
       {sheetsInDock ? null : sheets}
-      {inst.samplerMelody ? (
-        <SamplerMelodySheet
-          key={`sampler-melody-${inst.editDocId ?? 'new'}`}
-          melody={inst.samplerMelody}
-          bpm={bpm}
-          busy={inst.samplerBusy}
-          editDoc={instrumentDocOf(project, inst.editDocId ?? undefined)}
-          onClose={() => {
-            inst.setSamplerMelody(null);
-            inst.setEditDocId(null);
-          }}
-          onBake={(notes, bars) => void inst.bakeSamplerMelody(notes, bars)}
-        />
-      ) : null}
-      {inst.chordsOpen ? <ChordSheet bpm={bpm} busy={inst.chordBusy} onPlace={(key, prog, parts) => void inst.placeChords(key, prog, parts)} onClose={() => inst.setChordsOpen(false)} /> : null}
-      {inst.loopsOpen ? <LoopLibrarySheet bpm={bpm} busyId={inst.loopBusy} onPick={(l) => void inst.placeLoop(l)} onPickCloud={(tr) => void inst.placeCloudTrack(tr)} onClose={() => inst.setLoopsOpen(false)} /> : null}
+      <InstrumentOverlays inst={inst} project={project} bpm={bpm} />
     </View>
     </UndoGestureArea>
   );
 }
 
 const styles = StyleSheet.create({
-  multiBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, paddingHorizontal: 14, backgroundColor: palette.surfaceHigh },
-  multiText: { color: palette.text, fontSize: 13, fontWeight: '700' },
   root: { flex: 1, backgroundColor: '#05060a' },
   timelineWrap: { flex: 1, flexDirection: 'row', marginTop: 8, backgroundColor: '#080a11' },
   fillCol: { flex: 1 },

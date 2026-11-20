@@ -1728,6 +1728,57 @@
  "src/components/live/RecordToggle.tsx": {
   "RecordToggle": "v:f416520f5c"
  },
+ "src/components/live/studio/AddRtmpModal.tsx": {
+  "AddRtmpModal": "v:bbf68178dd",
+  "AddRtmpModalProps": "t:d0b244f23a"
+ },
+ "src/components/live/studio/LiveCanvas.tsx": {
+  "LiveCanvas": "v:72e82a53f9"
+ },
+ "src/components/live/studio/LiveStudioChrome.tsx": {
+  "LiveStudioLoadError": "v:34fe7ad9c2",
+  "LiveStudioLoading": "v:34fe7ad9c2",
+  "LiveStudioTopBar": "v:a471d37cde",
+  "LiveStudioTopBarProps": "t:ce6e63a75e",
+  "StartStreamBar": "v:14ecde7d09",
+  "StartStreamBarProps": "t:38f8869e7b"
+ },
+ "src/components/live/studio/MixerPanel.tsx": {
+  "MixerPanel": "v:7829d1efdb",
+  "MixerPanelProps": "t:fbea484f45"
+ },
+ "src/components/live/studio/ScenesPanel.tsx": {
+  "ScenesPanel": "v:9ce79fcfd6",
+  "ScenesPanelProps": "t:9a1f410463"
+ },
+ "src/components/live/studio/SourcesPanel.tsx": {
+  "SourcesPanel": "v:72261aef09",
+  "SourcesPanelProps": "t:2ff92739f2"
+ },
+ "src/components/live/studio/StreamConfigPanels.tsx": {
+  "DestinationsPanel": "v:34616216c4",
+  "DocPanelProps": "t:476f8c9d1c",
+  "MultistreamPanel": "v:f1fa786631",
+  "MultistreamPanelProps": "t:4786201b93",
+  "RecordPanel": "v:34616216c4"
+ },
+ "src/components/live/studio/liveStudioActions.ts": {
+  "RtmpActionDeps": "t:7ddf71d7fa",
+  "StudioActionDeps": "t:17ff2ef42e",
+  "createRtmpActions": "v:42e4f503b3",
+  "createStudioActions": "v:09cd71ee59"
+ },
+ "src/components/live/studio/liveStudioConstants.ts": {
+  "ADDABLE": "v:bf4af2ab42",
+  "CHANNEL_ICON": "v:cd9416044c",
+  "EXTERNAL_PLATFORMS": "v:58c32dc3b5",
+  "GAIN_STEP": "v:77de68daec",
+  "LAYOUT_PRESETS": "v:0a3ef99519",
+  "SOURCE_ICON": "v:369b43df2b"
+ },
+ "src/components/live/studio/liveStudioStyles.ts": {
+  "shared": "v:921c00f0a7"
+ },
  "src/components/preview/AudioLayer.tsx": {
   "AudioLayer": "v:b8aa420b18",
   "withoutProcessing": "v:c968515fa5"
@@ -5895,6 +5946,23 @@
   "isOnAir": "v:aea15bf06e",
   "liveReducer": "v:270e88a46a",
   "tokenErrorCode": "v:d11e715199"
+ },
+ "src/lib/liveStudioOps.ts": {
+  "aspectValue": "v:8dce77e7ff",
+  "canvasMaxHeight": "v:5f2db54032",
+  "fitCanvas": "v:3cd58d6eb1",
+  "flipFacing": "v:4c1e28bf27",
+  "formatGainDb": "v:e3cee1c4d4",
+  "gainLevel": "v:5984bece7b",
+  "isDestErrorKey": "v:6b6f0b63bf",
+  "levelWidth": "v:4a8878837d",
+  "nextSceneName": "v:2dc415070f",
+  "primaryCameraIdOf": "v:baf7e058a0",
+  "projectWithFacing": "v:89005fcf86",
+  "rtmpDestinationInput": "v:fd57e17e19",
+  "rtmpSubmitDisabled": "v:1e73261c41",
+  "sourceRect": "v:bf95729b2f",
+  "startTitle": "v:c309f95ba3"
  },
  "src/lib/liveTransform.ts": {
   "MIN_SOURCE_SIZE": "v:a5593f0327",

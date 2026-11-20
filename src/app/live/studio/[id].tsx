@@ -1,279 +1,54 @@
-import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useCameraPermissions } from 'expo-camera';
+import { useLocalSearchParams } from 'expo-router';
 import { UndoGestureArea } from '@/components/UndoGestureArea';
-import { RecordToggle } from '@/components/live/RecordToggle';
-import { LiveSourceBox } from '@/components/live/LiveSourceBox';
 import { LivePanelList } from '@/components/live/LivePanelList';
+import { AddRtmpModal } from '@/components/live/studio/AddRtmpModal';
+import { LiveCanvas } from '@/components/live/studio/LiveCanvas';
+import {
+  LiveStudioLoadError,
+  LiveStudioLoading,
+  LiveStudioTopBar,
+  StartStreamBar,
+} from '@/components/live/studio/LiveStudioChrome';
+import { MixerPanel } from '@/components/live/studio/MixerPanel';
+import { ScenesPanel } from '@/components/live/studio/ScenesPanel';
+import { SourcesPanel } from '@/components/live/studio/SourcesPanel';
+import { DestinationsPanel, MultistreamPanel, RecordPanel } from '@/components/live/studio/StreamConfigPanels';
+import { createRtmpActions, createStudioActions } from '@/components/live/studio/liveStudioActions';
+import { shared } from '@/components/live/studio/liveStudioStyles';
 import { sizeClassFor } from '@/constants/layout';
 import { normalizePanelOrder, type LivePanelId } from '@/lib/livePanels';
 import { useEditorPrefs } from '@/store/editorPrefsStore';
-import { goBackOrHome } from '@/lib/nav';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { palette } from '@/constants/editor';
-import { capabilityAllowed } from '@/lib/capabilities';
 import { makeId } from '@/lib/id';
-import { startLive } from '@/lib/live';
 import {
   activeScene as getActiveScene,
-  addDestination,
-  addScene,
-  addSource,
-  removeScene,
-  removeSource,
-  reorderSource,
-  setActiveScene,
   repairLiveDoc,
-  setRecord,
   setTitle as setDocTitle,
-  sortedSources,
-  toggleDestination,
-  toggleSourceVisible,
   updateSource,
 } from '@/lib/liveDoc';
-import {
-  MAX_DB,
-  MIN_DB,
-  setChannelGainDb,
-  setMasterGainDb,
-  toggleAutoDuck,
-  toggleMute as mixerToggleMute,
-  toggleSolo as mixerToggleSolo,
-} from '@/lib/liveMixer';
-import {
-  addDestination as addRtmpDestination,
-  listDestinations,
-  removeDestination as removeRtmpDestination,
-  setDestinationEnabled,
-  type LiveDestinationRow,
-} from '@/lib/liveDestinations';
-import { deleteProject, loadEvents, loadProject, saveProject } from '@/lib/storage';
+import { listDestinations, type LiveDestinationRow } from '@/lib/liveDestinations';
+import { aspectValue, canvasMaxHeight, flipFacing, primaryCameraIdOf } from '@/lib/liveStudioOps';
+import { loadEvents, loadProject, saveProject } from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
-import { useEntitlement } from '@/store/entitlementStore';
-import { usePaywall } from '@/store/paywallStore';
-import type {
-  LiveChannelId,
-  LiveDoc,
-  LiveMixer,
-  LivePlatform,
-  LiveSource,
-  LiveSourceKind,
-  LiveTransform,
-} from '@/types/live';
+import type { LiveDoc, LiveMixer, LiveSource } from '@/types/live';
 import { logCaught } from '@/lib/logCaught';
 
-const CHANNEL_ICON: Record<LiveChannelId, keyof typeof Ionicons.glyphMap> = {
-  mic: 'mic',
-  music: 'musical-notes',
-  media: 'film',
-  system: 'phone-portrait',
-};
-const GAIN_STEP = 3; // dB
-
-const SOURCE_ICON: Record<LiveSourceKind, keyof typeof Ionicons.glyphMap> = {
-  camera: 'videocam',
-  screen: 'desktop',
-  image: 'image',
-  video: 'film',
-  text: 'text',
-  shape: 'shapes',
-  logo: 'ribbon',
-  browser: 'globe',
-};
-
-const ADDABLE: LiveSourceKind[] = ['camera', 'screen', 'image', 'video', 'text', 'shape', 'logo', 'browser'];
-const EXTERNAL_PLATFORMS: { platform: LivePlatform; label: string }[] = [
-  { platform: 'youtube', label: 'YouTube' },
-  { platform: 'tiktok', label: 'TikTok' },
-  { platform: 'twitch', label: 'Twitch' },
-  { platform: 'facebook', label: 'Facebook' },
-  { platform: 'custom', label: 'RTMP' },
-];
-
-/** Vászon-arány a projekt aspectRatio-jából (szélesség:magasság). */
-function aspectValue(ar: string | undefined): number {
-  if (ar === '9:16') return 9 / 16;
-  if (ar === '1:1') return 1;
-  return 16 / 9;
-}
-
-/** Program-előnézet (SZERKESZTŐ mód): a jelenet forrásait 0–1 dobozokként rajzolja.
- *  A `camera` forrás ÉLŐ `expo-camera` előnézetet kap (a host saját kamerája, pontosan
- *  a forrás transformjában pozicionálva → OBS-szerű valós kompozíció). A Studio élő ELŐTTI
- *  (a LiveKit csak a „Start streaming"-re indul), így a kamera itt szabad — nem ütközik a
- *  publisherrel, és nem a (New-Arch alatt feketén renderelő) WebRTC-nézeten megy.
- *
- *  ⚠️ New-Arch (Fabric) + expo-camera workaround (expo/expo#49760, #31597, #50015): a
- *  Fabric a gyerek-sorrend változását Remove+Insert mutációként commitálja → a `CameraView`
- *  natív nézete `removeFromSuperview`-t kapna JS-unmount nélkül, és NEM inicializálna újra
- *  (fekete, pedig a zöld pont ég). Ezért a `CameraView` egy `collapsable={false}` wrapper
- *  EGYEDÜLI gyereke, külön STABIL rétegben (mindig a vászon első gyereke), és soha nem
- *  rendeződik át; a feliratok/keret FÖLÖTTE, abszolút overlayként jönnek. Egyszerre csak EGY
- *  kamera aktív (iOS), ezért csak az `primaryCameraId` kap élő képet. */
-function LiveCanvas({
-  doc,
-  width,
-  aspect,
-  maxHeight,
-  selectedId,
-  onSelect,
-  onMoveSource,
-  facing,
-  cameraGranted,
-  primaryCameraId,
-  onRequestCamera,
-  onFlip,
-  releasing,
-}: {
-  /** a Go-live alatt az előnézet elengedi a kamerát (L40) */
-  releasing?: boolean;
-  doc: LiveDoc;
-  width: number;
-  aspect: number;
-  maxHeight: number;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  onMoveSource: (id: string, transform: LiveTransform) => void;
-  facing: 'front' | 'back';
-  cameraGranted: boolean;
-  primaryCameraId: string | null;
-  onRequestCamera: () => void;
-  onFlip: () => void;
-}) {
-  const scene = getActiveScene(doc);
-  // húzás közben csak a keret mozog, a dokumentum a gesztus végén változik (egy undo)
-  const [draft, setDraft] = useState<{ id: string; t: LiveTransform } | null>(null);
-  const transformOf = (src: LiveSource) => (draft?.id === src.id ? draft.t : src.transform);
-  // a 9:16 vászon túl magas lenne teljes szélességen → ha kell, a magasságra
-  // korlátozzuk és a szélességet arányosan csökkentjük (középre igazítva).
-  let w = width;
-  let height = w / aspect;
-  if (height > maxHeight) {
-    height = maxHeight;
-    w = height * aspect;
-  }
-  // az élő kamera-forrás (az első látható) — a preview KÜLÖN, STABIL rétegben megy
-  const primaryCam = scene?.sources.find((s) => s.id === primaryCameraId) ?? null;
-  const showCamera = !!primaryCam && cameraGranted;
-  const camT = primaryCam ? transformOf(primaryCam) : null;
-  return (
-    <View style={[styles.canvas, { width: w, height }]}>
-      {showCamera && camT && (
-        <View
-          collapsable={false}
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            left: camT.x * w,
-            top: camT.y * height,
-            width: Math.max(28, camT.w * w),
-            height: Math.max(22, camT.h * height),
-            borderRadius: 8,
-            overflow: 'hidden',
-            backgroundColor: '#000',
-          }}
-        >
-          {releasing ? null : <CameraView style={StyleSheet.absoluteFill} facing={facing} mode="video" />}
-        </View>
-      )}
-      {scene &&
-        sortedSources(scene).map((src) => {
-          const t = transformOf(src);
-          const selected = src.id === selectedId;
-          const isCamera = src.kind === 'camera';
-          const liveCamera = isCamera && src.visible && src.id === primaryCameraId && cameraGranted;
-          return (
-            <LiveSourceBox
-              key={src.id}
-              id={src.id}
-              transform={src.transform}
-              canvas={{ w, h: height }}
-              selected={selected}
-              onPress={() => (isCamera && !cameraGranted ? onRequestCamera() : onSelect(src.id))}
-              onSelect={() => onSelect(src.id)}
-              onDraft={(next) => setDraft({ id: src.id, t: next })}
-              onCommit={(next) => {
-                setDraft(null);
-                onMoveSource(src.id, next);
-              }}
-              style={[
-                styles.srcBox,
-                liveCamera && styles.srcBoxLive,
-                {
-                  left: t.x * w,
-                  top: t.y * height,
-                  width: Math.max(28, t.w * w),
-                  height: Math.max(22, t.h * height),
-                  opacity: src.visible ? 1 : 0.35,
-                  borderColor: selected ? palette.accent : '#ffffff55',
-                  borderWidth: selected ? 2 : 1,
-                },
-              ]}
-            >
-              {liveCamera ? (
-                <View pointerEvents="none" style={styles.camTag}>
-                  <Ionicons name="videocam" size={11} color="#fff" />
-                  <Text style={styles.camTagText}>{src.label || 'Camera'}</Text>
-                </View>
-              ) : isCamera ? (
-                <>
-                  <Ionicons name="videocam-off" size={18} color="#fff" />
-                  <Text style={styles.srcBoxLabel} numberOfLines={1}>
-                    {cameraGranted ? src.label || 'Camera' : 'Tap to enable camera'}
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Ionicons name={SOURCE_ICON[src.kind]} size={16} color="#fff" />
-                  <Text style={styles.srcBoxLabel} numberOfLines={1}>
-                    {src.label || src.kind}
-                  </Text>
-                </>
-              )}
-            </LiveSourceBox>
-          );
-        })}
-      {(!scene || scene.sources.length === 0) && (
-        <View style={styles.canvasEmpty}>
-          <Ionicons name="add-circle-outline" size={28} color={palette.textDim} />
-          <Text style={styles.canvasEmptyText}>—</Text>
-        </View>
-      )}
-      {showCamera && (
-        <Pressable onPress={onFlip} style={styles.flipBtn} hitSlop={8}>
-          <Ionicons name="camera-reverse" size={20} color="#fff" />
-        </Pressable>
-      )}
-    </View>
-  );
-}
-
-/** Elrendezés-presetek a kijelölt forrásnak (drag helyett — OBS-szerű gyors layout). */
-const LAYOUT_PRESETS: { key: string; icon: keyof typeof Ionicons.glyphMap; t: Partial<LiveTransform> }[] = [
-  { key: 'full', icon: 'scan', t: { x: 0, y: 0, w: 1, h: 1 } },
-  { key: 'left', icon: 'contract', t: { x: 0, y: 0, w: 0.5, h: 1 } },
-  { key: 'right', icon: 'contract', t: { x: 0.5, y: 0, w: 0.5, h: 1 } },
-  { key: 'tl', icon: 'albums', t: { x: 0.04, y: 0.04, w: 0.3, h: 0.3 } },
-  { key: 'tr', icon: 'albums', t: { x: 0.66, y: 0.04, w: 0.3, h: 0.3 } },
-  { key: 'center', icon: 'tablet-portrait', t: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 } },
-];
-
+/**
+ * 🎥 Live Studio (élő ELŐTTI szerkesztő): jelenetek/források, célok, rögzítés, mixer,
+ * multistream RTMP-célok, majd „Start streaming” → /live/[id]. A gyökér a hookokat
+ * (eredeti sorrendben), a betöltést és a panel-összerakást tartja; a részek a
+ * src/components/live/studio/ alatt, a számítások a src/lib/liveStudioOps.ts-ben.
+ */
 export default function LiveStudioScreen() {
+  // szándékos: a bontás előtt a gyökér kimaradt a fordítóból (try/catch-es onStart) —
+  // a memoizálás bekapcsolása viselkedés-változás, külön döntés
+  'use no memo';
   const { t } = useTranslation();
   const { height: winH, width: winW } = useWindowDimensions();
   // tableten a vászon és a panelek egymás mellett
@@ -357,7 +132,7 @@ export default function LiveStudioScreen() {
   );
   // 🎥 egyszerre csak EGY élő kamera (iOS) → az első látható kamera-forrás kap képet
   const primaryCameraId = useMemo(
-    () => (scene ? sortedSources(scene).find((s) => s.kind === 'camera' && s.visible)?.id ?? null : null),
+    () => primaryCameraIdOf(scene),
     [scene]
   );
   // belépéskor elkérjük a kamera-engedélyt (a preview-hoz) — ha már eldőlt, no-op
@@ -368,357 +143,66 @@ export default function LiveStudioScreen() {
   }, [camPerm?.granted, requestCam]);
 
   if (loadError) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.center}>
-          <Ionicons name="alert-circle-outline" size={44} color={palette.border} />
-          <Text style={styles.dim}>{t('common.error')}</Text>
-          <Pressable style={styles.secondaryBtn} onPress={() => goBackOrHome()}>
-            <Text style={styles.secondaryText}>{t('live.leave')}</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
+    return <LiveStudioLoadError />;
   }
 
   if (!project || !live) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.center}>
-          <ActivityIndicator color={palette.accent} />
-        </View>
-      </SafeAreaView>
-    );
+    return <LiveStudioLoading />;
   }
 
   const aspect = aspectValue(project.aspectRatio);
 
-  const onAddSource = (kind: LiveSourceKind) => {
-    if (!scene) return;
-    const label = t(`live.studio.source.${kind}`, { defaultValue: kind });
-    commit(addSource(live, scene.id, kind, () => makeId('lsrc'), { label }), `+ ${label}`);
-    setAdding(false);
-  };
-
-  const onAddScene = () => {
-    const next = addScene(live, `Scene ${live.scenes.length + 1}`, () => makeId('lscn'));
-    const added = next.scenes[next.scenes.length - 1];
-    commit(setActiveScene(next, added.id), '+ scene');
-  };
-
-  // 🧹 Studióból kilépés = a live MEGSZAKÍTÁSA (nem indult adás) → a transient live-config
-  // projekt törlése, hogy ne maradjon üres projekt a galériában. A „Start streaming" NEM
-  // ezen megy (az router.replace-szel az /live/[id]-re lép), így a tényleges adást nem törli.
-  const onCancel = () => {
-    if (project?.kind === 'live') {
-      deleteProject(String(id)).catch((caught) => { logCaught('app/live/studio/[id].tsx:onCancel', caught); });
-    }
-    goBackOrHome();
-  };
-
-  const onStart = async () => {
-    const title = (titleDraft.trim() || live.title).slice(0, 120);
-    setStarting(true);
-    try {
-      // 💾 a Studio-szerkesztések a store-ban élnek (nincs külön autosave-hook) →
-      // mentjük, hogy a room a FRISS live-docot töltse (jelenetek/források/célok).
-      const current = useEditorStore.getState().project;
-      if (current) {
-        // 📷 L27: a választott kamera-irány a műsorral együtt mentődik → az adás ezzel indul
-        await saveProject(current.live ? { ...current, live: { ...current.live, cameraFacing: facing } } : current);
-      }
-      // 🎥 L40: az expo-camera előnézet ELENGEDI a kamerát, mielőtt a WebRTC megnyitja
-      // (különben „kamera foglalt" verseny, főleg Androidon)
-      setReleasingCamera(true);
-      await new Promise((r) => setTimeout(r, 350));
-      const session = await startLive(title, live?.visibility);
-      // 🎥 a room megkapja a live-projekt id-jét → a host betölti a live-docot és
-      // broadcastolja a jelenet-állapotot (Fázis B: több-forrás kompozíció).
-      router.replace(`/live/${session.id}?project=${id}`);
-    } catch (e) {
-      logCaught('app/live/studio/[id].tsx:onStart', e);
-      setStarting(false);
-      setReleasingCamera(false);
-      Alert.alert(t('live.error', { defaultValue: 'Live' }), String((e as Error)?.message ?? e));
-    }
-  };
+  const { onAddSource, onAddScene, onCancel, onStart } = createStudioActions({
+    id,
+    project,
+    live,
+    scene,
+    titleDraft,
+    facing,
+    commit,
+    t,
+    setAdding,
+    setStarting,
+    setReleasingCamera,
+  });
+  const { onToggleDest, onRemoveDest, onSubmitRtmp } = createRtmpActions({
+    rtmpLabel,
+    rtmpUrl,
+    rtmpKey,
+    setRtmpLabel,
+    setRtmpUrl,
+    setRtmpKey,
+    setRtmpOpen,
+    loadDests,
+    t,
+  });
 
   // 🧩 a szakaszok panelek: tableten a vászon mellett állnak, és ujjal átrendezhetők
   const panels: Partial<Record<LivePanelId, ReactNode>> = {
-    scenes: (
-      <>
-        {/* scene-strip */}
-        <Text style={styles.sectionLabel}>{t('live.studio.scenes', { defaultValue: 'Scenes' })}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sceneStrip}>
-          {live.scenes.map((s) => {
-            const on = s.id === live.activeSceneId;
-            return (
-              <Pressable
-                key={s.id}
-                onPress={() => commit(setActiveScene(live, s.id))}
-                onLongPress={() =>
-                  live.scenes.length > 1 &&
-                  Alert.alert(s.name, undefined, [
-                    { text: t('common.cancel'), style: 'cancel' },
-                    {
-                      text: t('common.delete'),
-                      style: 'destructive',
-                      onPress: () => commit(removeScene(live, s.id)),
-                    },
-                  ])
-                }
-                style={[styles.sceneChip, on && styles.sceneChipOn]}
-              >
-                <Text style={[styles.sceneChipText, on && styles.sceneChipTextOn]} numberOfLines={1}>
-                  {s.name}
-                </Text>
-                <Text style={styles.sceneChipCount}>{s.sources.length}</Text>
-              </Pressable>
-            );
-          })}
-          <Pressable onPress={onAddScene} style={[styles.sceneChip, styles.sceneChipAdd]}>
-            <Ionicons name="add" size={18} color={palette.accent} />
-          </Pressable>
-        </ScrollView>
-      </>
-    ),
+    scenes: <ScenesPanel live={live} commit={commit} onAddScene={onAddScene} />,
     sources: (
-      <>
-        {/* forrás-lista */}
-        <View style={styles.rowBetween}>
-          <Text style={styles.sectionLabel}>{t('live.studio.sources', { defaultValue: 'Sources' })}</Text>
-          <Pressable onPress={() => setAdding((v) => !v)} style={styles.addSourceBtn} hitSlop={8}>
-            <Ionicons name={adding ? 'close' : 'add'} size={16} color={palette.accent} />
-            <Text style={styles.addSourceText}>{t('live.studio.addSource', { defaultValue: 'Source' })}</Text>
-          </Pressable>
-        </View>
-
-        {adding && (
-          <View style={styles.addGrid}>
-            {ADDABLE.map((k) => (
-              <Pressable key={k} onPress={() => onAddSource(k)} style={styles.addTile}>
-                <Ionicons name={SOURCE_ICON[k]} size={20} color={palette.text} />
-                <Text style={styles.addTileText}>{t(`live.studio.source.${k}`, { defaultValue: k })}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-
-        {scene &&
-          sortedSources(scene)
-            .slice()
-            .reverse()
-            .map((src) => {
-              const sel = src.id === selectedId;
-              return (
-                <Pressable
-                  key={src.id}
-                  onPress={() => setSelectedId(sel ? null : src.id)}
-                  style={[styles.srcRow, sel && styles.srcRowSel]}
-                >
-                  <Pressable onPress={() => commit(toggleSourceVisible(live, scene.id, src.id))} hitSlop={8}>
-                    <Ionicons
-                      name={src.visible ? 'eye' : 'eye-off'}
-                      size={18}
-                      color={src.visible ? palette.text : palette.textDim}
-                    />
-                  </Pressable>
-                  <Ionicons name={SOURCE_ICON[src.kind]} size={16} color={palette.textDim} />
-                  <Text style={styles.srcRowLabel} numberOfLines={1}>
-                    {src.label || src.kind}
-                  </Text>
-                  <Pressable onPress={() => commit(reorderSource(live, scene.id, src.id, 'up'))} hitSlop={6}>
-                    <Ionicons name="chevron-up" size={18} color={palette.textDim} />
-                  </Pressable>
-                  <Pressable onPress={() => commit(reorderSource(live, scene.id, src.id, 'down'))} hitSlop={6}>
-                    <Ionicons name="chevron-down" size={18} color={palette.textDim} />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      commit(removeSource(live, scene.id, src.id));
-                      if (selectedId === src.id) setSelectedId(null);
-                    }}
-                    hitSlop={6}
-                  >
-                    <Ionicons name="trash-outline" size={17} color={palette.danger} />
-                  </Pressable>
-                </Pressable>
-              );
-            })}
-
-        {/* kijelölt forrás — gyors elrendezés */}
-        {selected && scene && (
-          <View style={styles.inspector}>
-            <Text style={styles.inspectorTitle}>{selected.label || selected.kind}</Text>
-            <View style={styles.presetRow}>
-              {LAYOUT_PRESETS.map((p) => (
-                <Pressable
-                  key={p.key}
-                  onPress={() => commit(updateSource(live, scene.id, selected.id, { transform: p.t }))}
-                  style={styles.presetBtn}
-                >
-                  <Ionicons name={p.icon} size={18} color={palette.text} />
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        )}
-      </>
+      <SourcesPanel
+        live={live}
+        scene={scene}
+        selected={selected}
+        selectedId={selectedId}
+        setSelectedId={setSelectedId}
+        adding={adding}
+        setAdding={setAdding}
+        commit={commit}
+        onAddSource={onAddSource}
+      />
     ),
-    destinations: (
-      <>
-        {/* célok */}
-        <Text style={styles.sectionLabel}>{t('live.studio.destinations', { defaultValue: 'Destinations' })}</Text>
-        <View style={styles.destRow}>
-          {live.destinations.map((d) => (
-            <Pressable
-              key={d.id}
-              onPress={() => d.platform !== 'remix' && commit(toggleDestination(live, d.id))}
-              style={[styles.destChip, d.enabled && styles.destChipOn, d.platform === 'remix' && styles.destChipLocked]}
-            >
-              <Text style={[styles.destChipText, d.enabled && styles.destChipTextOn]}>{d.label}</Text>
-              {d.platform !== 'remix' && !d.enabled && (
-                <Text style={styles.destPro}>Pro</Text>
-              )}
-            </Pressable>
-          ))}
-          {EXTERNAL_PLATFORMS.filter(
-            (p) => !live.destinations.some((d) => d.platform === p.platform)
-          ).map((p) => (
-            <Pressable
-              key={p.platform}
-              onPress={() =>
-                commit(addDestination(live, p.platform, p.label, () => makeId('ldst'), { enabled: true }))
-              }
-              style={[styles.destChip, styles.destChipAdd]}
-            >
-              <Ionicons name="add" size={14} color={palette.accent} />
-              <Text style={styles.destChipText}>{p.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <Text style={styles.hint}>{t('live.studio.destHint', { defaultValue: 'ReMix feed is always on. External platforms are Pro (multistream).' })}</Text>
-      </>
-    ),
-    record: (
-      <>
-        {/* 📼 Rögzítés: BE → az adás végén a teljes felvételből szerkeszthető video-projekt;
-            KI → NINCS projekt (a live csak élő adás, nem keletkezik üres-projekt). */}
-        <Text style={styles.sectionLabel}>{t('live.studio.recordSection', { defaultValue: 'Rögzítés' })}</Text>
-        <RecordToggle
-          value={!!live.record}
-          onToggle={() => {
-            // 💳 L18: a felhős felvétel Pro (szerveres egress) — Free usernél a Pro-ajánlat,
-            // nem egy csendben elbukó (402) „rögzítés" ígéret
-            if (!live.record && !capabilityAllowed('liveCloud', useEntitlement.getState().effectiveTier())) {
-              usePaywall.getState().open('liveCloud');
-              return;
-            }
-            commit(setRecord(live, !live.record), live.record ? 'record-off' : 'record-on');
-          }}
-        />
-      </>
-    ),
-    mixer: live.mixer ? (
-      <>
-        {/* 🎚️ audio-mixer */}
-        {live.mixer && (
-          <>
-            <View style={styles.rowBetween}>
-              <Text style={styles.sectionLabel}>{t('live.studio.mixer', { defaultValue: 'Audio mixer' })}</Text>
-              <Pressable
-                onPress={() => commitMixer(toggleAutoDuck(live.mixer!))}
-                style={[styles.duckChip, live.mixer.autoDuck && styles.duckChipOn]}
-                hitSlop={6}
-              >
-                <Ionicons name="trending-down" size={13} color={live.mixer.autoDuck ? '#fff' : palette.textDim} />
-                <Text style={[styles.duckText, live.mixer.autoDuck && styles.duckTextOn]}>Auto-duck</Text>
-              </Pressable>
-            </View>
-
-            {live.mixer.channels.map((ch) => {
-              const level = (ch.gainDb - MIN_DB) / (MAX_DB - MIN_DB); // 0..1 a sáv-vizualizációhoz
-              return (
-                <View key={ch.id} style={styles.mixRow}>
-                  <Ionicons name={CHANNEL_ICON[ch.id]} size={16} color={palette.textDim} />
-                  <Text style={styles.mixLabel}>{ch.label}</Text>
-                  <View style={styles.mixBarTrack}>
-                    <View style={[styles.mixBarFill, { width: `${Math.max(0, Math.min(1, level)) * 100}%` }, ch.mute && styles.mixBarMuted]} />
-                  </View>
-                  <Pressable onPress={() => commitMixer(setChannelGainDb(live.mixer!, ch.id, ch.gainDb - GAIN_STEP))} hitSlop={6} style={styles.mixStep}>
-                    <Ionicons name="remove" size={16} color={palette.text} />
-                  </Pressable>
-                  <Text style={styles.mixDb}>{ch.gainDb > 0 ? `+${ch.gainDb}` : ch.gainDb}</Text>
-                  <Pressable onPress={() => commitMixer(setChannelGainDb(live.mixer!, ch.id, ch.gainDb + GAIN_STEP))} hitSlop={6} style={styles.mixStep}>
-                    <Ionicons name="add" size={16} color={palette.text} />
-                  </Pressable>
-                  <Pressable onPress={() => commitMixer(mixerToggleMute(live.mixer!, ch.id))} hitSlop={6} style={[styles.msBtn, ch.mute && styles.mBtnOn]}>
-                    <Text style={[styles.msText, ch.mute && styles.msTextOn]}>M</Text>
-                  </Pressable>
-                  <Pressable onPress={() => commitMixer(mixerToggleSolo(live.mixer!, ch.id))} hitSlop={6} style={[styles.msBtn, ch.solo && styles.sBtnOn]}>
-                    <Text style={[styles.msText, ch.solo && styles.msTextOn]}>S</Text>
-                  </Pressable>
-                </View>
-              );
-            })}
-
-            <View style={styles.mixRow}>
-              <Ionicons name="options" size={16} color={palette.accent} />
-              <Text style={[styles.mixLabel, { color: palette.accent }]}>Master</Text>
-              <View style={{ flex: 1 }} />
-              <Pressable onPress={() => commitMixer(setMasterGainDb(live.mixer!, live.mixer!.masterGainDb - GAIN_STEP))} hitSlop={6} style={styles.mixStep}>
-                <Ionicons name="remove" size={16} color={palette.text} />
-              </Pressable>
-              <Text style={styles.mixDb}>{live.mixer!.masterGainDb > 0 ? `+${live.mixer!.masterGainDb}` : live.mixer!.masterGainDb}</Text>
-              <Pressable onPress={() => commitMixer(setMasterGainDb(live.mixer!, live.mixer!.masterGainDb + GAIN_STEP))} hitSlop={6} style={styles.mixStep}>
-                <Ionicons name="add" size={16} color={palette.text} />
-              </Pressable>
-            </View>
-            <Text style={styles.hint}>{t('live.studio.mixerHint', { defaultValue: 'Mic mute is live. Music/media/system mixing lands with native audio (soon).' })}</Text>
-          </>
-        )}
-      </>
-    ) : null,
+    destinations: <DestinationsPanel live={live} commit={commit} />,
+    record: <RecordPanel live={live} commit={commit} />,
+    mixer: live.mixer ? <MixerPanel live={live} commitMixer={commitMixer} /> : null,
     multistream: (
-      <>
-        {/* 🎥 Multistream RTMP-célok (Pro) — a tényleges ingest-URL + kulcs */}
-        <View style={styles.rowBetween}>
-          <Text style={styles.sectionLabel}>{t('live.studio.multistream', { defaultValue: 'Multistream (Pro)' })}</Text>
-          <Pressable onPress={() => setRtmpOpen(true)} style={styles.addSourceBtn} hitSlop={8}>
-            <Ionicons name="add" size={16} color={palette.accent} />
-            <Text style={styles.addSourceText}>RTMP</Text>
-          </Pressable>
-        </View>
-        {dests.length === 0 ? (
-          <Text style={styles.hint}>
-            {t('live.studio.noRtmp', { defaultValue: 'Add a YouTube/TikTok/Twitch/custom RTMP target to multistream. ReMix feed is always on.' })}
-          </Text>
-        ) : (
-          dests.map((d) => (
-            <View key={d.id} style={styles.destManageRow}>
-              <Pressable
-                onPress={() => {
-                  setDestinationEnabled(d.id, !d.enabled).then(loadDests).catch((caught) => { logCaught('app/live/studio/[id].tsx:LiveStudioScreen', caught); });
-                }}
-                hitSlop={6}
-              >
-                <Ionicons
-                  name={d.enabled ? 'checkmark-circle' : 'ellipse-outline'}
-                  size={20}
-                  color={d.enabled ? palette.accent : palette.textDim}
-                />
-              </Pressable>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.destManageLabel} numberOfLines={1}>{d.label}</Text>
-                <Text style={styles.destManageUrl} numberOfLines={1}>{d.rtmpUrl} · {d.hasKey ? '•••• key' : t('live.studio.noKey', { defaultValue: 'no key' })}</Text>
-              </View>
-              <Pressable onPress={() => removeRtmpDestination(d.id).then(loadDests).catch((caught) => { logCaught('app/live/studio/[id].tsx:LiveStudioScreen', caught); })} hitSlop={6}>
-                <Ionicons name="trash-outline" size={17} color={palette.danger} />
-              </Pressable>
-            </View>
-          ))
-        )}
-      </>
+      <MultistreamPanel
+        dests={dests}
+        onOpenRtmp={() => setRtmpOpen(true)}
+        onToggleDest={onToggleDest}
+        onRemoveDest={onRemoveDest}
+      />
     ),
   };
   const canvasBlock = (
@@ -730,7 +214,7 @@ export default function LiveStudioScreen() {
               doc={live}
               width={canvasW}
               aspect={aspect}
-              maxHeight={wide ? winH * 0.7 : winH * 0.42}
+              maxHeight={canvasMaxHeight(wide, winH)}
               selectedId={selectedId}
               onSelect={setSelectedId}
               onMoveSource={(sourceId, transform) => {
@@ -743,7 +227,7 @@ export default function LiveStudioScreen() {
               cameraGranted={!!camPerm?.granted}
               primaryCameraId={primaryCameraId}
               onRequestCamera={() => requestCam()}
-              onFlip={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))}
+              onFlip={() => setFacing(flipFacing)}
               releasing={releasingCamera}
             />
           )}
@@ -755,26 +239,14 @@ export default function LiveStudioScreen() {
 
   return (
     <UndoGestureArea>
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={shared.container} edges={['top', 'bottom']}>
       {/* fejléc */}
-      <View style={styles.topBar}>
-        <Pressable onPress={onCancel} hitSlop={10} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={24} color={palette.text} />
-        </Pressable>
-        <TextInput
-          value={titleDraft}
-          onChangeText={setTitleDraft}
-          onEndEditing={() => commit(setDocTitle(live, titleDraft))}
-          placeholder={t('live.titlePlaceholder', { defaultValue: "What's your live about?" })}
-          placeholderTextColor={palette.textDim}
-          style={styles.titleInput}
-          maxLength={120}
-        />
-        <View style={styles.liveStudioBadge}>
-          <Ionicons name="radio" size={13} color="#fff" />
-          <Text style={styles.liveStudioBadgeText}>Studio</Text>
-        </View>
-      </View>
+      <LiveStudioTopBar
+        onCancel={onCancel}
+        titleDraft={titleDraft}
+        setTitleDraft={setTitleDraft}
+        onTitleEnd={() => commit(setDocTitle(live, titleDraft))}
+      />
 
       {wide ? (
         <View style={styles.desk}>
@@ -793,345 +265,29 @@ export default function LiveStudioScreen() {
       )}
 
       {/* akció-sáv */}
-      <View style={styles.actionBar}>
-        <Pressable onPress={onStart} disabled={starting} style={[styles.startBtn, starting && styles.startBtnDisabled]}>
-          {starting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Ionicons name="radio" size={18} color="#fff" />
-              <Text style={styles.startText}>{t('live.studio.startStreaming', { defaultValue: 'Start streaming' })}</Text>
-            </>
-          )}
-        </Pressable>
-      </View>
+      <StartStreamBar starting={starting} onStart={onStart} />
 
       {/* 🎥 Add RTMP target modal */}
-      <Modal visible={rtmpOpen} transparent animationType="slide" onRequestClose={() => setRtmpOpen(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setRtmpOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitle}>{t('live.studio.addRtmp', { defaultValue: 'Add RTMP target' })}</Text>
-            <TextInput
-              value={rtmpLabel}
-              onChangeText={setRtmpLabel}
-              placeholder={t('live.studio.rtmpLabel', { defaultValue: 'Label (e.g. YouTube)' })}
-              placeholderTextColor={palette.textDim}
-              style={styles.modalInput}
-            />
-            <TextInput
-              value={rtmpUrl}
-              onChangeText={setRtmpUrl}
-              placeholder="rtmp://a.rtmp.youtube.com/live2"
-              placeholderTextColor={palette.textDim}
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={styles.modalInput}
-            />
-            <TextInput
-              value={rtmpKey}
-              onChangeText={setRtmpKey}
-              placeholder={t('live.studio.rtmpKey', { defaultValue: 'Stream key' })}
-              placeholderTextColor={palette.textDim}
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry
-              style={styles.modalInput}
-            />
-            <Text style={styles.modalHint}>{t('live.studio.rtmpHint', { defaultValue: 'Stored encrypted & owner-only; never leaves the server. Needs Pro + LiveKit egress to stream.' })}</Text>
-            <View style={styles.modalRow}>
-              <Pressable style={[styles.modalBtn]} onPress={() => setRtmpOpen(false)}>
-                <Text style={styles.modalBtnText}>{t('common.cancel')}</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modalBtn, styles.modalBtnPrimary, (!rtmpUrl.trim() || !rtmpKey.trim()) && styles.startBtnDisabled]}
-                disabled={!rtmpUrl.trim() || !rtmpKey.trim()}
-                onPress={() => {
-                  addRtmpDestination({
-                    platform: 'custom',
-                    label: rtmpLabel.trim() || 'RTMP',
-                    rtmpUrl: rtmpUrl.trim(),
-                    streamKey: rtmpKey.trim(),
-                    enabled: true,
-                  })
-                    .then(() => {
-                      setRtmpLabel('');
-                      setRtmpUrl('');
-                      setRtmpKey('');
-                      setRtmpOpen(false);
-                      loadDests();
-                    })
-                    .catch((e) => {
-                    logCaught('app/live/studio/[id].tsx:LiveStudioScreen', e);
-                      // a validációs hiba i18n-kulcs (live.dest.*), a többi szerver-üzenet (kitakarva)
-                      const msg = String(e?.message ?? e);
-                      Alert.alert(t('common.error'), msg.startsWith('live.dest.') ? t(msg) : msg);
-                    });
-                }}
-              >
-                <Text style={[styles.modalBtnText, styles.modalBtnTextPrimary]}>{t('common.add', { defaultValue: 'Add' })}</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <AddRtmpModal
+        open={rtmpOpen}
+        setOpen={setRtmpOpen}
+        rtmpLabel={rtmpLabel}
+        setRtmpLabel={setRtmpLabel}
+        rtmpUrl={rtmpUrl}
+        setRtmpUrl={setRtmpUrl}
+        rtmpKey={rtmpKey}
+        setRtmpKey={setRtmpKey}
+        onSubmit={onSubmitRtmp}
+      />
     </SafeAreaView>
     </UndoGestureArea>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: palette.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
-  dim: { color: palette.textDim, fontSize: 15, fontWeight: '700' },
-
-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  iconBtn: { padding: 2 },
-  titleInput: { flex: 1, color: palette.text, fontSize: 16, fontWeight: '700' },
-  liveStudioBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: palette.danger,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  liveStudioBadgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-
   body: { padding: 12, gap: 12, paddingBottom: 24 },
   desk: { flex: 1, flexDirection: 'row' },
   deskCanvas: { flex: 3 },
   deskPanels: { flex: 2, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: palette.border },
   canvasWrap: { width: '100%' },
-  canvas: { backgroundColor: '#000', borderRadius: 14, overflow: 'hidden', alignSelf: 'center' },
-  srcBox: {
-    position: 'absolute',
-    backgroundColor: '#ffffff14',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-    paddingHorizontal: 4,
-  },
-  srcBoxLabel: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  srcBoxLive: { backgroundColor: 'transparent' },
-  camTag: {
-    position: 'absolute',
-    left: 6,
-    bottom: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#00000073',
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  camTagText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-  flipBtn: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#00000073',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ffffff44',
-  },
-  canvasEmpty: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  canvasEmptyText: { color: palette.textDim },
-
-  sectionLabel: { color: palette.textDim, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-
-  sceneStrip: { gap: 8, paddingVertical: 2 },
-  sceneChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: palette.surface,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    maxWidth: 160,
-  },
-  sceneChipOn: { borderColor: palette.accent, backgroundColor: palette.accent + '22' },
-  sceneChipText: { color: palette.text, fontSize: 14, fontWeight: '700', flexShrink: 1 },
-  sceneChipTextOn: { color: palette.accent },
-  sceneChipCount: { color: palette.textDim, fontSize: 11, fontWeight: '800' },
-  sceneChipAdd: { paddingHorizontal: 14 },
-
-  addSourceBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  addSourceText: { color: palette.accent, fontSize: 13, fontWeight: '800' },
-  addGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  addTile: {
-    width: '23%',
-    aspectRatio: 1,
-    backgroundColor: palette.surface,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-  },
-  addTileText: { color: palette.text, fontSize: 11, fontWeight: '600' },
-
-  srcRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: palette.surface,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  srcRowSel: { borderColor: palette.accent },
-  srcRowLabel: { flex: 1, color: palette.text, fontSize: 14, fontWeight: '600' },
-
-  inspector: { backgroundColor: palette.surface, borderRadius: 12, padding: 12, gap: 10 },
-  inspectorTitle: { color: palette.text, fontSize: 14, fontWeight: '800' },
-  presetRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  presetBtn: {
-    width: 44,
-    height: 40,
-    backgroundColor: palette.bg,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  destRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  destChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: palette.surface,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  destChipOn: { borderColor: palette.accent, backgroundColor: palette.accent + '22' },
-  destChipLocked: { opacity: 0.9 },
-  destChipAdd: { borderStyle: 'dashed', borderColor: palette.border },
-  destChipText: { color: palette.text, fontSize: 13, fontWeight: '700' },
-  destChipTextOn: { color: palette.accent },
-  destPro: { color: palette.textDim, fontSize: 10, fontWeight: '800' },
-  hint: { color: palette.textDim, fontSize: 12, lineHeight: 17 },
-
-  duckChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: palette.surface,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  duckChipOn: { backgroundColor: palette.accent, borderColor: palette.accent },
-  duckText: { color: palette.textDim, fontSize: 12, fontWeight: '800' },
-  duckTextOn: { color: '#fff' },
-  mixRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: palette.surface,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  mixLabel: { color: palette.text, fontSize: 13, fontWeight: '700', width: 58 },
-  mixBarTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: palette.bg, overflow: 'hidden' },
-  mixBarFill: { height: 6, borderRadius: 3, backgroundColor: palette.accent },
-  mixBarMuted: { backgroundColor: palette.textDim },
-  mixStep: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: palette.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mixDb: { color: palette.text, fontSize: 12, fontWeight: '800', width: 32, textAlign: 'center' },
-  msBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 7,
-    backgroundColor: palette.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mBtnOn: { backgroundColor: palette.danger },
-  sBtnOn: { backgroundColor: '#f0a022' },
-  msText: { color: palette.textDim, fontSize: 12, fontWeight: '900' },
-  msTextOn: { color: '#fff' },
-
-  destManageRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: palette.surface,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  destManageLabel: { color: palette.text, fontSize: 14, fontWeight: '700' },
-  destManageUrl: { color: palette.textDim, fontSize: 11, marginTop: 1 },
-
-  modalBackdrop: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
-  modalCard: {
-    backgroundColor: palette.bg,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 18,
-    gap: 10,
-    borderTopWidth: 1,
-    borderColor: palette.border,
-  },
-  modalTitle: { color: palette.text, fontSize: 17, fontWeight: '800', marginBottom: 2 },
-  modalInput: {
-    backgroundColor: palette.surface,
-    borderRadius: 10,
-    color: palette.text,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-  },
-  modalHint: { color: palette.textDim, fontSize: 11, lineHeight: 16 },
-  modalRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
-  modalBtn: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 13,
-    borderRadius: 12,
-    backgroundColor: palette.surface,
-  },
-  modalBtnPrimary: { backgroundColor: palette.accent },
-  modalBtnText: { color: palette.text, fontSize: 15, fontWeight: '700' },
-  modalBtnTextPrimary: { color: '#fff', fontWeight: '800' },
-
-  actionBar: { padding: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border },
-  startBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: palette.danger,
-    borderRadius: 14,
-    paddingVertical: 15,
-  },
-  startBtnDisabled: { opacity: 0.6 },
-  startText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-
-  secondaryBtn: { backgroundColor: palette.surface, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 10 },
-  secondaryText: { color: palette.text, fontSize: 14, fontWeight: '700' },
 });

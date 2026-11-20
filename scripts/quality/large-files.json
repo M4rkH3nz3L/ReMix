@@ -1,6 +1,5 @@
 {
   "server/text-render.js": 1175,
-  "src/app/live/studio/[id].tsx": 1138,
   "src/components/studio/model3d/Model3DStudio.tsx": 1366,
   "src/lib/feed.ts": 1138,
   "src/lib/render.ts": 1196

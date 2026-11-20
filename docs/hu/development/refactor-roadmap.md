@@ -92,6 +92,18 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   soha nem illeszkedhet (halott ág); a `tracksIn` klip nélküli sávot is létezőnek vesz („az effektre”
   egy üres sfx-sávra mutat).
 
+- **Live Studio** (`src/components/live/studio/`, `src/lib/liveStudioOps.ts`): a képernyő az élő ELŐTTI
+  szerkesztő — LiveKit-kapcsolat, chat és egress NINCS benne (az a `/live/[id]`-ben él). Biztonsági
+  észrevételek (nem javítva): (1) a „+ RTMP” multistream-cél felvétele és be/ki kapcsolása kliens-oldalon
+  NINCS Pro-kapuhoz kötve (csak a felirat mondja „Pro”); a dokumentum külső célplatform-chipjei is
+  Free-ben kapcsolhatók — a kapu a szerveren kell legyen; (2) a kulcs nélküli cél (`hasKey: false`) a
+  listán bekapcsolható (`setDestinationEnabled` közvetlenül a táblára ír); (3) a stream-kulcs sikertelen
+  mentés / Mégse után a képernyő állapotában marad (`rtmpKey`), a modal újranyitásakor visszatöltődik;
+  (4) a nem `live.dest.*` hibaüzenet (szerver/DB-szöveg) nyersen jelenik meg az Alertben. Egyéb: a
+  „Tap to enable camera”, „Camera”, „Auto-duck”, „Master”, „Studio”, „Pro” beégetett angol szöveg; a
+  „Rögzítés” defaultValue magyar a többi angol mellett; az `onCancel` törlése nem várja meg a
+  `deleteProject`-et, mielőtt visszalép.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -105,7 +117,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/lib/render.ts` | 1195 | ⬜ |
 | `server/text-render.js` | 1174 | ⬜ |
 | `src/lib/feed.ts` | 1137 | ⬜ |
-| `src/app/live/studio/[id].tsx` | 1137 | ⬜ |
+| `src/app/live/studio/[id].tsx` | 1137 | ✅ → 293 |
 | `src/components/studio/image/LayerInspector.tsx` | 1105 | ✅ → 110 |
 | `src/components/editor/panels/ExportPanel.tsx` | 1059 | ✅ → 144 |
 | `server/userFiles.js` | 997 | ⬜ |

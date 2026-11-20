@@ -150,6 +150,19 @@ const MUST_BE_MEMOIZED = [
   ['src/components/studio/audio/clipEdit/VoiceTuneSection.tsx', 'VoiceTuneSection'],
   ['src/components/studio/audio/clipEdit/FxOrderSection.tsx', 'FxOrderSection'],
   ['src/components/studio/audio/clipEdit/ClipToolsSection.tsx', 'ClipToolsSection'],
+  // REFACTOR: a Live Studio (src/app/live/studio/[id].tsx) kiemelt renderelő részei (a gyökér kimarad, lásd lent)
+  ['src/components/live/studio/LiveCanvas.tsx', 'LiveCanvas'],
+  ['src/components/live/studio/ScenesPanel.tsx', 'ScenesPanel'],
+  ['src/components/live/studio/SourcesPanel.tsx', 'SourcesPanel'],
+  ['src/components/live/studio/StreamConfigPanels.tsx', 'DestinationsPanel'],
+  ['src/components/live/studio/StreamConfigPanels.tsx', 'RecordPanel'],
+  ['src/components/live/studio/StreamConfigPanels.tsx', 'MultistreamPanel'],
+  ['src/components/live/studio/MixerPanel.tsx', 'MixerPanel'],
+  ['src/components/live/studio/AddRtmpModal.tsx', 'AddRtmpModal'],
+  ['src/components/live/studio/LiveStudioChrome.tsx', 'LiveStudioLoadError'],
+  ['src/components/live/studio/LiveStudioChrome.tsx', 'LiveStudioLoading'],
+  ['src/components/live/studio/LiveStudioChrome.tsx', 'LiveStudioTopBar'],
+  ['src/components/live/studio/LiveStudioChrome.tsx', 'StartStreamBar'],
 ];
 
 /**
@@ -173,6 +186,7 @@ const KNOWN_BAILS = [
   ['src/components/editor/panels/PrecisionPanel.tsx', 'PrecisionPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],  ['src/components/studio/audio/ClipEditSheet.tsx', 'ClipEditSheet', 'a füstteszt-hookok refjeit (onDoneRef/presetRef/editInstRef) renderben írja'],
   ['src/components/studio/audio/clipEdit/FxParamsSection.tsx', 'FxParamsSection', 'a parametrikus EQ patch-e template-literál kulcsú objektum (a fordító még nem támogatja)'],
   ['src/components/studio/audio/clipEdit/FxPresetsSection.tsx', 'FxPresetsSection', 'a füstteszt görgetési pontját (presetsY ref) az onLayout írja'],
+  ['src/app/live/studio/[id].tsx', 'LiveStudioScreen', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
 ];
 
 const cache = new Map();

@@ -48,6 +48,10 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 - **Image Studio path-szerkesztés undo-címkéi** (`src/components/studio/image/body/pathEditActions.ts`):
   nyers technikai szövegek (`path-closed`, `path-reverse`, `node-<típus>`, `node-delete`), nem
   `t()`-kulcsok — ha az előzmény-lap mutatja őket, ott fordítatlanok.
+- **PrecisionPanel** (`src/components/editor/panels/precision/`): (1) a doksi „tizedmásodperces
+  igazítást” ír, a sec-mód viszont századra kerekít (a lépés 0,1 s); (2) a forgatás-stepper a nyers
+  értéket mutatja (`${rotation}°`), a Graph Editor kerekít; (3) `setDuration`-ben ha egy videó
+  `maxVideoDuration`-je kisebb a `MIN_CLIP_DURATION`-nál, a `clamp` min > max argumentumot kap.
 
 ## Éles fájlok (63)
 

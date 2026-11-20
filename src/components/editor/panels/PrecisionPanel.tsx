@@ -1,63 +1,28 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 
-import { KeyframeGraphEditor } from '@/components/editor/KeyframeGraphEditor';
-import { Chip, PanelSection, Stepper } from '@/components/ui/controls';
-import { aspectValue, MIN_CLIP_DURATION, palette } from '@/constants/editor';
+import { AppearanceSection } from '@/components/editor/panels/precision/AppearanceSection';
+import { CompoundSection } from '@/components/editor/panels/precision/CompoundSection';
+import { ImageTrackSection } from '@/components/editor/panels/precision/ImageTrackSection';
+import { KeyframesSection } from '@/components/editor/panels/precision/KeyframesSection';
 import {
-  FPS_OPTIONS,
-  formatTimecode,
-  frameDuration,
-  projectFps,
-  secToFrame,
-  snapToFrame,
-} from '@/lib/frames';
-import type { KeyframeChannel } from '@/lib/keyframes';
-import { activeVisualClip, maxVideoDuration, sourceTimeAt } from '@/lib/projectUtils';
-import { isRenderCancelledError, renderMp4 } from '@/lib/render';
-import { clamp } from '@/lib/time';
-import { pointsToPanKeyframes, trackSubject } from '@/lib/track';
+  createCompoundProxyAction,
+  createImageTrackActions,
+  createTimingActions,
+} from '@/components/editor/panels/precision/precisionActions';
+import { AlignSection, TimebaseSection, TimingSection } from '@/components/editor/panels/precision/TimingSections';
+import { frameDuration, projectFps } from '@/lib/frames';
+import { STEP, type ChannelCfg, type StepMode } from '@/lib/precisionPanelOps';
 import { useEditorStore } from '@/store/editorStore';
-import type { Clip, ImageClip, VideoClip } from '@/types/project';
-import { logCaught } from '@/lib/logCaught';
-
-const STEP = 0.1;
-
-/**
- * 🎞️ A Graph Editorban szerkeszthető transzform-csatornák (videó/kép): érték-
- * tartomány + a kulcskocka nélküli szél-érték + megjelenítés.
- */
-type ChannelCfg = {
-  id: Extract<KeyframeChannel, 'scale' | 'x' | 'y' | 'rotation' | 'opacity'>;
-  label: string;
-  min: number;
-  max: number;
-  fallback: (clip: VideoClip | ImageClip) => number;
-  fmt: (v: number) => string;
-};
-const TRANSFORM_CHANNELS: ChannelCfg[] = [
-  { id: 'scale', label: 'panels.precision.chScale', min: 0.2, max: 4, fallback: (c) => c.transform?.scale ?? 1, fmt: (v) => `${v.toFixed(2)}×` },
-  { id: 'x', label: 'panels.precision.chX', min: -0.75, max: 0.75, fallback: (c) => c.transform?.x ?? 0, fmt: (v) => `${Math.round(v * 100)}%` },
-  { id: 'y', label: 'panels.precision.chY', min: -0.75, max: 0.75, fallback: (c) => c.transform?.y ?? 0, fmt: (v) => `${Math.round(v * 100)}%` },
-  { id: 'rotation', label: 'panels.precision.chRotation', min: -180, max: 180, fallback: (c) => c.transform?.rotation ?? 0, fmt: (v) => `${Math.round(v)}°` },
-  { id: 'opacity', label: 'panels.precision.chOpacity', min: 0, max: 1, fallback: (c) => c.opacity ?? 1, fmt: (v) => `${Math.round(v * 100)}%` },
-];
-
-/**
- * A léptetés finomsága. Kockára állítva az érték a render KÉPKOCKA-RÁCSÁRA
- * kerekedik (nem tizedmásodpercre) — SFX-, felirat- és vágás-igazításnál ez
- * kell, mert fél kocka csúszás már látszik/hallatszik.
- */
-type StepMode = 'sec' | 'frame';
-
-/** kerekítés a lépés-mód szerint (frame-módban a projekt frame-rácsára) */
-function snap(value: number, mode: StepMode, fps: number): number {
-  return mode === 'frame' ? snapToFrame(value, fps) : Math.round(value * 100) / 100;
-}
+import type { Clip } from '@/types/project';
 
 /** Pro eszköz: kezdet/hossz tizedmásodperces igazítása + lejátszófej-műveletek. */
 export function PrecisionPanel({ clip }: { clip: Clip }) {
+  // 🧭 A bontás után a gyökér már FORDÍTHATÓ lenne a React Compilerrel (előtte kimaradt: a try/finally
+  // a gyökérben volt), de a memoizálás bekapcsolása viselkedés-változás → külön döntés
+  // (tools/reactCompiler.test.js KNOWN_BAILS).
+  'use no memo';
   const { t } = useTranslation();
   const updateClip = useEditorStore((s) => s.updateClip);
   const setPlayhead = useEditorStore((s) => s.setPlayhead);
@@ -70,514 +35,66 @@ export function PrecisionPanel({ clip }: { clip: Clip }) {
   const fps = useEditorStore((s) => projectFps(s.project));
   const dispatch = useEditorStore((s) => s.dispatch);
 
-  /**
-   * 🧱 Compound előnézet: a beágyazott kompozíciót MP4-proxyba rendereli
-   * (local-first, ingyen; összetettnél felhő = Pro), és a klip uri-ját a proxyra
-   * cseréli — így a compound a VALÓS tartalmát mutatja (a durva placeholder helyett).
-   * Az export úgyis rekurzívan újrarendereli a comp-ot, ez csak az előnézeté.
-   */
-  const renderCompoundProxy = async () => {
-    if (clip.kind !== 'video' || !clip.comp || proxyBusy) {
-      return;
-    }
-    setProxyBusy(true);
-    try {
-      const comp = clip.comp;
-      const sub = {
-        id: `${clip.id}-comp`,
-        name: 'comp',
-        aspectRatio: comp.aspectRatio,
-        tracks: comp.tracks,
-        assets: comp.assets,
-        createdAt: '',
-        updatedAt: '',
-        schemaVersion: 4,
-      };
-      const file = await renderMp4(sub, undefined, { resolution: 720, fps: 30, quality: 'medium', codec: 'h264' }, { mode: 'auto' });
-      updateClip(clip.id, { uri: file.uri });
-      Alert.alert(t('panels.precision.compoundDoneTitle'), t('panels.precision.compoundDoneBody'));
-    } catch (err) {
-      logCaught('components/editor/panels/PrecisionPanel.tsx:renderCompoundProxy', err);
-      if (!isRenderCancelledError(err)) {
-        Alert.alert(t('panels.precision.compoundTitle'), (err as Error).message);
-      }
-    } finally {
-      setProxyBusy(false);
-    }
-  };
+  const renderCompoundProxy = createCompoundProxyAction({ clip, t, proxyBusy, setProxyBusy, updateClip });
   const step = stepMode === 'frame' ? frameDuration(fps) : STEP;
-
-  /**
-   * 🎯 Objektum-követés: a felhasználó a vásznon rákoppint a követendő objektumra,
-   * a worker (NCC-tracker) végigköveti a videón, és a KÉP a pásztázással utána
-   * mozog (a kép a videó fölötti overlay/PiP; a videót követi). Pro (objectTrack).
-   */
-  const runTrackImage = (point: { x: number; y: number }) => {
-    const state = useEditorStore.getState();
-    const project = state.project;
-    if (!project || trackBusy || clip.kind !== 'image') {
-      return;
-    }
-    const video = activeVisualClip(project, state.playhead);
-    if (!video || video.kind !== 'video') {
-      Alert.alert(t('panels.precision.trackTitle'), t('panels.precision.trackNeedVideo'));
-      return;
-    }
-    if (state.playhead < clip.start || state.playhead >= clip.start + clip.duration) {
-      Alert.alert(t('panels.precision.trackTitle'), t('panels.precision.trackPlayheadOnClip'));
-      return;
-    }
-    const endTl = Math.min(clip.start + clip.duration, video.start + video.duration, state.playhead + 15);
-    const durTl = endTl - state.playhead;
-    if (durTl < 0.5) {
-      Alert.alert(t('panels.precision.trackTitle'), t('panels.precision.trackTooShort'));
-      return;
-    }
-    const base = { x: clip.transform?.x ?? 0, y: clip.transform?.y ?? 0 };
-    setTrackBusy(true);
-    trackSubject(video.uri, {
-      startSec: sourceTimeAt(video, state.playhead),
-      durationSec: durTl * video.speed,
-      cx: point.x,
-      cy: point.y,
-      aspectW: aspectValue(project.aspectRatio),
-      aspectH: 1,
-    })
-      .then((points) => {
-        if (!points) {
-          Alert.alert(t('panels.precision.trackTitle'), t('panels.precision.trackFailed'));
-          return;
-        }
-        const kf = pointsToPanKeyframes(points, base, state.playhead - clip.start, 1 / video.speed);
-        state.updateClip(clip.id, { keyframes: { ...clip.keyframes, ...kf } });
-        Alert.alert(t('panels.precision.trackDone'), t('panels.precision.trackDoneBody', { count: kf.x.length }));
-      })
-      .catch((err: Error) => { logCaught('components/editor/panels/PrecisionPanel.tsx:runTrackImage', err); return Alert.alert(t('panels.precision.trackTitle'), err.message); })
-      .finally(() => setTrackBusy(false));
-  };
-  const startTrackPick = () => {
-    Alert.alert(t('panels.precision.trackTitle'), t('panels.precision.trackPickHint'));
-    setPickTarget((point) => runTrackImage(point));
-  };
-
-  const maxDuration =
-    clip.kind === 'video' ? maxVideoDuration(clip) : Number.POSITIVE_INFINITY;
-
-  const setStart = (start: number) => {
-    updateClip(clip.id, { start: Math.max(0, snap(start, stepMode, fps)) });
-  };
-
-  const setDuration = (duration: number) => {
-    updateClip(clip.id, {
-      duration: snap(clamp(duration, MIN_CLIP_DURATION, maxDuration), stepMode, fps),
-    });
-  };
-
-  /** a lejátszófej léptetése ugyanazzal a finomsággal */
-  const nudgePlayhead = (dir: 1 | -1) => {
-    setPlayhead(snap(playhead + dir * step, stepMode, fps));
-  };
-
-  const alignToPlayhead = () => {
-    const { playhead } = useEditorStore.getState();
-    setStart(playhead);
-  };
+  const { startTrackPick } = createImageTrackActions({ clip, t, trackBusy, setTrackBusy, setPickTarget });
+  const { setStart, setDuration, nudgePlayhead, alignToPlayhead } = createTimingActions({
+    clip,
+    updateClip,
+    setPlayhead,
+    playhead,
+    stepMode,
+    fps,
+    step,
+  });
 
   return (
     <View>
       {/* 🎞️ Timebase: a projekt frame-rátája (egész app erre a rácsra ül) */}
-      <PanelSection title={t('panels.precision.timebaseTitle')}>
-        <View style={styles.row}>
-          {FPS_OPTIONS.map((f) => (
-            <Chip
-              key={f}
-              label={`${f}`}
-              active={fps === f}
-              onPress={() => dispatch({ type: 'SET_FPS', fps: f })}
-            />
-          ))}
-        </View>
-        <Text style={styles.range}>{t('panels.precision.timebaseNote', { fps })}</Text>
-      </PanelSection>
+      <TimebaseSection fps={fps} dispatch={dispatch} />
 
-      <PanelSection title={t('panels.precision.timingTitle')}>
-        <View style={styles.row}>
-          <Chip
-            label={t('panels.precision.stepSec')}
-            active={stepMode === 'sec'}
-            onPress={() => setStepMode('sec')}
-          />
-          <Chip
-            label={t('panels.precision.stepFrame', { fps })}
-            active={stepMode === 'frame'}
-            onPress={() => setStepMode('frame')}
-          />
-        </View>
-        <Stepper
-          label={t('panels.precision.start')}
-          value={formatTimecode(clip.start, fps)}
-          onDec={() => setStart(clip.start - step)}
-          onInc={() => setStart(clip.start + step)}
-        />
-        <Stepper
-          label={t('panels.precision.length')}
-          value={formatTimecode(clip.duration, fps)}
-          onDec={() => setDuration(clip.duration - step)}
-          onInc={() => setDuration(clip.duration + step)}
-        />
-        <Text style={styles.range}>
-          {formatTimecode(clip.start, fps)} → {formatTimecode(clip.start + clip.duration, fps)}
-          {stepMode === 'frame'
-            ? t('panels.precision.frameInfo', {
-                startFrame: secToFrame(clip.start, fps),
-                frameCount: secToFrame(clip.duration, fps),
-              })
-            : ''}
-        </Text>
-      </PanelSection>
+      <TimingSection
+        clip={clip}
+        fps={fps}
+        stepMode={stepMode}
+        setStepMode={setStepMode}
+        step={step}
+        setStart={setStart}
+        setDuration={setDuration}
+      />
 
-      <PanelSection title={t('panels.precision.alignTitle')}>
-        <View style={styles.row}>
-          <Chip
-            label={
-              stepMode === 'frame'
-                ? t('panels.precision.nudgeBackFrame')
-                : t('panels.precision.nudgeBackSec')
-            }
-            active={false}
-            onPress={() => nudgePlayhead(-1)}
-          />
-          <Chip
-            label={
-              stepMode === 'frame'
-                ? t('panels.precision.nudgeFwdFrame')
-                : t('panels.precision.nudgeFwdSec')
-            }
-            active={false}
-            onPress={() => nudgePlayhead(1)}
-          />
-          <Chip label={t('panels.precision.startToPlayhead')} active={false} onPress={alignToPlayhead} />
-          <Chip
-            label={t('panels.precision.playheadToClipStart')}
-            active={false}
-            onPress={() => setPlayhead(clip.start)}
-          />
-          <Chip
-            label={t('panels.precision.playheadToClipEnd')}
-            active={false}
-            onPress={() => setPlayhead(clip.start + clip.duration)}
-          />
-        </View>
-      </PanelSection>
+      <AlignSection
+        clip={clip}
+        stepMode={stepMode}
+        nudgePlayhead={nudgePlayhead}
+        alignToPlayhead={alignToPlayhead}
+        setPlayhead={setPlayhead}
+      />
 
       {clip.kind === 'video' || clip.kind === 'image' ? (
-        <PanelSection title={t('panels.precision.keyframesTitle')}>
-          <View style={styles.row}>
-            {TRANSFORM_CHANNELS.map((c) => (
-              <Chip
-                key={c.id}
-                label={t(c.label)}
-                active={kfChannel === c.id}
-                onPress={() => setKfChannel(c.id)}
-              />
-            ))}
-          </View>
-          {(() => {
-            const cfg = TRANSFORM_CHANNELS.find((c) => c.id === kfChannel) ?? TRANSFORM_CHANNELS[0];
-            const media = clip as VideoClip | ImageClip;
-            return (
-              <KeyframeGraphEditor
-                keyframes={media.keyframes?.[cfg.id] ?? []}
-                duration={clip.duration}
-                min={cfg.min}
-                max={cfg.max}
-                fallback={cfg.fallback(media)}
-                playhead={clamp(playhead - clip.start, 0, clip.duration)}
-                onChange={(next) =>
-                  updateClip(clip.id, {
-                    keyframes: { ...media.keyframes, [cfg.id]: next.length > 0 ? next : undefined },
-                  })
-                }
-                onSeek={(tt) => setPlayhead(clip.start + tt)}
-                formatValue={cfg.fmt}
-              />
-            );
-          })()}
-          <Text style={styles.range}>{t('panels.precision.keyframeHint')}</Text>
-        </PanelSection>
+        <KeyframesSection
+          clip={clip}
+          kfChannel={kfChannel}
+          setKfChannel={setKfChannel}
+          playhead={playhead}
+          updateClip={updateClip}
+          setPlayhead={setPlayhead}
+        />
       ) : null}
 
       {clip.kind === 'video' || clip.kind === 'image' ? (
-        <PanelSection title={t('panels.precision.appearanceTitle')}>
-          {/* 🔭 Méret + pozíció numerikus mezők (a gesztus-szerkesztés precíz párja) */}
-          <Stepper
-            label={t('panels.precision.scale', { defaultValue: 'Méret' })}
-            value={`${(clip.transform?.scale ?? 1).toFixed(2)}×`}
-            onDec={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  scale: clamp(Math.round(((clip.transform?.scale ?? 1) - 0.1) * 100) / 100, 0.2, 4),
-                },
-              })
-            }
-            onInc={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  scale: clamp(Math.round(((clip.transform?.scale ?? 1) + 0.1) * 100) / 100, 0.2, 4),
-                },
-              })
-            }
-          />
-          <Stepper
-            label={t('panels.precision.posX', { defaultValue: 'Pozíció X' })}
-            value={`${Math.round((clip.transform?.x ?? 0) * 100)}%`}
-            onDec={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  x: clamp(Math.round(((clip.transform?.x ?? 0) - 0.05) * 100) / 100, -0.75, 0.75),
-                },
-              })
-            }
-            onInc={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  x: clamp(Math.round(((clip.transform?.x ?? 0) + 0.05) * 100) / 100, -0.75, 0.75),
-                },
-              })
-            }
-          />
-          <Stepper
-            label={t('panels.precision.posY', { defaultValue: 'Pozíció Y' })}
-            value={`${Math.round((clip.transform?.y ?? 0) * 100)}%`}
-            onDec={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  y: clamp(Math.round(((clip.transform?.y ?? 0) - 0.05) * 100) / 100, -0.75, 0.75),
-                },
-              })
-            }
-            onInc={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  y: clamp(Math.round(((clip.transform?.y ?? 0) + 0.05) * 100) / 100, -0.75, 0.75),
-                },
-              })
-            }
-          />
-          <Stepper
-            label={t('panels.precision.rotation')}
-            value={`${clip.transform?.rotation ?? 0}°`}
-            onDec={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  rotation: ((clip.transform?.rotation ?? 0) - 5 + 360) % 360,
-                },
-              })
-            }
-            onInc={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  rotation: ((clip.transform?.rotation ?? 0) + 5) % 360,
-                },
-              })
-            }
-          />
-          {/* ⬛ Nyírás (skew) X/Y — audit §6.6 */}
-          <Stepper
-            label={t('panels.precision.skewX', { defaultValue: 'Nyírás X' })}
-            value={`${clip.transform?.skewX ?? 0}°`}
-            onDec={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  skewX: clamp((clip.transform?.skewX ?? 0) - 5, -45, 45) || undefined,
-                },
-              })
-            }
-            onInc={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  skewX: clamp((clip.transform?.skewX ?? 0) + 5, -45, 45) || undefined,
-                },
-              })
-            }
-          />
-          <Stepper
-            label={t('panels.precision.skewY', { defaultValue: 'Nyírás Y' })}
-            value={`${clip.transform?.skewY ?? 0}°`}
-            onDec={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  skewY: clamp((clip.transform?.skewY ?? 0) - 5, -45, 45) || undefined,
-                },
-              })
-            }
-            onInc={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  skewY: clamp((clip.transform?.skewY ?? 0) + 5, -45, 45) || undefined,
-                },
-              })
-            }
-          />
-          {/* 📐 Perspektíva / corner-pin X/Y — a klip egyik éle hátradől (−1…1), VIDEOT §4 */}
-          <Stepper
-            label={t('panels.precision.perspectiveX', { defaultValue: 'Perspektíva ↔' })}
-            value={`${Math.round((clip.transform?.perspectiveX ?? 0) * 100)}%`}
-            onDec={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  perspectiveX: clamp((clip.transform?.perspectiveX ?? 0) - 0.1, -1, 1) || undefined,
-                },
-              })
-            }
-            onInc={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  perspectiveX: clamp((clip.transform?.perspectiveX ?? 0) + 0.1, -1, 1) || undefined,
-                },
-              })
-            }
-          />
-          <Stepper
-            label={t('panels.precision.perspectiveY', { defaultValue: 'Perspektíva ↕' })}
-            value={`${Math.round((clip.transform?.perspectiveY ?? 0) * 100)}%`}
-            onDec={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  perspectiveY: clamp((clip.transform?.perspectiveY ?? 0) - 0.1, -1, 1) || undefined,
-                },
-              })
-            }
-            onInc={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  perspectiveY: clamp((clip.transform?.perspectiveY ?? 0) + 0.1, -1, 1) || undefined,
-                },
-              })
-            }
-          />
-          {/* ⚓ Pivot (anchor) X/Y — a forgatás/méretezés középpontja, audit §6.6 */}
-          <Stepper
-            label={t('panels.precision.anchorX', { defaultValue: 'Pivot X' })}
-            value={`${Math.round((clip.transform?.anchorX ?? 0.5) * 100)}%`}
-            onDec={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  anchorX: clamp((clip.transform?.anchorX ?? 0.5) - 0.1, 0, 1),
-                },
-              })
-            }
-            onInc={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  anchorX: clamp((clip.transform?.anchorX ?? 0.5) + 0.1, 0, 1),
-                },
-              })
-            }
-          />
-          <Stepper
-            label={t('panels.precision.anchorY', { defaultValue: 'Pivot Y' })}
-            value={`${Math.round((clip.transform?.anchorY ?? 0.5) * 100)}%`}
-            onDec={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  anchorY: clamp((clip.transform?.anchorY ?? 0.5) - 0.1, 0, 1),
-                },
-              })
-            }
-            onInc={() =>
-              updateClip(clip.id, {
-                transform: {
-                  ...(clip.transform ?? { scale: 1, x: 0, y: 0 }),
-                  anchorY: clamp((clip.transform?.anchorY ?? 0.5) + 0.1, 0, 1),
-                },
-              })
-            }
-          />
-          <Stepper
-            label={t('panels.precision.opacity')}
-            value={`${Math.round((clip.opacity ?? 1) * 100)}%`}
-            onDec={() =>
-              updateClip(clip.id, { opacity: clamp((clip.opacity ?? 1) - 0.1, 0.1, 1) })
-            }
-            onInc={() =>
-              updateClip(clip.id, { opacity: clamp((clip.opacity ?? 1) + 0.1, 0.1, 1) })
-            }
-          />
-        </PanelSection>
+        <AppearanceSection clip={clip} updateClip={updateClip} />
       ) : null}
 
       {/* 🎯 Objektum-követés: a kép/matrica a videó egy kijelölt objektumát követi */}
       {clip.kind === 'image' ? (
-        <PanelSection title={t('panels.precision.trackSectionTitle')}>
-          <View style={styles.row}>
-            <Chip
-              label={trackBusy ? t('panels.precision.tracking') : t('panels.precision.trackObject')}
-              active={trackBusy}
-              onPress={startTrackPick}
-            />
-            {clip.keyframes?.x?.length ? (
-              <Chip
-                label={t('panels.precision.trackClear')}
-                active={false}
-                onPress={() => updateClip(clip.id, { keyframes: undefined })}
-              />
-            ) : null}
-          </View>
-          <Text style={styles.range}>{t('panels.precision.trackNote')}</Text>
-        </PanelSection>
+        <ImageTrackSection clip={clip} updateClip={updateClip} trackBusy={trackBusy} startTrackPick={startTrackPick} />
       ) : null}
 
       {/* 🧱 Compound clip: a beágyazott kompozíció valós előnézete (proxy render) */}
       {clip.kind === 'video' && clip.comp ? (
-        <PanelSection title={t('panels.precision.compoundTitle')}>
-          <Text style={styles.range}>
-            {t('panels.precision.compoundInfo', { tracks: clip.comp.tracks.length })}
-          </Text>
-          <View style={styles.row}>
-            <Chip
-              label={proxyBusy ? t('panels.precision.compoundRendering') : t('panels.precision.compoundRender')}
-              active={proxyBusy}
-              onPress={() => {
-                renderCompoundProxy().catch((caught) => { logCaught('components/editor/panels/PrecisionPanel.tsx:PrecisionPanel', caught); });
-              }}
-            />
-          </View>
-          <Text style={styles.range}>{t('panels.precision.compoundNote')}</Text>
-        </PanelSection>
+        <CompoundSection comp={clip.comp} proxyBusy={proxyBusy} renderCompoundProxy={renderCompoundProxy} />
       ) : null}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  range: {
-    color: palette.textDim,
-    fontSize: 11,
-    fontVariant: ['tabular-nums'],
-  },
-});

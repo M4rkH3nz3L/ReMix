@@ -1486,6 +1486,60 @@
  "src/components/editor/panels/filter/ThreeDSection.tsx": {
   "ThreeDSection": "v:3122d77799"
  },
+ "src/components/editor/panels/precision/AppearanceSection.tsx": {
+  "AppearanceSection": "v:760057a488"
+ },
+ "src/components/editor/panels/precision/CompoundSection.tsx": {
+  "CompoundSection": "v:133d8c262b"
+ },
+ "src/components/editor/panels/precision/ImageTrackSection.tsx": {
+  "ImageTrackSection": "v:9f2ad408bb"
+ },
+ "src/components/editor/panels/precision/KeyframesSection.tsx": {
+  "KeyframesSection": "v:c4361cde12"
+ },
+ "src/components/editor/panels/precision/TimingSections.tsx": {
+  "AlignSection": "v:d642bf64a9",
+  "TimebaseSection": "v:82e279d332",
+  "TimingSection": "v:25b2f20c15"
+ },
+ "src/components/editor/panels/precision/precisionActions.ts": {
+  "CompoundProxyDeps": "t:a9b7b920a7",
+  "ImageTrackDeps": "t:82c77ec532",
+  "TimingDeps": "t:2f55a70de6",
+  "createCompoundProxyAction": "v:2294c9376b",
+  "createImageTrackActions": "v:41b4c09ff2",
+  "createTimingActions": "v:35214cd2c1"
+ },
+ "src/components/editor/panels/precision/precisionStyles.ts": {
+  "styles": "v:dac2def621"
+ },
+ "src/components/editor/panels/shape/BooleanSection.tsx": {
+  "BooleanSection": "v:0cffe2ef0a"
+ },
+ "src/components/editor/panels/shape/GlowOutlineSection.tsx": {
+  "GlowOutlineSection": "v:142986f388"
+ },
+ "src/components/editor/panels/shape/ShapeFillSection.tsx": {
+  "ShapeFillSection": "v:142986f388"
+ },
+ "src/components/editor/panels/shape/ShapeGeometrySections.tsx": {
+  "ShapeGeometrySections": "v:142986f388"
+ },
+ "src/components/editor/panels/shape/ShapeStyleSections.tsx": {
+  "ShapeAlignSection": "v:f0447c2479",
+  "ShapeStyleSections": "v:142986f388"
+ },
+ "src/components/editor/panels/shape/ShapeTrackSection.tsx": {
+  "ShapeTrackSection": "v:2015454f3d"
+ },
+ "src/components/editor/panels/shape/shapeStyles.ts": {
+  "styles": "v:f8a46d361b"
+ },
+ "src/components/editor/panels/shape/shapeTrackActions.ts": {
+  "ShapeTrackDeps": "t:80adf0e01e",
+  "createShapeTrackActions": "v:eeebc793c2"
+ },
  "src/components/editor/screen/EditorBanners.tsx": {
   "EditorBanners": "v:c82ec47f81"
  },
@@ -6202,6 +6256,10 @@
   "subscribeNotifications": "v:86fd605d95",
   "toNotification": "v:dfe1d886a1"
  },
+ "src/lib/objectTrackWindow.ts": {
+  "ObjectTrackWindow": "t:2db33bfa75",
+  "objectTrackWindow": "v:3ae7ff7e39"
+ },
  "src/lib/offlineMix.ts": {
   "DecodedSource": "t:6e504614ca",
   "EDGE_FADE_SEC": "v:6ae529bf5a",
@@ -6512,6 +6570,13 @@
  "src/lib/preCompose.ts": {
   "PreComposePlan": "t:6e3de9fb57",
   "buildPreComposePlan": "v:ec53130651"
+ },
+ "src/lib/precisionPanelOps.ts": {
+  "ChannelCfg": "t:8ae15ef942",
+  "STEP": "v:180505679c",
+  "StepMode": "t:d297fe9526",
+  "TRANSFORM_CHANNELS": "v:6b93120a12",
+  "snap": "v:a9b011c884"
  },
  "src/lib/previewEngine.ts": {
   "CHUNK_SAMPLES": "v:53b0a1b2fa",
@@ -7152,6 +7217,12 @@
   "regularPolygon": "v:4ffe29ab16",
   "shapeToPathPoints": "v:0311d1c310",
   "starPolygon": "v:0134335fb2"
+ },
+ "src/lib/shapePanelOps.ts": {
+  "GLOW_PRESETS": "v:8fcbad7c63",
+  "GRADIENTS": "v:a2457e84ae",
+  "OUTLINE_PRESETS": "v:8fcbad7c63",
+  "booleanResultClip": "v:af4987bbef"
  },
  "src/lib/shapePattern.ts": {
   "DEFAULT_SHAPE_PATTERN": "v:e888310b15",

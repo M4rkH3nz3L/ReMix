@@ -110,6 +110,23 @@ const MUST_BE_MEMOIZED = [
   // REFACTOR: az ImageStudioBody.tsx-ből kiemelt renderelő részek (a gyökér maga kimarad: ref-írás renderben)
   ['src/components/studio/image/body/ActiveModeBar.tsx', 'ActiveModeBar'],
   ['src/components/studio/image/body/DockedLayerPanel.tsx', 'DockedLayerPanel'],
+  // REFACTOR: a ShapePanel.tsx szekciói (a gyökér maga is memoizált marad)
+  ['src/components/editor/panels/shape/ShapeGeometrySections.tsx', 'ShapeGeometrySections'],
+  ['src/components/editor/panels/shape/BooleanSection.tsx', 'BooleanSection'],
+  ['src/components/editor/panels/shape/ShapeFillSection.tsx', 'ShapeFillSection'],
+  ['src/components/editor/panels/shape/ShapeStyleSections.tsx', 'ShapeStyleSections'],
+  ['src/components/editor/panels/shape/ShapeStyleSections.tsx', 'ShapeAlignSection'],
+  ['src/components/editor/panels/shape/GlowOutlineSection.tsx', 'GlowOutlineSection'],
+  ['src/components/editor/panels/shape/ShapeTrackSection.tsx', 'ShapeTrackSection'],
+  ['src/components/editor/panels/ShapePanel.tsx', 'ShapePanel'],
+  // REFACTOR: a PrecisionPanel.tsx szekciói (a gyökér kimarad, lásd lent)
+  ['src/components/editor/panels/precision/TimingSections.tsx', 'TimebaseSection'],
+  ['src/components/editor/panels/precision/TimingSections.tsx', 'TimingSection'],
+  ['src/components/editor/panels/precision/TimingSections.tsx', 'AlignSection'],
+  ['src/components/editor/panels/precision/KeyframesSection.tsx', 'KeyframesSection'],
+  ['src/components/editor/panels/precision/AppearanceSection.tsx', 'AppearanceSection'],
+  ['src/components/editor/panels/precision/ImageTrackSection.tsx', 'ImageTrackSection'],
+  ['src/components/editor/panels/precision/CompoundSection.tsx', 'CompoundSection'],
 ];
 
 /**
@@ -130,6 +147,7 @@ const KNOWN_BAILS = [
   ['src/app/editor/[id].tsx', 'EditorScreen', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
   ['src/components/preview/TextOverlay.tsx', 'TextOverlay', 'Reanimated shared value írása'],
   ['src/components/studio/image/ImageCanvas.tsx', 'ImageCanvas', 'a nézet-gesztusok refjeit (zoomRef/panRef/fitRef) renderben írja'],
+  ['src/components/editor/panels/PrecisionPanel.tsx', 'PrecisionPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
 ];
 
 const cache = new Map();

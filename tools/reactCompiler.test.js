@@ -75,6 +75,11 @@ const MUST_BE_MEMOIZED = [
   ['src/components/editor/timelineClip/ClipLabel.tsx', 'ClipLabel'],
   ['src/components/editor/timelineClip/ClipLockBadge.tsx', 'ClipLockBadge'],
   ['src/components/editor/timelineClip/ClipTrimHandles.tsx', 'ClipTrimHandles'],
+  // REFACTOR: a Toolbar.tsx-ből kiemelt renderelő részek (a gyökér maga is memoizált marad)
+  ['src/components/editor/toolbar/ToolbarToolRow.tsx', 'ToolCell'],
+  ['src/components/editor/toolbar/ToolbarToolRow.tsx', 'ToolbarToolRow'],
+  ['src/components/editor/toolbar/MoreToolsSheet.tsx', 'MoreToolsSheet'],
+  ['src/components/editor/Toolbar.tsx', 'Toolbar'],
 ];
 
 /**

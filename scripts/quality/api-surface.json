@@ -1533,6 +1533,26 @@
   "createTimelineClipHandlers": "v:ef52afb7f9",
   "selectionHaptic": "v:bc050ab876"
  },
+ "src/components/editor/toolbar/MoreToolsSheet.tsx": {
+  "MoreToolsSheet": "v:40d1e5734b"
+ },
+ "src/components/editor/toolbar/ToolbarToolRow.tsx": {
+  "ToolCell": "v:0b0d014a59",
+  "ToolbarToolRow": "v:676e45bbd5"
+ },
+ "src/components/editor/toolbar/addClipActions.ts": {
+  "AddClipActionDeps": "t:20b74bbc14",
+  "createAddClipActions": "v:27d10f5d22"
+ },
+ "src/components/editor/toolbar/clipActions.ts": {
+  "ClipActionDeps": "t:71f05b93d8",
+  "createClipActions": "v:b784e6a835"
+ },
+ "src/components/editor/toolbar/toolRegistry.ts": {
+  "ToolDef": "t:c6f29361d0",
+  "ToolRegistryDeps": "t:aed0bbf903",
+  "buildToolRegistry": "v:4970b15dee"
+ },
  "src/components/feed/FeedEmpty.tsx": {
   "FeedEmpty": "v:7b13e3bbe9",
   "FeedLoading": "v:767749a6d5"
@@ -7448,6 +7468,15 @@
   "trackHeightFor": "v:8ad3d21ed3",
   "videoTrackGaps": "v:7f6c1571d9",
   "visibleTrackTypes": "v:ae1961c4b2"
+ },
+ "src/lib/toolbarOps.ts": {
+  "PASTE_FALLBACK_TRACK": "v:1230de7bd0",
+  "PIP_CORNERS": "v:c10b842d98",
+  "adjustStartFor": "v:86c8c3fd1b",
+  "duplicatedTracks": "v:30b50dbd18",
+  "pipCornerFor": "v:b25072276f",
+  "promoteTutorialTool": "v:f377f252d6",
+  "tracksWithoutClips": "v:d121c8256b"
  },
  "src/lib/toolbarSpec.ts": {
   "EDIT_MODES": "v:e88f238ddd",

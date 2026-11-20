@@ -33,11 +33,16 @@ const printer = ts.createPrinter({ removeComments: true });
  * sorrendjétől függ (azaz attól, milyen sorrendben töltődnek be a fájlok) — egy új, ártatlan modul
  * is átrendezheti őket. Ugyanez igaz a mapped típusból (Omit/Pick) kibontott objektum tulajdonságaira.
  * Ezért a tagokat a kiírt szövegük szerint rendezzük, mielőtt hash-elünk (a szemantika nem változik).
+ * A nem látható típusokat a TS `import("…/fájl").Név` alakban írja ki — a fájl-útvonal viszont pont a
+ * bontással változik, ezért a minősítést elhagyjuk: a típus NEVE és szerkezete számít, nem a helye.
  */
 function canonicalText(node, sf) {
   const print = (n) => printer.printNode(ts.EmitHint.Unspecified, n, sf);
   const visit = (n) => {
-    const v = ts.visitEachChild(n, visit, undefined);
+    let v = ts.visitEachChild(n, visit, undefined);
+    if (ts.isImportTypeNode(v) && v.qualifier && !v.isTypeOf) {
+      v = ts.factory.createTypeReferenceNode(v.qualifier, v.typeArguments);
+    }
     if (ts.isUnionTypeNode(v) || ts.isIntersectionTypeNode(v)) {
       const sorted = [...v.types].sort((a, b) => print(a).localeCompare(print(b)));
       return ts.isUnionTypeNode(v) ? ts.factory.updateUnionTypeNode(v, ts.factory.createNodeArray(sorted)) : ts.factory.updateIntersectionTypeNode(v, ts.factory.createNodeArray(sorted));

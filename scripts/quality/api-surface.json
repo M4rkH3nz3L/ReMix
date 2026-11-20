@@ -73,8 +73,8 @@
   "isPaid": "v:8ef1a874e7",
   "isPro": "v:8ef1a874e7",
   "processRevenueCatEvent": "v:2da16419b1",
-  "recordWebhookEvent": "v:fb7659a848",
-  "webhookEventSeen": "v:ea56c1800e"
+  "recordWebhookEvent": "v:17b1d9d511",
+  "webhookEventSeen": "v:91e2d43c31"
  },
  "server/botHeuristic.js": {
   "clusterByShared": "v:39347b39cf",
@@ -83,7 +83,7 @@
  },
  "server/coinSettle.js": {
   "Notice": "t:ff5f9820fb",
-  "SupabaseClient": "t:b9c2a27f66",
+  "SupabaseClient": "t:686268a866",
   "renewalNotice": "v:cd782f51ca",
   "runCoinSettleOnce": "v:8ea85825ed",
   "runSubscriptionCycleOnce": "v:2e20aeb8e3",
@@ -380,8 +380,8 @@
   "PayoutSender": "t:9101909196",
   "PayoutSenders": "t:8d064b1f94",
   "defaultSenders": "v:4572b41711",
-  "executeApproved": "v:52a876be68",
-  "runApprovedPayouts": "v:104c6a1c2f"
+  "executeApproved": "v:98d2967459",
+  "runApprovedPayouts": "v:1397d3e058"
  },
  "server/payouts.js": {
   "eurValue": "v:1915d21003",
@@ -447,15 +447,15 @@
   "QUEUE_NAME": "v:e64386a663",
   "cancelRenderJob": "v:825ae50357",
   "clearJobCancel": "v:4cdd11add3",
-  "connection": "v:8b9a236a69",
+  "connection": "v:42869bcda6",
   "enqueueRender": "v:92ef7969c3",
-  "getRenderJob": "v:28320148b0",
+  "getRenderJob": "v:68b527d471",
   "isJobCancelRequested": "v:c122ceca36",
   "listRenderJobs": "v:3c2d498cc5",
   "queueEnabled": "v:5c04da0bc5",
   "renderConcurrency": "v:41b16234f5",
   "renderJobOptions": "v:56176abe48",
-  "renderQueue": "v:df568eef90",
+  "renderQueue": "v:8e29e5cf1b",
   "requestJobCancel": "v:4cdd11add3",
   "tierJobPriority": "v:5095ce0bd9",
   "workerOptions": "v:9fd2bd5bad"
@@ -644,7 +644,7 @@
  "server/security/accountErase.js": {
   "ERASE_COOLDOWN_DAYS": "v:53b0a1b2fa",
   "eraseCooldownElapsed": "v:675a856b09",
-  "purgeUserMedia": "v:9d76ede056"
+  "purgeUserMedia": "v:ab78abc061"
  },
  "server/security/auditLog.js": {
   "AuditEvent": "t:de2ce41e9c",
@@ -950,444 +950,444 @@
   "redirectSystemPath": "v:0c529b666d"
  },
  "src/app/_layout.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/admin.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/auth.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/channel/[id].tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/chat/[id].tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/coins.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/collab/[id].tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/collab/[id].web.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/collections/[id].tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/collections/index.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/command.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/dashboard.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/dev-image-smoke.tsx": {
-  "default": "v:796e34b691"
+  "default": "v:b8aa420b18"
  },
  "src/app/devices.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/editor/[id].tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/editor/[id].web.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/hashtag/[tag].tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/import3d.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/inbox.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/index.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/legal.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/live.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/live/[id].tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/live/studio/[id].tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/live/studio/[id].web.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/mfa.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/org.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/player/[id].tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/profile.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/schedules.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/search.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/shop.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/storage/index.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/storage/index.web.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/studio/audio/[id].tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/studio/audio/[id].web.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/studio/design/[id].tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/studio/design/[id].web.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/studio/image/[id].tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/studio/image/[id].web.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/studio/index.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/studio/index.web.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/studio/model3d/[id].tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/studio/model3d/[id].web.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/studio/music/[id].tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/app/studio/music/[id].web.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/components/ActionMenuHost.tsx": {
-  "ActionMenuHost": "v:796e34b691"
+  "ActionMenuHost": "v:b8aa420b18"
  },
  "src/components/AvatarSvg.tsx": {
-  "AvatarSvg": "v:0781c0803b"
+  "AvatarSvg": "v:bd544e2f97"
  },
  "src/components/BottomNav.tsx": {
   "BOTTOM_NAV_HEIGHT": "v:54ceb91256",
-  "BottomNav": "v:f6df58a901"
+  "BottomNav": "v:5d6df2145b"
  },
  "src/components/CollectionSheet.tsx": {
-  "CollectionSheet": "v:bb43b96eef"
+  "CollectionSheet": "v:4e8c7f3acb"
  },
  "src/components/CommentSheet.tsx": {
-  "CommentSheet": "v:47a47eb634"
+  "CommentSheet": "v:753929d2b7"
  },
  "src/components/CoverPhotoEditor.tsx": {
-  "CoverPhotoEditor": "v:9b2cef3745"
+  "CoverPhotoEditor": "v:db94608b66"
  },
  "src/components/ErrorBoundary.tsx": {
   "ErrorBoundary": "v:cd813353e0"
  },
  "src/components/GiftSheet.tsx": {
-  "GiftSheet": "v:49e975fa16"
+  "GiftSheet": "v:26c8971a45"
  },
  "src/components/LanguageSwitcher.tsx": {
-  "LanguageSwitcher": "v:724866754d"
+  "LanguageSwitcher": "v:981b0a46da"
  },
  "src/components/NewerSchemaBanner.tsx": {
-  "NewerSchemaBanner": "v:796e34b691"
+  "NewerSchemaBanner": "v:b8aa420b18"
  },
  "src/components/NotificationSheet.tsx": {
-  "NotificationBell": "v:767749a6d5",
-  "NotificationSheet": "v:18ad4f0c8b"
+  "NotificationBell": "v:34fe7ad9c2",
+  "NotificationSheet": "v:36995c2695"
  },
  "src/components/PaywallSheet.tsx": {
-  "PaywallSheet": "v:767749a6d5"
+  "PaywallSheet": "v:34fe7ad9c2"
  },
  "src/components/ProgressOverlay.tsx": {
-  "ProgressOverlay": "v:796e34b691"
+  "ProgressOverlay": "v:b8aa420b18"
  },
  "src/components/SeoGateHost.tsx": {
-  "SeoGateHost": "v:796e34b691"
+  "SeoGateHost": "v:b8aa420b18"
  },
  "src/components/SourceBin.tsx": {
-  "SourceBin": "v:29faa54291"
+  "SourceBin": "v:29f6ff5f14"
  },
  "src/components/SourceSheet.tsx": {
-  "SourceSheet": "v:ab3618b035"
+  "SourceSheet": "v:06df17229f"
  },
  "src/components/UndoGestureArea.tsx": {
-  "UndoGestureArea": "v:4b64b16498"
+  "UndoGestureArea": "v:61aad20580"
  },
  "src/components/UsageBanner.tsx": {
-  "UsageBanner": "v:796e34b691"
+  "UsageBanner": "v:b8aa420b18"
  },
  "src/components/VideoThumb.tsx": {
-  "VideoThumb": "v:3e85f754a3",
+  "VideoThumb": "v:6762ab606d",
   "VideoThumbProps": "t:9cd210fe29"
  },
  "src/components/WebAlertHost.tsx": {
-  "WebAlertHost": "v:796e34b691"
+  "WebAlertHost": "v:b8aa420b18"
  },
  "src/components/admin/FinanceReviewList.tsx": {
-  "FinanceReviewList": "v:767749a6d5"
+  "FinanceReviewList": "v:34fe7ad9c2"
  },
  "src/components/admin/PayoutReviewList.tsx": {
-  "PayoutReviewList": "v:767749a6d5"
+  "PayoutReviewList": "v:34fe7ad9c2"
  },
  "src/components/chat/ChatThread.tsx": {
-  "ChatThread": "v:f6e27fbe4c"
+  "ChatThread": "v:6784834b77"
  },
  "src/components/chat/GroupCreateSheet.tsx": {
-  "GroupCreateSheet": "v:630f87f2ea"
+  "GroupCreateSheet": "v:5c55fb7760"
  },
  "src/components/collab/InviteResponseCard.tsx": {
-  "InviteResponseCard": "v:1ac799e0ea"
+  "InviteResponseCard": "v:46eee02c91"
  },
  "src/components/collab/ProjectMetaSection.tsx": {
-  "ProjectMetaSection": "v:68881cc337"
+  "ProjectMetaSection": "v:e3d69bc2ec"
  },
  "src/components/collab/RoleManagerSection.tsx": {
-  "RoleManagerSection": "v:02ceadae74"
+  "RoleManagerSection": "v:c8e48efbf0"
  },
  "src/components/editor/AiActivity.tsx": {
-  "AiActivity": "v:6dc83fb735",
+  "AiActivity": "v:ea0b8b0ce7",
   "AiResult": "t:45fe85049b"
  },
  "src/components/editor/AiCharacterPicker.tsx": {
-  "AiCharacterPicker": "v:b41fa5b1e0"
+  "AiCharacterPicker": "v:27080d4f8e"
  },
  "src/components/editor/AiProviderPicker.tsx": {
-  "AiProviderPicker": "v:b41fa5b1e0"
+  "AiProviderPicker": "v:27080d4f8e"
  },
  "src/components/editor/AvatarBuilder.tsx": {
-  "AvatarBuilder": "v:af2a42befb"
+  "AvatarBuilder": "v:2c1e9cacdf"
  },
  "src/components/editor/CameraRecorder.tsx": {
-  "CameraRecorder": "v:18ad4f0c8b"
+  "CameraRecorder": "v:36995c2695"
  },
  "src/components/editor/ClipFilmstrip.tsx": {
-  "ClipFilmstrip": "v:a4fd915710"
+  "ClipFilmstrip": "v:406a232dbd"
  },
  "src/components/editor/ClipWaveform.tsx": {
-  "ClipWaveform": "v:3c00747a52"
+  "ClipWaveform": "v:c515875c78"
  },
  "src/components/editor/CollabPresence.tsx": {
-  "CollabPresence": "v:796e34b691"
+  "CollabPresence": "v:b8aa420b18"
  },
  "src/components/editor/CurveEditor.tsx": {
-  "CurveEditor": "v:e0ce17427f"
+  "CurveEditor": "v:d34e66cd04"
  },
  "src/components/editor/DetailPreview.tsx": {
-  "DetailPreview": "v:4fccd6e34f"
+  "DetailPreview": "v:990f92bec8"
  },
  "src/components/editor/FocusChrome.tsx": {
-  "FocusChrome": "v:7a7a199e51"
+  "FocusChrome": "v:3c02cba5f8"
  },
  "src/components/editor/HelpOverlay.tsx": {
-  "HelpOverlay": "v:2f9a2fe381"
+  "HelpOverlay": "v:0c7fe530fb"
  },
  "src/components/editor/HistoryModal.tsx": {
-  "HistoryModal": "v:18ad4f0c8b"
+  "HistoryModal": "v:36995c2695"
  },
  "src/components/editor/KeyframeGraphEditor.tsx": {
-  "KeyframeGraphEditor": "v:d4179ac5d0"
+  "KeyframeGraphEditor": "v:14266a60f6"
  },
  "src/components/editor/LinkedUpdateBanner.tsx": {
-  "LinkedUpdateBanner": "v:796e34b691"
+  "LinkedUpdateBanner": "v:b8aa420b18"
  },
  "src/components/editor/MiniTimeline.tsx": {
-  "MiniTimeline": "v:4dfce1fcd4"
+  "MiniTimeline": "v:2f505b5ced"
  },
  "src/components/editor/MissingMediaSheet.tsx": {
-  "MissingMediaSheet": "v:24669d9988"
+  "MissingMediaSheet": "v:665f3c66a2"
  },
  "src/components/editor/OverlayRasterHost.tsx": {
-  "OverlayRasterHost": "v:796e34b691"
+  "OverlayRasterHost": "v:b8aa420b18"
  },
  "src/components/editor/PacingLane.tsx": {
-  "PacingLane": "v:796e34b691"
+  "PacingLane": "v:b8aa420b18"
  },
  "src/components/editor/PanelHost.tsx": {
-  "PanelHost": "v:c1788ad153"
+  "PanelHost": "v:d97e181bdb"
  },
  "src/components/editor/PathEditor.tsx": {
-  "PathEditor": "v:874b90c131"
+  "PathEditor": "v:445d6ebf7c"
  },
  "src/components/editor/RemixGraphModal.tsx": {
-  "RemixGraphModal": "v:47a93f0d52"
+  "RemixGraphModal": "v:9f3474a5c2"
  },
  "src/components/editor/ScopesView.tsx": {
-  "ScopesView": "v:49ea803a6b"
+  "ScopesView": "v:4cc1249bee"
  },
  "src/components/editor/SelectionInfo.tsx": {
-  "SelectionInfo": "v:796e34b691"
+  "SelectionInfo": "v:b8aa420b18"
  },
  "src/components/editor/StoryLane.tsx": {
-  "StoryLane": "v:796e34b691"
+  "StoryLane": "v:b8aa420b18"
  },
  "src/components/editor/Timeline.tsx": {
-  "Timeline": "v:9e83e3d4d9"
+  "Timeline": "v:dddc8b3214"
  },
  "src/components/editor/TimelineClip.tsx": {
-  "TimelineClip": "v:7c9ffbe35a"
+  "TimelineClip": "v:a6689a8484"
  },
  "src/components/editor/TimelineMinimap.tsx": {
-  "TimelineMinimap": "v:cbee6c9eaf"
+  "TimelineMinimap": "v:13bdb1b1b1"
  },
  "src/components/editor/ToneCurveEditor.tsx": {
-  "ToneCurveEditor": "v:34a8c4acdb"
+  "ToneCurveEditor": "v:4940831a68"
  },
  "src/components/editor/Toolbar.tsx": {
-  "Toolbar": "v:e54899625d"
+  "Toolbar": "v:ec4f93b055"
  },
  "src/components/editor/TransportBar.tsx": {
   "MARKER_COLORS": "v:649de6328e",
-  "TransportBar": "v:767749a6d5",
+  "TransportBar": "v:34fe7ad9c2",
   "nextMarkerColor": "v:7cc2848399"
  },
  "src/components/editor/VodProcessingOverlay.tsx": {
-  "VodProcessingOverlay": "v:796e34b691"
+  "VodProcessingOverlay": "v:b8aa420b18"
  },
  "src/components/editor/panels/AdjustPanel.tsx": {
-  "AdjustPanel": "v:c806821c70"
+  "AdjustPanel": "v:5e0790a43a"
  },
  "src/components/editor/panels/AssistantPanel.tsx": {
-  "AssistantPanel": "v:767749a6d5"
+  "AssistantPanel": "v:34fe7ad9c2"
  },
  "src/components/editor/panels/AudioOnlyExportSection.tsx": {
-  "AudioOnlyExportSection": "v:767749a6d5"
+  "AudioOnlyExportSection": "v:34fe7ad9c2"
  },
  "src/components/editor/panels/AudioPanel.tsx": {
-  "AudioPanel": "v:62520546f0"
+  "AudioPanel": "v:798a6deb70"
  },
  "src/components/editor/panels/CaptionsPanel.tsx": {
-  "CaptionsPanel": "v:767749a6d5"
+  "CaptionsPanel": "v:34fe7ad9c2"
  },
  "src/components/editor/panels/CloudMediaSection.tsx": {
-  "CloudMediaSection": "v:9175f4a0fe"
+  "CloudMediaSection": "v:963b37e103"
  },
  "src/components/editor/panels/CreatorPresetPanel.tsx": {
-  "CreatorPresetPanel": "v:767749a6d5"
+  "CreatorPresetPanel": "v:34fe7ad9c2"
  },
  "src/components/editor/panels/ExportLintList.tsx": {
-  "ExportLintList": "v:9175f4a0fe"
+  "ExportLintList": "v:963b37e103"
  },
  "src/components/editor/panels/ExportPanel.tsx": {
-  "ExportPanel": "v:796e34b691"
+  "ExportPanel": "v:b8aa420b18"
  },
  "src/components/editor/panels/FilterPanel.tsx": {
-  "FilterPanel": "v:3122d77799"
+  "FilterPanel": "v:27871b50e6"
  },
  "src/components/editor/panels/HotspotPanel.tsx": {
-  "HotspotPanel": "v:f5df1e24d4"
+  "HotspotPanel": "v:3b64105fea"
  },
  "src/components/editor/panels/ImageDocPanel.tsx": {
-  "ImageDocPanel": "v:796e34b691"
+  "ImageDocPanel": "v:b8aa420b18"
  },
  "src/components/editor/panels/LibraryPanel.tsx": {
-  "LibraryPanel": "v:767749a6d5"
+  "LibraryPanel": "v:34fe7ad9c2"
  },
  "src/components/editor/panels/MulticamPanel.tsx": {
-  "MulticamPanel": "v:767749a6d5"
+  "MulticamPanel": "v:34fe7ad9c2"
  },
  "src/components/editor/panels/My3DModelsSection.tsx": {
-  "My3DModelsSection": "v:90f6b4c3a9"
+  "My3DModelsSection": "v:0f58cb52a4"
  },
  "src/components/editor/panels/PipPanel.tsx": {
-  "PipPanel": "v:3122d77799"
+  "PipPanel": "v:27871b50e6"
  },
  "src/components/editor/panels/PrecisionPanel.tsx": {
-  "PrecisionPanel": "v:09c04c30be"
+  "PrecisionPanel": "v:e83a204d20"
  },
  "src/components/editor/panels/QuickPanels.tsx": {
-  "FilterQuick": "v:3122d77799",
-  "SpeedQuick": "v:289d890c8f",
-  "TransitionQuick": "v:3122d77799",
-  "VolumeQuick": "v:58da3c4c97"
+  "FilterQuick": "v:27871b50e6",
+  "SpeedQuick": "v:0bf42778f5",
+  "TransitionQuick": "v:27871b50e6",
+  "VolumeQuick": "v:d0e63e0c37"
  },
  "src/components/editor/panels/ShapePanel.tsx": {
-  "ShapePanel": "v:126bb7342e"
+  "ShapePanel": "v:81d0834c69"
  },
  "src/components/editor/panels/SpeedPanel.tsx": {
-  "SpeedPanel": "v:289d890c8f"
+  "SpeedPanel": "v:0bf42778f5"
  },
  "src/components/editor/panels/StickerPanel.tsx": {
-  "StickerPanel": "v:767749a6d5"
+  "StickerPanel": "v:34fe7ad9c2"
  },
  "src/components/editor/panels/TextPanel.tsx": {
-  "TextPanel": "v:600b1b4657"
+  "TextPanel": "v:3819f6bb6e"
  },
  "src/components/editor/panels/TranscriptPanel.tsx": {
-  "TranscriptPanel": "v:767749a6d5"
+  "TranscriptPanel": "v:34fe7ad9c2"
  },
  "src/components/editor/panels/TransitionPanel.tsx": {
   "TRANSITIONS": "v:d671dc4a1a",
-  "TransitionPanel": "v:3122d77799"
+  "TransitionPanel": "v:27871b50e6"
  },
  "src/components/editor/panels/WorkflowPanel.tsx": {
-  "WorkflowPanel": "v:796e34b691"
+  "WorkflowPanel": "v:b8aa420b18"
  },
  "src/components/editor/panels/assistant/AutoEditSection.tsx": {
-  "AutoEditSection": "v:5d15164b00"
+  "AutoEditSection": "v:39cd88e65e"
  },
  "src/components/editor/panels/assistant/BrandKitSection.tsx": {
-  "BrandKitSection": "v:767749a6d5"
+  "BrandKitSection": "v:34fe7ad9c2"
  },
  "src/components/editor/panels/assistant/CommandBarSection.tsx": {
-  "CommandBarSection": "v:591987abb7"
+  "CommandBarSection": "v:4f7bdb8c96"
  },
  "src/components/editor/panels/assistant/CutToolsSection.tsx": {
-  "CutToolsSection": "v:3ae5c4f335"
+  "CutToolsSection": "v:a7a93c87ed"
  },
  "src/components/editor/panels/assistant/HooksSection.tsx": {
-  "HooksSection": "v:ff3d0f6c66"
+  "HooksSection": "v:a2742344aa"
  },
  "src/components/editor/panels/assistant/InstructionSection.tsx": {
-  "InstructionSection": "v:e09a09581d"
+  "InstructionSection": "v:928545a067"
  },
  "src/components/editor/panels/assistant/LookPacksSection.tsx": {
-  "LookPacksSection": "v:ff3d0f6c66"
+  "LookPacksSection": "v:a2742344aa"
  },
  "src/components/editor/panels/assistant/SmartSearchSection.tsx": {
-  "SmartSearchSection": "v:3bfd3f20db"
+  "SmartSearchSection": "v:4f425a1fcc"
  },
  "src/components/editor/panels/assistant/SocialPresetsSection.tsx": {
-  "SocialPresetsSection": "v:0dddd9f48f"
+  "SocialPresetsSection": "v:12fa7e81f4"
  },
  "src/components/editor/panels/assistant/SoundDesignSection.tsx": {
-  "SoundDesignSection": "v:3bfd3f20db"
+  "SoundDesignSection": "v:4f425a1fcc"
  },
  "src/components/editor/panels/assistant/SuggestionSection.tsx": {
-  "SuggestionSection": "v:57e18af6ba"
+  "SuggestionSection": "v:d1d7f30f24"
  },
  "src/components/editor/panels/assistant/useAiReply.tsx": {
   "revertProjectTo": "v:90efc0dcb1",
-  "useAiReply": "v:30f08f89d7"
+  "useAiReply": "v:beec63d0e1"
  },
  "src/components/editor/panels/assistant/useAutoEdit.tsx": {
-  "useAutoEdit": "v:d438328bd9"
+  "useAutoEdit": "v:9855a318c7"
  },
  "src/components/editor/panels/assistant/useCutTools.tsx": {
   "useCutTools": "v:0b95569879"
@@ -1402,28 +1402,28 @@
   "useWorkerDiag": "v:6e1a8c088a"
  },
  "src/components/editor/panels/export/AdvancedExportControls.tsx": {
-  "AdvancedExportControls": "v:3e031ab3f4"
+  "AdvancedExportControls": "v:8f2f25eab5"
  },
  "src/components/editor/panels/export/CaptionsSection.tsx": {
-  "CaptionsSection": "v:861dc1d28c"
+  "CaptionsSection": "v:6960dfe39e"
  },
  "src/components/editor/panels/export/InteractiveSection.tsx": {
-  "InteractiveSection": "v:aca91b6fc7"
+  "InteractiveSection": "v:726b819cdb"
  },
  "src/components/editor/panels/export/PostSection.tsx": {
-  "PostSection": "v:c98e8f006e"
+  "PostSection": "v:40398758af"
  },
  "src/components/editor/panels/export/ProStatusBanner.tsx": {
-  "ProStatusBanner": "v:83497814db"
+  "ProStatusBanner": "v:059cd82a6b"
  },
  "src/components/editor/panels/export/ProjectFileSection.tsx": {
-  "ProjectFileSection": "v:2691b55745"
+  "ProjectFileSection": "v:60e8d5e816"
  },
  "src/components/editor/panels/export/ThumbnailStudioSection.tsx": {
-  "ThumbnailStudioSection": "v:33316d2ff4"
+  "ThumbnailStudioSection": "v:c857179210"
  },
  "src/components/editor/panels/export/VideoExportSection.tsx": {
-  "VideoExportSection": "v:c77f657d30"
+  "VideoExportSection": "v:c241e2d0ee"
  },
  "src/components/editor/panels/export/exportStyles.ts": {
   "styles": "v:bc37fe5fe0"
@@ -1436,72 +1436,72 @@
   "createThumbActions": "v:2b86cfd27d"
  },
  "src/components/editor/panels/export/useExportSettings.ts": {
-  "ExportSettingsState": "t:2cd7f9226c",
-  "useExportSettings": "v:526b39769b"
+  "ExportSettingsState": "t:6c249086f3",
+  "useExportSettings": "v:a24a4f18f0"
  },
  "src/components/editor/panels/export/useThumbStudioState.ts": {
-  "ThumbStudioState": "t:5e4b5db42b",
-  "useThumbStudioState": "v:09c9aaeca5"
+  "ThumbStudioState": "t:340880ca40",
+  "useThumbStudioState": "v:277f5da716"
  },
  "src/components/editor/panels/export/videoExportActions.ts": {
   "VideoExportDeps": "t:8b7c11d994",
   "createVideoExportActions": "v:50e91d3c30"
  },
  "src/components/editor/panels/filter/AnimateSection.tsx": {
-  "AnimateSection": "v:3122d77799"
+  "AnimateSection": "v:27871b50e6"
  },
  "src/components/editor/panels/filter/BackgroundFillSection.tsx": {
-  "BackgroundFillSection": "v:3122d77799"
+  "BackgroundFillSection": "v:27871b50e6"
  },
  "src/components/editor/panels/filter/EffectsSection.tsx": {
-  "EffectsSection": "v:3122d77799"
+  "EffectsSection": "v:27871b50e6"
  },
  "src/components/editor/panels/filter/EnhanceSection.tsx": {
-  "EnhanceSection": "v:3122d77799"
+  "EnhanceSection": "v:27871b50e6"
  },
  "src/components/editor/panels/filter/FaceBlurSection.tsx": {
-  "FaceBlurSection": "v:3122d77799"
+  "FaceBlurSection": "v:27871b50e6"
  },
  "src/components/editor/panels/filter/FiltersSection.tsx": {
-  "FiltersSection": "v:3122d77799"
+  "FiltersSection": "v:27871b50e6"
  },
  "src/components/editor/panels/filter/GreenScreenSection.tsx": {
-  "GreenScreenSection": "v:3122d77799"
+  "GreenScreenSection": "v:27871b50e6"
  },
  "src/components/editor/panels/filter/ImageStudioSection.tsx": {
-  "ImageStudioSection": "v:77eb9ff848"
+  "ImageStudioSection": "v:af672b4306"
  },
  "src/components/editor/panels/filter/LightingSection.tsx": {
-  "LightingSection": "v:3122d77799"
+  "LightingSection": "v:27871b50e6"
  },
  "src/components/editor/panels/filter/MatteSection.tsx": {
-  "MatteSection": "v:3122d77799"
+  "MatteSection": "v:27871b50e6"
  },
  "src/components/editor/panels/filter/SkySection.tsx": {
-  "SkySection": "v:77eb9ff848"
+  "SkySection": "v:af672b4306"
  },
  "src/components/editor/panels/filter/StabilizeSection.tsx": {
-  "StabilizeSection": "v:289d890c8f"
+  "StabilizeSection": "v:0bf42778f5"
  },
  "src/components/editor/panels/filter/ThreeDSection.tsx": {
-  "ThreeDSection": "v:3122d77799"
+  "ThreeDSection": "v:27871b50e6"
  },
  "src/components/editor/panels/precision/AppearanceSection.tsx": {
-  "AppearanceSection": "v:760057a488"
+  "AppearanceSection": "v:a44bbc52c8"
  },
  "src/components/editor/panels/precision/CompoundSection.tsx": {
-  "CompoundSection": "v:133d8c262b"
+  "CompoundSection": "v:c6d42932ae"
  },
  "src/components/editor/panels/precision/ImageTrackSection.tsx": {
-  "ImageTrackSection": "v:9f2ad408bb"
+  "ImageTrackSection": "v:e2c2b5b1c2"
  },
  "src/components/editor/panels/precision/KeyframesSection.tsx": {
-  "KeyframesSection": "v:c4361cde12"
+  "KeyframesSection": "v:65b9e5ca5c"
  },
  "src/components/editor/panels/precision/TimingSections.tsx": {
-  "AlignSection": "v:d642bf64a9",
-  "TimebaseSection": "v:82e279d332",
-  "TimingSection": "v:25b2f20c15"
+  "AlignSection": "v:dc38d854aa",
+  "TimebaseSection": "v:adbbacaac8",
+  "TimingSection": "v:fa8d6c1f0f"
  },
  "src/components/editor/panels/precision/precisionActions.ts": {
   "CompoundProxyDeps": "t:a9b7b920a7",
@@ -1515,23 +1515,23 @@
   "styles": "v:dac2def621"
  },
  "src/components/editor/panels/shape/BooleanSection.tsx": {
-  "BooleanSection": "v:0cffe2ef0a"
+  "BooleanSection": "v:aaaa07b161"
  },
  "src/components/editor/panels/shape/GlowOutlineSection.tsx": {
-  "GlowOutlineSection": "v:142986f388"
+  "GlowOutlineSection": "v:5f19ed9c08"
  },
  "src/components/editor/panels/shape/ShapeFillSection.tsx": {
-  "ShapeFillSection": "v:142986f388"
+  "ShapeFillSection": "v:5f19ed9c08"
  },
  "src/components/editor/panels/shape/ShapeGeometrySections.tsx": {
-  "ShapeGeometrySections": "v:142986f388"
+  "ShapeGeometrySections": "v:5f19ed9c08"
  },
  "src/components/editor/panels/shape/ShapeStyleSections.tsx": {
-  "ShapeAlignSection": "v:f0447c2479",
-  "ShapeStyleSections": "v:142986f388"
+  "ShapeAlignSection": "v:4a115dd70e",
+  "ShapeStyleSections": "v:5f19ed9c08"
  },
  "src/components/editor/panels/shape/ShapeTrackSection.tsx": {
-  "ShapeTrackSection": "v:2015454f3d"
+  "ShapeTrackSection": "v:817f4b72d9"
  },
  "src/components/editor/panels/shape/shapeStyles.ts": {
   "styles": "v:f8a46d361b"
@@ -1541,19 +1541,19 @@
   "createShapeTrackActions": "v:eeebc793c2"
  },
  "src/components/editor/screen/EditorBanners.tsx": {
-  "EditorBanners": "v:c82ec47f81"
+  "EditorBanners": "v:47c2690f7f"
  },
  "src/components/editor/screen/EditorHeader.tsx": {
-  "EditorHeader": "v:2e66b3cc30"
+  "EditorHeader": "v:bfbc97009e"
  },
  "src/components/editor/screen/EditorLayoutBody.tsx": {
-  "EditorLayoutBody": "v:e586e1b8dd"
+  "EditorLayoutBody": "v:3f35a4feea"
  },
  "src/components/editor/screen/MissingProjectView.tsx": {
-  "MissingProjectView": "v:089f8ddd8d"
+  "MissingProjectView": "v:1a7bfd96a7"
  },
  "src/components/editor/screen/ProjectMenuSheet.tsx": {
-  "ProjectMenuSheet": "v:119afaaa9a"
+  "ProjectMenuSheet": "v:874b7c4b0f"
  },
  "src/components/editor/screen/missingMediaActions.ts": {
   "createMissingMediaActions": "v:6131ab2383"
@@ -1577,29 +1577,29 @@
   "useProjectLoader": "v:388e5a6eb3"
  },
  "src/components/editor/screen/useProjectMenu.tsx": {
-  "useProjectMenu": "v:a569683cd9"
+  "useProjectMenu": "v:6d2a05fda2"
  },
  "src/components/editor/screen/useTransferAvailability.tsx": {
-  "useTransferAvailability": "v:d36939bebe"
+  "useTransferAvailability": "v:17733ab65c"
  },
  "src/components/editor/timeline/FloatingTrackLabels.tsx": {
-  "FloatingTrackLabels": "v:0187066895"
+  "FloatingTrackLabels": "v:628099f4c1"
  },
  "src/components/editor/timeline/TimelineControlsBar.tsx": {
   "ControlsScrollState": "t:f712ebc07b",
-  "TimelineControlsBar": "v:8188c18c31"
+  "TimelineControlsBar": "v:398781b01c"
  },
  "src/components/editor/timeline/TimelineGuideLines.tsx": {
-  "TimelineGuideLines": "v:91a2bd2771"
+  "TimelineGuideLines": "v:d8bdb93f9d"
  },
  "src/components/editor/timeline/TimelineRuler.tsx": {
-  "TimelineRuler": "v:3a36fb7adb"
+  "TimelineRuler": "v:dc41004ff4"
  },
  "src/components/editor/timeline/TimelineTrackRow.tsx": {
-  "TimelineTrackRow": "v:9d2b27a9a4"
+  "TimelineTrackRow": "v:493c0cdadd"
  },
  "src/components/editor/timeline/TrackHeaderColumn.tsx": {
-  "TrackHeaderColumn": "v:0187066895"
+  "TrackHeaderColumn": "v:628099f4c1"
  },
  "src/components/editor/timeline/timelineMenus.tsx": {
   "TrackMenuState": "t:0b50c1e46d",
@@ -1612,33 +1612,33 @@
   "useTimelineBeatGrid": "v:231b5dc6dc"
  },
  "src/components/editor/timeline/useTimelinePinch.tsx": {
-  "useTimelinePinch": "v:1d3bb5d844"
+  "useTimelinePinch": "v:cd7a8a0785"
  },
  "src/components/editor/timeline/useTimelineScroll.tsx": {
-  "useTimelineScroll": "v:b3293f2030"
+  "useTimelineScroll": "v:1f8f0c7887"
  },
  "src/components/editor/timelineClip/ClipEdgePreview.tsx": {
-  "ClipEdgePreview": "v:26d324950f"
+  "ClipEdgePreview": "v:7c4042bdf9"
  },
  "src/components/editor/timelineClip/ClipLabel.tsx": {
-  "ClipLabel": "v:55dd2c74fd"
+  "ClipLabel": "v:236130c442"
  },
  "src/components/editor/timelineClip/ClipLockBadge.tsx": {
-  "ClipLockBadge": "v:4a3af25731"
+  "ClipLockBadge": "v:0c3685d9cd"
  },
  "src/components/editor/timelineClip/ClipTrimHandles.tsx": {
-  "ClipTrimHandles": "v:54296e7034"
+  "ClipTrimHandles": "v:33f9d4e203"
  },
  "src/components/editor/timelineClip/timelineClipHandlers.ts": {
   "createTimelineClipHandlers": "v:ef52afb7f9",
   "selectionHaptic": "v:bc050ab876"
  },
  "src/components/editor/toolbar/MoreToolsSheet.tsx": {
-  "MoreToolsSheet": "v:40d1e5734b"
+  "MoreToolsSheet": "v:404afadc0c"
  },
  "src/components/editor/toolbar/ToolbarToolRow.tsx": {
-  "ToolCell": "v:0b0d014a59",
-  "ToolbarToolRow": "v:676e45bbd5"
+  "ToolCell": "v:2eb4913257",
+  "ToolbarToolRow": "v:dfcab7ac61"
  },
  "src/components/editor/toolbar/addClipActions.ts": {
   "AddClipActionDeps": "t:20b74bbc14",
@@ -1654,99 +1654,99 @@
   "buildToolRegistry": "v:4970b15dee"
  },
  "src/components/feed/FeedEmpty.tsx": {
-  "FeedEmpty": "v:7b13e3bbe9",
-  "FeedLoading": "v:767749a6d5"
+  "FeedEmpty": "v:265853d589",
+  "FeedLoading": "v:34fe7ad9c2"
  },
  "src/components/feed/FeedImageCarousel.tsx": {
-  "FeedImageCarousel": "v:66b15da4c1"
+  "FeedImageCarousel": "v:f9bf740706"
  },
  "src/components/feed/FeedPostBody.tsx": {
-  "FeedPostBody": "v:4434813b96"
+  "FeedPostBody": "v:df66fe1612"
  },
  "src/components/feed/FeedTopBar.tsx": {
-  "FeedTopBar": "v:e51f792486"
+  "FeedTopBar": "v:30f909418b"
  },
  "src/components/feed/feedStyles.ts": {
   "styles": "v:78b349f1de"
  },
  "src/components/live/LiveComposite.tsx": {
-  "LiveComposite": "v:b277d674cb"
+  "LiveComposite": "v:628fb74776"
  },
  "src/components/live/LiveNowStrip.tsx": {
-  "LiveNowStrip": "v:796e34b691"
+  "LiveNowStrip": "v:b8aa420b18"
  },
  "src/components/live/LivePanelList.tsx": {
-  "LivePanelList": "v:3561d2892a"
+  "LivePanelList": "v:11e3e73d7f"
  },
  "src/components/live/LiveQuickGrid.tsx": {
-  "LiveQuickGrid": "v:798700396f"
+  "LiveQuickGrid": "v:8d92359185"
  },
  "src/components/live/LiveSourceBox.tsx": {
-  "LiveSourceBox": "v:f252e5879b"
+  "LiveSourceBox": "v:02f18f8e8f"
  },
  "src/components/live/LiveVideoStage.tsx": {
   "LiveVideoStageProps": "t:72e032f7fb",
-  "default": "v:3d8dc87620"
+  "default": "v:583cd96cb5"
  },
  "src/components/live/RecordToggle.tsx": {
-  "RecordToggle": "v:a928309dfc"
+  "RecordToggle": "v:f416520f5c"
  },
  "src/components/preview/AudioLayer.tsx": {
-  "AudioLayer": "v:796e34b691",
+  "AudioLayer": "v:b8aa420b18",
   "withoutProcessing": "v:c968515fa5"
  },
  "src/components/preview/HotspotOverlay.tsx": {
-  "HotspotOverlay": "v:13333ebce1"
+  "HotspotOverlay": "v:9f69489df8"
  },
  "src/components/preview/MaskOverlay.tsx": {
-  "MaskOverlay": "v:c94f31bd07"
+  "MaskOverlay": "v:a839254c7f"
  },
  "src/components/preview/PipLayer.tsx": {
-  "PipLayer": "v:d376cb97fc"
+  "PipLayer": "v:e81599f2ad"
  },
  "src/components/preview/PreviewSurface.tsx": {
-  "PreviewSurface": "v:880f2dc560"
+  "PreviewSurface": "v:2bf1029ec2"
  },
  "src/components/preview/SafeZoneOverlay.tsx": {
-  "SafeZoneOverlay": "v:fa4b92064d"
+  "SafeZoneOverlay": "v:a9ee14f70f"
  },
  "src/components/preview/ShapeOverlay.tsx": {
-  "ShapeOverlay": "v:8c934509c3"
+  "ShapeOverlay": "v:47cbef47bc"
  },
  "src/components/preview/SkiaFilteredImage.tsx": {
-  "SkiaFilteredImage": "v:cf1b25563a"
+  "SkiaFilteredImage": "v:7bdf633677"
  },
  "src/components/preview/SkiaFilteredVideo.tsx": {
-  "SkiaFilteredVideo": "v:d3d627f303"
+  "SkiaFilteredVideo": "v:e023181210"
  },
  "src/components/preview/TextOverlay.tsx": {
-  "TextOverlay": "v:b61bbebf67"
+  "TextOverlay": "v:bab4d94826"
  },
  "src/components/preview/TransitionLayer.tsx": {
-  "TransitionLayer": "v:32c09e8e0b"
+  "TransitionLayer": "v:c47377489d"
  },
  "src/components/preview/surface/CanvasMarkers.tsx": {
-  "BlackScrim": "v:4d852b786b",
-  "FaceBlurMarker": "v:b1d8456735",
-  "MaskShade": "v:f4ee877aad",
-  "SmartGuideLines": "v:a0964347ec",
-  "StrokePreview": "v:a0cad330be"
+  "BlackScrim": "v:308f90dc42",
+  "FaceBlurMarker": "v:7f8ceee43d",
+  "MaskShade": "v:99412bc556",
+  "SmartGuideLines": "v:ff9079d2bb",
+  "StrokePreview": "v:49a4b1c5af"
  },
  "src/components/preview/surface/CompareSlider.tsx": {
-  "CompareSlider": "v:2f02cee8cd"
+  "CompareSlider": "v:0eea44a765"
  },
  "src/components/preview/surface/LookLayers.tsx": {
-  "AdjustTintLayers": "v:a31cbdad46",
-  "AdjustTrackTintLayers": "v:6b257572d5",
-  "FilterLookLayer": "v:cc6807a079",
-  "LightingTintLayer": "v:0dde2ff691"
+  "AdjustTintLayers": "v:c9d1eec6e8",
+  "AdjustTrackTintLayers": "v:46dfebf01c",
+  "FilterLookLayer": "v:3439cb4a3b",
+  "LightingTintLayer": "v:3d80bcdaee"
  },
  "src/components/preview/surface/PreviewMedia.tsx": {
-  "BlurBackdrop": "v:7e1e3592c1",
-  "MediaLayer": "v:cc2638b52f"
+  "BlurBackdrop": "v:1d077c5dad",
+  "MediaLayer": "v:121b62b9bd"
  },
  "src/components/preview/surface/PreviewToolbar.tsx": {
-  "PreviewToolbar": "v:ce4ad4a50b"
+  "PreviewToolbar": "v:a3a1a0434a"
  },
  "src/components/preview/surface/canvasMath.ts": {
   "GestureDelta": "t:346f04f1ff",
@@ -1782,7 +1782,7 @@
   "useCanvasGestures": "v:49e2a4285f"
  },
  "src/components/preview/surface/useCanvasTransformStyle.ts": {
-  "useCanvasTransformStyle": "v:5589806af4"
+  "useCanvasTransformStyle": "v:f57016c769"
  },
  "src/components/preview/surface/usePreviewSources.ts": {
   "usePreviewSources": "v:18baf163ff"
@@ -1798,77 +1798,77 @@
   "videoFill": "v:466ecdee3e"
  },
  "src/components/profile/AccountCard.tsx": {
-  "AccountCard": "v:dedbc098e5"
+  "AccountCard": "v:5c91c968f1"
  },
  "src/components/profile/AiModelsCard.tsx": {
-  "AiModelsCard": "v:73bf6c9f66"
+  "AiModelsCard": "v:2be10b5600"
  },
  "src/components/profile/AiTasksCard.tsx": {
-  "AiTasksCard": "v:dc996c52b8"
+  "AiTasksCard": "v:e1fa77b37c"
  },
  "src/components/profile/BugReportCard.tsx": {
-  "BugReportCard": "v:767749a6d5"
+  "BugReportCard": "v:34fe7ad9c2"
  },
  "src/components/profile/CreatorCard.tsx": {
-  "CreatorCard": "v:d882080407"
+  "CreatorCard": "v:2aaf019f30"
  },
  "src/components/profile/CreatorControls.tsx": {
-  "CreatorBadges": "v:d71c6342c5",
-  "CreatorTypePicker": "v:097be1b669",
-  "TagBadges": "v:d61b00045b",
-  "TagEditor": "v:7b68ebe6c1",
+  "CreatorBadges": "v:83ec863bd7",
+  "CreatorTypePicker": "v:43fa80e2c2",
+  "TagBadges": "v:3aece257f0",
+  "TagEditor": "v:f8a1692413",
   "creatorTypeLabel": "v:8263b7fcc5"
  },
  "src/components/profile/DangerZoneCard.tsx": {
-  "DangerZoneCard": "v:767749a6d5"
+  "DangerZoneCard": "v:34fe7ad9c2"
  },
  "src/components/profile/DevBillingPanel.tsx": {
-  "DevBillingPanel": "v:767749a6d5"
+  "DevBillingPanel": "v:34fe7ad9c2"
  },
  "src/components/profile/EarningsCard.tsx": {
-  "EarningsCard": "v:12cb77c041"
+  "EarningsCard": "v:2a13b235a3"
  },
  "src/components/profile/FactoryModelsCard.tsx": {
-  "FactoryModelsCard": "v:767749a6d5"
+  "FactoryModelsCard": "v:34fe7ad9c2"
  },
  "src/components/profile/IdentityCard.tsx": {
-  "IdentityCard": "v:da1283223c"
+  "IdentityCard": "v:9d1595d6e8"
  },
  "src/components/profile/LegalCard.tsx": {
-  "LegalCard": "v:39668c7759"
+  "LegalCard": "v:6a1ed6abf1"
  },
  "src/components/profile/PerformanceCard.tsx": {
-  "PerformanceCard": "v:70bc783335"
+  "PerformanceCard": "v:778fcd30b7"
  },
  "src/components/profile/PersonalCard.tsx": {
-  "PersonalCard": "v:5184ba7db5"
+  "PersonalCard": "v:30d0e877f6"
  },
  "src/components/profile/ProviderEditorModal.tsx": {
-  "ProviderEditorModal": "v:7a8aa52097"
+  "ProviderEditorModal": "v:002299d57a"
  },
  "src/components/profile/ReferralCard.tsx": {
-  "ReferralCard": "v:767749a6d5"
+  "ReferralCard": "v:34fe7ad9c2"
  },
  "src/components/profile/SaveButton.tsx": {
-  "SaveButton": "v:2311cc85e4"
+  "SaveButton": "v:e14d8d7bf2"
  },
  "src/components/profile/ShowcaseEditor.tsx": {
-  "ShowcaseEditor": "v:80137c0cc0"
+  "ShowcaseEditor": "v:45d29d88ae"
  },
  "src/components/profile/SocialLinksEditor.tsx": {
-  "SocialLinksEditor": "v:80137c0cc0"
+  "SocialLinksEditor": "v:45d29d88ae"
  },
  "src/components/profile/StorageCard.tsx": {
-  "StorageCard": "v:767749a6d5"
+  "StorageCard": "v:34fe7ad9c2"
  },
  "src/components/profile/SubscriptionCard.tsx": {
-  "SubscriptionCard": "v:b253838b5c"
+  "SubscriptionCard": "v:94e60cbf0a"
  },
  "src/components/profile/SubscriptionManageCard.tsx": {
-  "SubscriptionManageCard": "v:c947595456"
+  "SubscriptionManageCard": "v:a33cd806ee"
  },
  "src/components/profile/WalletCard.tsx": {
-  "WalletCard": "v:767749a6d5"
+  "WalletCard": "v:34fe7ad9c2"
  },
  "src/components/profile/aiProviderMeta.ts": {
   "PROVIDER_KINDS": "v:bbedb51969",
@@ -1878,150 +1878,150 @@
   "profileStyles": "v:84cd7a0287"
  },
  "src/components/storage/FolderPickerSheet.tsx": {
-  "FolderPickerSheet": "v:7ef8ab8f47"
+  "FolderPickerSheet": "v:a32707f051"
  },
  "src/components/storage/ProjectSyncSection.tsx": {
-  "ProjectSyncSection": "v:ed61dbb01f"
+  "ProjectSyncSection": "v:3d249507ea"
  },
  "src/components/storage/StorageParts.tsx": {
-  "ActionSheet": "v:e759a2260d",
-  "EntryIcon": "v:ba75a0c8e4",
-  "EntryRow": "v:f39ea426d0",
-  "LocationCard": "v:a66be7ac6a",
+  "ActionSheet": "v:17d6634b73",
+  "EntryIcon": "v:77c6480708",
+  "EntryRow": "v:4ed8df642f",
+  "LocationCard": "v:8119d870b6",
   "SheetAction": "t:ad4c104918",
-  "TransferList": "v:ddaede798d"
+  "TransferList": "v:bcfd214229"
  },
  "src/components/storage/StoragePickerSheet.tsx": {
-  "StoragePickerSheet": "v:66bd4e8780"
+  "StoragePickerSheet": "v:fefbc8c2ad"
  },
  "src/components/storage/TrashView.tsx": {
-  "TrashView": "v:a029887c8b"
+  "TrashView": "v:29ae6f7edd"
  },
  "src/components/studio/CreateProjectModal.tsx": {
-  "CreateProjectModal": "v:33829869bf"
+  "CreateProjectModal": "v:1b9543103d"
  },
  "src/components/studio/ProjectThumb.tsx": {
-  "ProjectThumb": "v:11002f1a46"
+  "ProjectThumb": "v:22fa7e6e76"
  },
  "src/components/studio/RenameModal.tsx": {
-  "RenameModal": "v:6a2a4a42b7"
+  "RenameModal": "v:b7cf818d95"
  },
  "src/components/studio/StudioHeader.tsx": {
-  "StudioHeader": "v:5759226fbd"
+  "StudioHeader": "v:05ba4ecdfc"
  },
  "src/components/studio/StudioStatusBanners.tsx": {
-  "StudioStatusBanners": "v:679f2d5fe8"
+  "StudioStatusBanners": "v:f640bbe7bd"
  },
  "src/components/studio/StudioTabBar.tsx": {
-  "StudioTabBar": "v:7d647a4afb"
+  "StudioTabBar": "v:7cb64510c9"
  },
  "src/components/studio/audio/AddMediaSheet.tsx": {
-  "AddMediaSheet": "v:23b7678c8a"
+  "AddMediaSheet": "v:4ef87d40f5"
  },
  "src/components/studio/audio/AlbumSheet.tsx": {
-  "AlbumSheet": "v:a206cd38dd"
+  "AlbumSheet": "v:df80d4ea3c"
  },
  "src/components/studio/audio/AudioAssistantBar.tsx": {
-  "AudioAssistantBar": "v:a5a16f76ce",
+  "AudioAssistantBar": "v:5432a15647",
   "applyIntent": "v:976169645d",
   "devTypeAssistant": "v:e5fabbda65",
   "parseNow": "v:27c9c6c1b9"
  },
  "src/components/studio/audio/AudioCheckSheet.tsx": {
-  "AudioCheckSheet": "v:234e1a53bb"
+  "AudioCheckSheet": "v:8e06b01bbc"
  },
  "src/components/studio/audio/AudioEmptyGuide.tsx": {
-  "AudioEmptyGuide": "v:f0d657093a"
+  "AudioEmptyGuide": "v:ed2ae6af52"
  },
  "src/components/studio/audio/AudioExportSheet.tsx": {
-  "AudioExportSheet": "v:c4dcf87f9d"
+  "AudioExportSheet": "v:c4aa680c7c"
  },
  "src/components/studio/audio/AudioLaneHeaders.tsx": {
-  "AudioLaneHeaders": "v:47650f11ed"
+  "AudioLaneHeaders": "v:f388b3a9d3"
  },
  "src/components/studio/audio/AudioMarkerFlags.tsx": {
-  "AudioMarkerFlags": "v:f863213a01",
+  "AudioMarkerFlags": "v:8adcb25d2a",
   "markerActions": "v:efe87f2e46"
  },
  "src/components/studio/audio/AudioSheetFrame.tsx": {
-  "AudioSheetFrame": "v:187eeea2f6",
-  "AudioSheetFrameContext": "v:6b08fb7400",
+  "AudioSheetFrame": "v:ac21796e39",
+  "AudioSheetFrameContext": "v:50e74c4ff7",
   "AudioSheetFrameValue": "t:fe2d0ce1d8"
  },
  "src/components/studio/audio/AudioStudioBody.tsx": {
-  "AudioStudioBody": "v:69c6527ce6"
+  "AudioStudioBody": "v:5706b3a0c7"
  },
  "src/components/studio/audio/AudioStudioModal.tsx": {
-  "AudioStudioModal": "v:767749a6d5"
+  "AudioStudioModal": "v:34fe7ad9c2"
  },
  "src/components/studio/audio/AudioStudioTopBar.tsx": {
-  "AudioStudioTopBar": "v:3dceb49bf7"
+  "AudioStudioTopBar": "v:1fa21c3a06"
  },
  "src/components/studio/audio/AudioTimelineClip.tsx": {
-  "AudioTimelineClip": "v:a85f8d47ba"
+  "AudioTimelineClip": "v:8458349fbd"
  },
  "src/components/studio/audio/AudioTimelineContent.tsx": {
-  "AudioTimelineContent": "v:66e596b9d1"
+  "AudioTimelineContent": "v:144d451cfd"
  },
  "src/components/studio/audio/AudioTransportBar.tsx": {
-  "AudioTransportBar": "v:f2f6a45d8c",
+  "AudioTransportBar": "v:0853762c62",
   "TransportInstrument": "t:7fce8ebb54"
  },
  "src/components/studio/audio/ChordSheet.tsx": {
   "CHORD_PARTS": "v:baccf0318b",
   "ChordPart": "t:80bb5e3438",
-  "ChordSheet": "v:bf4659ccbe"
+  "ChordSheet": "v:2fa4e39994"
  },
  "src/components/studio/audio/ClipEditSheet.tsx": {
-  "ClipEditSheet": "v:ddb45c30ac",
+  "ClipEditSheet": "v:ba8c8487e3",
   "selectedAudioClip": "v:dd71939b61"
  },
  "src/components/studio/audio/CrossfadeMarks.tsx": {
-  "CrossfadeMarks": "v:3401dc7c94"
+  "CrossfadeMarks": "v:fc1bad8892"
  },
  "src/components/studio/audio/DrumMachineSheet.tsx": {
-  "DrumMachineSheet": "v:b7db49e0bf",
+  "DrumMachineSheet": "v:90c32d8014",
   "DrumSource": "t:8eecdba118"
  },
  "src/components/studio/audio/LaneMeter.tsx": {
-  "ClipMarkers": "v:3e786c5a3e",
-  "LaneMeter": "v:ba369c3bc1",
-  "LoudnessReadout": "v:767749a6d5",
-  "MasterMeter": "v:767749a6d5"
+  "ClipMarkers": "v:a9bb1031e7",
+  "LaneMeter": "v:bfeaac3c45",
+  "LoudnessReadout": "v:34fe7ad9c2",
+  "MasterMeter": "v:34fe7ad9c2"
  },
  "src/components/studio/audio/LoopLibrarySheet.tsx": {
-  "LoopLibrarySheet": "v:35caab27af"
+  "LoopLibrarySheet": "v:67a7c8907f"
  },
  "src/components/studio/audio/MasterSheet.tsx": {
-  "MasterSheet": "v:2f9a2fe381"
+  "MasterSheet": "v:0c7fe530fb"
  },
  "src/components/studio/audio/MixAssistSheet.tsx": {
-  "MixAssistSheet": "v:796e34b691"
+  "MixAssistSheet": "v:b8aa420b18"
  },
  "src/components/studio/audio/MixerSheet.tsx": {
-  "MixerSheet": "v:e2f5d4bb8b"
+  "MixerSheet": "v:f74b076c6d"
  },
  "src/components/studio/audio/PianoRollSheet.tsx": {
-  "PianoRollSheet": "v:422c75c026"
+  "PianoRollSheet": "v:560c8e4f37"
  },
  "src/components/studio/audio/PreviewPlayButton.tsx": {
-  "PreviewPlayButton": "v:27ca030d3f"
+  "PreviewPlayButton": "v:40f0c5221f"
  },
  "src/components/studio/audio/SamplerMelodySheet.tsx": {
-  "SamplerMelodySheet": "v:0ebc136b03"
+  "SamplerMelodySheet": "v:5c277d2542"
  },
  "src/components/studio/audio/SamplerSheet.tsx": {
-  "SamplerSheet": "v:48ebf5cad1"
+  "SamplerSheet": "v:6f68789190"
  },
  "src/components/studio/audio/SilenceReview.tsx": {
-  "SilenceMarks": "v:c6108b0b6f",
-  "SilenceReviewBar": "v:796e34b691",
+  "SilenceMarks": "v:8f02c7686f",
+  "SilenceReviewBar": "v:b8aa420b18",
   "applySilenceReview": "v:41b16234f5",
   "startSilenceSearch": "v:c867397f82"
  },
  "src/components/studio/audio/SpeechEditBar.tsx": {
-  "SpeechCutMarks": "v:c6108b0b6f",
-  "SpeechEditBar": "v:796e34b691",
+  "SpeechCutMarks": "v:8f02c7686f",
+  "SpeechEditBar": "v:b8aa420b18",
   "applySpeechCut": "v:41b16234f5",
   "currentSpeechWords": "v:766c9c03b0",
   "ensureWhisperModel": "v:7c855eeff7",
@@ -2031,25 +2031,25 @@
   "upgradeSpeechModel": "v:7fe44681c0"
  },
  "src/components/studio/audio/TakePicker.tsx": {
-  "TakePicker": "v:8aef9a0b25"
+  "TakePicker": "v:fb23c75686"
  },
  "src/components/studio/audio/TransportButton.tsx": {
-  "TBtn": "v:d9b43289b9"
+  "TBtn": "v:854d55627f"
  },
  "src/components/studio/audio/TtsSheet.tsx": {
-  "TtsSheet": "v:2f9a2fe381"
+  "TtsSheet": "v:0c7fe530fb"
  },
  "src/components/studio/audio/UserPresetRow.tsx": {
-  "UserPresetRow": "v:23d2d4d8e1"
+  "UserPresetRow": "v:4de0c2b48c"
  },
  "src/components/studio/audio/VerticalFader.tsx": {
-  "VerticalFader": "v:b1bd73efd0"
+  "VerticalFader": "v:93cee161c6"
  },
  "src/components/studio/audio/VideoReference.tsx": {
-  "VideoReference": "v:796e34b691"
+  "VideoReference": "v:b8aa420b18"
  },
  "src/components/studio/audio/WorkflowRunBar.tsx": {
-  "WorkflowRunBar": "v:4b82c340e0"
+  "WorkflowRunBar": "v:52788b18d5"
  },
  "src/components/studio/audio/audioLanes.ts": {
   "AudioLane": "t:0fe1b6312c",
@@ -2062,13 +2062,13 @@
   "syncCandidates": "v:0bbafe895c"
  },
  "src/components/studio/audio/body/AudioStudioSheets.tsx": {
-  "AudioStudioSheets": "v:5536f9eb0d"
+  "AudioStudioSheets": "v:a98abcd027"
  },
  "src/components/studio/audio/body/AudioStudioToolbar.tsx": {
-  "AudioStudioToolbar": "v:18bb3e9913"
+  "AudioStudioToolbar": "v:4c0854b41f"
  },
  "src/components/studio/audio/body/RecordingStrip.tsx": {
-  "RecordingStrip": "v:97d665f25b"
+  "RecordingStrip": "v:1e40e39e00"
  },
  "src/components/studio/audio/body/clipAiActions.ts": {
   "clipAiActions": "v:0d9427b866"
@@ -2092,245 +2092,245 @@
  "src/components/studio/audio/body/useInstrumentStudio.ts": {
   "PlaceInstrument": "t:102737cf05",
   "SamplerMelody": "t:46ecdcf79e",
-  "useInstrumentStudio": "v:c320b314e4"
+  "useInstrumentStudio": "v:14b99e60aa"
  },
  "src/components/studio/audio/body/useStudioRecording.ts": {
-  "useStudioRecording": "v:070bf3c0ab"
+  "useStudioRecording": "v:31f4902016"
  },
  "src/components/studio/audio/exportParts.ts": {
   "exportParts": "v:d0061b6917"
  },
  "src/components/studio/audio/primitives.tsx": {
-  "RegionBar": "v:c9ee8fefcc",
-  "Slider": "v:916dfb3ed0",
-  "ToggleRow": "v:fd538750ad",
+  "RegionBar": "v:a44e42a7e4",
+  "Slider": "v:a726a4ac3e",
+  "ToggleRow": "v:46518b79c4",
   "useWaveform": "v:92bacc3bb9"
  },
  "src/components/studio/image/AdjustStackSheet.tsx": {
-  "AdjustStackSheet": "v:aad273463f",
+  "AdjustStackSheet": "v:54bb8a6524",
   "FIELD_META": "v:4f04b88305"
  },
  "src/components/studio/image/AlignSheet.tsx": {
-  "AlignSheet": "v:14fcb4d169"
+  "AlignSheet": "v:5f9f646104"
  },
  "src/components/studio/image/BooleanSheet.tsx": {
-  "BooleanSheet": "v:7777642bd1"
+  "BooleanSheet": "v:4e99f63c49"
  },
  "src/components/studio/image/BrushOverlay.tsx": {
   "BrushHandle": "t:ef56437fcd",
-  "BrushOverlay": "v:f20035bb84",
+  "BrushOverlay": "v:e6dfe357c6",
   "Stroke": "t:9b7d8736d0",
   "drawStrokes": "v:cb92b6a782",
   "renderStrokes": "v:6f050c0bb0"
  },
  "src/components/studio/image/CanvasLayerView.tsx": {
-  "CanvasLayerView": "v:03d577d694"
+  "CanvasLayerView": "v:1b7422c3a2"
  },
  "src/components/studio/image/CanvasSheet.tsx": {
-  "CanvasSheet": "v:38db39260b"
+  "CanvasSheet": "v:c181a181e2"
  },
  "src/components/studio/image/ColorField.tsx": {
-  "ColorField": "v:e0a32a6470"
+  "ColorField": "v:1df165a3e2"
  },
  "src/components/studio/image/CornerPinOverlay.tsx": {
-  "CornerPinOverlay": "v:daef106e8a"
+  "CornerPinOverlay": "v:e6f48ba75b"
  },
  "src/components/studio/image/CropOverlay.tsx": {
-  "CropOverlay": "v:14925178cd"
+  "CropOverlay": "v:7c99169d3a"
  },
  "src/components/studio/image/DevelopSheet.tsx": {
-  "DevelopSheet": "v:aad273463f"
+  "DevelopSheet": "v:54bb8a6524"
  },
  "src/components/studio/image/DocVignette.tsx": {
-  "DocGrain": "v:b0b05e59b1",
-  "DocVignette": "v:c94fae378c",
+  "DocGrain": "v:8a226f1896",
+  "DocVignette": "v:c17263f549",
   "vignetteFactor": "v:862f338ad2"
  },
  "src/components/studio/image/EffectsSheet.tsx": {
-  "EffectsSheet": "v:0b0d0d9dae"
+  "EffectsSheet": "v:6dfda90ab1"
  },
  "src/components/studio/image/EmptyCanvasHint.tsx": {
-  "EmptyCanvasHint": "v:d7a666b095"
+  "EmptyCanvasHint": "v:c148c18067"
  },
  "src/components/studio/image/ExportSheet.tsx": {
-  "ExportSheet": "v:50a2472d8d"
+  "ExportSheet": "v:0c425084b7"
  },
  "src/components/studio/image/FillLayerView.tsx": {
-  "FillLayerView": "v:d03fa7135b"
+  "FillLayerView": "v:73027f7347"
  },
  "src/components/studio/image/GeometryFields.tsx": {
-  "GeometryFields": "v:cd1e55a357"
+  "GeometryFields": "v:0605c5c4d3"
  },
  "src/components/studio/image/GradientEditor.tsx": {
-  "GradientEditor": "v:862181e175"
+  "GradientEditor": "v:efd1f5130e"
  },
  "src/components/studio/image/GridOverlay.tsx": {
-  "GridOverlay": "v:e9f4ba38a7"
+  "GridOverlay": "v:44b13cd90f"
  },
  "src/components/studio/image/HistogramView.tsx": {
-  "HistogramView": "v:88862f74eb",
+  "HistogramView": "v:fd3de37257",
   "layerHistogram": "v:6fbb4dd107"
  },
  "src/components/studio/image/HistorySheet.tsx": {
-  "HistorySheet": "v:2f9a2fe381"
+  "HistorySheet": "v:0c7fe530fb"
  },
  "src/components/studio/image/HslSheet.tsx": {
-  "HslSheet": "v:9999c778c2"
+  "HslSheet": "v:7358b4d2f3"
  },
  "src/components/studio/image/ImageAdjustStrip.tsx": {
-  "ImageAdjustStrip": "v:fad24f4e59",
+  "ImageAdjustStrip": "v:0ad008db58",
   "QUICK_ADJUST_ID": "v:c00bfd8380"
  },
  "src/components/studio/image/ImageCanvas.tsx": {
-  "ImageCanvas": "v:7d838586ac"
+  "ImageCanvas": "v:fd4ff965b7"
  },
  "src/components/studio/image/ImageStudioBody.tsx": {
-  "ImageStudioBody": "v:c4043c23dc"
+  "ImageStudioBody": "v:4adf3a8069"
  },
  "src/components/studio/image/ImageStudioModal.tsx": {
-  "ImageStudioModal": "v:767749a6d5"
+  "ImageStudioModal": "v:34fe7ad9c2"
  },
  "src/components/studio/image/ImportSheet.tsx": {
-  "ImportSheet": "v:e031fbde68"
+  "ImportSheet": "v:80ecc1dad5"
  },
  "src/components/studio/image/LassoOverlay.tsx": {
-  "LassoOverlay": "v:809e8b3ab7"
+  "LassoOverlay": "v:3acf51792a"
  },
  "src/components/studio/image/LayerInspector.tsx": {
-  "LayerInspector": "v:564f4079d3"
+  "LayerInspector": "v:2244726efb"
  },
  "src/components/studio/image/LayerMenuSheet.tsx": {
   "LayerMenuAction": "t:78c4167481",
-  "LayerMenuSheet": "v:34ddd257c4",
+  "LayerMenuSheet": "v:0dc22be2b5",
   "layerMenuActions": "v:6618b09cf8"
  },
  "src/components/studio/image/LayerPanel.tsx": {
-  "LayerPanel": "v:666e8a369f"
+  "LayerPanel": "v:c9bd040312"
  },
  "src/components/studio/image/LayerStyleSheet.tsx": {
-  "LayerStyleSheet": "v:13852a276c"
+  "LayerStyleSheet": "v:ce201050e7"
  },
  "src/components/studio/image/LayerThumb.tsx": {
-  "LayerThumb": "v:e4d8689bc1"
+  "LayerThumb": "v:6d1cd86998"
  },
  "src/components/studio/image/MarqueeOverlay.tsx": {
-  "MarqueeOverlay": "v:ee18f92466"
+  "MarqueeOverlay": "v:bbf3a94a58"
  },
  "src/components/studio/image/PathEditOverlay.tsx": {
-  "PathEditOverlay": "v:f727bdd8b6"
+  "PathEditOverlay": "v:3f78589458"
  },
  "src/components/studio/image/PatternSheet.tsx": {
-  "PatternSheet": "v:0b0d0d9dae"
+  "PatternSheet": "v:6dfda90ab1"
  },
  "src/components/studio/image/PenOverlay.tsx": {
-  "PenOverlay": "v:868563a5c9"
+  "PenOverlay": "v:a806c66bb4"
  },
  "src/components/studio/image/PhotoLayerView.tsx": {
-  "PhotoLayerView": "v:6ccf1d9f2a"
+  "PhotoLayerView": "v:11db214d2b"
  },
  "src/components/studio/image/PixelStudio.tsx": {
-  "PixelStudio": "v:e9260a4934"
+  "PixelStudio": "v:e89a06ba5f"
  },
  "src/components/studio/image/RenderStage.tsx": {
-  "RenderStage": "v:a3e71098b6",
+  "RenderStage": "v:d92c267136",
   "RenderStageHandle": "t:b09d4d3f92",
   "RenderStageOptions": "t:c1f74eb258",
-  "StageLayers": "v:ac3c37bc5d",
+  "StageLayers": "v:5cdf8f8a4a",
   "ensureTextClipMasks": "v:4d4c9dfbfd",
   "keepRenderedInProject": "v:c7f91581f8",
   "renderOnDevice": "v:301726b3ca"
  },
  "src/components/studio/image/RulersOverlay.tsx": {
-  "RulersOverlay": "v:08b8097b24"
+  "RulersOverlay": "v:b7c78a630e"
  },
  "src/components/studio/image/SelectionAnts.tsx": {
-  "SelectionAnts": "v:78fe4bb100"
+  "SelectionAnts": "v:7b2da3382d"
  },
  "src/components/studio/image/SelectionFrame.tsx": {
-  "SelectionFrame": "v:206639cfb9"
+  "SelectionFrame": "v:a609ae1991"
  },
  "src/components/studio/image/ShapeEffects.tsx": {
-  "ShapeEffects": "v:378fd0c4db",
-  "ShapeInnerEffects": "v:378fd0c4db"
+  "ShapeEffects": "v:ca8c5c6ef0",
+  "ShapeInnerEffects": "v:ca8c5c6ef0"
  },
  "src/components/studio/image/ShapePickerSheet.tsx": {
-  "ShapePickerSheet": "v:b7ae808595"
+  "ShapePickerSheet": "v:6c4c33129d"
  },
  "src/components/studio/image/SkiaPhotoLayer.tsx": {
-  "PhotoSkiaContent": "v:ba460f2e7c",
-  "SkiaPhotoLayer": "v:6131420f8b",
+  "PhotoSkiaContent": "v:651b0db982",
+  "SkiaPhotoLayer": "v:0363917f0f",
   "makeLutImage": "v:0020e04502",
   "needsSkiaPreview": "v:95ea92ea3e",
   "useCubeFile": "v:845daf724b"
  },
  "src/components/studio/image/StageLayers.tsx": {
-  "StageLayers": "v:ac3c37bc5d"
+  "StageLayers": "v:5cdf8f8a4a"
  },
  "src/components/studio/image/StudioSheet.tsx": {
-  "StudioSheet": "v:49e6532863",
+  "StudioSheet": "v:d37e66dee5",
   "StudioSheetFrame": "t:8ddf866831",
-  "StudioSheetFrameContext": "v:71a3345ac7"
+  "StudioSheetFrameContext": "v:9c19ec1be3"
  },
  "src/components/studio/image/TemplatesSheet.tsx": {
-  "TemplatesSheet": "v:dc30fdda1a"
+  "TemplatesSheet": "v:1061b4e0e5"
  },
  "src/components/studio/image/WandOverlay.tsx": {
-  "WandOverlay": "v:a8a4c14fbb"
+  "WandOverlay": "v:0838d8ca67"
  },
  "src/components/studio/image/body/ActiveModeBar.tsx": {
-  "ActiveModeBar": "v:b71425cecc"
+  "ActiveModeBar": "v:ab71297a34"
  },
  "src/components/studio/image/body/AssistantBar.tsx": {
-  "AssistantBar": "v:2f48c50f14"
+  "AssistantBar": "v:ab27c111d8"
  },
  "src/components/studio/image/body/BrushBar.tsx": {
-  "BrushBar": "v:90db2947ea"
+  "BrushBar": "v:9f69877618"
  },
  "src/components/studio/image/body/DockedLayerPanel.tsx": {
-  "DockedLayerPanel": "v:8afff39365"
+  "DockedLayerPanel": "v:4d7a784aa1"
  },
  "src/components/studio/image/body/ImageStudioSheets.tsx": {
-  "ImageStudioSheets": "v:b2f480d6f5",
+  "ImageStudioSheets": "v:4b269e6884",
   "SheetKind": "t:1ecaaefeba",
   "isInlineSheet": "v:bc8b94768e"
  },
  "src/components/studio/image/body/ImageStudioToolbar.tsx": {
-  "ImageStudioToolbar": "v:47fcc94093"
+  "ImageStudioToolbar": "v:481da6ad77"
  },
  "src/components/studio/image/body/ModeBars.tsx": {
-  "CornerPinBar": "v:66374e8e7a",
-  "CropBar": "v:33b17de9b5",
-  "GuidesBar": "v:ab2f107c92",
-  "LassoBar": "v:177eeb6a05",
-  "PathEditBar": "v:b49edcb53c",
-  "PenBar": "v:e664c2c625",
-  "WandBar": "v:087a6072b1"
+  "CornerPinBar": "v:a49438c93c",
+  "CropBar": "v:39f024f098",
+  "GuidesBar": "v:1bbb2294f6",
+  "LassoBar": "v:86c6b061d3",
+  "PathEditBar": "v:6ad4bb42a2",
+  "PenBar": "v:e4c2ac4490",
+  "WandBar": "v:44ac17278c"
  },
  "src/components/studio/image/body/MultiSelectBar.tsx": {
   "MultiAction": "t:8b6ce5eadb",
-  "MultiSelectBar": "v:743139d7cf"
+  "MultiSelectBar": "v:abd1e33f4e"
  },
  "src/components/studio/image/body/PageStrip.tsx": {
-  "PageStrip": "v:25567d4ba9"
+  "PageStrip": "v:ceda29e6e5"
  },
  "src/components/studio/image/body/PanelChrome.tsx": {
-  "EdgeTab": "v:ad91605ff4"
+  "EdgeTab": "v:d1753e4d34"
  },
  "src/components/studio/image/body/SelectionActionBar.tsx": {
-  "SelectionActionBar": "v:c25c7f9a19"
+  "SelectionActionBar": "v:e4fe26e1f4"
  },
  "src/components/studio/image/body/SelectionBar.tsx": {
   "SelectTool": "t:e54815a66c",
   "SelectionAction": "t:26a275c200",
-  "SelectionBar": "v:9cf7df02df"
+  "SelectionBar": "v:d3c4af6c86"
  },
  "src/components/studio/image/body/StatusRows.tsx": {
-  "ActiveSelectionRow": "v:caec3b59bb",
-  "ExportingRow": "v:177eeb6a05",
-  "StatusHintRow": "v:7176612da1"
+  "ActiveSelectionRow": "v:0fb18ce4e3",
+  "ExportingRow": "v:86c6b061d3",
+  "StatusHintRow": "v:293eb0da85"
  },
  "src/components/studio/image/body/StudioTopBar.tsx": {
-  "StudioTopBar": "v:431ca18e6d"
+  "StudioTopBar": "v:b211ccbc46"
  },
  "src/components/studio/image/body/layerEditActions.tsx": {
   "LayerEditDeps": "t:fdf323559d",
@@ -2370,39 +2370,39 @@
   "useProjectFonts": "v:41b16234f5"
  },
  "src/components/studio/image/body/useStudioModeState.ts": {
-  "StudioModeState": "t:07d0630871",
-  "useStudioModeState": "v:23d6678cdc"
+  "StudioModeState": "t:57ba5da84d",
+  "useStudioModeState": "v:162143cd2d"
  },
  "src/components/studio/image/body/useStudioPanels.ts": {
-  "useStudioPanels": "v:b8c9edc17c"
+  "useStudioPanels": "v:04871d8514"
  },
  "src/components/studio/image/canvas/CanvasLayerStack.tsx": {
-  "CanvasLayerStack": "v:f4a077c7ec"
+  "CanvasLayerStack": "v:ce5a6d8136"
  },
  "src/components/studio/image/canvas/CanvasMarks.tsx": {
-  "MultiSelectOutlines": "v:dddbf7c1c5",
+  "MultiSelectOutlines": "v:bc29a3c713",
   "PASTEBOARD": "v:9fc4777aa5",
-  "PasteboardVeil": "v:95ba158144",
-  "SmartGuideMarks": "v:54974f5b2d"
+  "PasteboardVeil": "v:85ddf7fd24",
+  "SmartGuideMarks": "v:84ec0fb8f4"
  },
  "src/components/studio/image/canvas/EditOverlays.tsx": {
-  "EditOverlays": "v:17c8e639be"
+  "EditOverlays": "v:32ab9c7e0b"
  },
  "src/components/studio/image/canvas/GuideOverlays.tsx": {
-  "GuideOverlays": "v:af6dbf09e3"
+  "GuideOverlays": "v:08910455ef"
  },
  "src/components/studio/image/canvas/SelectionOverlays.tsx": {
-  "SelectionOverlays": "v:da2e8fec14"
+  "SelectionOverlays": "v:42d149b904"
  },
  "src/components/studio/image/canvas/pathEditActions.ts": {
   "PathEditActions": "t:bcf15ddff6",
   "createPathEditActions": "v:1e0df3fb0e"
  },
  "src/components/studio/image/canvas/viewportGestures.ts": {
-  "createBackdropTap": "v:68fa0d801a",
-  "createLayerLongPress": "v:f9b9047fb6",
-  "createPanGesture": "v:e8e54f89a9",
-  "createPinchGesture": "v:b276a5b1e4"
+  "createBackdropTap": "v:37eda30e44",
+  "createLayerLongPress": "v:dd53028610",
+  "createPanGesture": "v:786c1cfaf3",
+  "createPinchGesture": "v:7ef4b481cf"
  },
  "src/components/studio/image/exportEstimate.ts": {
   "photoBytesPerPixel": "v:b3124ff955"
@@ -2412,28 +2412,28 @@
   "verifyExport": "v:981b82dc03"
  },
  "src/components/studio/image/inspector/AdjustLayerSection.tsx": {
-  "AdjustLayerSection": "v:2beda05761"
+  "AdjustLayerSection": "v:6aa0a4a687"
  },
  "src/components/studio/image/inspector/FillLayerSection.tsx": {
-  "FillLayerSection": "v:47ee5135e6"
+  "FillLayerSection": "v:13b89025fc"
  },
  "src/components/studio/image/inspector/LayerCompositeSection.tsx": {
-  "LayerCompositeSection": "v:60b067bb4d"
+  "LayerCompositeSection": "v:fc6e5bbee4"
  },
  "src/components/studio/image/inspector/LayerEffectsSection.tsx": {
-  "LayerEffectsSection": "v:e4e8a36509"
+  "LayerEffectsSection": "v:b2506adbdd"
  },
  "src/components/studio/image/inspector/MaskFadeSection.tsx": {
-  "MaskFadeSection": "v:e4e8a36509"
+  "MaskFadeSection": "v:b2506adbdd"
  },
  "src/components/studio/image/inspector/PhotoLayerSection.tsx": {
-  "PhotoLayerSection": "v:cadac64f5b"
+  "PhotoLayerSection": "v:677d1ebd7d"
  },
  "src/components/studio/image/inspector/ShapeLayerSection.tsx": {
-  "ShapeLayerSection": "v:a7bad52e26"
+  "ShapeLayerSection": "v:c6eb3ceab0"
  },
  "src/components/studio/image/inspector/TextLayerSection.tsx": {
-  "TextLayerSection": "v:630fc2e477"
+  "TextLayerSection": "v:1642dca1e3"
  },
  "src/components/studio/image/inspector/inspectorStyles.ts": {
   "inspectorStyles": "v:96ef58d2cd"
@@ -2453,54 +2453,54 @@
   "withResult": "v:5587f10fb3"
  },
  "src/components/studio/model3d/Model3DEditSheet.tsx": {
-  "Model3DEditSheet": "v:36fbd0fba0"
+  "Model3DEditSheet": "v:a022b5b640"
  },
  "src/components/studio/model3d/Model3DExportSheet.tsx": {
-  "Model3DExportSheet": "v:a9d9ced20c"
+  "Model3DExportSheet": "v:b294f2c5f9"
  },
  "src/components/studio/model3d/Model3DStudio.tsx": {
-  "Model3DStudio": "v:38119c3abb"
+  "Model3DStudio": "v:200a08127f"
  },
  "src/components/tutorial/TutorialMenu.tsx": {
-  "TutorialMenu": "v:767749a6d5"
+  "TutorialMenu": "v:34fe7ad9c2"
  },
  "src/components/tutorial/TutorialOverlay.tsx": {
-  "TutorialOverlay": "v:796e34b691"
+  "TutorialOverlay": "v:b8aa420b18"
  },
  "src/components/tutorial/TutorialTarget.tsx": {
-  "TutorialTarget": "v:90d81f1d98"
+  "TutorialTarget": "v:d9cd3eb9fd"
  },
  "src/components/ui/BottomSheet.tsx": {
-  "BottomSheet": "v:e651cbd0cd"
+  "BottomSheet": "v:68f6745a80"
  },
  "src/components/ui/CollapsibleCard.tsx": {
-  "CollapsibleCard": "v:cc0eb6ab9a"
+  "CollapsibleCard": "v:690c1c99c9"
  },
  "src/components/ui/InlineSheet.tsx": {
-  "InlineSheet": "v:be10821571"
+  "InlineSheet": "v:5e9f55dbb1"
  },
  "src/components/ui/PressableScale.tsx": {
-  "PressableScale": "v:376133534c"
+  "PressableScale": "v:dbf629245b"
  },
  "src/components/ui/ProgressBar.tsx": {
-  "ProgressBar": "v:ccc1a7c902"
+  "ProgressBar": "v:8fb1a32507"
  },
  "src/components/ui/Toast.tsx": {
-  "Toast": "v:796e34b691"
+  "Toast": "v:b8aa420b18"
  },
  "src/components/ui/controls.tsx": {
-  "Chip": "v:2766254d87",
-  "ColorDot": "v:76b20068ca",
-  "PanelSection": "v:cc523ed7c4",
-  "PrimaryButton": "v:29444ffefa",
-  "Stepper": "v:74fa9630b8",
-  "ToolButton": "v:009b553c22"
+  "Chip": "v:44ea6f931b",
+  "ColorDot": "v:4903e3beac",
+  "PanelSection": "v:3930675c56",
+  "PrimaryButton": "v:108b25378f",
+  "Stepper": "v:de609bc87f",
+  "ToolButton": "v:46ae7acc2e"
  },
  "src/components/ui/errorAlert.ts": {
   "showError": "v:7c1e984bc3"
  },
  "src/components/web/OpenInAppScreen.tsx": {
-  "default": "v:767749a6d5"
+  "default": "v:34fe7ad9c2"
  },
  "src/constants/adjust.ts": {
   "ADJUST_FIELDS": "v:bddeb109fe",
@@ -2581,10 +2581,10 @@
  "src/design/colors.ts": {
   "FunctionalColor": "t:194ba083e6",
   "accentGradient": "v:94aaf2487d",
-  "colors": "v:df7bcff581",
+  "colors": "v:976e36a35c",
   "functional": "v:09f5873bfe",
   "palette": "v:14e0481d13",
-  "trackColors": "v:0ae1cb1f38"
+  "trackColors": "v:bf5cb1aeb1"
  },
  "src/design/gestures.ts": {
   "Gestures": "t:2914b3f048",
@@ -2598,29 +2598,29 @@
   "Gestures": "t:2914b3f048",
   "RadiusToken": "t:c6892ca0c2",
   "accentGradient": "v:94aaf2487d",
-  "colors": "v:df7bcff581",
+  "colors": "v:976e36a35c",
   "duration": "v:4333d465fb",
-  "easing": "v:3b2d72546b",
+  "easing": "v:7350f97e1f",
   "functional": "v:09f5873bfe",
   "gestures": "v:2914b3f048",
   "haptics": "v:b10885b23d",
-  "motion": "v:b6a5eb1545",
+  "motion": "v:75f99aa8c8",
   "palette": "v:14e0481d13",
   "radius": "v:aebce9da39",
   "size": "v:b78c7c86ba",
   "spring": "v:c852278737",
   "text": "v:c7ce893d35",
-  "timing": "v:0bab0bf16b",
-  "trackColors": "v:0ae1cb1f38",
+  "timing": "v:d5b03ed317",
+  "trackColors": "v:bf5cb1aeb1",
   "typography": "v:56065b9492",
   "weight": "v:3d93a78d6e"
  },
  "src/design/motion.ts": {
   "duration": "v:4333d465fb",
-  "easing": "v:3b2d72546b",
-  "motion": "v:b6a5eb1545",
+  "easing": "v:7350f97e1f",
+  "motion": "v:75f99aa8c8",
   "spring": "v:c852278737",
-  "timing": "v:0bab0bf16b"
+  "timing": "v:d5b03ed317"
  },
  "src/design/radius.ts": {
   "RadiusToken": "t:c6892ca0c2",
@@ -2912,7 +2912,7 @@
  "src/hooks/useFeed.ts": {
   "compact": "v:71267fb618",
   "hotspotsOf": "v:3193f7ca46",
-  "useFeed": "v:13182ed4a8"
+  "useFeed": "v:4472b97ac3"
  },
  "src/hooks/useFinishRecordingOnLeave.ts": {
   "useFinishRecordingOnLeave": "v:460efa2c14"
@@ -2934,7 +2934,7 @@
   "EMPTY_FORM": "v:9721989244",
   "ProviderForm": "t:9721989244",
   "ProxyQuality": "t:aa398bf353",
-  "useProfile": "v:ea99d7ca16"
+  "useProfile": "v:d46da9db22"
  },
  "src/hooks/useProjectAutosave.ts": {
   "AUTOSAVE_MS": "v:290a52e4dd",
@@ -2948,25 +2948,25 @@
  },
  "src/hooks/useStorageBrowser.ts": {
   "BrowsableLocation": "t:811f26c74b",
-  "Transfer": "t:586e59c32b",
-  "useStorageBrowser": "v:a038ce77d9"
+  "Transfer": "t:cbb4cc4982",
+  "useStorageBrowser": "v:542b263a70"
  },
  "src/hooks/useStudio.ts": {
-  "useStudio": "v:52fc3ab415"
+  "useStudio": "v:cd923b97f9"
  },
  "src/hooks/useStudioSession.ts": {
   "useStudioSession": "v:cb5518bef0"
  },
  "src/hooks/useTtsEngine.ts": {
   "TtsChoice": "t:69c1a0e633",
-  "useTtsEngine": "v:035e3b37e4"
+  "useTtsEngine": "v:477213b362"
  },
  "src/hooks/useUndoRedoGestures.ts": {
-  "useUndoRedoGestures": "v:2f4b434551"
+  "useUndoRedoGestures": "v:9131f23d60"
  },
  "src/i18n/index.ts": {
   "currentLanguage": "v:2351be9f10",
-  "default": "v:744eab5896",
+  "default": "v:61d28b9c49",
   "hydrateLanguage": "v:e8adaa9cef",
   "resources": "v:7f88367d82",
   "setLanguage": "v:46031e2080"
@@ -3728,13 +3728,13 @@
  },
  "src/lib/beats.ts": {
   "BeatGrid": "t:f4ee35bade",
-  "BeatSplitPlan": "t:4dc92de760",
-  "buildBeatSplitPlan": "v:f44a08cb7f",
+  "BeatSplitPlan": "t:3bf65ef870",
+  "buildBeatSplitPlan": "v:a52a8e2c21",
   "clearBeatMemory": "v:bc050ab876",
   "detectBeats": "v:1c9c9ff735",
   "detectBeatsOnDevice": "v:1c9c9ff735",
   "lastBeatPath": "v:ebec6b1f71",
-  "timelineBeats": "v:3deed3d1ea"
+  "timelineBeats": "v:b1e56ca5d7"
  },
  "src/lib/bgremove.ts": {
   "CutoutResult": "t:459d777d8f",
@@ -4274,7 +4274,7 @@
   "GraphEdge": "t:595183cdbd",
   "GraphInput": "t:f11677b750",
   "GraphNode": "t:4c8465f685",
-  "GraphProjectInput": "t:4eb96d6d7a",
+  "GraphProjectInput": "t:5064c04bdb",
   "NeighborOpts": "t:22b6d29572",
   "NodeType": "t:a2e28f055f",
   "addEdge": "v:b85c39ac16",
@@ -4404,11 +4404,11 @@
   "sampleCurvePath": "v:0f8685b93a"
  },
  "src/lib/cutlist.ts": {
-  "CutPlan": "t:779c080f97",
-  "SceneSplitPlan": "t:455d0cfd51",
+  "CutPlan": "t:0b390948c4",
+  "SceneSplitPlan": "t:ce9f1cf740",
   "SilenceRange": "t:c94e9761e3",
-  "buildCutPlan": "v:cdb815c17c",
-  "buildSceneSplitPlan": "v:1b0085b0a7",
+  "buildCutPlan": "v:dc4e154580",
+  "buildSceneSplitPlan": "v:7673e6bcce",
   "clearCutlistMemory": "v:bc050ab876",
   "detectScenes": "v:88ee520aa1",
   "detectSilence": "v:936a91bdab"
@@ -4639,7 +4639,7 @@
   "slimForLog": "v:f924132ab9"
  },
  "src/lib/export.ts": {
-  "buildInteractiveMetadata": "v:54d836a7f6",
+  "buildInteractiveMetadata": "v:3e3d5a1943",
   "shareCaptionsAss": "v:4fd48548ec",
   "shareCaptionsSrt": "v:4fd48548ec",
   "shareCaptionsVtt": "v:4fd48548ec",
@@ -4693,7 +4693,7 @@
  },
  "src/lib/faceClient.ts": {
   "FaceBox": "t:10ecd370e3",
-  "faceUnionRegion": "v:73d7394cc4",
+  "faceUnionRegion": "v:15dff25842",
   "fetchFaces": "v:9a5f7f001e",
   "pickPrimaryFace": "v:5ac9516737"
  },
@@ -5200,7 +5200,7 @@
   "toggleId": "v:ceab7e74b9"
  },
  "src/lib/imagePixelPipeline.ts": {
-  "ColorFields": "t:5a7ae494a2",
+  "ColorFields": "t:928ae04c9c",
   "CorrectionMap": "t:18969360a0",
   "FILTER_TINTS": "v:96ed195b72",
   "GRADE_OPS": "v:299934d73c",
@@ -5288,7 +5288,7 @@
   "PrecisionFlags": "t:0efdc9497e",
   "initialSheetDetent": "v:3db98e995a",
   "isPrecisionMode": "v:147b92f214",
-  "pathEditTarget": "v:7d1b20bcbe"
+  "pathEditTarget": "v:6e6cf3a6ae"
  },
  "src/lib/imageTemplates.ts": {
   "IMAGE_TEMPLATES": "v:a848d78d83",
@@ -7698,7 +7698,7 @@
   "nextEdgePreview": "v:e449f0faec",
   "pickSnappedMoveStart": "v:1380603716",
   "rightEdgePreview": "v:77db152705",
-  "trimLeftUpdate": "v:1ff7c6daf3",
+  "trimLeftUpdate": "v:54f183f0e5",
   "trimRightPatch": "v:69f7af639d",
   "wantsTrackStep": "v:a26c809056"
  },
@@ -7742,8 +7742,8 @@
  },
  "src/lib/track.ts": {
   "TrackPoint": "t:7c393b3fd7",
-  "pointsToPanKeyframes": "v:dd5d5cfd33",
-  "pointsToPositionKeyframes": "v:dd5d5cfd33",
+  "pointsToPanKeyframes": "v:38a9e76bd4",
+  "pointsToPositionKeyframes": "v:38a9e76bd4",
   "trackSubject": "v:2ae3fc495a"
  },
  "src/lib/trackPlan.ts": {
@@ -8156,7 +8156,7 @@
  "src/lib/webAlert.ts": {
   "WebAlertButton": "t:4f596f6943",
   "installWebAlert": "v:bc050ab876",
-  "useWebAlert": "v:43f58c1109"
+  "useWebAlert": "v:91e7dbf6b9"
  },
  "src/lib/webGate.ts": {
   "IS_WEB_VIEWER": "v:48647474b8",
@@ -8293,21 +8293,21 @@
  },
  "src/store/actionMenuStore.ts": {
   "ActionMenuItem": "t:4d6f7f4784",
-  "useActionMenu": "v:67f42b6e6f"
+  "useActionMenu": "v:57745c5be9"
  },
  "src/store/audioEditModeStore.ts": {
   "AudioEditMode": "t:d4898d0e05",
   "LANE_HEIGHTS": "v:6cc576d2e2",
-  "useAudioEditMode": "v:e29f1845b2"
+  "useAudioEditMode": "v:fdcf18c4ef"
  },
  "src/store/authStore.ts": {
   "AuthResult": "t:56e77989e3",
-  "useAuth": "v:cc2f0c59c0"
+  "useAuth": "v:bfcc7a3b09"
  },
  "src/store/brandStyleStore.ts": {
   "brandDir": "v:3fd09227dd",
   "copyBrandLogoInto": "v:5d5b8294e8",
-  "useBrandStyle": "v:b631de6b0b"
+  "useBrandStyle": "v:056fb9854e"
  },
  "src/store/broadcasters.ts": {
   "getLiveBroadcaster": "v:7d720c1b2b",
@@ -8316,17 +8316,17 @@
   "setLockBroadcaster": "v:768099f241"
  },
  "src/store/chatStore.ts": {
-  "useChat": "v:081487ee18"
+  "useChat": "v:e5fefa8aee"
  },
  "src/store/collabLiveStore.ts": {
-  "useCollabLive": "v:9722655f36"
+  "useCollabLive": "v:3c1a50060b"
  },
  "src/store/collabStore.ts": {
-  "useCollab": "v:81fc7a0c00"
+  "useCollab": "v:e7ceb86784"
  },
  "src/store/editorPrefsStore.ts": {
   "ImagePanels": "t:90b6a32053",
-  "useEditorPrefs": "v:8c082ff66d"
+  "useEditorPrefs": "v:6d349ae659"
  },
  "src/store/editorState.ts": {
   "DEFAULT_SNAP_TARGETS": "v:e180c76bee",
@@ -8349,65 +8349,65 @@
   "touchedTrackTypes": "v:3d009f0756"
  },
  "src/store/editorStore.ts": {
-  "DEFAULT_SNAP_TARGETS": "v:3e8905406c",
+  "DEFAULT_SNAP_TARGETS": "v:e180c76bee",
   "EditorState": "t:47d8031309",
   "InsightLane": "t:7ff28775ac",
-  "PROXY_MAX_SIDE": "v:58feb20ee8",
-  "PanelId": "t:b34de425ad",
+  "PROXY_MAX_SIDE": "v:a927c6abfe",
+  "PanelId": "t:d5c9d3fd6e",
   "ProxyQuality": "t:aa398bf353",
-  "SNAP_FACTOR": "v:a27831544f",
+  "SNAP_FACTOR": "v:279f1aa4df",
   "SnapStrength": "t:bd643247eb",
-  "SnapTargets": "t:3e8905406c",
-  "TRIM_MODES": "v:7e5d6b42a8",
+  "SnapTargets": "t:e180c76bee",
+  "TRIM_MODES": "v:aa1382f0bf",
   "TrimMode": "t:f08c7a26d7",
   "selectPanelVisible": "v:eccf3ac67b",
   "selectSelectedClip": "v:8f4f98ac95",
   "selectSurfaceTier": "v:febafca95e",
-  "setLiveBroadcaster": "v:5ccadf988b",
-  "setLockBroadcaster": "v:65fb90e457",
-  "useEditorStore": "v:966b20f0bc"
+  "setLiveBroadcaster": "v:4e7cc93f30",
+  "setLockBroadcaster": "v:768099f241",
+  "useEditorStore": "v:0814ffaad8"
  },
  "src/store/entitlementStore.ts": {
   "Tier": "t:42354b3b1a",
   "allowsNow": "v:ea05839728",
   "isProNow": "v:5c04da0bc5",
-  "useEntitlement": "v:77d73c1a76"
+  "useEntitlement": "v:f969f1d74f"
  },
  "src/store/mixAssistStore.ts": {
-  "useMixAssist": "v:8cc83d2235"
+  "useMixAssist": "v:6db88ca723"
  },
  "src/store/notificationStore.ts": {
-  "useNotifications": "v:28316a04c7"
+  "useNotifications": "v:fcee352d6e"
  },
  "src/store/paywallStore.ts": {
   "guardPro": "v:e23419bd87",
-  "usePaywall": "v:a93a4c6bb8"
+  "usePaywall": "v:ab06f6adc6"
  },
  "src/store/progressStore.ts": {
   "ProgressTask": "t:8a20eeba80",
-  "useProgressStore": "v:e4bd0a205f",
+  "useProgressStore": "v:9ecf8464bd",
   "withCancellableProgress": "v:1511d66376",
   "withProgress": "v:7e3a089e98"
  },
  "src/store/recordPrefsStore.ts": {
   "METRONOME_LEVELS": "v:4103652996",
-  "useRecordPrefs": "v:a9b0a8b245"
+  "useRecordPrefs": "v:72a11dd6fd"
  },
  "src/store/referenceStore.ts": {
   "ReferenceTrack": "t:42b4b47396",
-  "useReference": "v:a5da38539f"
+  "useReference": "v:5293f25746"
  },
  "src/store/roleStore.ts": {
   "can": "v:3f6844b89f",
-  "useRoles": "v:1d4c199ebf"
+  "useRoles": "v:3f90bd2531"
  },
  "src/store/seoGateStore.ts": {
   "seoComplete": "v:61f8917ff5",
-  "useSeoGate": "v:1c9965d283"
+  "useSeoGate": "v:b955282373"
  },
  "src/store/silenceReviewStore.ts": {
   "SilenceReview": "t:ba523b8943",
-  "useSilenceReview": "v:6176d9ef93"
+  "useSilenceReview": "v:301ea243f1"
  },
  "src/store/slices/clipEditSlice.ts": {
   "createClipEditSlice": "v:9f2bba9a24"
@@ -8428,50 +8428,50 @@
   "createTimelineMetaSlice": "v:7511238873"
  },
  "src/store/slices/types.ts": {
-  "EditorSlice": "t:726728e8e5"
+  "EditorSlice": "t:e3f3bb9945"
  },
  "src/store/slices/viewSlice.ts": {
   "createViewSlice": "v:b1c8973519"
  },
  "src/store/soundPackStore.ts": {
   "OwnedPack": "t:cc6c44653f",
-  "useSoundPacks": "v:800252152b"
+  "useSoundPacks": "v:c93b17b7ee"
  },
  "src/store/speechEditStore.ts": {
-  "useSpeechEdit": "v:6176d9ef93"
+  "useSpeechEdit": "v:301ea243f1"
  },
  "src/store/textMaskStore.ts": {
   "ensureTextMasksFor": "v:4d4c9dfbfd",
   "setTextMaskEnsurer": "v:4fed63b04b",
-  "useTextMasks": "v:59526e9f04"
+  "useTextMasks": "v:6a9bb3e0bc"
  },
  "src/store/toastStore.ts": {
   "TOAST_ACTION_DURATION_MS": "v:31d9ddeaa8",
   "TOAST_DURATION_MS": "v:e0b2d81c80",
   "ToastState": "t:fc3a6b81c1",
-  "useToast": "v:11f7a0524a"
+  "useToast": "v:dcfc4567c0"
  },
  "src/store/tutorialStore.ts": {
-  "useTutorial": "v:d18f8b53fa"
+  "useTutorial": "v:f5d89cb8e0"
  },
  "src/store/upsellStore.ts": {
   "nudgeUpsell": "v:ad8c0ce7ae",
-  "useUpsell": "v:717d96a2fd"
+  "useUpsell": "v:93974b6aa4"
  },
  "src/store/userLooksStore.ts": {
   "USER_LOOKS_MAX": "v:af3e133428",
-  "useUserLooks": "v:c2aefb5591"
+  "useUserLooks": "v:50d140cbec"
  },
  "src/store/userPresetStore.ts": {
   "USER_PRESETS_KEY": "v:3713c8f127",
-  "useUserPresets": "v:6176d9ef93"
+  "useUserPresets": "v:301ea243f1"
  },
  "src/store/userTemplatesStore.ts": {
   "USER_TEMPLATES_MAX": "v:e6c3dd6304",
-  "useUserTemplates": "v:c2a387f1d3"
+  "useUserTemplates": "v:89ff60bdca"
  },
  "src/store/walletEvents.ts": {
-  "useWalletEvents": "v:964f31e70d"
+  "useWalletEvents": "v:71a4c7df07"
  },
  "src/types/live.ts": {
   "LiveChannelId": "t:eb69d25cc7",
@@ -8511,101 +8511,101 @@
   "Vec3": "t:e884a5890e"
  },
  "src/types/project.ts": {
-  "AdjustClip": "t:395a7a8e12",
-  "AdjustmentImageLayer": "t:37c51ac890",
+  "AdjustClip": "t:82c99c4ef7",
+  "AdjustmentImageLayer": "t:1486e7a695",
   "AdjustmentKind": "t:f2ac2a2013",
-  "AdjustmentLayer": "t:1a1303e5f9",
-  "AlbumDoc": "t:6bb95a48b8",
-  "AlbumSong": "t:8e8ae13578",
+  "AdjustmentLayer": "t:83056e7ae7",
+  "AlbumDoc": "t:33b590076d",
+  "AlbumSong": "t:b7ac975636",
   "AspectRatio": "t:dc775ecc5f",
-  "Asset": "t:548ec597d4",
-  "AssetSource": "t:32a9daa0b6",
-  "AudioBus": "t:dc23188c5c",
-  "AudioClip": "t:17f592db9b",
-  "AudioFx": "t:b029f37331",
-  "AudioMaster": "t:c1374c5436",
+  "Asset": "t:4426afd90a",
+  "AssetSource": "t:2598c01084",
+  "AudioBus": "t:19cae42027",
+  "AudioClip": "t:c2ded36aec",
+  "AudioFx": "t:1ff3f59473",
+  "AudioMaster": "t:bf5adf5b96",
   "AudioMasterDynamics": "t:89f64f0ed6",
   "AudioMasterTarget": "t:1fc5da875c",
-  "AudioTake": "t:0961ea627b",
+  "AudioTake": "t:2842f0d9b9",
   "BlendMode": "t:9a91c66d0d",
-  "CanvasTransform": "t:39636fdf03",
-  "Chapter": "t:29b3bc333f",
+  "CanvasTransform": "t:7c4c59048c",
+  "Chapter": "t:46b005909e",
   "ChapterKind": "t:cd69bdec14",
-  "ChromaKey": "t:7d7f949a97",
-  "Clip": "t:b3b7640967",
-  "ClipAdjust": "t:6ab19cb06e",
-  "ClipBase": "t:b7d07d6433",
-  "ClipKeyframes": "t:7c4c45fd51",
-  "ClipLut": "t:f46657a46f",
-  "ClipMask": "t:5e138f15a2",
-  "ClipMatte": "t:3825064bd6",
-  "CurvePoint": "t:b9b5ff370d",
-  "DepthFocus": "t:aa9b11fd03",
-  "DepthParallax": "t:58bffc3787",
-  "FaceBlur": "t:7ebbc6ac82",
-  "FillLayer": "t:8bf9902e27",
+  "ChromaKey": "t:da66954ff0",
+  "Clip": "t:1f052098d4",
+  "ClipAdjust": "t:cb462d95b4",
+  "ClipBase": "t:bb69c04762",
+  "ClipKeyframes": "t:72b660717b",
+  "ClipLut": "t:475b29796d",
+  "ClipMask": "t:89767400f0",
+  "ClipMatte": "t:649f169f2c",
+  "CurvePoint": "t:7b08a5fe93",
+  "DepthFocus": "t:01f172aab9",
+  "DepthParallax": "t:c764dcfe76",
+  "FaceBlur": "t:4e13741715",
+  "FillLayer": "t:6838028279",
   "FilterId": "t:c35375e190",
   "GradeId": "t:36fb318cf9",
-  "GradientStop": "t:35e154f304",
+  "GradientStop": "t:4eec359fb1",
   "HotspotAction": "t:8b652955e3",
   "HslBand": "t:3ea318a2ff",
   "HslBands": "t:66622f89c6",
-  "ImageClip": "t:863e4db792",
-  "ImageDoc": "t:228d350da5",
-  "ImageFilter": "t:55ee4a07e4",
+  "ImageClip": "t:814f704352",
+  "ImageDoc": "t:9a65af03e3",
+  "ImageFilter": "t:bb30cc1f9e",
   "ImageFilterType": "t:4c58a07e6b",
-  "ImageGrid": "t:d425b2403a",
-  "ImageGroup": "t:83ef65839f",
-  "ImageGuide": "t:cba5021867",
-  "ImageLayer": "t:c42b1475bf",
-  "ImageLayerBase": "t:1199059cc4",
-  "InstrumentDoc": "t:4aff8611e3",
-  "InteractiveClip": "t:fdee5001ee",
-  "Keyframe": "t:a832ddbdf8",
+  "ImageGrid": "t:49f5d7d02c",
+  "ImageGroup": "t:359f3dca78",
+  "ImageGuide": "t:1503ad8638",
+  "ImageLayer": "t:d4d196f05b",
+  "ImageLayerBase": "t:b807a2c765",
+  "InstrumentDoc": "t:a6a2282f05",
+  "InteractiveClip": "t:069f0bcab2",
+  "Keyframe": "t:2168157d81",
   "KeyframeEasing": "t:56627b8823",
   "LightingPreset": "t:2502726e02",
-  "Marker": "t:914886ebf4",
-  "MaskFrame": "t:d859ff4123",
+  "Marker": "t:4290a8030a",
+  "MaskFrame": "t:ff090a8715",
   "MaskGradientDir": "t:828b0a4951",
-  "NestedComposition": "t:bb27c15f0e",
-  "ParticlesConfig": "t:4cb90e7db2",
+  "NestedComposition": "t:f499d56b24",
+  "ParticlesConfig": "t:4449db4bd6",
   "ParticlesPreset": "t:e8bc9819db",
-  "PathAnim": "t:fada721520",
-  "PathPoint": "t:0a6204861a",
+  "PathAnim": "t:cc527aa110",
+  "PathPoint": "t:e5a670bd08",
   "PatternPreset": "t:76d0d5953f",
-  "PhotoLayer": "t:7287a4b1f8",
-  "PipFrame": "t:c8020f479d",
-  "Project": "t:29fa988eb4",
-  "ProjectFont": "t:54f665ab18",
+  "PhotoLayer": "t:02ccf79927",
+  "PipFrame": "t:e8e7339dc1",
+  "Project": "t:f6f4da8d93",
+  "ProjectFont": "t:02969cb262",
   "ProjectKind": "t:0b51d5ec73",
-  "ProjectMeta": "t:7b804e7bda",
-  "ProjectSeo": "t:4a539df747",
-  "RenderedVersion": "t:d14bbcc394",
-  "SelectiveEdit": "t:511cd106f2",
-  "ShapeClip": "t:386005d4c0",
-  "ShapeGradient": "t:e0c3eeae70",
-  "ShapeLayer": "t:9f556908b1",
-  "ShapePattern": "t:1abe111eca",
-  "Stabilize": "t:eeb5b7b32f",
-  "TempoChange": "t:5ff6a8157e",
-  "Text3D": "t:2b32cbce05",
+  "ProjectMeta": "t:613e1c07d5",
+  "ProjectSeo": "t:271deccf7e",
+  "RenderedVersion": "t:bdfce1e73b",
+  "SelectiveEdit": "t:0a0fe4056a",
+  "ShapeClip": "t:5b39ba0431",
+  "ShapeGradient": "t:52cc7feae1",
+  "ShapeLayer": "t:0c13a97479",
+  "ShapePattern": "t:e888310b15",
+  "Stabilize": "t:a0dcca382e",
+  "TempoChange": "t:24ce334719",
+  "Text3D": "t:062c71414e",
   "TextAnimation": "t:96c31e2c6b",
-  "TextClip": "t:689914fc8a",
-  "TextLayer": "t:ffa3389c52",
-  "TextMotion": "t:14630883fb",
+  "TextClip": "t:22060f65c3",
+  "TextLayer": "t:9543a4fe7d",
+  "TextMotion": "t:16d7469d2d",
   "TextMotionPreset": "t:4c0fd01d21",
-  "TextPath": "t:2fe065f731",
-  "TextStyle": "t:a10a35b2f4",
+  "TextPath": "t:6bc43d8642",
+  "TextStyle": "t:9730e5eb39",
   "TextStylePreset": "t:09d48d2272",
-  "Tilt3D": "t:9eb0609d53",
-  "TimelineRegion": "t:c862cbfffc",
-  "ToneCurves": "t:d66496295a",
-  "Track": "t:4fe4eb00a4",
-  "TrackSidechain": "t:d409e25b8d",
+  "Tilt3D": "t:c7f7520b56",
+  "TimelineRegion": "t:c0db1c11a1",
+  "ToneCurves": "t:e4c56a7b3c",
+  "Track": "t:b1c5a7af06",
+  "TrackSidechain": "t:4731cfb662",
   "TrackType": "t:ac6b8f9334",
-  "TransitionOut": "t:9863390148",
-  "VideoClip": "t:c1fa2f5589",
-  "VideoEffect": "t:5d5cfd28ba",
+  "TransitionOut": "t:6624dc618f",
+  "VideoClip": "t:4040720f39",
+  "VideoEffect": "t:74569a77a5",
   "VideoEffectType": "t:e8d0eee93e"
  },
  "src/types/project/assets.ts": {

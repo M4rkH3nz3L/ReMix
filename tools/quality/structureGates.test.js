@@ -87,6 +87,12 @@ describe('api-surface canonicalText', () => {
     expect(canon('type T = { b: 1 } & { a: 2 };')).toBe(canon('type T = { a: 2 } & { b: 1 };'));
   });
 
+  it('a típus helye (import("…").Név) nem számít, csak a neve', () => {
+    expect(canon('type T = { p: import("./a/b").PathPoint };')).toBe(canon('type T = { p: PathPoint };'));
+    expect(canon('type T = import("./x").Box<number>;')).toBe(canon('type T = Box<number>;'));
+    expect(canon('type T = { p: import("./a").PathPoint };')).not.toBe(canon('type T = { p: Vec };'));
+  });
+
   it('a valódi változást észreveszi: új tag, opcionalitás, típus', () => {
     const base = canon("type T = { a: string; b?: number } | 'x';");
     expect(canon("type T = { a: string; b?: number } | 'x' | 'y';")).not.toBe(base);

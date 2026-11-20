@@ -2156,6 +2156,47 @@
   "timelineZoomActions": "v:03db18182d",
   "useTimelineView": "v:ea11261426"
  },
+ "src/components/studio/audio/clipEdit/AiDenoiseSection.tsx": {
+  "AiDenoiseSection": "v:2bb50f28d6"
+ },
+ "src/components/studio/audio/clipEdit/ClipAutomationSection.tsx": {
+  "ClipAutomationSection": "v:169b0860c3"
+ },
+ "src/components/studio/audio/clipEdit/ClipLevelSection.tsx": {
+  "ClipLevelSection": "v:a1b7bdf87d"
+ },
+ "src/components/studio/audio/clipEdit/ClipToggleSection.tsx": {
+  "ClipToggleSection": "v:9c98457177"
+ },
+ "src/components/studio/audio/clipEdit/ClipToolsSection.tsx": {
+  "ClipToolsSection": "v:786eab89ed"
+ },
+ "src/components/studio/audio/clipEdit/FxOrderSection.tsx": {
+  "FxOrderSection": "v:cfc863cc7b"
+ },
+ "src/components/studio/audio/clipEdit/FxParamsSection.tsx": {
+  "FxParamsSection": "v:37dd420057"
+ },
+ "src/components/studio/audio/clipEdit/FxPresetsSection.tsx": {
+  "FxPresetsSection": "v:157d0d8467"
+ },
+ "src/components/studio/audio/clipEdit/TempoMatchRow.tsx": {
+  "TempoMatchRow": "v:9475a4a394"
+ },
+ "src/components/studio/audio/clipEdit/VoiceTuneSection.tsx": {
+  "VoiceTuneSection": "v:c3100c7f24"
+ },
+ "src/components/studio/audio/clipEdit/clipCommitActions.ts": {
+  "ClipCommitDeps": "t:555f8e481e",
+  "createClipCommitActions": "v:cc81ff3b18"
+ },
+ "src/components/studio/audio/clipEdit/clipEditStyles.ts": {
+  "clipEditStyles": "v:503ec83821"
+ },
+ "src/components/studio/audio/clipEdit/clipToolActions.ts": {
+  "ClipToolDeps": "t:08fdac33a1",
+  "createClipToolActions": "v:6db613cbe0"
+ },
  "src/components/studio/audio/exportParts.ts": {
   "exportParts": "v:d0061b6917"
  },
@@ -4148,6 +4189,20 @@
  },
  "src/lib/clipDuplicate.ts": {
   "duplicateAfter": "v:3870a284d9"
+ },
+ "src/lib/clipEditOps.ts": {
+  "ClipEditSettings": "t:1019da0427",
+  "FX_AUTO": "v:6030dbcdb4",
+  "FxAutoKey": "t:96795dc0b3",
+  "beatLabel": "v:754a40529b",
+  "clipDonePatch": "v:5d083dd86a",
+  "clipEditDirty": "v:4f9faa8d4e",
+  "clipGeometryChanged": "v:1051f9078a",
+  "fxStageActive": "v:a109e2b11a",
+  "loopTogglePatch": "v:6f9e23a146",
+  "paramEqCustomized": "v:f5eda9f40e",
+  "pendingSettingsPatch": "v:8c0b8515c0",
+  "stemSeparationCommands": "v:5d522020ce"
  },
  "src/lib/clipGain.ts": {
   "CLIP_DB_MAX": "v:7b52009b64",

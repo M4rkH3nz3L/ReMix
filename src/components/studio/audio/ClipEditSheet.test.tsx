@@ -1,12 +1,12 @@
 /** 🎧 A11: a klip beállítása bezáráskor is megmarad, bárhogy zárul a lap. */
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
-import { ClipEditSheet } from '@/components/studio/audio/ClipEditSheet';
+import { ClipEditSheet, selectedAudioClip } from '@/components/studio/audio/ClipEditSheet';
 import { useEditorStore } from '@/store/editorStore';
 import { useEntitlement } from '@/store/entitlementStore';
 import { usePaywall } from '@/store/paywallStore';
 import { createEmptyProject } from '@/lib/projectUtils';
-import type { AudioClip } from '@/types/project';
+import type { AudioClip, Project } from '@/types/project';
 
 jest.mock('react-native-worklets', () => ({ runOnJS: (fn: unknown) => fn, scheduleOnRN: (fn: (...a: unknown[]) => void, ...a: unknown[]) => fn(...a) }));
 jest.mock('react-native-reanimated', () => {
@@ -131,3 +131,16 @@ describe('ClipEditSheet', () => {
   });
 });
 
+describe('selectedAudioClip', () => {
+  const project = { tracks: [{ clips: [{ id: 't1', kind: 'text' }] }, { clips: [{ id: 'a1', kind: 'audio' }] }] } as unknown as Project;
+  it('a kijelölt hang-klip, bármelyik sávon', () => {
+    expect(selectedAudioClip(project, 'a1')).toEqual({ id: 'a1', kind: 'audio' });
+  });
+  it('nem hang-klip, ismeretlen azonosító, üres kijelölés vagy projekt → null', () => {
+    expect(selectedAudioClip(project, 't1')).toBeNull();
+    expect(selectedAudioClip(project, 'nincs')).toBeNull();
+    expect(selectedAudioClip(project, null)).toBeNull();
+    expect(selectedAudioClip(project, '')).toBeNull();
+    expect(selectedAudioClip(null, 'a1')).toBeNull();
+  });
+});

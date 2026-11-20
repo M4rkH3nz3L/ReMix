@@ -138,6 +138,15 @@ const MUST_BE_MEMOIZED = [
   ['src/components/editor/panels/audio/BeatSection.tsx', 'BeatSection'],
   ['src/components/editor/panels/audio/ClipMixSection.tsx', 'ClipMixSection'],
   ['src/components/editor/panels/audio/AudioFxSection.tsx', 'AudioFxSection'],
+  // REFACTOR: a Hang Stúdió ClipEditSheet.tsx-ének szekciói (a gyökér kimarad, lásd lent)
+  ['src/components/studio/audio/clipEdit/TempoMatchRow.tsx', 'TempoMatchRow'],
+  ['src/components/studio/audio/clipEdit/ClipLevelSection.tsx', 'ClipLevelSection'],
+  ['src/components/studio/audio/clipEdit/ClipAutomationSection.tsx', 'ClipAutomationSection'],
+  ['src/components/studio/audio/clipEdit/ClipToggleSection.tsx', 'ClipToggleSection'],
+  ['src/components/studio/audio/clipEdit/AiDenoiseSection.tsx', 'AiDenoiseSection'],
+  ['src/components/studio/audio/clipEdit/VoiceTuneSection.tsx', 'VoiceTuneSection'],
+  ['src/components/studio/audio/clipEdit/FxOrderSection.tsx', 'FxOrderSection'],
+  ['src/components/studio/audio/clipEdit/ClipToolsSection.tsx', 'ClipToolsSection'],
 ];
 
 /**
@@ -158,7 +167,9 @@ const KNOWN_BAILS = [
   ['src/app/editor/[id].tsx', 'EditorScreen', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
   ['src/components/preview/TextOverlay.tsx', 'TextOverlay', 'Reanimated shared value írása'],
   ['src/components/studio/image/ImageCanvas.tsx', 'ImageCanvas', 'a nézet-gesztusok refjeit (zoomRef/panRef/fitRef) renderben írja'],
-  ['src/components/editor/panels/PrecisionPanel.tsx', 'PrecisionPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
+  ['src/components/editor/panels/PrecisionPanel.tsx', 'PrecisionPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],  ['src/components/studio/audio/ClipEditSheet.tsx', 'ClipEditSheet', 'a füstteszt-hookok refjeit (onDoneRef/presetRef/editInstRef) renderben írja'],
+  ['src/components/studio/audio/clipEdit/FxParamsSection.tsx', 'FxParamsSection', 'a parametrikus EQ patch-e template-literál kulcsú objektum (a fordító még nem támogatja)'],
+  ['src/components/studio/audio/clipEdit/FxPresetsSection.tsx', 'FxPresetsSection', 'a füstteszt görgetési pontját (presetsY ref) az onLayout írja'],
 ];
 
 const cache = new Map();

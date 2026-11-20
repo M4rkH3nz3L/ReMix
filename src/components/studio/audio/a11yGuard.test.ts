@@ -25,6 +25,8 @@ const path = require('path');
 declare const __dirname: string;
 
 const AUDIO_DIR = path.join(__dirname);
+// a klip-szerkesztő lap szekciói (REFACTOR: a ClipEditSheet.tsx-ből)
+const CLIP_EDIT_DIR = path.join(__dirname, 'clipEdit');
 const EXTRA_FILES = [path.join(__dirname, '..', '..', 'ui', 'controls.tsx')];
 
 const TAPPABLE = new Set(['Pressable', 'TouchableOpacity', 'TouchableHighlight', 'TouchableWithoutFeedback']);
@@ -103,14 +105,10 @@ function auditFile(file: string): string[] {
 }
 
 describe('♿ Hang Stúdió: minden érintő vezérlőnek van neve a képernyőolvasónak', () => {
-  // a törzsből kiemelt részek (body/) is ide tartoznak
-  const files: string[] = [AUDIO_DIR, path.join(AUDIO_DIR, 'body')]
-    .flatMap((dir: string) =>
-      (fs.readdirSync(dir) as string[])
-        .filter((f: string) => f.endsWith('.tsx') && !f.endsWith('.test.tsx'))
-        .map((f: string) => path.join(dir, f))
-    )
-    .concat(EXTRA_FILES);
+  const list = (dir: string): string[] =>
+    (fs.readdirSync(dir) as string[]).filter((f: string) => f.endsWith('.tsx') && !f.endsWith('.test.tsx')).map((f: string) => path.join(dir, f));
+  // a törzsből (body/) és a klip-szerkesztőből (clipEdit/) kiemelt részek is ide tartoznak
+  const files: string[] = [...list(AUDIO_DIR), ...list(path.join(AUDIO_DIR, 'body')), ...list(CLIP_EDIT_DIR)].concat(EXTRA_FILES);
 
   it('a hang-lapok és a közös vezérlők forrása', () => {
     const problems = files.flatMap(auditFile);

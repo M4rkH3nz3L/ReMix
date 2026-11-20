@@ -69,6 +69,13 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   (pl. AI-állította 40) `+20`-szal 60-ra ugrik, nem a 60-as padlóra; a low-pass 16 kHz feletti
   érték (pl. 18 kHz) csak kikapcsolható; az `AudioFxSection.setFx` felesleges `if (clip)` ellenőrzése.
 
+- **ClipEditSheet** (`src/lib/clipEditOps.ts`): (1) a „mentetlen változás” az effekteket
+  `JSON.stringify`-jal hasonlítja → ugyanazok az értékek más kulcssorrendben (pl. felhasználói preset
+  után) hamis „dirty”-t adnak; (2) a `pendingSettingsPatch` (take-választás, tempó-illesztés) a fade-eket
+  a MENTETT hosszhoz vágja, nem a szerkesztetthez; (3) trim + minimális hossznál a fade-ek a nyers
+  (0,01 s) hosszhoz vágódnak, a hossz viszont 0,1 s-ra emelkedik → fadeIn/fadeOut 0; (4) a `proFx`
+  azonosság-burkoló maradvány.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -90,7 +97,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/hooks/useFeed.ts` | 975 | ⬜ |
 | `src/app/live/[id].tsx` | 952 | ⬜ |
 | `src/components/editor/panels/TextPanel.tsx` | 926 | ⬜ |
-| `src/components/studio/audio/ClipEditSheet.tsx` | 889 | ⬜ |
+| `src/components/studio/audio/ClipEditSheet.tsx` | 889 | ✅ → 310 |
 | `src/lib/offlineMix.ts` | 887 | ⬜ |
 | `src/components/editor/panels/CaptionsPanel.tsx` | 850 | ⬜ |
 | `src/lib/commands.ts` | 843 | ⬜ |

@@ -41,6 +41,13 @@ const MUST_BE_MEMOIZED = [
   ['src/components/editor/timeline/TrackHeaderColumn.tsx', 'TrackHeaderColumn'],
   ['src/components/editor/timeline/FloatingTrackLabels.tsx', 'FloatingTrackLabels'],
   ['src/components/editor/timeline/TimelineGuideLines.tsx', 'TimelineGuideLines'],
+  // REFACTOR: az AssistantPanel.tsx-ből kiemelt szekciók (a gyökér és a hookok kimaradnak: getState a renderben, try/finally)
+  ['src/components/editor/panels/assistant/AutoEditSection.tsx', 'AutoEditSection'],
+  ['src/components/editor/panels/assistant/CommandBarSection.tsx', 'CommandBarSection'],
+  ['src/components/editor/panels/assistant/CutToolsSection.tsx', 'CutToolsSection'],
+  ['src/components/editor/panels/assistant/InstructionSection.tsx', 'InstructionSection'],
+  ['src/components/editor/panels/assistant/SocialPresetsSection.tsx', 'SocialPresetsSection'],
+  ['src/components/editor/panels/assistant/SuggestionSection.tsx', 'SuggestionSection'],
 ];
 
 /**

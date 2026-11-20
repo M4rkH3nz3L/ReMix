@@ -1349,11 +1349,23 @@
  "src/components/editor/panels/WorkflowPanel.tsx": {
   "WorkflowPanel": "v:796e34b691"
  },
+ "src/components/editor/panels/assistant/AutoEditSection.tsx": {
+  "AutoEditSection": "v:5d15164b00"
+ },
  "src/components/editor/panels/assistant/BrandKitSection.tsx": {
   "BrandKitSection": "v:767749a6d5"
  },
+ "src/components/editor/panels/assistant/CommandBarSection.tsx": {
+  "CommandBarSection": "v:591987abb7"
+ },
+ "src/components/editor/panels/assistant/CutToolsSection.tsx": {
+  "CutToolsSection": "v:3ae5c4f335"
+ },
  "src/components/editor/panels/assistant/HooksSection.tsx": {
   "HooksSection": "v:ff3d0f6c66"
+ },
+ "src/components/editor/panels/assistant/InstructionSection.tsx": {
+  "InstructionSection": "v:e09a09581d"
  },
  "src/components/editor/panels/assistant/LookPacksSection.tsx": {
   "LookPacksSection": "v:ff3d0f6c66"
@@ -1361,8 +1373,33 @@
  "src/components/editor/panels/assistant/SmartSearchSection.tsx": {
   "SmartSearchSection": "v:3bfd3f20db"
  },
+ "src/components/editor/panels/assistant/SocialPresetsSection.tsx": {
+  "SocialPresetsSection": "v:0dddd9f48f"
+ },
  "src/components/editor/panels/assistant/SoundDesignSection.tsx": {
   "SoundDesignSection": "v:3bfd3f20db"
+ },
+ "src/components/editor/panels/assistant/SuggestionSection.tsx": {
+  "SuggestionSection": "v:57e18af6ba"
+ },
+ "src/components/editor/panels/assistant/useAiReply.tsx": {
+  "revertProjectTo": "v:90efc0dcb1",
+  "useAiReply": "v:30f08f89d7"
+ },
+ "src/components/editor/panels/assistant/useAutoEdit.tsx": {
+  "useAutoEdit": "v:d438328bd9"
+ },
+ "src/components/editor/panels/assistant/useCutTools.tsx": {
+  "useCutTools": "v:0b95569879"
+ },
+ "src/components/editor/panels/assistant/useFootageInsights.tsx": {
+  "useFootageInsights": "v:fa1088994d"
+ },
+ "src/components/editor/panels/assistant/useReframeTools.tsx": {
+  "useReframeTools": "v:cda381295a"
+ },
+ "src/components/editor/panels/assistant/useWorkerDiag.tsx": {
+  "useWorkerDiag": "v:6e1a8c088a"
  },
  "src/components/editor/panels/filter/AnimateSection.tsx": {
   "AnimateSection": "v:3122d77799"
@@ -2917,6 +2954,16 @@
   "remoteChangeDecision": "v:a234167363",
   "remoteChanged": "v:cfb2ce4833",
   "selectForEviction": "v:0bb7bba606"
+ },
+ "src/lib/assistantPanelOps.ts": {
+  "QUICK_ACTIONS": "v:649de6328e",
+  "SOCIAL_PRESETS": "v:f612ab6ea4",
+  "aiReplyCommands": "v:fbe4c49838",
+  "firstMusicClip": "v:d4a2395a68",
+  "firstVideoClip": "v:62de454325",
+  "variantKeepSeconds": "v:0d5bc2c9c7",
+  "variantPreviewRanges": "v:6838536d7e",
+  "videoUris": "v:ac53f8f6ea"
  },
  "src/lib/asyncGuard.ts": {
   "AliveGuard": "t:da2a8ffdb5",

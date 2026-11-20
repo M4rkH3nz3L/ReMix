@@ -34,6 +34,13 @@ const MUST_BE_MEMOIZED = [
   ['src/components/preview/TransitionLayer.tsx', 'TransitionLayer'],
   ['src/components/preview/TransitionLayer.tsx', 'IncomingClip'],
   ['src/components/preview/ShapeOverlay.tsx', 'ShapeOverlay'],
+  // REFACTOR: a Timeline.tsx-ből kiemelt, tisztán renderelő részek (a gyökér maga kimarad, lásd lent)
+  ['src/components/editor/timeline/TimelineControlsBar.tsx', 'TimelineControlsBar'],
+  ['src/components/editor/timeline/TimelineRuler.tsx', 'TimelineRuler'],
+  ['src/components/editor/timeline/TimelineTrackRow.tsx', 'TimelineTrackRow'],
+  ['src/components/editor/timeline/TrackHeaderColumn.tsx', 'TrackHeaderColumn'],
+  ['src/components/editor/timeline/FloatingTrackLabels.tsx', 'FloatingTrackLabels'],
+  ['src/components/editor/timeline/TimelineGuideLines.tsx', 'TimelineGuideLines'],
 ];
 
 /**
@@ -46,7 +53,7 @@ const MUST_BE_MEMOIZED = [
  * viszont ugyanezeket látja, és emiatt hagyja ki a komponenst.
  */
 const KNOWN_BAILS = [
-  ['src/components/editor/Timeline.tsx', 'Timeline', 'pinch-gesztus closure refet ír'],
+  ['src/components/editor/Timeline.tsx', 'Timeline', 'a virtualizációs ablak renderben olvassa a lastScrollX refet'],
   // a komponens neve a forrásban TimelineClipInner; a `TimelineClip` a memo() burkolat
   ['src/components/editor/TimelineClip.tsx', 'TimelineClipInner', 'Reanimated shared value mutációk'],
   ['src/components/preview/PreviewSurface.tsx', 'PreviewSurface', 'expo-video player-mutáció'],

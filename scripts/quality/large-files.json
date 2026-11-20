@@ -2,7 +2,6 @@
   "server/text-render.js": 1175,
   "src/app/editor/[id].tsx": 1460,
   "src/app/live/studio/[id].tsx": 1138,
-  "src/components/editor/Timeline.tsx": 1532,
   "src/components/editor/panels/AssistantPanel.tsx": 1508,
   "src/components/editor/panels/ExportPanel.tsx": 1060,
   "src/components/preview/PreviewSurface.tsx": 1424,

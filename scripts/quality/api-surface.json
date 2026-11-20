@@ -1403,6 +1403,41 @@
  "src/components/editor/panels/filter/ThreeDSection.tsx": {
   "ThreeDSection": "v:3122d77799"
  },
+ "src/components/editor/timeline/FloatingTrackLabels.tsx": {
+  "FloatingTrackLabels": "v:0187066895"
+ },
+ "src/components/editor/timeline/TimelineControlsBar.tsx": {
+  "ControlsScrollState": "t:f712ebc07b",
+  "TimelineControlsBar": "v:8188c18c31"
+ },
+ "src/components/editor/timeline/TimelineGuideLines.tsx": {
+  "TimelineGuideLines": "v:91a2bd2771"
+ },
+ "src/components/editor/timeline/TimelineRuler.tsx": {
+  "TimelineRuler": "v:3a36fb7adb"
+ },
+ "src/components/editor/timeline/TimelineTrackRow.tsx": {
+  "TimelineTrackRow": "v:9d2b27a9a4"
+ },
+ "src/components/editor/timeline/TrackHeaderColumn.tsx": {
+  "TrackHeaderColumn": "v:0187066895"
+ },
+ "src/components/editor/timeline/timelineMenus.tsx": {
+  "TrackMenuState": "t:0b50c1e46d",
+  "openMarkerMenu": "v:85e3500f3f",
+  "openRangeMenu": "v:8a1c7f3701",
+  "openSnapMenu": "v:574dff8329",
+  "openTrackMenu": "v:e6d816cf2b"
+ },
+ "src/components/editor/timeline/useTimelineBeatGrid.tsx": {
+  "useTimelineBeatGrid": "v:231b5dc6dc"
+ },
+ "src/components/editor/timeline/useTimelinePinch.tsx": {
+  "useTimelinePinch": "v:1d3bb5d844"
+ },
+ "src/components/editor/timeline/useTimelineScroll.tsx": {
+  "useTimelineScroll": "v:b3293f2030"
+ },
  "src/components/feed/FeedEmpty.tsx": {
   "FeedEmpty": "v:7b13e3bbe9",
   "FeedLoading": "v:767749a6d5"
@@ -7196,6 +7231,24 @@
  "src/lib/timeAgo.ts": {
   "AgoUnit": "t:5bdc7edc8d",
   "timeAgoParts": "v:45562c3b57"
+ },
+ "src/lib/timelineLayout.ts": {
+  "AUDIBLE_TRACKS": "v:a7f781c80d",
+  "AUTO_HEIGHT_FACTOR": "v:d7de1c035e",
+  "COLLAPSED_H": "v:9e6a55b6b4",
+  "OVERSCAN_FACTOR": "v:aa8f289ebe",
+  "RULER_HEIGHT": "v:12c6fc06c9",
+  "TrackHeightInput": "t:1e5dd4cb2a",
+  "VIRTUALIZE_MIN_CLIPS": "v:e6c3dd6304",
+  "VISUAL_TRACKS": "v:a7f781c80d",
+  "contentWidthFor": "v:3bc821f1c1",
+  "countClips": "v:bb59e689c0",
+  "firstMusicClip": "v:c266931920",
+  "razorCutTarget": "v:2327d17e88",
+  "rulerMarksFor": "v:60ad901ebb",
+  "trackHeightFor": "v:8ad3d21ed3",
+  "videoTrackGaps": "v:7f6c1571d9",
+  "visibleTrackTypes": "v:ae1961c4b2"
  },
  "src/lib/toolbarSpec.ts": {
   "EDIT_MODES": "v:e88f238ddd",

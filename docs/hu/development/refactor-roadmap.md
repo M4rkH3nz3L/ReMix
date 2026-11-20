@@ -87,6 +87,11 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   kétszer hívja a `sendsOf`-ot; az `OfflineUnsupported` többi mezőjét (videoSpeed, voiceEnhance, …) soha
   semmi nem tölti, csak az `effects`-et.
 
+- **Hang-DSP és -intent** (`src/lib/dsp/`, `src/lib/intent/audio/`): az `Echo`/`Haas` nem véges
+  késleltetésre (ms) `RangeError`-t dob; a split-szabály `kette`/`ketté` alternatívája a `norm` után
+  soha nem illeszkedhet (halott ág); a `tracksIn` klip nélküli sávot is létezőnek vesz („az effektre”
+  egy üres sfx-sávra mutat).
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -125,7 +130,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/app/channel/[id].tsx` | 693 | ⬜ |
 | `server/userStorage.js` | 693 | ⬜ |
 | `src/components/studio/CreateProjectModal.tsx` | 687 | ⬜ |
-| `src/lib/audioDsp.ts` | 680 | ⬜ |
+| `src/lib/audioDsp.ts` | 680 | ✅ → 23 |
 | `src/components/preview/AudioLayer.tsx` | 676 | ✅ → 88 |
 | `src/components/profile/WalletCard.tsx` | 674 | ⬜ |
 | `server/routes/render.js` | 667 | ⬜ |
@@ -149,7 +154,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/lib/storage.ts` | 524 | ⬜ |
 | `src/app/admin.tsx` | 524 | ⬜ |
 | `server/liveEgress.js` | 524 | ⬜ |
-| `src/lib/audioIntent.ts` | 523 | ⬜ |
+| `src/lib/audioIntent.ts` | 523 | ✅ → 13 |
 | `src/components/editor/panels/LibraryPanel.tsx` | 523 | ⬜ |
 | `src/store/editorState.ts` | 522 | ⬜ |
 | `src/lib/assetLibrary.ts` | 514 | ⬜ |

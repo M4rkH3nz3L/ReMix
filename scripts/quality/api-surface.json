@@ -4757,6 +4757,59 @@
  "src/lib/drumsClient.ts": {
   "renderDrumsToClip": "v:ad761b73f4"
  },
+ "src/lib/dsp/delays.ts": {
+  "Echo": "v:633ddd1511",
+  "Haas": "v:13d56b8092"
+ },
+ "src/lib/dsp/dynamics.ts": {
+  "Compressor": "v:a80b62ee64",
+  "DeEsser": "v:ad1f6b81a2",
+  "Ducker": "v:27ef6e7929",
+  "Gate": "v:24931866c8",
+  "Limiter": "v:235373955c",
+  "Multiband": "v:86cbd613a5"
+ },
+ "src/lib/dsp/filters.ts": {
+  "AutoBiquad": "v:251a83e257",
+  "Biquad": "v:cbfa8c96e7",
+  "Coeffs": "t:0faf68a531",
+  "highShelf": "v:f285883db7",
+  "highpass": "v:cb2b8db562",
+  "highpassCoeffs": "v:a62c0e773b",
+  "lowShelf": "v:f285883db7",
+  "lowpass": "v:cb2b8db562",
+  "lowpassCoeffs": "v:a62c0e773b",
+  "peaking": "v:962c79ea16",
+  "peakingCoeffs": "v:0f5a8cf81d"
+ },
+ "src/lib/dsp/fxChain.ts": {
+  "FX_AUTO_KEYS": "v:1128e0e240",
+  "FX_WARMUP": "v:53b0a1b2fa",
+  "FxAutomation": "t:c5280ac084",
+  "FxState": "t:7a13ebe55a",
+  "NORMALIZE_LUFS": "v:ab33e22244",
+  "NORMALIZE_PEAK_DB": "v:a54aa0f714",
+  "buildFxChain": "v:7600f5471e",
+  "fxActive": "v:eef1458b66",
+  "fxUnsupported": "v:eef1458b66",
+  "voiceFx": "v:88d5f4a817"
+ },
+ "src/lib/dsp/master.ts": {
+  "MASTER_COMP_ATTACK_MS": "v:b1d5781111",
+  "MASTER_COMP_RELEASE_MS": "v:13682ac418",
+  "Saturator": "v:27f77287d9",
+  "buildMasterChain": "v:9109b6bb90",
+  "masterCompressorParams": "v:f7f731c1fa",
+  "saturationDrive": "v:004d8ff16f"
+ },
+ "src/lib/dsp/processor.ts": {
+  "AUTO_BLOCK": "v:c66c65175f",
+  "Gain": "v:d3e110c8f8",
+  "Processor": "t:b74d0d4bb5",
+  "coeff": "v:d7dc583c75",
+  "dbToLin": "v:f96e9b7caa",
+  "runChain": "v:5e90652675"
+ },
  "src/lib/dspKernels.ts": {
   "DspRun": "t:a9b03e7906",
   "KERNEL": "v:ebbb1e01b7",
@@ -5553,6 +5606,42 @@
   "renderSamplerPcm": "v:d8844f91ae",
   "renderSynthPcm": "v:50045d88cb",
   "waveSample": "v:bdbe3ff6af"
+ },
+ "src/lib/intent/audio/clause.ts": {
+  "clause": "v:5a7f3f63d8"
+ },
+ "src/lib/intent/audio/dictation.ts": {
+  "ASR_HINT": "v:ecb252044b",
+  "fixDictation": "v:adc96ffb5e",
+  "numberWordsToDigits": "v:adc96ffb5e"
+ },
+ "src/lib/intent/audio/parse.ts": {
+  "intentCommands": "v:ef8ab1a1e5",
+  "parseAudioIntent": "v:3fef9a66e2"
+ },
+ "src/lib/intent/audio/sound.ts": {
+  "OFF": "v:ca5db4fe93",
+  "fxPatch": "v:b3a83c1f8d",
+  "volumeDb": "v:79b608cace"
+ },
+ "src/lib/intent/audio/text.ts": {
+  "norm": "v:e2d4d022b4",
+  "num": "v:7634720192",
+  "quoted": "v:e8ed609a3a",
+  "splitClauses": "v:9d241d5507"
+ },
+ "src/lib/intent/audio/tracks.ts": {
+  "audioClipsOn": "v:d9a8de06bc",
+  "ownTracks": "v:172e7ee0cd",
+  "selectedClip": "v:e2f4afab9d",
+  "targetClips": "v:fa98300b5d",
+  "tracksIn": "v:19b7fc4d29"
+ },
+ "src/lib/intent/audio/types.ts": {
+  "AudioAction": "t:32e7b830bd",
+  "AudioIntentContext": "t:f9c00b056f",
+  "AudioIntentResult": "t:37766659af",
+  "AudioStep": "t:7762bcdab0"
  },
  "src/lib/interruption.ts": {
   "INITIAL_STALL": "v:af4669907b",

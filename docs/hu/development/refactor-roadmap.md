@@ -76,6 +76,12 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   (0,01 s) hosszhoz vágódnak, a hossz viszont 0,1 s-ra emelkedik → fadeIn/fadeOut 0; (4) a `proFx`
   azonosság-burkoló maradvány.
 
+- **AudioLayer** (`src/components/preview/audio/`): a `VideoVoice` minden képkockán írja a
+  `player.volume`-ot 0,005-ös küszöb nélkül (a `ClipAudioPlayer` küszöböl); a `ClipAudioPlayer`
+  play/pause-effektje a `latencyLearnedRef`-et a `useRef` deklarációja ELŐTT használja (csak azért
+  működik, mert az effekt a render után fut); a modul-globális `startLatencySec` minden lejátszó és
+  képernyő között közös.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -115,7 +121,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `server/userStorage.js` | 693 | ⬜ |
 | `src/components/studio/CreateProjectModal.tsx` | 687 | ⬜ |
 | `src/lib/audioDsp.ts` | 680 | ⬜ |
-| `src/components/preview/AudioLayer.tsx` | 676 | ⬜ |
+| `src/components/preview/AudioLayer.tsx` | 676 | ✅ → 88 |
 | `src/components/profile/WalletCard.tsx` | 674 | ⬜ |
 | `server/routes/render.js` | 667 | ⬜ |
 | `src/components/editor/panels/ShapePanel.tsx` | 637 | ✅ → 45 |

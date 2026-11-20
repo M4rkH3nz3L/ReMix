@@ -30,6 +30,9 @@ const ROOT = path.join(__dirname, '..');
 /** fájl → a benne memoizálandó komponensek (a lejátszás alatt dolgozók) */
 const MUST_BE_MEMOIZED = [
   ['src/components/preview/AudioLayer.tsx', 'AudioLayer'],
+  // REFACTOR: az AudioLayer.tsx-ből kiemelt részek (a gyökér maga is memoizált marad)
+  ['src/components/preview/audio/MixEngineLayer.tsx', 'MixEngineLayer'],
+  ['src/components/preview/audio/TrackAudio.tsx', 'TrackAudio'],
   ['src/components/preview/PipLayer.tsx', 'PipLayer'],
   ['src/components/preview/PipLayer.tsx', 'PipClipFrame'],
   ['src/components/preview/TransitionLayer.tsx', 'TransitionLayer'],

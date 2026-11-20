@@ -1762,6 +1762,25 @@
  "src/components/preview/TransitionLayer.tsx": {
   "TransitionLayer": "v:c47377489d"
  },
+ "src/components/preview/audio/ClipAudioPlayer.tsx": {
+  "ClipAudioPlayer": "v:a68044b020"
+ },
+ "src/components/preview/audio/MixEngineLayer.tsx": {
+  "MixEngineLayer": "v:2f1a9d8ec9"
+ },
+ "src/components/preview/audio/TrackAudio.tsx": {
+  "TrackAudio": "v:76ad8e91f0"
+ },
+ "src/components/preview/audio/VideoVoice.tsx": {
+  "VideoVoice": "v:7c26f12a8d"
+ },
+ "src/components/preview/audio/enginePlayable.ts": {
+  "engineCanPlay": "v:ac218df946",
+  "longClipPlayable": "v:12c10bda04"
+ },
+ "src/components/preview/audio/useSystemInterruptGuard.ts": {
+  "useSystemInterruptGuard": "v:7a2caa8838"
+ },
  "src/components/preview/surface/CanvasMarkers.tsx": {
   "BlackScrim": "v:308f90dc42",
   "FaceBlurMarker": "v:7f8ceee43d",
@@ -3552,6 +3571,15 @@
   "numberWordsToDigits": "v:adc96ffb5e",
   "parseAudioIntent": "v:3fef9a66e2",
   "splitClauses": "v:9d241d5507"
+ },
+ "src/lib/audioLayerMix.ts": {
+  "PreviewMixInput": "t:25531267d0",
+  "PreviewReferenceTrack": "t:0d32555650",
+  "clipPreviewVolume": "v:b6925f9367",
+  "fadeFactor": "v:99c0cd339c",
+  "previewMixPlan": "v:b9cd316aaf",
+  "trackAudible": "v:f3efde545c",
+  "withoutProcessing": "v:c968515fa5"
  },
  "src/lib/audioMarkers.ts": {
   "SECTION_KINDS": "v:82388bf1ac",

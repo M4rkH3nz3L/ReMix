@@ -82,6 +82,11 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   működik, mert az effekt a render után fut); a modul-globális `startLatencySec` minden lejátszó és
   képernyő között közös.
 
+- **Offline mix** (`src/lib/mix/`): a `stretchJobs` `trimIn` nélküli klipen TypeError-t dob (csak kézzel
+  épített tervvel érhető el); a `sliceSource` negatív `n`-re RangeError; az `offlineMixPlan` klipenként
+  kétszer hívja a `sendsOf`-ot; az `OfflineUnsupported` többi mezőjét (videoSpeed, voiceEnhance, …) soha
+  semmi nem tölti, csak az `effects`-et.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -104,7 +109,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/app/live/[id].tsx` | 952 | ⬜ |
 | `src/components/editor/panels/TextPanel.tsx` | 926 | ⬜ |
 | `src/components/studio/audio/ClipEditSheet.tsx` | 889 | ✅ → 310 |
-| `src/lib/offlineMix.ts` | 887 | ⬜ |
+| `src/lib/offlineMix.ts` | 887 | ✅ → 21 |
 | `src/components/editor/panels/CaptionsPanel.tsx` | 850 | ⬜ |
 | `src/lib/commands.ts` | 843 | ⬜ |
 | `src/lib/vectorPath.ts` | 813 | ✅ → 35 |
@@ -138,7 +143,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/preview/TextOverlay.tsx` | 558 | ⬜ |
 | `src/app/shop.tsx` | 557 | ⬜ |
 | `src/components/profile/StorageCard.tsx` | 549 | ⬜ |
-| `src/lib/offlineMixClient.ts` | 543 | ⬜ |
+| `src/lib/offlineMixClient.ts` | 543 | ✅ → 11 |
 | `src/components/editor/CameraRecorder.tsx` | 543 | ⬜ |
 | `src/app/schedules.tsx` | 541 | ⬜ |
 | `src/lib/storage.ts` | 524 | ⬜ |

@@ -6037,6 +6037,55 @@
   "parseMidi": "v:c3f3ab0401",
   "writeMidi": "v:abb9353eab"
  },
+ "src/lib/mix/fades.ts": {
+  "crossfadePairs": "v:2bd63b2e8a",
+  "crossfades": "v:f0f06e4a7a",
+  "edgeFades": "v:f0f06e4a7a"
+ },
+ "src/lib/mix/gain.ts": {
+  "clipGainAt": "v:3ad7622332",
+  "fadeAt": "v:3ad7622332",
+  "panGains": "v:d8564f8c5c"
+ },
+ "src/lib/mix/levels.ts": {
+  "measureMasterGain": "v:2778937f17",
+  "withNormalizeGains": "v:1d20468811"
+ },
+ "src/lib/mix/model.ts": {
+  "DecodedSource": "t:6e504614ca",
+  "EDGE_EPS": "v:8b9b9c3a6a",
+  "EDGE_FADE_SEC": "v:6ae529bf5a",
+  "OFFLINE_SAMPLE_RATE": "v:37e3abd76c",
+  "OfflineMixClip": "t:f7805ce4ca",
+  "OfflineMixPlan": "t:e017510741",
+  "OfflineUnsupported": "t:cb85f52fb8",
+  "StretchJob": "t:5a11efff66"
+ },
+ "src/lib/mix/plan.ts": {
+  "offlineMixPlan": "v:e86acf6079"
+ },
+ "src/lib/mix/render.ts": {
+  "mixRange": "v:d9ce03c995"
+ },
+ "src/lib/mix/sourcePrep.ts": {
+  "needsWholeWindow": "v:e9ee22262d",
+  "sliceSource": "v:9142638dec",
+  "sourceRanges": "v:0cd4f97f70",
+  "stretchJobs": "v:e60bdb3cc0"
+ },
+ "src/lib/mix/visualAudio.ts": {
+  "pipAudioClips": "v:ff3e4d9895",
+  "videoAudioClips": "v:3b4ea15fc2"
+ },
+ "src/lib/mix/wav.ts": {
+  "encodeWav16": "v:898b518503",
+  "pcm16": "v:5df727f5e6",
+  "pcm24": "v:abbd313be5",
+  "pcmF32": "v:abbd313be5",
+  "wavHeader16": "v:26fd339710",
+  "wavHeader24": "v:26fd339710",
+  "wavHeaderF32": "v:26fd339710"
+ },
  "src/lib/mixAssist.ts": {
   "MasterProposal": "t:26d21ac7db",
   "MixSuggestion": "t:55ed4ab54e",
@@ -6052,6 +6101,41 @@
   "analyzeMixOnDevice": "v:bfaf50fc37",
   "analyzeMixTracks": "v:f6d4ee1fb2",
   "measureMastered": "v:ac0621938b"
+ },
+ "src/lib/mixClient/exportOps.ts": {
+  "MixPass": "t:5c287d4cfb",
+  "OfflineExportOptions": "t:81afc424d1",
+  "StemSpec": "t:97a35825e1",
+  "exportOfflineStems": "v:52e5fc177f",
+  "exportOfflineWav": "v:06ee522f8d",
+  "streamOfflineMix": "v:886b8b20ea",
+  "streamOfflinePasses": "v:ed77e6ec5f"
+ },
+ "src/lib/mixClient/mixLoop.ts": {
+  "mixLoop": "v:6405f2d066",
+  "recentExportPower": "v:cc2841f022"
+ },
+ "src/lib/mixClient/nativeStretch.ts": {
+  "AudioApi": "t:ba8854c956",
+  "measureStretchLatency": "v:3f3f414160",
+  "pitchShiftBuffer": "v:51ed14d300",
+  "probeStretchTiming": "v:4e170bd695",
+  "stretchSegment": "v:6900fc6f81"
+ },
+ "src/lib/mixClient/prepare.ts": {
+  "OFFLINE_MAX_SEC": "v:53b0a1b2fa",
+  "Prepared": "t:d8b21a674c",
+  "frameRange": "v:37c2967971",
+  "prepareOffline": "v:56d910e4ce"
+ },
+ "src/lib/mixClient/wavOutput.ts": {
+  "WavBits": "t:0de2731256",
+  "bytesPerSample": "v:a356d43937",
+  "ensureRoom": "v:0a4064b7d5",
+  "wavData": "v:3ed0667e83",
+  "wavHeader": "v:8488b7fda7",
+  "withTargetFile": "v:b5e9ff7ec1",
+  "writeWav": "v:40a87eca98"
  },
  "src/lib/mixer.ts": {
   "Bus": "t:56070a5683",

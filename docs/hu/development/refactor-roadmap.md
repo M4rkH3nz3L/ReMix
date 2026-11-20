@@ -68,18 +68,18 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 
 | Fájl | Sor | Állapot |
 |---|---:|---|
-| `src/components/editor/Timeline.tsx` | 1531 | ⬜ |
-| `src/components/editor/panels/AssistantPanel.tsx` | 1507 | ⬜ |
-| `src/app/editor/[id].tsx` | 1459 | ⬜ |
-| `src/components/studio/image/ImageStudioBody.tsx` | 1444 | ⬜ |
-| `src/components/preview/PreviewSurface.tsx` | 1423 | ⬜ |
+| `src/components/editor/Timeline.tsx` | 1531 | ✅ → 233 |
+| `src/components/editor/panels/AssistantPanel.tsx` | 1507 | ✅ → 195 |
+| `src/app/editor/[id].tsx` | 1459 | ✅ → 288 |
+| `src/components/studio/image/ImageStudioBody.tsx` | 1444 | ✅ → 581 |
+| `src/components/preview/PreviewSurface.tsx` | 1423 | ✅ → 443 |
 | `src/components/studio/model3d/Model3DStudio.tsx` | 1365 | ⬜ |
 | `src/lib/render.ts` | 1195 | ⬜ |
 | `server/text-render.js` | 1174 | ⬜ |
 | `src/lib/feed.ts` | 1137 | ⬜ |
 | `src/app/live/studio/[id].tsx` | 1137 | ⬜ |
-| `src/components/studio/image/LayerInspector.tsx` | 1105 | ⬜ |
-| `src/components/editor/panels/ExportPanel.tsx` | 1059 | ⬜ |
+| `src/components/studio/image/LayerInspector.tsx` | 1105 | ✅ → 110 |
+| `src/components/editor/panels/ExportPanel.tsx` | 1059 | ✅ → 144 |
 | `server/userFiles.js` | 997 | ⬜ |
 | `src/app/auth.tsx` | 980 | ⬜ |
 | `src/hooks/useFeed.ts` | 975 | ⬜ |
@@ -89,16 +89,16 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/lib/offlineMix.ts` | 887 | ⬜ |
 | `src/components/editor/panels/CaptionsPanel.tsx` | 850 | ⬜ |
 | `src/lib/commands.ts` | 843 | ⬜ |
-| `src/lib/vectorPath.ts` | 813 | ⬜ |
+| `src/lib/vectorPath.ts` | 813 | ✅ → 35 |
 | `server/ai.js` | 805 | ⬜ |
-| `src/components/editor/Toolbar.tsx` | 795 | ⬜ |
+| `src/components/editor/Toolbar.tsx` | 795 | ✅ → 237 |
 | `server/imagedoc.js` | 775 | ⬜ |
 | `server/routes/imageTools.js` | 741 | ⬜ |
 | `src/components/studio/audio/AudioStudioBody.tsx` | 738 | ⬜ |
-| `src/components/editor/TimelineClip.tsx` | 732 | ⬜ |
+| `src/components/editor/TimelineClip.tsx` | 732 | ✅ → 277 |
 | `src/components/editor/panels/AudioPanel.tsx` | 718 | ⬜ |
 | `src/lib/projectUtils.ts` | 715 | ⬜ |
-| `src/components/studio/image/ImageCanvas.tsx` | 715 | ⬜ |
+| `src/components/studio/image/ImageCanvas.tsx` | 715 | ✅ → 442 |
 | `src/app/channel/[id].tsx` | 693 | ⬜ |
 | `server/userStorage.js` | 693 | ⬜ |
 | `src/components/studio/CreateProjectModal.tsx` | 687 | ⬜ |
@@ -106,14 +106,14 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/preview/AudioLayer.tsx` | 676 | ⬜ |
 | `src/components/profile/WalletCard.tsx` | 674 | ⬜ |
 | `server/routes/render.js` | 667 | ⬜ |
-| `src/components/editor/panels/ShapePanel.tsx` | 637 | ⬜ |
+| `src/components/editor/panels/ShapePanel.tsx` | 637 | ✅ → 45 |
 | `src/components/editor/panels/StickerPanel.tsx` | 608 | ⬜ |
 | `src/hooks/useProfile.ts` | 601 | ⬜ |
-| `src/components/studio/image/body/useImageExport.tsx` | 601 | ⬜ |
-| `src/lib/svgImport.ts` | 595 | ⬜ |
+| `src/components/studio/image/body/useImageExport.tsx` | 601 | ✅ → 73 |
+| `src/lib/svgImport.ts` | 595 | ✅ → 65 |
 | `src/lib/universalSearch.ts` | 593 | ⬜ |
 | `src/lib/wallet.ts` | 592 | ⬜ |
-| `src/components/editor/panels/PrecisionPanel.tsx` | 583 | ⬜ |
+| `src/components/editor/panels/PrecisionPanel.tsx` | 583 | ✅ → 101 |
 | `src/lib/chat.ts` | 578 | ⬜ |
 | `server/render/clipChains.js` | 570 | ⬜ |
 | `src/hooks/useStudio.ts` | 558 | ⬜ |

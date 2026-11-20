@@ -11,7 +11,8 @@ const babel = require('@babel/core');
  *
  * KOMPONENSENKÉNT mér, nem fájlonként. Ez lényeges: egy fájlban együtt élhet
  * lefordult és kimaradt függvény (a `TimelineClip.tsx`-ben például a kis
- * `EdgeThumb` segéd lefordul, miközben a FŐ `TimelineClip` kimarad), ezért a
+ * `EdgeThumb` segéd lefordult, miközben a FŐ `TimelineClip` kimaradt — a REFACTOR óta
+ * az `EdgeThumb` a `timelineClip/` alatt él), ezért a
  * fájl-szintű „van-e benne `_c(`" mérés HAMIS biztonságot ad.
  *
  * A mérés a VALÓDI fordítási úton történik (`babel-preset-expo`,
@@ -68,6 +69,12 @@ const MUST_BE_MEMOIZED = [
   ['src/components/editor/screen/EditorLayoutBody.tsx', 'EditorLayoutBody'],
   ['src/components/editor/screen/MissingProjectView.tsx', 'MissingProjectView'],
   ['src/components/editor/screen/ProjectMenuSheet.tsx', 'ProjectMenuSheet'],
+  // REFACTOR: a TimelineClip.tsx-ből kiemelt renderelő részek (a gyökér TimelineClipInner kimarad, lásd lent)
+  ['src/components/editor/timelineClip/ClipEdgePreview.tsx', 'ClipEdgePreview'],
+  ['src/components/editor/timelineClip/ClipEdgePreview.tsx', 'EdgeThumb'],
+  ['src/components/editor/timelineClip/ClipLabel.tsx', 'ClipLabel'],
+  ['src/components/editor/timelineClip/ClipLockBadge.tsx', 'ClipLockBadge'],
+  ['src/components/editor/timelineClip/ClipTrimHandles.tsx', 'ClipTrimHandles'],
 ];
 
 /**

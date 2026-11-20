@@ -1517,6 +1517,22 @@
  "src/components/editor/timeline/useTimelineScroll.tsx": {
   "useTimelineScroll": "v:b3293f2030"
  },
+ "src/components/editor/timelineClip/ClipEdgePreview.tsx": {
+  "ClipEdgePreview": "v:26d324950f"
+ },
+ "src/components/editor/timelineClip/ClipLabel.tsx": {
+  "ClipLabel": "v:55dd2c74fd"
+ },
+ "src/components/editor/timelineClip/ClipLockBadge.tsx": {
+  "ClipLockBadge": "v:4a3af25731"
+ },
+ "src/components/editor/timelineClip/ClipTrimHandles.tsx": {
+  "ClipTrimHandles": "v:54296e7034"
+ },
+ "src/components/editor/timelineClip/timelineClipHandlers.ts": {
+  "createTimelineClipHandlers": "v:ef52afb7f9",
+  "selectionHaptic": "v:bc050ab876"
+ },
  "src/components/feed/FeedEmpty.tsx": {
   "FeedEmpty": "v:7b13e3bbe9",
   "FeedLoading": "v:767749a6d5"
@@ -7399,6 +7415,21 @@
  "src/lib/timeAgo.ts": {
   "AgoUnit": "t:5bdc7edc8d",
   "timeAgoParts": "v:45562c3b57"
+ },
+ "src/lib/timelineClipOps.ts": {
+  "ClipEdgePreviewState": "t:06eaa8c97d",
+  "ClipSnapSource": "t:775af0c2df",
+  "clipLabel": "v:c0d5d16ffc",
+  "clipMenuSplitAt": "v:b8bd0fe27c",
+  "collectClipSnapTargets": "v:56a9837122",
+  "leftEdgePreview": "v:77db152705",
+  "nearestSnapTarget": "v:523166cb85",
+  "nextEdgePreview": "v:e449f0faec",
+  "pickSnappedMoveStart": "v:1380603716",
+  "rightEdgePreview": "v:77db152705",
+  "trimLeftUpdate": "v:1ff7c6daf3",
+  "trimRightPatch": "v:69f7af639d",
+  "wantsTrackStep": "v:a26c809056"
  },
  "src/lib/timelineLayout.ts": {
   "AUDIBLE_TRACKS": "v:a7f781c80d",

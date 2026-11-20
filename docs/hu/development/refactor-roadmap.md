@@ -32,6 +32,16 @@ A három struktúra-kapu: `npm run structure`, és része az `npm run audit`-nak
   típusellenőrzés + az API-kapu + a meglévő integrációs tesztek fedik, az érintős munkafolyamatokat
   az iPad-es eszközkör.
 
+## Bontás közben talált, NEM javított furcsaságok
+
+A szerkezeti commitok szándékosan nem javítanak viselkedést; ezeket a tesztek a mai állapotukban
+rögzítik, a javítás külön (funkcionális) commit, döntés után.
+
+- **TimelineClip mozgatás-snap** (`src/components/editor/timelineClip/timelineClipHandlers.ts`,
+  `commitMove`): a kezdet- és a vég-illesztés közül az nyer, amelyik KEVESEBBET mozdítana — a nem
+  illeszkedő él elmozdulása 0, így mindig ő nyer. A mágneses illesztés ezért csak akkor hat, ha
+  mindkét él illeszkedik; a haptika viszont hatástalan illesztésnél is megszólal.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |

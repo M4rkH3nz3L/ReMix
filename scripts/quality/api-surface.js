@@ -25,6 +25,31 @@ function program(root, configFile, extraOptions = {}) {
 
 const FLAGS =
   ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseFullyQualifiedType | ts.TypeFormatFlags.WriteArrayAsGenericType;
+const NODE_FLAGS = ts.NodeBuilderFlags.NoTruncation | ts.NodeBuilderFlags.UseFullyQualifiedType | ts.NodeBuilderFlags.WriteArrayAsGenericType | ts.NodeBuilderFlags.IgnoreErrors;
+const printer = ts.createPrinter({ removeComments: true });
+
+/**
+ * Kanonikus típus-szöveg: a union- és intersection-tagok sorrendje a TS-ben a típusok LÉTREHOZÁSI
+ * sorrendjétől függ (azaz attól, milyen sorrendben töltődnek be a fájlok) — egy új, ártatlan modul
+ * is átrendezheti őket. Ugyanez igaz a mapped típusból (Omit/Pick) kibontott objektum tulajdonságaira.
+ * Ezért a tagokat a kiírt szövegük szerint rendezzük, mielőtt hash-elünk (a szemantika nem változik).
+ */
+function canonicalText(node, sf) {
+  const print = (n) => printer.printNode(ts.EmitHint.Unspecified, n, sf);
+  const visit = (n) => {
+    const v = ts.visitEachChild(n, visit, undefined);
+    if (ts.isUnionTypeNode(v) || ts.isIntersectionTypeNode(v)) {
+      const sorted = [...v.types].sort((a, b) => print(a).localeCompare(print(b)));
+      return ts.isUnionTypeNode(v) ? ts.factory.updateUnionTypeNode(v, ts.factory.createNodeArray(sorted)) : ts.factory.updateIntersectionTypeNode(v, ts.factory.createNodeArray(sorted));
+    }
+    if (ts.isTypeLiteralNode(v)) {
+      const sorted = [...v.members].sort((a, b) => print(a).localeCompare(print(b)));
+      return ts.factory.updateTypeLiteralNode(v, ts.factory.createNodeArray(sorted));
+    }
+    return v;
+  };
+  return print(visit(node));
+}
 
 /** Egy program `prefix` alatti forrásfájljainak export-felülete: { fájl: { név: 'v:hash' | 't:hash' } }. */
 function surfaceOf(prog, root, prefix) {
@@ -39,12 +64,9 @@ function surfaceOf(prog, root, prefix) {
     for (const exp of checker.getExportsOfModule(modSym)) {
       const sym = exp.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(exp) : exp;
       const isValue = (sym.flags & ts.SymbolFlags.Value) !== 0;
-      let text;
-      if (isValue) {
-        text = checker.typeToString(checker.getTypeOfSymbolAtLocation(sym, sf), sf, FLAGS);
-      } else {
-        text = checker.typeToString(checker.getDeclaredTypeOfSymbol(sym), sf, FLAGS | ts.TypeFormatFlags.InTypeAlias);
-      }
+      const type = isValue ? checker.getTypeOfSymbolAtLocation(sym, sf) : checker.getDeclaredTypeOfSymbol(sym);
+      const node = checker.typeToTypeNode(type, sf, NODE_FLAGS | (isValue ? 0 : ts.NodeBuilderFlags.InTypeAlias));
+      const text = node ? canonicalText(node, sf) : checker.typeToString(type, sf, FLAGS);
       const hash = crypto.createHash('sha1').update(text).digest('hex').slice(0, 10);
       entry[exp.name] = { kind: isValue ? 'v' : 't', hash, text };
     }
@@ -107,4 +129,4 @@ function main(argv, root = process.cwd()) {
 if (require.main === module) {
   process.exitCode = main(process.argv.slice(2));
 }
-module.exports = { main, collect, compact };
+module.exports = { main, collect, compact, canonicalText };

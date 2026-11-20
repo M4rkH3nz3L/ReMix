@@ -71,3 +71,26 @@ describe('api-surface compact', () => {
     expect(out['src/b.ts'].a).toBe('t:2');
   });
 });
+
+describe('api-surface canonicalText', () => {
+  const ts = require('typescript');
+  const { canonicalText } = require('../../scripts/quality/api-surface');
+  /** a forrás egyetlen `type T = …` aliasának kanonikus szövege */
+  const canon = (src) => {
+    const sf = ts.createSourceFile('x.ts', src, ts.ScriptTarget.ES2022, true);
+    const decl = sf.statements.find(ts.isTypeAliasDeclaration);
+    return canonicalText(decl.type, sf);
+  };
+
+  it('a union-, intersection- és objektumtag-sorrend nem számít (betöltési sorrendtől függ)', () => {
+    expect(canon("type T = 'b' | 'a' | { y: 1; x?: 2 };")).toBe(canon("type T = { x?: 2; y: 1 } | 'a' | 'b';"));
+    expect(canon('type T = { b: 1 } & { a: 2 };')).toBe(canon('type T = { a: 2 } & { b: 1 };'));
+  });
+
+  it('a valódi változást észreveszi: új tag, opcionalitás, típus', () => {
+    const base = canon("type T = { a: string; b?: number } | 'x';");
+    expect(canon("type T = { a: string; b?: number } | 'x' | 'y';")).not.toBe(base);
+    expect(canon("type T = { a: string; b: number } | 'x';")).not.toBe(base);
+    expect(canon("type T = { a: string; b?: string } | 'x';")).not.toBe(base);
+  });
+});

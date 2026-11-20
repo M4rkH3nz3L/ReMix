@@ -40,8 +40,11 @@ function canonicalText(node, sf) {
   const print = (n) => printer.printNode(ts.EmitHint.Unspecified, n, sf);
   const visit = (n) => {
     let v = ts.visitEachChild(n, visit, undefined);
-    if (ts.isImportTypeNode(v) && v.qualifier && !v.isTypeOf) {
-      v = ts.factory.createTypeReferenceNode(v.qualifier, v.typeArguments);
+    if (ts.isImportTypeNode(v) && v.qualifier) {
+      // `typeof import("…").Biquad` (osztály, függvény-érték) → `typeof Biquad`
+      v = v.isTypeOf
+        ? ts.factory.createTypeQueryNode(v.qualifier, v.typeArguments)
+        : ts.factory.createTypeReferenceNode(v.qualifier, v.typeArguments);
     }
     if (ts.isUnionTypeNode(v) || ts.isIntersectionTypeNode(v)) {
       const sorted = [...v.types].sort((a, b) => print(a).localeCompare(print(b)));

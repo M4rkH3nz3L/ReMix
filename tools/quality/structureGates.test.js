@@ -91,6 +91,8 @@ describe('api-surface canonicalText', () => {
     expect(canon('type T = { p: import("./a/b").PathPoint };')).toBe(canon('type T = { p: PathPoint };'));
     expect(canon('type T = import("./x").Box<number>;')).toBe(canon('type T = Box<number>;'));
     expect(canon('type T = { p: import("./a").PathPoint };')).not.toBe(canon('type T = { p: Vec };'));
+    expect(canon('type T = typeof import("./dsp/filters").Biquad;')).toBe(canon('type T = typeof Biquad;'));
+    expect(canon('type T = typeof import("./a").Biquad;')).not.toBe(canon('type T = typeof Gain;'));
   });
 
   it('a valódi változást észreveszi: új tag, opcionalitás, típus', () => {

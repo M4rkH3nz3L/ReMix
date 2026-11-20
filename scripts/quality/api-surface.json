@@ -1401,6 +1401,43 @@
  "src/components/editor/panels/assistant/useWorkerDiag.tsx": {
   "useWorkerDiag": "v:6e1a8c088a"
  },
+ "src/components/editor/panels/audio/AudioFxSection.tsx": {
+  "AudioFxSection": "v:a676a46cd0"
+ },
+ "src/components/editor/panels/audio/AudioSourceSections.tsx": {
+  "OwnFileSection": "v:45a4eb7fa5",
+  "VoiceoverSection": "v:f50b01b6cd",
+  "VoiceoverSectionProps": "t:f4d2ac6c8f"
+ },
+ "src/components/editor/panels/audio/BeatSection.tsx": {
+  "BeatSection": "v:e36add8402",
+  "BeatSectionProps": "t:c95a5e691e"
+ },
+ "src/components/editor/panels/audio/ClipMixSection.tsx": {
+  "ClipMixSection": "v:0de518c8f2",
+  "ClipMixSectionProps": "t:9f893571f3"
+ },
+ "src/components/editor/panels/audio/LibrarySection.tsx": {
+  "LibrarySection": "v:0d24e9a253",
+  "LibrarySectionProps": "t:1f7b4c9b04"
+ },
+ "src/components/editor/panels/audio/TtsSection.tsx": {
+  "TtsSection": "v:b9f2e8423d",
+  "TtsSectionProps": "t:6830cbbcf5"
+ },
+ "src/components/editor/panels/audio/audioPanelActions.ts": {
+  "AddAudioActionDeps": "t:b44a65d983",
+  "BeatActionDeps": "t:321408034f",
+  "RecordActionDeps": "t:c7b2548e08",
+  "TtsActionDeps": "t:3b4a0a14fe",
+  "createAddAudioActions": "v:4ed37d9042",
+  "createBeatActions": "v:4c46eb1676",
+  "createRecordActions": "v:03ca2d362f",
+  "createTtsActions": "v:65dcd30780"
+ },
+ "src/components/editor/panels/audio/audioStyles.ts": {
+  "styles": "v:8e01366f10"
+ },
  "src/components/editor/panels/export/AdvancedExportControls.tsx": {
   "AdvancedExportControls": "v:8f2f25eab5"
  },
@@ -3495,6 +3532,21 @@
   "drumModel": "v:40c6518891",
   "ensureAudioModel": "v:14359fdaba",
   "runAudioModelSmoke": "v:14359fdaba"
+ },
+ "src/lib/audioPanelOps.ts": {
+  "beatSourceClip": "v:4c580df0e6",
+  "clipFxOf": "v:9001c89ded",
+  "dubCaptions": "v:83aa89d2cc",
+  "dubText": "v:65351b5c79",
+  "formatEqDb": "v:6d07f4ce92",
+  "panLabel": "v:2d2bf96f87",
+  "round1": "v:4c8cb8c49c",
+  "stepEqBand": "v:1cfdf1fddf",
+  "stepFade": "v:7433183245",
+  "stepHighpass": "v:b2f612da19",
+  "stepLowpass": "v:1f0f97d76a",
+  "stepPan": "v:1d28fabc6a",
+  "stepWet": "v:e00f609656"
  },
  "src/lib/audioSheetLayout.ts": {
   "inlineDetentOf": "v:fbd1e3ff84",

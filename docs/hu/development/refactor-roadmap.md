@@ -64,6 +64,11 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   hogy az elemet kihagyná (a golden trace 978 `parseSvg`-hívásából 37); (2) a hexa karakter-entitás
   (`&#x41;`) dekódolatlan marad; (3) részben érvénytelen `viewBox` (nem numerikus x/y) NaN eltolást ad.
 
+- **AudioPanel** (`src/components/editor/panels/audio/`, `src/lib/audioPanelOps.ts`): a „Fade in” /
+  „Fade out” Stepper-címke beégetett angol szöveg, nem i18n-kulcs; a high-pass 1–40 közötti értékről
+  (pl. AI-állította 40) `+20`-szal 60-ra ugrik, nem a 60-as padlóra; a low-pass 16 kHz feletti
+  érték (pl. 18 kHz) csak kikapcsolható; az `AudioFxSection.setFx` felesleges `if (clip)` ellenőrzése.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -94,9 +99,9 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/editor/Toolbar.tsx` | 795 | ✅ → 237 |
 | `server/imagedoc.js` | 775 | ⬜ |
 | `server/routes/imageTools.js` | 741 | ⬜ |
-| `src/components/studio/audio/AudioStudioBody.tsx` | 738 | ⬜ |
+| `src/components/studio/audio/AudioStudioBody.tsx` | 738 | ✅ → 512 |
 | `src/components/editor/TimelineClip.tsx` | 732 | ✅ → 277 |
-| `src/components/editor/panels/AudioPanel.tsx` | 718 | ⬜ |
+| `src/components/editor/panels/AudioPanel.tsx` | 718 | ✅ → 145 |
 | `src/lib/projectUtils.ts` | 715 | ⬜ |
 | `src/components/studio/image/ImageCanvas.tsx` | 715 | ✅ → 442 |
 | `src/app/channel/[id].tsx` | 693 | ⬜ |

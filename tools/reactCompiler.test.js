@@ -130,6 +130,14 @@ const MUST_BE_MEMOIZED = [
   // REFACTOR: az AudioStudioBody.tsx-ből kiemelt renderelő részek (a gyökér maga kimarad: ref-írás renderben)
   ['src/components/studio/audio/body/InstrumentOverlays.tsx', 'InstrumentOverlays'],
   ['src/components/studio/audio/body/MultiSelectBar.tsx', 'MultiSelectBar'],
+  // REFACTOR: az AudioPanel.tsx szekciói (a gyökér előtte és utána is kimarad: ref-írás renderben)
+  ['src/components/editor/panels/audio/LibrarySection.tsx', 'LibrarySection'],
+  ['src/components/editor/panels/audio/AudioSourceSections.tsx', 'OwnFileSection'],
+  ['src/components/editor/panels/audio/AudioSourceSections.tsx', 'VoiceoverSection'],
+  ['src/components/editor/panels/audio/TtsSection.tsx', 'TtsSection'],
+  ['src/components/editor/panels/audio/BeatSection.tsx', 'BeatSection'],
+  ['src/components/editor/panels/audio/ClipMixSection.tsx', 'ClipMixSection'],
+  ['src/components/editor/panels/audio/AudioFxSection.tsx', 'AudioFxSection'],
 ];
 
 /**

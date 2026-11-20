@@ -89,6 +89,16 @@ const MUST_BE_MEMOIZED = [
   ['src/components/editor/panels/export/ProjectFileSection.tsx', 'ProjectFileSection'],
   ['src/components/editor/panels/export/ThumbnailStudioSection.tsx', 'ThumbnailStudioSection'],
   ['src/components/editor/panels/export/VideoExportSection.tsx', 'VideoExportSection'],
+  // REFACTOR: a Kép Stúdió LayerInspector.tsx-ének szekciói (a gyökér maga is memoizált marad)
+  ['src/components/studio/image/inspector/TextLayerSection.tsx', 'TextLayerSection'],
+  ['src/components/studio/image/inspector/PhotoLayerSection.tsx', 'PhotoLayerSection'],
+  ['src/components/studio/image/inspector/AdjustLayerSection.tsx', 'AdjustLayerSection'],
+  ['src/components/studio/image/inspector/ShapeLayerSection.tsx', 'ShapeLayerSection'],
+  ['src/components/studio/image/inspector/FillLayerSection.tsx', 'FillLayerSection'],
+  ['src/components/studio/image/inspector/LayerCompositeSection.tsx', 'LayerCompositeSection'],
+  ['src/components/studio/image/inspector/LayerEffectsSection.tsx', 'LayerEffectsSection'],
+  ['src/components/studio/image/inspector/MaskFadeSection.tsx', 'MaskFadeSection'],
+  ['src/components/studio/image/LayerInspector.tsx', 'LayerInspector'],
 ];
 
 /**

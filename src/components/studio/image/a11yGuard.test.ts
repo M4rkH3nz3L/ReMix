@@ -26,6 +26,8 @@ declare const __dirname: string;
 
 const IMAGE_DIR = path.join(__dirname);
 const BODY_DIR = path.join(__dirname, 'body');
+// a réteg-inspektor szekciói (REFACTOR: a LayerInspector.tsx-ből)
+const INSPECTOR_DIR = path.join(__dirname, 'inspector');
 
 const TAPPABLE = new Set(['Pressable', 'TouchableOpacity', 'TouchableHighlight', 'TouchableWithoutFeedback']);
 const LABEL_REQUIRED = new Set(['Switch', 'TextInput']);
@@ -105,7 +107,7 @@ function auditFile(file: string): string[] {
 describe('♿ Kép Stúdió: minden érintő vezérlőnek van neve a képernyőolvasónak', () => {
   const list = (dir: string): string[] =>
     (fs.readdirSync(dir) as string[]).filter((f: string) => f.endsWith('.tsx') && !f.endsWith('.test.tsx')).map((f: string) => path.join(dir, f));
-  const files: string[] = [...list(IMAGE_DIR), ...list(BODY_DIR)];
+  const files: string[] = [...list(IMAGE_DIR), ...list(BODY_DIR), ...list(INSPECTOR_DIR)];
 
   it('a kép-stúdió lapjai, sávjai és vásznai', () => {
     const problems = files.flatMap(auditFile);

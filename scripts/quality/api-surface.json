@@ -2295,6 +2295,33 @@
   "readExportFacts": "v:120f82c370",
   "verifyExport": "v:981b82dc03"
  },
+ "src/components/studio/image/inspector/AdjustLayerSection.tsx": {
+  "AdjustLayerSection": "v:2beda05761"
+ },
+ "src/components/studio/image/inspector/FillLayerSection.tsx": {
+  "FillLayerSection": "v:47ee5135e6"
+ },
+ "src/components/studio/image/inspector/LayerCompositeSection.tsx": {
+  "LayerCompositeSection": "v:60b067bb4d"
+ },
+ "src/components/studio/image/inspector/LayerEffectsSection.tsx": {
+  "LayerEffectsSection": "v:e4e8a36509"
+ },
+ "src/components/studio/image/inspector/MaskFadeSection.tsx": {
+  "MaskFadeSection": "v:e4e8a36509"
+ },
+ "src/components/studio/image/inspector/PhotoLayerSection.tsx": {
+  "PhotoLayerSection": "v:cadac64f5b"
+ },
+ "src/components/studio/image/inspector/ShapeLayerSection.tsx": {
+  "ShapeLayerSection": "v:a7bad52e26"
+ },
+ "src/components/studio/image/inspector/TextLayerSection.tsx": {
+  "TextLayerSection": "v:630fc2e477"
+ },
+ "src/components/studio/image/inspector/inspectorStyles.ts": {
+  "inspectorStyles": "v:96ef58d2cd"
+ },
  "src/components/studio/image/projectMask.ts": {
   "projectMaskToCanvas": "v:ffba387e1d"
  },
@@ -5252,6 +5279,15 @@
   "toShapePrimitives": "v:a447f6ced2",
   "toggleEffect": "v:f7076f4e58",
   "updateEffect": "v:80d5421ab8"
+ },
+ "src/lib/layerInspectorOps.ts": {
+  "BLENDS": "v:19c7dc3fa5",
+  "CAPS": "v:c84645f32c",
+  "DASHES": "v:57d117dde1",
+  "JOINS": "v:4e4a891f21",
+  "SHAPES": "v:75059592d0",
+  "TEXT_ALIGNS": "v:52b2d8771f",
+  "defaultBorderAlign": "v:097c4c4b7a"
  },
  "src/lib/layerResize.ts": {
   "ResizeCorner": "t:561714f9b1",

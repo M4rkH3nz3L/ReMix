@@ -18,7 +18,7 @@ const fs = require('fs');
 const path = require('path');
 declare const __dirname: string;
 
-const DIRS = [path.join(__dirname), path.join(__dirname, 'body')];
+const DIRS = [path.join(__dirname), path.join(__dirname, 'body'), path.join(__dirname, 'inspector')];
 const VISIBLE_PROPS = new Set(['label', 'title', 'placeholder', 'accessibilityLabel', 'accessibilityHint', 'hint', 'message']);
 /** szándékosan nem fordított, látható szövegek (márka / mértékegység / formátum-név) */
 // a „ffffff” a hex színmező helyőrzője, a „PRO” jelvény és a „HSL” rövidítés minden nyelven ugyanaz

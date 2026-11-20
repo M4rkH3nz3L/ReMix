@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 declare const __dirname: string;
 
-const FILES: string[] = [path.join(__dirname), path.join(__dirname, 'body')].flatMap((d: string) =>
+const FILES: string[] = [path.join(__dirname), path.join(__dirname, 'body'), path.join(__dirname, 'inspector')].flatMap((d: string) =>
   fs.readdirSync(d).filter((f: string) => f.endsWith('.tsx') && !f.includes('.test.')).map((f: string) => path.join(d, f))
 );
 const SHARED = [path.join(__dirname, '../../ui/controls.tsx'), path.join(__dirname, '../audio/primitives.tsx')];

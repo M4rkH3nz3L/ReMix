@@ -41,6 +41,10 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   `commitMove`): a kezdet- és a vég-illesztés közül az nyer, amelyik KEVESEBBET mozdítana — a nem
   illeszkedő él elmozdulása 0, így mindig ő nyer. A mágneses illesztés ezért csak akkor hat, ha
   mindkét él illeszkedik; a haptika viszont hatástalan illesztésnél is megszólal.
+- **LayerInspector font-betöltés** (`src/components/studio/image/LayerInspector.tsx`): a
+  `setFontsReady` állapot csak újrarenderelést kényszerítene a font betöltése után, de az értékét
+  senki nem olvassa; memoizált gyökérnél a gyorsítótárazott JSX így nem rajzolódik újra — a
+  font-chipek frissítése valószínűleg már az eredetiben is hatástalan.
 
 ## Éles fájlok (63)
 

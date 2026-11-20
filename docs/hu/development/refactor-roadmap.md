@@ -37,6 +37,13 @@ A három struktúra-kapu: `npm run structure`, és része az `npm run audit`-nak
 A szerkezeti commitok szándékosan nem javítanak viselkedést; ezeket a tesztek a mai állapotukban
 rögzítik, a javítás külön (funkcionális) commit, döntés után.
 
+- ⚠️ **SÚLYOS — Image Studio SVG- és vektoros PDF-export** (`src/components/studio/image/body/fileExportActions.tsx`,
+  `buildExportSvg`): a beágyazott helyi fotó `data:…;base64,${src.base64()}` — az expo-file-system v57-ben
+  a `File.base64()` `Promise<string>`-et ad, így MINDEN beágyazott fotó helyén
+  `data:image/…;base64,[object Promise]` kerül a fájlba (a golden trace-ben 11 előfordulás). Valószínű
+  javítás: `base64Sync()` vagy `await`. Ugyanitt: jestben az `await import('…/exportVerify')` nem fut,
+  így a minőségkapun átmenő tesztek a catch-ágba esnek.
+
 - **TimelineClip mozgatás-snap** (`src/components/editor/timelineClip/timelineClipHandlers.ts`,
   `commitMove`): a kezdet- és a vég-illesztés közül az nyer, amelyik KEVESEBBET mozdítana — a nem
   illeszkedő él elmozdulása 0, így mindig ő nyer. A mágneses illesztés ezért csak akkor hat, ha

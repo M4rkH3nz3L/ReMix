@@ -2332,6 +2332,18 @@
  "src/components/studio/image/body/StudioTopBar.tsx": {
   "StudioTopBar": "v:b211ccbc46"
  },
+ "src/components/studio/image/body/exportCommon.ts": {
+  "commitRendered": "v:87990e5c3a",
+  "markExported": "v:ef23bc6514"
+ },
+ "src/components/studio/image/body/exportRasterizer.tsx": {
+  "ExportRasterizerDeps": "t:d26e1cb073",
+  "createExportRasterizer": "v:40c46429a0"
+ },
+ "src/components/studio/image/body/fileExportActions.tsx": {
+  "FileExportDeps": "t:f34b7b3fe8",
+  "createFileExportActions": "v:c25890aef1"
+ },
  "src/components/studio/image/body/layerEditActions.tsx": {
   "LayerEditDeps": "t:fdf323559d",
   "createLayerEditActions": "v:0db06efede"
@@ -2343,6 +2355,14 @@
  "src/components/studio/image/body/pathEditActions.ts": {
   "PathEditDeps": "t:0437316a3b",
   "createPathEditActions": "v:078757d953"
+ },
+ "src/components/studio/image/body/publishActions.tsx": {
+  "PublishDeps": "t:1f0a529425",
+  "createPublishActions": "v:0c3ffd2cb2"
+ },
+ "src/components/studio/image/body/rasterExportActions.tsx": {
+  "RasterExportDeps": "t:b0b4dd79ae",
+  "createRasterExportActions": "v:0d0016b8a8"
  },
  "src/components/studio/image/body/toolDispatch.tsx": {
   "ToolDispatchDeps": "t:246d57ccd4",
@@ -5095,6 +5115,13 @@
   "imageMimeForUri": "v:affbc370e6",
   "pdfExportFileName": "v:84b1931609",
   "svgExportFileName": "v:84b1931609"
+ },
+ "src/lib/imageExportPlan.ts": {
+  "captureViewSize": "v:d225142c51",
+  "isEmbeddablePhoto": "v:8010573948",
+  "linkableVideoProjects": "v:d6dc8ffa0d",
+  "pdfRasterHeight": "v:d94a0bfbb6",
+  "rasterHeightOf": "v:849774034b"
  },
  "src/lib/imageFilters.ts": {
   "DEFAULT_FILTER_AMOUNT": "v:fbccebab4a",

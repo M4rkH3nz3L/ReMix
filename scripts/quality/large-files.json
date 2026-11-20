@@ -1,6 +1,5 @@
 {
   "server/text-render.js": 1175,
-  "src/app/editor/[id].tsx": 1460,
   "src/app/live/studio/[id].tsx": 1138,
   "src/components/editor/panels/ExportPanel.tsx": 1060,
   "src/components/studio/image/ImageStudioBody.tsx": 1445,

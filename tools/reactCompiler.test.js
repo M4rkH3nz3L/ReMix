@@ -62,6 +62,12 @@ const MUST_BE_MEMOIZED = [
   ['src/components/preview/surface/PreviewMedia.tsx', 'BlurBackdrop'],
   ['src/components/preview/surface/PreviewMedia.tsx', 'MediaLayer'],
   ['src/components/preview/surface/PreviewToolbar.tsx', 'PreviewToolbar'],
+  // REFACTOR: a szerkesztő-képernyő (src/app/editor/[id].tsx) kiemelt renderelő részei
+  ['src/components/editor/screen/EditorBanners.tsx', 'EditorBanners'],
+  ['src/components/editor/screen/EditorHeader.tsx', 'EditorHeader'],
+  ['src/components/editor/screen/EditorLayoutBody.tsx', 'EditorLayoutBody'],
+  ['src/components/editor/screen/MissingProjectView.tsx', 'MissingProjectView'],
+  ['src/components/editor/screen/ProjectMenuSheet.tsx', 'ProjectMenuSheet'],
 ];
 
 /**
@@ -78,6 +84,7 @@ const KNOWN_BAILS = [
   // a komponens neve a forrásban TimelineClipInner; a `TimelineClip` a memo() burkolat
   ['src/components/editor/TimelineClip.tsx', 'TimelineClipInner', 'Reanimated shared value mutációk'],
   ['src/components/preview/PreviewSurface.tsx', 'PreviewSurface', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
+  ['src/app/editor/[id].tsx', 'EditorScreen', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
   ['src/components/preview/TextOverlay.tsx', 'TextOverlay', 'Reanimated shared value írása'],
 ];
 

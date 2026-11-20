@@ -1440,6 +1440,48 @@
  "src/components/editor/panels/filter/ThreeDSection.tsx": {
   "ThreeDSection": "v:3122d77799"
  },
+ "src/components/editor/screen/EditorBanners.tsx": {
+  "EditorBanners": "v:c82ec47f81"
+ },
+ "src/components/editor/screen/EditorHeader.tsx": {
+  "EditorHeader": "v:2e66b3cc30"
+ },
+ "src/components/editor/screen/EditorLayoutBody.tsx": {
+  "EditorLayoutBody": "v:e586e1b8dd"
+ },
+ "src/components/editor/screen/MissingProjectView.tsx": {
+  "MissingProjectView": "v:089f8ddd8d"
+ },
+ "src/components/editor/screen/ProjectMenuSheet.tsx": {
+  "ProjectMenuSheet": "v:119afaaa9a"
+ },
+ "src/components/editor/screen/missingMediaActions.ts": {
+  "createMissingMediaActions": "v:6131ab2383"
+ },
+ "src/components/editor/screen/useAutosave.tsx": {
+  "useAutosave": "v:c0ffda0304"
+ },
+ "src/components/editor/screen/useEditorCollab.tsx": {
+  "useEditorCollab": "v:4fb715a8d4"
+ },
+ "src/components/editor/screen/useEditorWarmup.tsx": {
+  "useEditorWarmup": "v:f9263cb670"
+ },
+ "src/components/editor/screen/useForeignSourceToast.tsx": {
+  "useForeignSourceToast": "v:cc290190aa"
+ },
+ "src/components/editor/screen/usePanelDeepLink.tsx": {
+  "usePanelDeepLink": "v:b2aaedaad1"
+ },
+ "src/components/editor/screen/useProjectLoader.tsx": {
+  "useProjectLoader": "v:388e5a6eb3"
+ },
+ "src/components/editor/screen/useProjectMenu.tsx": {
+  "useProjectMenu": "v:a569683cd9"
+ },
+ "src/components/editor/screen/useTransferAvailability.tsx": {
+  "useTransferAvailability": "v:d36939bebe"
+ },
  "src/components/editor/timeline/FloatingTrackLabels.tsx": {
   "FloatingTrackLabels": "v:0187066895"
  },
@@ -4323,6 +4365,16 @@
   "densify": "v:6134d20f4c",
   "gradientMagnitude": "v:2eae4de40a",
   "refineRingToEdges": "v:2c606c692a"
+ },
+ "src/lib/editorScreenOps.ts": {
+  "AUTOSAVE_MS": "v:290a52e4dd",
+  "EditorLayoutKind": "t:ca548c6f14",
+  "autosaveDelay": "v:c248e92123",
+  "collabScreenPath": "v:4781df221a",
+  "editorLayoutKind": "v:dd6715a38b",
+  "isDeepLinkPanel": "v:5f5ed2759a",
+  "nextAspectRatio": "v:be86669680",
+  "videoClipUris": "v:ac53f8f6ea"
  },
  "src/lib/edl.ts": {
   "EdlEvent": "t:dd717c533f",

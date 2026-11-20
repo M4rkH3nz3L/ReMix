@@ -52,6 +52,10 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   igazítást” ír, a sec-mód viszont századra kerekít (a lépés 0,1 s); (2) a forgatás-stepper a nyers
   értéket mutatja (`${rotation}°`), a Graph Editor kerekít; (3) `setDuration`-ben ha egy videó
   `maxVideoDuration`-je kisebb a `MIN_CLIP_DURATION`-nál, a `clamp` min > max argumentumot kap.
+- **SVG-import** (`src/lib/svg/`, `src/lib/vector/svgPathParse.ts`): (1) egyetlen hibás `<path>`
+  (kevés szám egy parancsban, pl. `"M0 0 L1"`) `TypeError`-ral az EGÉSZ importot megbuktatja ahelyett,
+  hogy az elemet kihagyná (a golden trace 978 `parseSvg`-hívásából 37); (2) a hexa karakter-entitás
+  (`&#x41;`) dekódolatlan marad; (3) részben érvénytelen `viewBox` (nem numerikus x/y) NaN eltolást ad.
 
 ## Éles fájlok (63)
 

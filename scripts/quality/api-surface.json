@@ -7563,6 +7563,41 @@
  "src/lib/supabaseFetch.ts": {
   "loggedSupabaseFetch": "v:53316b821e"
  },
+ "src/lib/svg/geometry.ts": {
+  "anchorBounds": "v:325cd78158",
+  "bakeMatrix": "v:66f015cd68",
+  "boxToDoc": "v:bc858a2dd0",
+  "ellipsePath": "v:eb77ba67d8",
+  "rectPath": "v:e92e6a9d61"
+ },
+ "src/lib/svg/gradients.ts": {
+  "collectGradients": "v:4f25285a6b"
+ },
+ "src/lib/svg/layers.ts": {
+  "Ctx": "t:e68eca48dd",
+  "readViewBox": "v:0df917f3ca",
+  "walkLayers": "v:a2010efaa4"
+ },
+ "src/lib/svg/matrix.ts": {
+  "IDENTITY": "v:9e9171c4db",
+  "Mat": "t:7c7a577fa7",
+  "apply": "v:d512eb6985",
+  "hasRotation": "v:53d2af744f",
+  "mul": "v:e58353ccea",
+  "parseTransform": "v:e76550ccae"
+ },
+ "src/lib/svg/style.ts": {
+  "Style": "t:99a0efc6cf",
+  "clamp01": "v:81a32a7c5f",
+  "parseLen": "v:f3a76244f0",
+  "resolveStyle": "v:7c56fdd6c1",
+  "round": "v:81a32a7c5f",
+  "urlId": "v:0004f7694b"
+ },
+ "src/lib/svg/xml.ts": {
+  "XmlNode": "t:f919063295",
+  "parseXml": "v:ec20b22854"
+ },
  "src/lib/svgExport.ts": {
   "SvgExportOptions": "t:051e30d77e",
   "imageDocToSvg": "v:455d77dd41",
@@ -7912,6 +7947,60 @@
   "PreviewStep": "t:765907a4da",
   "previewDuration": "v:dae7781063",
   "stepPreviewPlayhead": "v:3afc271350"
+ },
+ "src/lib/vector/arc.ts": {
+  "arcToCubics": "v:df1ef69102"
+ },
+ "src/lib/vector/bounds.ts": {
+  "normalizeSubpaths": "v:62be9a8ec7",
+  "subpathsBounds": "v:2a10da7cc3"
+ },
+ "src/lib/vector/geometry.ts": {
+  "HandleId": "t:91161bc29e",
+  "NodeType": "t:cc4491a23e",
+  "Subpath": "t:dde0e20a22",
+  "Vec": "t:3e8f48ebd5",
+  "add": "v:481bc0b169",
+  "clonePt": "v:bf5984cd23",
+  "cubic": "v:961036b535",
+  "dist": "v:c105bca8c7",
+  "len": "v:8dea884399",
+  "lerp": "v:418c979089",
+  "lerpP": "v:96e9115723",
+  "norm": "v:4dea34dfa8",
+  "round": "v:81a32a7c5f",
+  "rp": "v:bf5984cd23",
+  "scaleV": "v:c7d491726f",
+  "sub": "v:481bc0b169"
+ },
+ "src/lib/vector/nodeEdit.ts": {
+  "addAnchor": "v:8ab481c3fe",
+  "deleteAnchor": "v:c291c6740f",
+  "dragHandle": "v:16add4baa5",
+  "insertAnchor": "v:18088f52cb",
+  "joinPaths": "v:d208638290",
+  "moveAnchor": "v:1ce56e9092",
+  "reversePath": "v:e59e170cf6",
+  "setNodeType": "v:8ede259ca8",
+  "splitSegment": "v:319b3c43e7"
+ },
+ "src/lib/vector/query.ts": {
+  "anchorIndexAt": "v:952dcf2adc",
+  "evalSegment": "v:07b9eaaa6c",
+  "handleAt": "v:1f02587714",
+  "nearestOnPath": "v:99e98c6f45",
+  "nodeType": "v:3b331fc49c"
+ },
+ "src/lib/vector/ringEdit.ts": {
+  "pathEditPatch": "v:3254f80997",
+  "pathEditView": "v:994d40e2af"
+ },
+ "src/lib/vector/svgPathEmit.ts": {
+  "pointsToSvgPath": "v:9b46edcd40",
+  "subpathsToSvgPath": "v:c2cb395c30"
+ },
+ "src/lib/vector/svgPathParse.ts": {
+  "parseSvgPath": "v:f2bedfe806"
  },
  "src/lib/vectorPath.ts": {
   "HandleId": "t:91161bc29e",

@@ -1401,6 +1401,52 @@
  "src/components/editor/panels/assistant/useWorkerDiag.tsx": {
   "useWorkerDiag": "v:6e1a8c088a"
  },
+ "src/components/editor/panels/export/AdvancedExportControls.tsx": {
+  "AdvancedExportControls": "v:3e031ab3f4"
+ },
+ "src/components/editor/panels/export/CaptionsSection.tsx": {
+  "CaptionsSection": "v:861dc1d28c"
+ },
+ "src/components/editor/panels/export/InteractiveSection.tsx": {
+  "InteractiveSection": "v:aca91b6fc7"
+ },
+ "src/components/editor/panels/export/PostSection.tsx": {
+  "PostSection": "v:c98e8f006e"
+ },
+ "src/components/editor/panels/export/ProStatusBanner.tsx": {
+  "ProStatusBanner": "v:83497814db"
+ },
+ "src/components/editor/panels/export/ProjectFileSection.tsx": {
+  "ProjectFileSection": "v:2691b55745"
+ },
+ "src/components/editor/panels/export/ThumbnailStudioSection.tsx": {
+  "ThumbnailStudioSection": "v:33316d2ff4"
+ },
+ "src/components/editor/panels/export/VideoExportSection.tsx": {
+  "VideoExportSection": "v:c77f657d30"
+ },
+ "src/components/editor/panels/export/exportStyles.ts": {
+  "styles": "v:bc37fe5fe0"
+ },
+ "src/components/editor/panels/export/projectFileActions.ts": {
+  "ProjectFileDeps": "t:c88024c1a1",
+  "createProjectFileActions": "v:cd06769d6f"
+ },
+ "src/components/editor/panels/export/thumbActions.ts": {
+  "createThumbActions": "v:2b86cfd27d"
+ },
+ "src/components/editor/panels/export/useExportSettings.ts": {
+  "ExportSettingsState": "t:2cd7f9226c",
+  "useExportSettings": "v:526b39769b"
+ },
+ "src/components/editor/panels/export/useThumbStudioState.ts": {
+  "ThumbStudioState": "t:5e4b5db42b",
+  "useThumbStudioState": "v:09c9aaeca5"
+ },
+ "src/components/editor/panels/export/videoExportActions.ts": {
+  "VideoExportDeps": "t:8b7c11d994",
+  "createVideoExportActions": "v:50e91d3c30"
+ },
  "src/components/editor/panels/filter/AnimateSection.tsx": {
   "AnimateSection": "v:3122d77799"
  },
@@ -4464,6 +4510,22 @@
   "ExportIssueCode": "t:8f25f8653f",
   "TEMPLATE_PLACEHOLDER_KEYS": "v:1e329c9682",
   "exportLint": "v:7bd4b625d5"
+ },
+ "src/lib/exportPanelOps.ts": {
+  "BASE_MBPS": "v:85c65796f6",
+  "CODECS": "v:873d78afe7",
+  "ExportBitrateMode": "t:3a31b583f5",
+  "ExportChipValues": "t:d2985fe048",
+  "ExportCodec": "t:307e779dac",
+  "ExportColorMode": "t:1480dbe343",
+  "ExportQuality": "t:aa398bf353",
+  "FPS_OPTIONS": "v:9269dd4517",
+  "QUALITIES": "v:048fb74f0a",
+  "QUALITY_MULT": "v:d3f7b87e17",
+  "RESOLUTIONS": "v:d2975a7024",
+  "buildRenderSettings": "v:8e8b98929b",
+  "estimateExportMb": "v:9884a5d8da",
+  "toggleBatchPlatform": "v:63a477feb2"
  },
  "src/lib/exportPolicy.ts": {
   "ExportPolicyResult": "t:a6806b76a1",

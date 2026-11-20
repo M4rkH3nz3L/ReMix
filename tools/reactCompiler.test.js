@@ -80,6 +80,15 @@ const MUST_BE_MEMOIZED = [
   ['src/components/editor/toolbar/ToolbarToolRow.tsx', 'ToolbarToolRow'],
   ['src/components/editor/toolbar/MoreToolsSheet.tsx', 'MoreToolsSheet'],
   ['src/components/editor/Toolbar.tsx', 'Toolbar'],
+  // REFACTOR: az ExportPanel.tsx-ből kiemelt szekciók (a gyökér kimarad, lásd lent)
+  ['src/components/editor/panels/export/AdvancedExportControls.tsx', 'AdvancedExportControls'],
+  ['src/components/editor/panels/export/CaptionsSection.tsx', 'CaptionsSection'],
+  ['src/components/editor/panels/export/InteractiveSection.tsx', 'InteractiveSection'],
+  ['src/components/editor/panels/export/PostSection.tsx', 'PostSection'],
+  ['src/components/editor/panels/export/ProStatusBanner.tsx', 'ProStatusBanner'],
+  ['src/components/editor/panels/export/ProjectFileSection.tsx', 'ProjectFileSection'],
+  ['src/components/editor/panels/export/ThumbnailStudioSection.tsx', 'ThumbnailStudioSection'],
+  ['src/components/editor/panels/export/VideoExportSection.tsx', 'VideoExportSection'],
 ];
 
 /**
@@ -96,6 +105,7 @@ const KNOWN_BAILS = [
   // a komponens neve a forrásban TimelineClipInner; a `TimelineClip` a memo() burkolat
   ['src/components/editor/TimelineClip.tsx', 'TimelineClipInner', 'Reanimated shared value mutációk'],
   ['src/components/preview/PreviewSurface.tsx', 'PreviewSurface', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
+  ['src/components/editor/panels/ExportPanel.tsx', 'ExportPanel', 'a füstteszt-hook renderben írja az exportLocalRef refet'],
   ['src/app/editor/[id].tsx', 'EditorScreen', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
   ['src/components/preview/TextOverlay.tsx', 'TextOverlay', 'Reanimated shared value írása'],
 ];

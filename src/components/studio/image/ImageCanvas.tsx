@@ -1,70 +1,37 @@
 import { Ionicons } from '@expo/vector-icons';
-import { type Ref, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { type Ref, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 
-// 🖌️ a BrushOverlay (Skia-függő) LUSTÁN töltődik — csak a TÍPUS statikus (erased),
-// a komponens csak az ecset bekapcsolásakor rántja be a @shopify/react-native-skia
-// natív modult, így annak hiánya (régi dev-kliens) nem crash-eltet betöltéskor.
 import { type BrushHandle } from '@/components/studio/image/BrushOverlay';
+import { CanvasLayerStack } from '@/components/studio/image/canvas/CanvasLayerStack';
+import { MultiSelectOutlines, PASTEBOARD, PasteboardVeil, SmartGuideMarks } from '@/components/studio/image/canvas/CanvasMarks';
+import { EditOverlays } from '@/components/studio/image/canvas/EditOverlays';
+import { GuideOverlays } from '@/components/studio/image/canvas/GuideOverlays';
+import { createPathEditActions } from '@/components/studio/image/canvas/pathEditActions';
+import { SelectionOverlays } from '@/components/studio/image/canvas/SelectionOverlays';
+import { createBackdropTap, createLayerLongPress, createPanGesture, createPinchGesture } from '@/components/studio/image/canvas/viewportGestures';
 import { type BrushSettings, DEFAULT_BRUSH } from '@/lib/brushEngine';
-import { CropOverlay } from '@/components/studio/image/CropOverlay';
-import { CanvasLayerView } from '@/components/studio/image/CanvasLayerView';
 import { useUndoRedoGestures } from '@/hooks/useUndoRedoGestures';
-import { gestures } from '@/design';
-import { layerAtPoint, layerBounds, stageToCanvas } from '@/lib/imageMulti';
-import { GridOverlay } from '@/components/studio/image/GridOverlay';
-import { LassoOverlay } from '@/components/studio/image/LassoOverlay';
-import { snapBoxToGrid, snapPointToGrid } from '@/lib/imageGrid';
-import { MarqueeOverlay } from '@/components/studio/image/MarqueeOverlay';
+import { layerAtPoint, stageToCanvas } from '@/lib/imageMulti';
 import type { SkImage } from '@shopify/react-native-skia';
 import type { Point, Selection } from '@/lib/selection';
-import { CornerPinOverlay } from '@/components/studio/image/CornerPinOverlay';
-import { PathEditOverlay } from '@/components/studio/image/PathEditOverlay';
-import { PenOverlay } from '@/components/studio/image/PenOverlay';
-import { RulersOverlay } from '@/components/studio/image/RulersOverlay';
-import { SelectionFrame } from '@/components/studio/image/SelectionFrame';
-import { WandOverlay } from '@/components/studio/image/WandOverlay';
 import { aspectValue, palette } from '@/constants/editor';
-import { canvasTransform, clampPan, pinchAt, zoomStep } from '@/lib/canvasZoom';
+import { canvasTransform, clampPan, zoomStep } from '@/lib/canvasZoom';
 import type { CropRect } from '@/lib/imageCrop';
-import { snapToLayers, type LayerBox, type SnapLine } from '@/lib/smartGuides';
+import { cornerPinTarget, pointOf, resolvePathEdit, snapLayerMove, stageFit, wandHit, withLive } from '@/lib/imageCanvasStage';
+import { type SnapLine } from '@/lib/smartGuides';
 import { resolveClipMasks } from '@/lib/imageClip';
 import { useTextMasks } from '@/store/textMaskStore';
-import { effectiveLayerOpacity, updateLayer, visibleLayers } from '@/lib/imageDoc';
+import { updateLayer, visibleLayers } from '@/lib/imageDoc';
 import { type LivePatch } from '@/lib/imageLayerClip';
 import { DocGrain, DocVignette } from '@/components/studio/image/DocVignette';
 import type { CanvasPoint } from '@/lib/penPath';
-import { addGuide, moveGuide, removeGuide, snapPointToGuides } from '@/lib/rulers';
+import { addGuide, moveGuide, removeGuide } from '@/lib/rulers';
 import { effectiveCanvas } from '@/lib/canvasPresets';
-import { canvasToLayerBox, layerBoxToCanvas, renormalizePathLayer } from '@/lib/imageLayerGeometry';
 import { correctionContext, correctionsKey, type CorrectionMap, docVignetteAngles, NO_CORRECTIONS } from '@/lib/imagePixelPipeline';
-import { dragHandle, type HandleId, insertAnchor, moveAnchor, nearestOnPath, nodeType, pathEditPatch, pathEditView } from '@/lib/vectorPath';
-import type { ClipMask, ImageDoc, ImageLayer, PathPoint, PhotoLayer, ShapeLayer } from '@/types/project';
-
-// lusta Skia-komponens: csak ecset-módban töltődik be (lásd a fenti import-jegyzetet)
-const SelectionAnts = lazy(() =>
-  import('@/components/studio/image/SelectionAnts').then((m) => ({ default: m.SelectionAnts }))
-);
-const BrushOverlay = lazy(() =>
-  import('@/components/studio/image/BrushOverlay').then((m) => ({ default: m.BrushOverlay }))
-);
-
-const pointOf = (p: { x: number; y: number }): [number, number] => [p.x, p.y];
-
-/** a vászon ennyit tölt ki a munkaterületből — körülötte látszik, ami kilóg */
-const CANVAS_FILL = 0.84;
-/** a munkaterület színe */
-const PASTEBOARD = '#14161d';
-/** a vászon körüli fátyol kiterjedése (px) — legkisebb nagyításnál is takarnia kell */
-const VEIL = 6000;
-/** a vásznon túl ennyi vászonnyira húzható egy réteg közepe */
-const MOVE_RANGE: [number, number] = [-1.5, 2.5];
-
-function withLive(layer: ImageLayer, patch: LivePatch): ImageLayer {
-  return { ...layer, ...patch } as ImageLayer;
-}
+import type { ClipMask, ImageDoc, PhotoLayer } from '@/types/project';
 
 /**
  * 🖼️ A Kép Stúdió VÁSZNA — a látható rétegeket ALULRÓL FÖLFELÉ rajzolja,
@@ -200,12 +167,7 @@ export function ImageCanvas({
 
   // a szabad W×H a mérvadó (kép-editor); különben a 3-arányos enum
   const av = doc.width && doc.height ? doc.width / doc.height : aspectValue(doc.aspectRatio);
-  const fit =
-    container.w > 0 && container.h > 0
-      ? container.w / container.h > av
-        ? { w: container.h * CANVAS_FILL * av, h: container.h * CANVAS_FILL }
-        : { w: container.w * CANVAS_FILL, h: (container.w * CANVAS_FILL) / av }
-      : { w: 0, h: 0 };
+  const fit = stageFit(container, av);
 
   // 🔍 munkaterület-nézet (RNGH): a csippentés és a kétujjas húzás a TELJES nézetet mozgatja,
   // egy ujj mindig a szerkesztésé. A gesztusok EGYSZER jönnek létre, a friss értékeket
@@ -226,73 +188,15 @@ export function ImageCanvas({
     x: e.focalX - containerRef.current.w / 2,
     y: e.focalY - containerRef.current.h / 2,
   });
-  const panGesture = useRef(
-    Gesture.Pan()
-      .runOnJS(true)
-      .minPointers(2)
-      .onStart(() => {
-        panStart.current = panRef.current;
-      })
-      .onUpdate((e) => {
-        if (pinching.current) {
-          return; // a csippentés a fókuszponttal maga tolja a nézetet
-        }
-        setPan(
-          clampPan(
-            { x: panStart.current.x + e.translationX, y: panStart.current.y + e.translationY },
-            zoomRef.current,
-            fitRef.current
-          )
-        );
-      })
-  ).current;
-  const pinchGesture = useRef(
-    Gesture.Pinch()
-      .runOnJS(true)
-      .onStart((e) => {
-        pinching.current = true;
-        pinchStart.current = { zoom: zoomRef.current, pan: panRef.current, focal: fromCenter(e) };
-      })
-      .onUpdate((e) => {
-        const next = pinchAt(pinchStart.current, e.scale, fromCenter(e), fitRef.current);
-        setZoom(next.zoom);
-        setPan(next.pan);
-      })
-      .onFinalize(() => {
-        pinching.current = false;
-      })
-  ).current;
+  const panGesture = useRef(createPanGesture({ panStart, panRef, pinching, setPan, zoomRef, fitRef })).current;
+  const pinchGesture = useRef(createPinchGesture({ pinching, pinchStart, zoomRef, panRef, fromCenter, fitRef, setZoom, setPan })).current;
   // koppintás a vásznon kívüli üres területre: kijelölés megszüntetése
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
-  const backdropTap = useRef(
-    Gesture.Exclusive(
-      // dupla koppintás a szabad területre: a teljes vászon vissza a nézetbe
-      Gesture.Tap()
-        .withTestId('canvas-fit-tap')
-        .runOnJS(true)
-        .numberOfTaps(2)
-        .onEnd((_e, success) => {
-          if (success) {
-            setZoom(1);
-            setPan({ x: 0, y: 0 });
-          }
-        }),
-      Gesture.Tap()
-        .runOnJS(true)
-        .onEnd(() => onSelectRef.current(null))
-    )
-  ).current;
+  const backdropTap = useRef(createBackdropTap({ setZoom, setPan, onSelectRef })).current;
   // hosszú nyomás a rétegen: a menü; a pontot a nézet aktuális állása szerint váltjuk vászon-arányra
   const longPress = useRef({ run: (_x: number, _y: number) => {} });
-  const layerLongPress = useRef(
-    Gesture.LongPress()
-      .withTestId('canvas-long-press')
-      .runOnJS(true)
-      .minDuration(gestures.longPress.context)
-      .maxDistance(gestures.slop.tap)
-      .onStart((e) => longPress.current.run(e.x, e.y))
-  ).current;
+  const layerLongPress = useRef(createLayerLongPress({ longPress })).current;
   // kétujjas koppintás = visszavonás, háromujjas = újra (a profi rajz-appok szokása)
   const undoRedo = useUndoRedoGestures(() => onUndo?.(), () => onRedo?.());
   const canvasGesture = useRef(Gesture.Simultaneous(pinchGesture, panGesture, undoRedo, layerLongPress)).current;
@@ -316,38 +220,16 @@ export function ImageCanvas({
     setPan((p) => clampPan(p, z, fitRef.current));
   };
 
-  // 🧲 egy réteg igazodó-doboza (közép-pozíció + méret; a méret nélkülieké — pl. szöveg — 0)
-  const layerBox = (l: ImageLayer, posOverride?: { x: number; y: number }): LayerBox => {
-    const pos = posOverride ?? ('position' in l ? l.position : { x: 0.5, y: 0.5 });
-    const w = 'w' in l && typeof l.w === 'number' ? l.w : 0;
-    const h = 'h' in l && typeof l.h === 'number' ? l.h : 0;
-    return { x: pos.x, y: pos.y, w, h };
-  };
-
   // 📐 réteg-mozgatás: kézi vonalzó-guide-ok (ha vannak), MAJD 🧲 smart-guides (a többi réteghez + vászonhoz)
   const move = (id: string, position: { x: number; y: number }) => {
-    let pos = position;
-    const g = doc.guides?.length ? snapPointToGuides(pos, doc.guides) : null;
-    if (g) {
-      pos = { x: g.x, y: g.y };
-    }
-    const dragged = doc.layers.find((l) => l.id === id);
-    // a bekapcsolt rács erősebb az okos segédvonalaknál: pontos, ismétlődő elhelyezéshez van
-    if (doc.grid?.snap && dragged && dragged.kind !== 'fill' && dragged.kind !== 'adjust') {
-      const { w, h } = layerBox(dragged, pos);
-      pos = snapBoxToGrid(pos, { w, h }, doc.grid, effectiveCanvas(doc));
-    } else if (dragged && dragged.kind !== 'fill' && dragged.kind !== 'adjust') {
-      const others = visibleLayers(doc)
-        .filter((l) => l.id !== id && l.kind !== 'fill' && l.kind !== 'adjust')
-        .map((l) => layerBox(l));
-      const snap = snapToLayers(layerBox(dragged, pos), others);
-      pos = { x: snap.x, y: snap.y };
+    const { pos, lines } = snapLayerMove(doc, id, position);
+    if (lines) {
       // rövid jelző-vonal-felvillanás a pattintott tengely(ek)en
       if (smartTimer.current) {
         clearTimeout(smartTimer.current);
       }
-      setSmartLines(snap.lines);
-      if (snap.lines.length) {
+      setSmartLines(lines);
+      if (lines.length) {
         smartTimer.current = setTimeout(() => setSmartLines([]), 800);
       }
     }
@@ -394,70 +276,15 @@ export function ImageCanvas({
   const selectedLayer = doc.layers.find((l) => l.id === selectedId) ?? null;
 
   // ✏️ node-szerkesztő: a kijelölt path-forma (committed = a moveAnchor stabil alapja)
-  const cornerPinFound = cornerPinId ? doc.layers.find((l) => l.id === cornerPinId) : undefined;
-  const cornerPinLayer = cornerPinFound?.kind === 'photo' ? cornerPinFound : null;
-  const rawPathEdit = pathEditId ? doc.layers.find((l) => l.id === pathEditId) ?? null : null;
-  const rawPathShape = rawPathEdit && rawPathEdit.kind === 'shape' && rawPathEdit.shape === 'path' ? rawPathEdit : null;
-  const pathEditShape = rawPathShape ? pathEditView(rawPathShape, pathEditRing) : null;
-  // a dot-követéshez a vászon-rajzolással AZONOS élő-patchelt változat
-  const pathEditLive =
-    rawPathShape && live?.id === rawPathShape.id
-      ? pathEditView(withLive(rawPathShape, live.patch) as ShapeLayer, pathEditRing)
-      : pathEditShape;
-  const livePath = (points: PathPoint[]) => setLive({ id: rawPathShape!.id, patch: pathEditPatch(rawPathShape!, pathEditRing, points) });
-  const onNodeLive = (index: number, x: number, y: number) => {
-    if (!pathEditShape?.points) return;
-    livePath(moveAnchor(pathEditShape.points, index, x, y));
-  };
-  // I28: a dobozon kívülre húzott pont után a réteg doboza a formához igazodik
-  const commitPath = (points: PathPoint[], label: string) => {
-    if (!pathEditShape || !rawPathShape) return;
-    if (rawPathShape.subpaths?.length) {
-      commit(updateLayer(doc, rawPathShape.id, pathEditPatch(rawPathShape, pathEditRing, points)), label);
-      return;
-    }
-    const next = renormalizePathLayer({ ...pathEditShape, points }, effectiveCanvas(doc));
-    const { points: pts, position, w, h } = next;
-    commit(updateLayer(doc, pathEditShape.id, { points: pts, position, w, h }), label);
-  };
-  const onNodeCommit = (index: number, x: number, y: number) => {
-    if (!pathEditShape?.points) return;
-    setLive(null);
-    const size = effectiveCanvas(doc);
-    const snapped = canvasToLayerBox(snapPointToGrid(layerBoxToCanvas({ x, y }, pathEditShape, size), doc.grid, size), pathEditShape, size);
-    commitPath(moveAnchor(pathEditShape.points, index, snapped.x, snapped.y), 'node');
-  };
-  // ✏️ v3: bezier-fogó húzása — I27: a node SAJÁT típusa szerint (a smooth/broken megmarad)
-  const onHandleLive = (index: number, handle: HandleId, x: number, y: number) => {
-    if (!pathEditShape?.points) return;
-    const mode = nodeType(pathEditShape.points[index]);
-    livePath(dragHandle(pathEditShape.points, index, handle, x, y, mode));
-  };
-  const onHandleCommit = (index: number, handle: HandleId, x: number, y: number) => {
-    if (!pathEditShape?.points) return;
-    setLive(null);
-    commitPath(dragHandle(pathEditShape.points, index, handle, x, y, nodeType(pathEditShape.points[index])), 'handle');
-  };
-  // ✏️ v4: koppintás a path-ÉLRE → új node (csak ha elég közel a vonalhoz)
-  const onInsertNode = (x: number, y: number) => {
-    if (!pathEditShape?.points) return;
-    const hit = nearestOnPath(pathEditShape.points, !!pathEditShape.closed, x, y);
-    if (!hit || hit.dist > 0.05) return;
-    commit(updateLayer(doc, pathEditShape.id, pathEditPatch(rawPathShape ?? {}, pathEditRing, insertAnchor(pathEditShape.points, x, y, !!pathEditShape.closed))), 'node-insert');
-  };
+  const cornerPinLayer = cornerPinTarget(doc, cornerPinId);
+  const { rawPathShape, pathEditShape, pathEditLive } = resolvePathEdit(doc, pathEditId, pathEditRing, live);
+  const pathEdit = createPathEditActions({ doc, commit, setLive, rawPathShape, pathEditShape, pathEditRing });
 
   // 🪄 varázspálca: a koppintás alatti LEGFELSŐ fotó-réteg + a dobozon belüli lokális (0–1) pont
   const onWandTap = (nx: number, ny: number) => {
-    const canvas = effectiveCanvas(doc);
-    for (let i = doc.layers.length - 1; i >= 0; i--) {
-      const l = doc.layers[i];
-      if (l.kind !== 'photo' || l.hidden) continue;
-      // I33: a réteg forgatása/tükrözése is számít
-      const local = canvasToLayerBox({ x: nx, y: ny }, l, canvas);
-      if (local.x >= 0 && local.x <= 1 && local.y >= 0 && local.y <= 1) {
-        onWandSeed?.(l.uri, local.x, local.y, l);
-        return;
-      }
+    const hit = wandHit(doc, nx, ny);
+    if (hit) {
+      onWandSeed?.(hit.layer.uri, hit.u, hit.v, hit.layer);
     }
   };
 
@@ -479,194 +306,96 @@ export function ImageCanvas({
             csak a raszterizálás idejére vág, keret és háttér nélkül */}
         <View ref={canvasRef} style={[{ width: fit.w, height: fit.h }, capturing && styles.canvasCapture]} collapsable={false}>
           {!capturing ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.paper]} /> : null}
-          {layers.map((raw0) => {
-            if (brushActive && !brushMaskMode && raw0.id === brushLayerId) {
-              return null;
-            }
-            // 🗂️ csoport-opacity: a réteg saját opacity-jére rászorozva (a worker-renderrel paritásban)
-            const raw =
-              raw0.groupId && effectiveLayerOpacity(doc, raw0) !== (raw0.opacity ?? 1)
-                ? ({ ...raw0, opacity: effectiveLayerOpacity(doc, raw0) } as ImageLayer)
-                : raw0;
-            return (
-              <CanvasLayerView
-                key={raw.id}
-                layer={live?.id === raw.id ? withLive(raw, live.patch) : raw}
-                box={box}
-                canvas={docCanvas}
-                zoom={zoom}
-                moveRange={MOVE_RANGE}
-                selected={!capturing && raw.id === selectedId}
-                corrections={corrections(raw.id)}
-                onSelect={stable.select}
-                onMove={stable.move}
-                onEdit={onRequestEdit ? stable.edit : undefined}
-              />
-            );
-          })}
+          <CanvasLayerStack
+            layers={layers}
+            doc={doc}
+            live={live}
+            brushActive={brushActive}
+            brushMaskMode={brushMaskMode}
+            brushLayerId={brushLayerId}
+            box={box}
+            docCanvas={docCanvas}
+            zoom={zoom}
+            capturing={capturing}
+            selectedId={selectedId}
+            corrections={corrections}
+            stable={stable}
+            onRequestEdit={onRequestEdit}
+          />
 
-          {!capturing
-            ? multiIds?.map((id) => {
-                const layer = doc.layers.find((l) => l.id === id);
-                const b = layer ? layerBounds(layer, docCanvas) : null;
-                return b ? (
-                  <View
-                    key={id}
-                    pointerEvents="none"
-                    style={[
-                      styles.multiOutline,
-                      { left: (b.x - b.w / 2) * fit.w, top: (b.y - b.h / 2) * fit.h, width: b.w * fit.w, height: b.h * fit.h, transform: [{ rotate: `${b.rotation}deg` }], borderWidth: 2 / zoom },
-                    ]}
-                  />
-                ) : null;
-              })
-            : null}
+          {!capturing ? <MultiSelectOutlines multiIds={multiIds} doc={doc} docCanvas={docCanvas} fit={fit} zoom={zoom} /> : null}
 
           <DocVignette angles={docVignetteAngles(doc as Parameters<typeof docVignetteAngles>[0])} box={fit} />
           <DocGrain grain={doc.grain ?? 0} cell={fit.w / (doc.width || fit.w)} />
 
           {/* a vásznon kívüli rész halványan látszik; a fátyol nem fogja el az érintést */}
-          {!capturing ? (
-            <>
-              <View pointerEvents="none" style={[styles.veil, { left: -VEIL, right: -VEIL, top: -VEIL, height: VEIL }]} />
-              <View pointerEvents="none" style={[styles.veil, { left: -VEIL, right: -VEIL, bottom: -VEIL, height: VEIL }]} />
-              <View pointerEvents="none" style={[styles.veil, { left: -VEIL, width: VEIL, top: 0, bottom: 0 }]} />
-              <View pointerEvents="none" style={[styles.veil, { right: -VEIL, width: VEIL, top: 0, bottom: 0 }]} />
-              <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.canvasEdge, { borderWidth: 1 / zoom }]} />
-            </>
-          ) : null}
+          {!capturing ? <PasteboardVeil zoom={zoom} /> : null}
 
           {/* 🧲 smart-guide jelző-vonalak (a pattintott tengelyeken, rövid felvillanás) */}
-          {!capturing && smartLines.map((ln, i) => (
-            <View
-              key={`sg${i}`}
-              pointerEvents="none"
-              style={
-                ln.axis === 'x'
-                  ? { position: 'absolute', left: ln.at * fit.w, top: 0, bottom: 0, width: 1, backgroundColor: '#ff2d95' }
-                  : { position: 'absolute', top: ln.at * fit.h, left: 0, right: 0, height: 1, backgroundColor: '#ff2d95' }
-              }
-            />
-          ))}
+          {!capturing && <SmartGuideMarks lines={smartLines} fit={fit} />}
 
-          {!capturing && !cropRect && !penPoints && !pathEditId && !cornerPinId && !marquee && !lassoActive && !wandActive && !brushActive && selectedLayer && selectedLayer.kind !== 'fill' && selectedLayer.kind !== 'adjust' && !selectedLayer.hidden && !selectedLayer.locked ? (
-            <SelectionFrame
-              layer={live?.id === selectedLayer.id ? withLive(selectedLayer, live.patch) : selectedLayer}
-              box={fit}
-              zoom={zoom}
-              onLive={(patch) =>
-                setLive(Object.keys(patch).length ? { id: selectedLayer.id, patch } : null)
-              }
-              onCommit={(patch) => {
-                setLive(null);
-                commit(updateLayer(doc, selectedLayer.id, patch), 'transform');
-              }}
-            />
-          ) : null}
+          <EditOverlays
+            capturing={capturing}
+            doc={doc}
+            fit={fit}
+            zoom={zoom}
+            docCanvas={docCanvas}
+            live={live}
+            setLive={setLive}
+            commit={commit}
+            selectedLayer={selectedLayer}
+            cropRect={cropRect}
+            onCropRectChange={onCropRectChange}
+            cropAspect={cropAspect}
+            penPoints={penPoints}
+            onPenAddPoint={onPenAddPoint}
+            onPenClose={onPenClose}
+            pathEditId={pathEditId}
+            cornerPinId={cornerPinId}
+            marquee={marquee}
+            lassoActive={lassoActive}
+            wandActive={wandActive}
+            brushActive={brushActive}
+            cornerPinLayer={cornerPinLayer}
+            pathEditLive={pathEditLive}
+            selectedNode={selectedNode}
+            onSelectNode={onSelectNode}
+            pathEdit={pathEdit}
+          />
 
-          {/* ✂️ kivágás-overlay (a kijelölés helyett) */}
-          {!capturing && cropRect && onCropRectChange ? (
-            <CropOverlay box={fit} zoom={zoom} aspect={cropAspect} rect={cropRect} onChange={onCropRectChange} />
-          ) : null}
+          <SelectionOverlays
+            capturing={capturing}
+            fit={fit}
+            lassoActive={lassoActive}
+            onLassoComplete={onLassoComplete}
+            onLassoCancel={onLassoCancel}
+            wandActive={wandActive}
+            onWandTap={onWandTap}
+            marquee={marquee}
+            onSelectionRing={onSelectionRing}
+            brushActive={brushActive}
+            brushRef={brushRef}
+            brushSettings={brushSettings}
+            brushMaskMode={brushMaskMode}
+            brushTarget={brushTarget}
+            brushSource={brushSource}
+            onBrushNeedSource={onBrushNeedSource}
+            onBrushHistory={onBrushHistory}
+            selection={selection}
+          />
 
-          {/* ✏️ toll-overlay (a kijelölés helyett) */}
-          {!capturing && penPoints && onPenAddPoint && onPenClose ? (
-            <PenOverlay
-              box={fit}
-              points={penPoints}
-              onAddPoint={(p) => {
-                const at = snapPointToGrid(p, doc.grid, effectiveCanvas(doc));
-                const shift = (h: { x: number; y: number }) => ({ x: h.x + at.x - p.x, y: h.y + at.y - p.y });
-                onPenAddPoint({ ...at, ...(p.h1 ? { h1: shift(p.h1) } : {}), ...(p.h2 ? { h2: shift(p.h2) } : {}) });
-              }}
-              onClosePath={onPenClose}
-            />
-          ) : null}
-
-          {/* 🔲 S18: 4-sarkos perspektíva fogói */}
-          {!capturing && cornerPinLayer ? (
-            <CornerPinOverlay
-              layer={live?.id === cornerPinLayer.id ? (withLive(cornerPinLayer, live.patch) as PhotoLayer) : cornerPinLayer}
-              box={fit}
-              canvas={docCanvas}
-              zoom={zoom}
-              onLive={(corners) => setLive({ id: cornerPinLayer.id, patch: { corners } })}
-              onCommit={(corners) => {
-                setLive(null);
-                commit(updateLayer<PhotoLayer>(doc, cornerPinLayer.id, { corners }), 'corner-pin');
-              }}
-            />
-          ) : null}
-
-          {/* ✏️ node-szerkesztő overlay (toll v2 + v3 bezier) */}
-          {!capturing && pathEditLive ? (
-            <PathEditOverlay
-              box={fit}
-              zoom={zoom}
-              layer={pathEditLive}
-              selectedNode={selectedNode ?? null}
-              onSelectNode={onSelectNode ?? (() => {})}
-              onLive={onNodeLive}
-              onCommit={onNodeCommit}
-              onHandleLive={onHandleLive}
-              onHandleCommit={onHandleCommit}
-              onInsertNode={onInsertNode}
-            />
-          ) : null}
-
-          {/* 🪢 lasszó-overlay (szabadkézi → zárt path) */}
-          {!capturing && lassoActive && onLassoComplete && onLassoCancel ? (
-            <LassoOverlay box={fit} onComplete={onLassoComplete} onCancel={onLassoCancel} />
-          ) : null}
-
-          {/* 🪄 varázspálca-overlay (fotóra koppintás → szín-szelekció) */}
-          {!capturing && wandActive ? <WandOverlay box={fit} onTap={onWandTap} /> : null}
-
-          {/* ✂️ téglalap / ellipszis kijelölő */}
-          {!capturing && marquee && onSelectionRing ? <MarqueeOverlay box={fit} shape={marquee} onRing={onSelectionRing} /> : null}
-
-          {/* 🖌️ ecset-overlay (Skia raszter-festés) — lustán, Suspense-szel */}
-          {!capturing && brushActive ? (
-            <Suspense fallback={null}>
-              <BrushOverlay ref={brushRef} box={fit} settings={brushSettings} baseUri={brushMaskMode ? brushTarget?.mask?.image : brushTarget?.uri} maskMode={brushMaskMode} maskSeed={brushMaskMode ? brushTarget?.mask : null} source={brushSource} onNeedSource={onBrushNeedSource} onHistory={onBrushHistory} clip={selection} />
-            </Suspense>
-          ) : null}
-
-          {/* ✂️ a kijelölés körvonala minden eszköz fölött látszik; lustán, mint az ecset */}
-          {!capturing && selection ? (
-            <Suspense fallback={null}>
-              <SelectionAnts selection={selection} box={fit} />
-            </Suspense>
-          ) : null}
-
-          {!capturing && doc.grid ? <GridOverlay grid={doc.grid} canvas={effectiveCanvas(doc)} box={fit} /> : null}
-
-          {/* 📐 statikus segédvonalak — mindig látszanak, ha vannak (a snap miatt) */}
-          {!capturing && !guidesActive
-            ? guides.map((g) => (
-                <View
-                  key={g.id}
-                  pointerEvents="none"
-                  style={
-                    g.axis === 'x'
-                      ? { position: 'absolute', left: g.pos * fit.w, top: 0, bottom: 0, width: 1, backgroundColor: '#00e5ff' }
-                      : { position: 'absolute', top: g.pos * fit.h, left: 0, right: 0, height: 1, backgroundColor: '#00e5ff' }
-                  }
-                />
-              ))
-            : null}
-
-          {/* 📐 vonalzók + szerkeszthető segédvonalak (guides-mód) */}
-          {!capturing && guidesActive ? (
-            <RulersOverlay
-              box={fit}
-              zoom={zoom}
-              guides={displayGuides}
-              onAddGuide={onAddGuide}
-              onMoveGuide={(id, pos) => setLiveGuide({ id, pos })}
-              onCommitGuide={onCommitGuide}
-            />
-          ) : null}
+          <GuideOverlays
+            capturing={capturing}
+            doc={doc}
+            fit={fit}
+            zoom={zoom}
+            guidesActive={guidesActive}
+            guides={guides}
+            displayGuides={displayGuides}
+            onAddGuide={onAddGuide}
+            onMoveGuide={(id, pos) => setLiveGuide({ id, pos })}
+            onCommitGuide={onCommitGuide}
+          />
         </View>
         </View>
       ) : null}
@@ -696,9 +425,6 @@ export function ImageCanvas({
 const styles = StyleSheet.create({
   stage: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: PASTEBOARD },
   paper: { backgroundColor: '#0b0c12' },
-  multiOutline: { position: 'absolute', borderColor: palette.accent },
-  veil: { position: 'absolute', backgroundColor: `${PASTEBOARD}a6` },
-  canvasEdge: { borderColor: palette.border },
   // I12: az on-device kép a dokumentum, keret és szerkesztő-háttér nélkül; csak itt vág
   canvasCapture: { overflow: 'hidden', backgroundColor: 'transparent' },
   zoomBar: { position: 'absolute', top: 8, right: 8, gap: 6 },

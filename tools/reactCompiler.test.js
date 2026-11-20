@@ -99,6 +99,14 @@ const MUST_BE_MEMOIZED = [
   ['src/components/studio/image/inspector/LayerEffectsSection.tsx', 'LayerEffectsSection'],
   ['src/components/studio/image/inspector/MaskFadeSection.tsx', 'MaskFadeSection'],
   ['src/components/studio/image/LayerInspector.tsx', 'LayerInspector'],
+  // REFACTOR: az ImageCanvas.tsx-ből kiemelt renderelő részek (a gyökér kimarad, lásd lent)
+  ['src/components/studio/image/canvas/CanvasLayerStack.tsx', 'CanvasLayerStack'],
+  ['src/components/studio/image/canvas/CanvasMarks.tsx', 'MultiSelectOutlines'],
+  ['src/components/studio/image/canvas/CanvasMarks.tsx', 'PasteboardVeil'],
+  ['src/components/studio/image/canvas/CanvasMarks.tsx', 'SmartGuideMarks'],
+  ['src/components/studio/image/canvas/EditOverlays.tsx', 'EditOverlays'],
+  ['src/components/studio/image/canvas/GuideOverlays.tsx', 'GuideOverlays'],
+  ['src/components/studio/image/canvas/SelectionOverlays.tsx', 'SelectionOverlays'],
 ];
 
 /**
@@ -118,6 +126,7 @@ const KNOWN_BAILS = [
   ['src/components/editor/panels/ExportPanel.tsx', 'ExportPanel', 'a füstteszt-hook renderben írja az exportLocalRef refet'],
   ['src/app/editor/[id].tsx', 'EditorScreen', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
   ['src/components/preview/TextOverlay.tsx', 'TextOverlay', 'Reanimated shared value írása'],
+  ['src/components/studio/image/ImageCanvas.tsx', 'ImageCanvas', 'a nézet-gesztusok refjeit (zoomRef/panRef/fitRef) renderben írja'],
 ];
 
 const cache = new Map();

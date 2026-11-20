@@ -2288,6 +2288,34 @@
   "MaskTarget": "t:6d29ff9115",
   "useSelectionOps": "v:81ef398532"
  },
+ "src/components/studio/image/canvas/CanvasLayerStack.tsx": {
+  "CanvasLayerStack": "v:f4a077c7ec"
+ },
+ "src/components/studio/image/canvas/CanvasMarks.tsx": {
+  "MultiSelectOutlines": "v:dddbf7c1c5",
+  "PASTEBOARD": "v:9fc4777aa5",
+  "PasteboardVeil": "v:95ba158144",
+  "SmartGuideMarks": "v:54974f5b2d"
+ },
+ "src/components/studio/image/canvas/EditOverlays.tsx": {
+  "EditOverlays": "v:17c8e639be"
+ },
+ "src/components/studio/image/canvas/GuideOverlays.tsx": {
+  "GuideOverlays": "v:af6dbf09e3"
+ },
+ "src/components/studio/image/canvas/SelectionOverlays.tsx": {
+  "SelectionOverlays": "v:da2e8fec14"
+ },
+ "src/components/studio/image/canvas/pathEditActions.ts": {
+  "PathEditActions": "t:bcf15ddff6",
+  "createPathEditActions": "v:1e0df3fb0e"
+ },
+ "src/components/studio/image/canvas/viewportGestures.ts": {
+  "createBackdropTap": "v:68fa0d801a",
+  "createLayerLongPress": "v:f9b9047fb6",
+  "createPanGesture": "v:e8e54f89a9",
+  "createPinchGesture": "v:b276a5b1e4"
+ },
  "src/components/studio/image/exportEstimate.ts": {
   "photoBytesPerPixel": "v:b3124ff955"
  },
@@ -4858,6 +4886,20 @@
   "resampleDoc": "v:3e28a637a6",
   "resizeCanvasDoc": "v:ec71c8301d",
   "rotateCanvasDoc": "v:8dd80e2a55"
+ },
+ "src/lib/imageCanvasStage.ts": {
+  "CANVAS_FILL": "v:a151da3dad",
+  "MOVE_RANGE": "v:ab1565b07f",
+  "cornerPinTarget": "v:9aa54571c2",
+  "layerBox": "v:918b9d4f80",
+  "pointOf": "v:aa1edfef8a",
+  "resolvePathEdit": "v:044097713b",
+  "snapLayerMove": "v:73c70afdaf",
+  "snapPenPoint": "v:c90e172ee4",
+  "stageFit": "v:f0405fbb4a",
+  "wandHit": "v:33fd0c87e6",
+  "withGroupOpacity": "v:b79773a7eb",
+  "withLive": "v:20f8b1ee3f"
  },
  "src/lib/imageClip.ts": {
   "clipBaseBelow": "v:f5cb226b3b",

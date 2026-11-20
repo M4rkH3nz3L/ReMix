@@ -1,0 +1,10 @@
+[
+  [
+    "src/dev/smoke/phases15.tsx",
+    "src/dev/smoke/shared.tsx"
+  ],
+  [
+    "src/lib/errors.ts",
+    "src/lib/logCaught.ts"
+  ]
+]

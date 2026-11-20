@@ -63,6 +63,11 @@ jobs:
       - name: Fájlméret-kapu
         run: node scripts/quality/file-size.js
 
+      # 🔁 új körfüggőség nem keletkezhet (scripts/quality/cycles-baseline.json); 🧾 a rögzített exportok
+      # neve és típusa nem változhat (scripts/quality/api-surface.json — jóváhagyott változás: --update)
+      - name: Struktúra-kapuk (körfüggőség · API-felület)
+        run: node scripts/quality/cycles.js && node scripts/quality/api-surface.js
+
       - name: Worker syntax-ellenőrzés
         run: for f in server/*.js; do node -c "$f" || exit 1; done
 

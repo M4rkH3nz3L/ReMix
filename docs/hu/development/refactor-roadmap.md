@@ -45,6 +45,9 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   `setFontsReady` állapot csak újrarenderelést kényszerítene a font betöltése után, de az értékét
   senki nem olvassa; memoizált gyökérnél a gyorsítótárazott JSX így nem rajzolódik újra — a
   font-chipek frissítése valószínűleg már az eredetiben is hatástalan.
+- **Image Studio path-szerkesztés undo-címkéi** (`src/components/studio/image/body/pathEditActions.ts`):
+  nyers technikai szövegek (`path-closed`, `path-reverse`, `node-<típus>`, `node-delete`), nem
+  `t()`-kulcsok — ha az előzmény-lap mutatja őket, ott fordítatlanok.
 
 ## Éles fájlok (63)
 

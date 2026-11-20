@@ -107,6 +107,9 @@ const MUST_BE_MEMOIZED = [
   ['src/components/studio/image/canvas/EditOverlays.tsx', 'EditOverlays'],
   ['src/components/studio/image/canvas/GuideOverlays.tsx', 'GuideOverlays'],
   ['src/components/studio/image/canvas/SelectionOverlays.tsx', 'SelectionOverlays'],
+  // REFACTOR: az ImageStudioBody.tsx-ből kiemelt renderelő részek (a gyökér maga kimarad: ref-írás renderben)
+  ['src/components/studio/image/body/ActiveModeBar.tsx', 'ActiveModeBar'],
+  ['src/components/studio/image/body/DockedLayerPanel.tsx', 'DockedLayerPanel'],
 ];
 
 /**

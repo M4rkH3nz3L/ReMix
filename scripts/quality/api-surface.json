@@ -2223,11 +2223,17 @@
  "src/components/studio/image/WandOverlay.tsx": {
   "WandOverlay": "v:a8a4c14fbb"
  },
+ "src/components/studio/image/body/ActiveModeBar.tsx": {
+  "ActiveModeBar": "v:b71425cecc"
+ },
  "src/components/studio/image/body/AssistantBar.tsx": {
   "AssistantBar": "v:2f48c50f14"
  },
  "src/components/studio/image/body/BrushBar.tsx": {
   "BrushBar": "v:90db2947ea"
+ },
+ "src/components/studio/image/body/DockedLayerPanel.tsx": {
+  "DockedLayerPanel": "v:8afff39365"
  },
  "src/components/studio/image/body/ImageStudioSheets.tsx": {
   "ImageStudioSheets": "v:b2f480d6f5",
@@ -2272,6 +2278,22 @@
  "src/components/studio/image/body/StudioTopBar.tsx": {
   "StudioTopBar": "v:431ca18e6d"
  },
+ "src/components/studio/image/body/layerEditActions.tsx": {
+  "LayerEditDeps": "t:fdf323559d",
+  "createLayerEditActions": "v:0db06efede"
+ },
+ "src/components/studio/image/body/modeActions.tsx": {
+  "ModeActionDeps": "t:2bc32c316c",
+  "createModeActions": "v:fa63c0f0bf"
+ },
+ "src/components/studio/image/body/pathEditActions.ts": {
+  "PathEditDeps": "t:0437316a3b",
+  "createPathEditActions": "v:078757d953"
+ },
+ "src/components/studio/image/body/toolDispatch.tsx": {
+  "ToolDispatchDeps": "t:246d57ccd4",
+  "createToolDispatch": "v:aa62411c08"
+ },
  "src/components/studio/image/body/useImageExport.tsx": {
   "useImageExport": "v:c1cae5fbbf"
  },
@@ -2287,6 +2309,18 @@
  "src/components/studio/image/body/useSelectionOps.tsx": {
   "MaskTarget": "t:6d29ff9115",
   "useSelectionOps": "v:81ef398532"
+ },
+ "src/components/studio/image/body/useStudioLifecycle.ts": {
+  "useEnsureImageDoc": "v:7ace0e08f3",
+  "usePageThumbnail": "v:5e7fb9d021",
+  "useProjectFonts": "v:41b16234f5"
+ },
+ "src/components/studio/image/body/useStudioModeState.ts": {
+  "StudioModeState": "t:07d0630871",
+  "useStudioModeState": "v:23d6678cdc"
+ },
+ "src/components/studio/image/body/useStudioPanels.ts": {
+  "useStudioPanels": "v:b8c9edc17c"
  },
  "src/components/studio/image/canvas/CanvasLayerStack.tsx": {
   "CanvasLayerStack": "v:f4a077c7ec"
@@ -5195,6 +5229,12 @@
  "src/lib/imageStraighten.ts": {
   "STRAIGHTEN_MAX": "v:fb64435156",
   "straightenZoom": "v:cdb92d9781"
+ },
+ "src/lib/imageStudioOps.ts": {
+  "PrecisionFlags": "t:0efdc9497e",
+  "initialSheetDetent": "v:3db98e995a",
+  "isPrecisionMode": "v:147b92f214",
+  "pathEditTarget": "v:7d1b20bcbe"
  },
  "src/lib/imageTemplates.ts": {
   "IMAGE_TEMPLATES": "v:a848d78d83",

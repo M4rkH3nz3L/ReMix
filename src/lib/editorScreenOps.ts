@@ -43,7 +43,7 @@ export function videoClipUris(project: Project): string[] {
 }
 
 /** a közreműködők képernyő útvonala (megosztott projektnél a tulajjal) */
-export function collabScreenPath(id: string, collab: { ownerId: string } | null): string {
+export function collabScreenPath(id: string, collab: { ownerId: string } | null): `/collab/${string}` {
   return `/collab/${id}${collab ? `?owner=${collab.ownerId}` : ''}`;
 }
 

@@ -52,6 +52,10 @@ refaktor-regresszió. Régi, eszközös hibák (külön javítandók): a `Render
 iPhone-on a selection/textfx/fxorder zöld); thumbdoc (projekt/bélyegkép `null`); fxorder/masterdyn élő
 előnézet LUFS `null`/`-Infinity` (ingadozó); iPhone-on a textoverlay „rések: text, helyi: false” (a
 telepített dev-kliens natív render-motorja a szöveget nem rendereli helyben — az alapállapoton is így).
+Mérési csapda 2: a CI-ben és a friss worktree-ben NINCS generált `.expo/types` (expo-router typed
+routes) — a `tsc` csak ott ellenőrzi az útvonalakat, ahol a Metro már futott (a fő munkafában igen). A
+refaktorban kiemelt `collabScreenPath` `string`-et adott a sablon-literál helyett → helyben `tsc`-hiba;
+javítva (`` `/collab/${string}` `` visszatérési típus). Javaslat: a CI generálja le a typed routes-t.
 Mérési csapda: a worktree symlinkelt `node_modules`-a a Metro lusta `import()`-jait rossz útra oldja fel —
 valódi (APFS-klón) `node_modules` kell.
 

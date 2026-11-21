@@ -7804,6 +7804,61 @@
   "projectKindMeta": "v:13b71324c6",
   "visibleProjects": "v:9dd766e46b"
  },
+ "src/lib/projectModel/clipEdit.ts": {
+  "cropClip": "v:ff45036959",
+  "loopPhase": "v:f3e096d803",
+  "maxVideoDuration": "v:3364ee13cb",
+  "splitClip": "v:fc2faef294",
+  "trimClipLeft": "v:d12fc70d74",
+  "trimClipRight": "v:be0e02150c"
+ },
+ "src/lib/projectModel/create.ts": {
+  "CreateProjectConfig": "t:869af41d69",
+  "createEmptyProject": "v:75740eb02f",
+  "projectKind": "v:7c20b35355",
+  "studioRoute": "v:fc2e428b1e"
+ },
+ "src/lib/projectModel/playhead.ts": {
+  "ActiveTransition": "t:a08be87298",
+  "activeAdjustClips": "v:52331ccf6a",
+  "activePipClip": "v:c2e0dd0e41",
+  "activePipClips": "v:ecf58dd629",
+  "activeTransition": "v:5dd90fe762",
+  "activeVisualClip": "v:ffc4c43d99",
+  "clipsAt": "v:53f74cc253",
+  "sourceTimeAt": "v:748ee7c7ce",
+  "upcomingVisualClip": "v:3f93a6e2b3"
+ },
+ "src/lib/projectModel/queries.ts": {
+  "MAX_PROJECT_DURATION_SEC": "v:15aa0c7e8f",
+  "clipEnd": "v:e5a768ab07",
+  "exceedsMaxDuration": "v:61f8917ff5",
+  "findAssetByUri": "v:0f2e0e112e",
+  "findClip": "v:2997a9e1e5",
+  "isProjectEmpty": "v:61f8917ff5",
+  "projectDuration": "v:0b30ff0c2e",
+  "projectMediaBytes": "v:0b30ff0c2e",
+  "trackEnd": "v:30442b5885",
+  "trackOf": "v:dd5685cf26"
+ },
+ "src/lib/projectModel/rewrite.ts": {
+  "relinkUri": "v:5e91d3a9ef",
+  "replaceClip": "v:caf1654e21"
+ },
+ "src/lib/projectModel/schema.ts": {
+  "CURRENT_SCHEMA_VERSION": "v:b1d5781111",
+  "isNewerSchema": "v:1d3a1de80b",
+  "migrateProject": "v:c968515fa5"
+ },
+ "src/lib/projectModel/tokens.ts": {
+  "parseHashtags": "v:7368c3ae8f",
+  "parseKeywords": "v:7368c3ae8f"
+ },
+ "src/lib/projectModel/tracks.ts": {
+  "CANONICAL_TRACKS": "v:4b21462097",
+  "canHostClip": "v:b5aaadd827",
+  "compatibleTracksFor": "v:2b8a80d83b"
+ },
  "src/lib/projectPreview.ts": {
   "PreviewSource": "t:d00092f55c",
   "projectPreviewSource": "v:b39a0d5344"
@@ -7831,6 +7886,62 @@
   "pickSourceAsset": "v:2e48a86618",
   "sourceSummary": "v:1d0ebd7126",
   "supportedSourceKinds": "v:50a1af34b6"
+ },
+ "src/lib/projectStoreClient/events.ts": {
+  "loadEvents": "v:a1ff8aec7e",
+  "saveEvents": "v:51921e4820"
+ },
+ "src/lib/projectStoreClient/projectIndex.ts": {
+  "listProjects": "v:5dac3455ed"
+ },
+ "src/lib/projectStoreClient/projects.ts": {
+  "deleteProject": "v:4cdd11add3",
+  "duplicateProject": "v:b5b834145f",
+  "loadProject": "v:e995a46195",
+  "saveProject": "v:612627d996",
+  "saveProjectAndEvents": "v:1967d8d92f"
+ },
+ "src/lib/projectStoreClient/recovery.ts": {
+  "clearRecovery": "v:4cdd11add3",
+  "readRecovery": "v:8a919935eb",
+  "writeRecovery": "v:1967d8d92f"
+ },
+ "src/lib/projectStoreClient/storedUris.ts": {
+  "rebaseStoredUris": "v:4b76ef62ac"
+ },
+ "src/lib/projectStoreClient/tombstones.ts": {
+  "clearTombstone": "v:4cdd11add3",
+  "deletedProjectIds": "v:db2e2db2de",
+  "markProjectsDeleted": "v:acf1b4bb32"
+ },
+ "src/lib/projectStoreClient/versions.ts": {
+  "loadVersions": "v:dbc93307cc",
+  "recordAutoVersion": "v:612627d996",
+  "saveVersions": "v:e9dabb86ea"
+ },
+ "src/lib/projectStoreCore/keys.ts": {
+  "INDEX_KEY": "v:616b946f75",
+  "MEDIA_REF_PREFIXES": "v:380b29f17f",
+  "TOMBSTONE_KEY": "v:9463464af7",
+  "eventsKey": "v:c77be23ea5",
+  "lastAutoKey": "v:c77be23ea5",
+  "projectKey": "v:c77be23ea5",
+  "recoveryKey": "v:c77be23ea5",
+  "versionsKey": "v:c77be23ea5"
+ },
+ "src/lib/projectStoreCore/limits.ts": {
+  "PROJECT_SIZE_WARN_BYTES": "v:53b0a1b2fa",
+  "estimateProjectBytes": "v:0b30ff0c2e",
+  "isProjectTooLarge": "v:61f8917ff5"
+ },
+ "src/lib/projectStoreCore/meta.ts": {
+  "folderOf": "v:477bb3d06a",
+  "metaOf": "v:dc81e7a372"
+ },
+ "src/lib/projectStoreCore/snapshots.ts": {
+  "ProjectVersion": "t:e975b4c8c2",
+  "RecoverySnapshot": "t:7569b54924",
+  "recoveryIsFresher": "v:f8035a5370"
  },
  "src/lib/projectSyncClient.ts": {
   "ProjectSyncPhase": "t:e7b35063e0",

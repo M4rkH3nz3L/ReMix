@@ -225,6 +225,18 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   zárolt sávok) `key: undefined`-ot hagynak a kulcs törlése helyett (a fontok/thumbnail/workflow/tempo-map
   törli); hibás payload nyers TypeError-t dob, validáció nincs.
 
+- ⚠️ **Projekt-tár (adatvesztés-közeli)** (`src/lib/projectStoreClient/projects.ts`): a `saveProject` /
+  `saveProjectAndEvents` beolvassa, majd felülírja a projekt-indexet — párhuzamos mentésnél az utolsó
+  író nyer, a többi projekt KIESIK a listából (a trace-ben p1 és p2 dokumentuma a tárban van, a lista csak
+  x-et és p3-at mutatja); mivel az index nem sérült, újraépítés sem indul. Apróságok: az `isNewerSchema`
+  a `'12'` stringet is újabbnak veszi; a `loadVersions` nem validálja az elemeket; a `recordAutoVersion`
+  NaN lastauto-értéknél nem throttle-öl.
+- 🧪 **Teszt-infra: a jest nem futtatja a dinamikus `import()`-ot** (`--experimental-vm-modules` nélkül
+  „A dynamic import callback was invoked without…”) — a repó tesztjeiben így a `storage` mappa/szinkron/
+  GC/rebase-ágai, a render `phoneMixFile`- és médiatár-útjai és az Image Studio minőségkapuja
+  CSENDBEN a catch-ágba esnek, valójában teszteletlenek (négy bontás golden trace-e egymástól függetlenül
+  mutatta ki; a trace-ekhez scratch babel-plugin fordította `require`-re). → 6. fázis.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -258,7 +270,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/studio/audio/AudioStudioBody.tsx` | 738 | ✅ → 512 |
 | `src/components/editor/TimelineClip.tsx` | 732 | ✅ → 277 |
 | `src/components/editor/panels/AudioPanel.tsx` | 718 | ✅ → 145 |
-| `src/lib/projectUtils.ts` | 715 | ⬜ |
+| `src/lib/projectUtils.ts` | 715 | ✅ → 45 |
 | `src/components/studio/image/ImageCanvas.tsx` | 715 | ✅ → 442 |
 | `src/app/channel/[id].tsx` | 693 | ⬜ |
 | `server/userStorage.js` | 693 | ✅ → 46 |
@@ -284,7 +296,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/lib/offlineMixClient.ts` | 543 | ✅ → 11 |
 | `src/components/editor/CameraRecorder.tsx` | 543 | ⬜ |
 | `src/app/schedules.tsx` | 541 | ⬜ |
-| `src/lib/storage.ts` | 524 | ⬜ |
+| `src/lib/storage.ts` | 524 | ✅ → 27 |
 | `src/app/admin.tsx` | 524 | ⬜ |
 | `server/liveEgress.js` | 524 | ✅ → 27 |
 | `src/lib/audioIntent.ts` | 523 | ✅ → 13 |

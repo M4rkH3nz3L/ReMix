@@ -31,6 +31,47 @@
   "runTranslateCaptions": "v:e4d214d5cd",
   "sanitizeAiConfig": "v:a0d1f28f3e"
  },
+ "server/aiLib/assistant.js": {
+  "runAssistant": "v:d88f19ef7c"
+ },
+ "server/aiLib/byok.js": {
+  "probeProvider": "v:227da1a642",
+  "sanitizeAiConfig": "v:a0d1f28f3e"
+ },
+ "server/aiLib/config.js": {
+  "LOCAL_MODEL": "v:ecb252044b",
+  "MODEL": "v:ecb252044b",
+  "OLLAMA_URL": "v:ecb252044b",
+  "remixAiConfig": "v:2070984a90",
+  "remixAiQueue": "v:913f93e2b1"
+ },
+ "server/aiLib/editFeatures.js": {
+  "runAutoEdit": "v:9533664f34",
+  "runHighlights": "v:8e54407caf",
+  "runStoryEngine": "v:5cfcbcf27e"
+ },
+ "server/aiLib/health.js": {
+  "aiAvailable": "v:fc1170465f",
+  "aiProvider": "v:60b29fd990",
+  "localAvailable": "v:fc1170465f",
+  "remixAvailable": "v:fc1170465f",
+  "remixStatus": "v:27fd1021cd"
+ },
+ "server/aiLib/providers.js": {
+  "openAiCompatCall": "v:c4eab84556",
+  "runAnthropic": "v:c4eab84556",
+  "runLocal": "v:f75bacbafe",
+  "runOpenAICompatible": "v:c4eab84556"
+ },
+ "server/aiLib/runStructured.js": {
+  "runStructured": "v:479544ab13"
+ },
+ "server/aiLib/textFeatures.js": {
+  "runCaptionStudio": "v:9844504ac1",
+  "runHookGenerator": "v:88633a10f0",
+  "runThumbHeadlines": "v:8bb00ab476",
+  "runTranslateCaptions": "v:e4d214d5cd"
+ },
  "server/aiQueue.js": {
   "AiOverloadedError": "v:79094043a0",
   "createAiQueue": "v:249d514bd0",

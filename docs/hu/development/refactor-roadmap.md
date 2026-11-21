@@ -237,6 +237,18 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   CSENDBEN a catch-ágba esnek, valójában teszteletlenek (négy bontás golden trace-e egymástól függetlenül
   mutatta ki; a trace-ekhez scratch babel-plugin fordította `require`-re). → 6. fázis.
 
+- 🔒⚠️ **SÚLYOS — AI-számlázás megkerülése a SAJÁT env-kulcsunkon** (`server/aiLib/`; HEAD `server/ai.js`):
+  a `sanitizeAiConfig` (ai.js:313-319) elfogad `{provider:'anthropic', model:'<bármi>'}` configot ÜRES
+  `apiKey`-jel; az `aiMeter` (`server/lib/guards.js:76`) ezt BYOK-nak veszi és kihagyja a kvótát; a
+  `runStructured` (ai.js:388-393) a BYOK-ot nem méri; a `runAnthropic` (ai.js:239) viszont `new Anthropic()`-ra
+  esik vissza, ami a MI `ANTHROPIC_API_KEY`-ünket használja → bármely hitelesített (Free) user mérés és
+  kvóta nélkül, tetszőleges modellel (max_tokens 16000 + adaptive thinking) használja a kulcsunkat (a
+  trace igazolja: BYOK-hívás env-klienssel, `trackUsage` nélkül). További: (2) nincs timeout/abort az
+  LLM-hívásokon (ai.js:240, 274, 347) — egy lassú BYOK-végpont a végtelenségig fogja a kérést, a ReMix-
+  úton a sor-helyet is (ai.js:399); (3) DNS-rebinding ablak (ai.js:330→347, 763→779); (4) 300 karakter
+  upstream hibaszöveg jut a hívóhoz (ai.js:280, 363); (5) gyenge prompt-injection határ (ai.js:433, 741;
+  a séma-validáció enyhíti).
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -263,7 +275,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/editor/panels/CaptionsPanel.tsx` | 850 | ⬜ |
 | `src/lib/commands.ts` | 843 | ✅ → 13 |
 | `src/lib/vectorPath.ts` | 813 | ✅ → 35 |
-| `server/ai.js` | 805 | ⬜ |
+| `server/ai.js` | 805 | ✅ → 35 |
 | `src/components/editor/Toolbar.tsx` | 795 | ✅ → 237 |
 | `server/imagedoc.js` | 775 | ✅ → 33 |
 | `server/routes/imageTools.js` | 741 | ✅ → 56 |

@@ -165,6 +165,27 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   `listAll`-nak nincs MAX_TREE plafonja; (9) L777–785 `purgeTrash` nem létező id-t is „removed”-nak
   számol, nem tömb `ids` → TypeError (500); (10) L952–959 `uploadAbort` mindig `{aborted:true}`.
 
+- 🔒⚠️ **SÚLYOS — Külső tárhelyek / OAuth (szerver)** (`server/userStorageLib/`; a sorszám a HEAD-beli
+  `server/userStorage.js`): (1) L63–64: az `OAUTH_STATE_SECRET` a `SUPABASE_SERVICE_ROLE_KEY`-re, majd a
+  beégetett `'insecure-dev-secret'`-re esik vissza, fail-fast nélkül — a konstanssal BÁRKI hamisíthat
+  OAuth-state-et és LEJÁRAT NÉLKÜLI fájl-capability tokent BÁRMELY uid-ra (`verifyFileToken` L656–674 →
+  `routes/storage.js:211`; a trace üres env-vel elfogadta a hamisítottat); (2) L154–173, L202–214: az
+  OAuth-state-nek nincs session-kötése, nonce-a, lejárata → örökké újrajátszható, account-linking CSRF;
+  (3) L163/L213 + `routes/storage.js:104–110`: a validálatlan `returnUrl` egy `<script>location.replace(…)</script>`
+  blokkba kerül a worker originjén (`javascript:` fut, a `</script>` nincs escape-elve) → XSS;
+  `routes/storage.js:97` az `oauthErr`-t HTML-be tükrözi; (4) L80, L673: nem konstans idejű HMAC-
+  összehasonlítás; (5) L651, L670: kétértelmű `:` elválasztó a HMAC-inputban; (6) L128, L249: az OAuth
+  access/refresh tokenek és a WebDAV/S3 hitelesítők titkosítatlanul a `config` jsonb-ben; (7) L118: a
+  `saveSourceConfig` elnyeli a hibát → elveszhet a rotált refresh_token; (8) L570–580: a
+  `setDefaultTarget` nem atomi, idegen `sourceId`-re hibátlanul törli az összes alapértelmezést; (9)
+  L308–311, L430–433: az upstream Content-Type (pl. `text/html`) visszhangzik nosniff/attachment
+  nélkül egy bearer nélküli capability URL-en → tárolt XSS a worker originjén; (10) timeout nélküli
+  nyers `fetch` (L300, L375, L422, L450, L469, L489), teljes fájl memóriába (L441/467/487); (11)
+  CRLF-injekció a multipart contentType-ban (L446, L468, L526, L530), szanitizálatlan fájlnév
+  (`ReMix/../../x.mp4` → `davUpload`); (12) a `routes/storage.js:133` WebDAV/S3 config-ja
+  validálatlanul tárolódik — nincs igazolva, hogy az `assertSafeUrl` minden dav*/s3* utat fed; (13)
+  L58–61, L155: az `OAUTH[provider]` lookup Object.prototype-kulcsokat is elér.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -201,7 +222,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/lib/projectUtils.ts` | 715 | ⬜ |
 | `src/components/studio/image/ImageCanvas.tsx` | 715 | ✅ → 442 |
 | `src/app/channel/[id].tsx` | 693 | ⬜ |
-| `server/userStorage.js` | 693 | ⬜ |
+| `server/userStorage.js` | 693 | ✅ → 46 |
 | `src/components/studio/CreateProjectModal.tsx` | 687 | ⬜ |
 | `src/lib/audioDsp.ts` | 680 | ✅ → 23 |
 | `src/components/preview/AudioLayer.tsx` | 676 | ✅ → 88 |

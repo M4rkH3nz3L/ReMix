@@ -1171,6 +1171,58 @@
   "upsertProvider": "v:f5223215cd",
   "verifyFileToken": "v:39f7daac0b"
  },
+ "server/userStorageLib/dropbox.js": {
+  "dropboxListMedia": "v:f47b5b2ac1",
+  "dropboxStream": "v:f7197b3749",
+  "dropboxUpload": "v:cb0760376c"
+ },
+ "server/userStorageLib/gateway.js": {
+  "describeUserSources": "v:2da894a936",
+  "getDefaultTarget": "v:2da894a936",
+  "listConnected": "v:2da894a936",
+  "listUserSource": "v:d940880365",
+  "setDefaultTarget": "v:a4eb242a29",
+  "streamUserSourceFile": "v:65d23be9e8",
+  "uploadToSource": "v:a05000c9a7"
+ },
+ "server/userStorageLib/gdrive.js": {
+  "gdriveListMedia": "v:ac67fcabcb",
+  "gdriveStream": "v:4d3b1c00a2",
+  "gdriveUpload": "v:988004d313"
+ },
+ "server/userStorageLib/mimeKind.js": {
+  "mimeKind": "v:1d4a458ef1"
+ },
+ "server/userStorageLib/oauthConfig.js": {
+  "OAUTH": "v:dfaa96cff9",
+  "oauthConfigured": "v:680fec1e65"
+ },
+ "server/userStorageLib/oauthFlow.js": {
+  "ensureAccessToken": "v:fb689668fb",
+  "exchangeCode": "v:a133cd56f8",
+  "oauthCallback": "v:033b6b4ce3",
+  "oauthStartUrl": "v:a355dba9d9"
+ },
+ "server/userStorageLib/onedrive.js": {
+  "onedriveListMedia": "v:ac67fcabcb",
+  "onedriveStream": "v:1d1f727ef0",
+  "onedriveUpload": "v:cb0760376c"
+ },
+ "server/userStorageLib/signing.js": {
+  "STATE_SECRET": "v:ecb252044b",
+  "b64url": "v:814c01d9e6",
+  "fileToken": "v:4bfa906f62",
+  "signState": "v:15cec35597",
+  "verifyFileToken": "v:39f7daac0b",
+  "verifyState": "v:d36479e904"
+ },
+ "server/userStorageLib/sourcesDb.js": {
+  "disconnectSource": "v:a4eb242a29",
+  "findUserSource": "v:9041c95ab4",
+  "loadUserSources": "v:2da894a936",
+  "saveSourceConfig": "v:a894ea1e57",
+  "upsertProvider": "v:f5223215cd"
+ },
  "server/vision.js": {
   "VISION_MODEL": "v:ecb252044b",
   "indexFrames": "v:dbad7c1ffe",

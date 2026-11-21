@@ -69,7 +69,15 @@ function surfaceOf(prog, root, prefix) {
     const modSym = checker.getSymbolAtLocation(sf);
     if (!modSym) continue;
     const entry = {};
-    for (const exp of checker.getExportsOfModule(modSym)) {
+    let exports = checker.getExportsOfModule(modSym);
+    // CommonJS `module.exports = {…}` / `= router` (TS-ben `export=`): a getExportsOfModule ilyenkor
+    // gyakran üres — a felület az `export=` típusának tulajdonságai, `any` típusnál maga az `export=`
+    const exportEq = modSym.exports && modSym.exports.get('export=');
+    if (!exports.length && exportEq) {
+      const props = checker.getTypeOfSymbolAtLocation(exportEq, sf).getProperties();
+      exports = props.length ? props : [exportEq];
+    }
+    for (const exp of exports) {
       const sym = exp.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(exp) : exp;
       const isValue = (sym.flags & ts.SymbolFlags.Value) !== 0;
       const type = isValue ? checker.getTypeOfSymbolAtLocation(sym, sf) : checker.getDeclaredTypeOfSymbol(sym);

@@ -242,6 +242,9 @@
   "renderImageDoc": "v:e8752e6fd6",
   "resolveRemoteMedia": "v:860920430e"
  },
+ "server/index.js": {
+  "export=": "v:c5fe0200d1"
+ },
  "server/invoice.js": {
   "HU_VAT_PCT": "v:bc33ea4e26",
   "TRANSFER_DUE_DAYS": "v:f1abd67035",
@@ -645,14 +648,93 @@
   "selectiveChain": "v:7d82380491",
   "stabilizeChain": "v:7641a87459"
  },
+ "server/routes/account.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/ads.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/ai.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/analysis.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/audioGen.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/auth.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/billing.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/bugs.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/devBilling.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/externalMedia.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/files.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/imageAI.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/imageTools.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/library.js": {
+  "export=": "v:c5fe0200d1"
+ },
  "server/routes/live.js": {
   "liveIdentity": "v:5e75b859d1",
   "resolveLiveAccess": "v:1f997a460a"
+ },
+ "server/routes/media.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/org.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/postDownload.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/render.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/schemas/ai.js": {
+  "assist": "v:a373416476",
+  "autoedit": "v:80760b4742",
+  "captionstudio": "v:3452aaabbc",
+  "highlights": "v:80760b4742",
+  "hooks": "v:defdcb4d21",
+  "story": "v:80760b4742",
+  "thumbheadlines": "v:defdcb4d21",
+  "translate": "v:3452aaabbc"
+ },
+ "server/routes/schemas/analysis.js": {
+  "visionQuery": "v:d647ae83bb"
  },
  "server/routes/schemas/audioGen.js": {
   "drumsBody": "v:bbb60461f9",
   "samplerSteps": "v:7005eea49f",
   "synthBody": "v:5f61d602e2"
+ },
+ "server/routes/social.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/storage.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/transfer.js": {
+  "export=": "v:c5fe0200d1"
+ },
+ "server/routes/wallet.js": {
+  "export=": "v:c5fe0200d1"
  },
  "server/s3store.js": {
   "BUCKET": "v:ecb252044b",
@@ -777,6 +859,29 @@
   "listSkies": "v:39f44c5664",
   "replaceSky": "v:7455affc52"
  },
+ "server/smokeAudioFixtures.js": {
+  "DUR": "v:53b0a1b2fa",
+  "SMOKE_AUDIO": "v:100db50006",
+  "buildSmokeProjects": "v:dcb709beb0",
+  "mediaUrisOf": "v:63dc9c9be5"
+ },
+ "server/smokeFixtures.js": {
+  "DUR": "v:53b0a1b2fa",
+  "FPS": "v:53b0a1b2fa",
+  "H": "v:53b0a1b2fa",
+  "SMOKE_MEDIA": "v:7ad29025d0",
+  "W": "v:53b0a1b2fa",
+  "buildSmokeProjects": "v:fa78d1c1e4",
+  "mediaUrisOf": "v:16bbb90625",
+  "projectDurationOf": "v:50609d6ae3"
+ },
+ "server/smokeImageFixtures.js": {
+  "H": "v:53b0a1b2fa",
+  "SMOKE_IMAGE_MEDIA": "v:ade573a70d",
+  "W": "v:53b0a1b2fa",
+  "buildSmokeDocs": "v:9cef872986",
+  "mediaUrisOf": "v:f277fa6a0a"
+ },
  "server/sparkGate.js": {
   "SECONDS_PER_MONTH": "v:53b0a1b2fa",
   "costModel": "v:388740b3f9",
@@ -856,6 +961,23 @@
  },
  "server/text-motion.js": {
   "renderTextSequence": "v:f7176d0856"
+ },
+ "server/text-render.js": {
+  "__fontCss": "v:37401afc86",
+  "bakeTextPng": "v:53dc7912f3",
+  "findChromium": "v:1a44197a23",
+  "fontFaceCss": "v:37401afc86",
+  "fontFamilyCss": "v:056faf84e0",
+  "isRenderableShapePatternJs": "v:fb104425ef",
+  "pathDataJs": "v:8ebc0a6b8e",
+  "patternTileJs": "v:aae28bd889",
+  "presetCss": "v:5bd9cf5d0e",
+  "renderShapePngs": "v:f0afcebf00",
+  "renderTextPngs": "v:68954547e9",
+  "shapePatternSvgDefJs": "v:457e11824c",
+  "textStyleCss": "v:5bd9cf5d0e",
+  "textTransformCss": "v:7641a87459",
+  "typographyCss": "v:7641a87459"
  },
  "server/textRender/chromium.js": {
   "findChromium": "v:1a44197a23"

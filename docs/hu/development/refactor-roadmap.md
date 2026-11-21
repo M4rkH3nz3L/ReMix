@@ -317,6 +317,25 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   tölti a profilt, a szolgáltatókat és a taskokat — egy hiba az egész profil-képernyőt üresen hagyja;
   (5) a dev-akció effekt első-render closure-öket használ (csak a stabil setterek miatt működik).
 
+- 🔒 **Chat** (`src/lib/chatCore/`, `chatClient/`; HEAD `src/lib/chat.ts`): (1) :551 `openTypingChannel`
+  `void senderFields().then(...)` catch nélkül — offline kezeletlen rejection; (2) :268-271 az inbox
+  `conversations` select-jén nincs tagság-szűrő, a :521 `subscribeInbox` minden változásra figyel — a
+  privátság teljesen az RLS-en (és az RLS realtime-szűrésén) múlik; (3) :115 profilnév nélkül az e-mail
+  helyi része kerül `sender_username`/`sender_name`-ként a mások által olvasható üzenetekbe (privacy);
+  (4) :221, :445 és a listConversations/resolvePeers olvasásai figyelmen kívül hagyják a `{error}`-t —
+  RLS-elutasítás „nincs beszélgetés”; (5) :~376 a `getConversation` a teljes inboxot tölti, a
+  `resolvePeers` peerenként egy RPC (N+1).
+- 💰 **Wallet lib** (`src/lib/walletCore/`, `walletClient/`; HEAD `src/lib/wallet.ts`): (6) :182, 239, 259,
+  333, 355, 554 a listák figyelmen kívül hagyják a `{error}`-t — RLS/hálózati hiba üres lista vagy 0
+  (a `fetchWallet`/`fetchSubscription` viszont dob — következetlen); (7) :291 a `requestPayout`
+  validálatlan `cents`-et küld (2000.5 is) — a szervernek kell validálnia; (8) :316 `minor_no_payout`
+  sima Error; (9) :394 a `parseSubscription` tört/negatív seats-et és negatív `renewal_cost`-ot is
+  elfogad; (10) :540 a `claimReferral` csak egy vezető `@`-ot vág.
+- **Kereső / asset-könyvtár** (`src/lib/universalSearchCore/`, `assetLibraryCore/`): a `summerYear`
+  ternary két ága azonos; „this-week/month” gördülő 7/30 nap; érvénytelen `now` → RangeError;
+  `rateAsset(NaN)` NaN-t tárol; az `addVersion` üres hash-t a felső szintre írja; a no-op `removeTag`/
+  `removeFromCollection`/azonos nevű `renameAsset` is új referenciát és `updatedAt`-et ad.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -364,10 +383,10 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/hooks/useProfile.ts` | 601 | ✅ → 202 |
 | `src/components/studio/image/body/useImageExport.tsx` | 601 | ✅ → 73 |
 | `src/lib/svgImport.ts` | 595 | ✅ → 65 |
-| `src/lib/universalSearch.ts` | 593 | ⬜ |
-| `src/lib/wallet.ts` | 592 | ⬜ |
+| `src/lib/universalSearch.ts` | 593 | ✅ → 26 |
+| `src/lib/wallet.ts` | 592 | ✅ → 55 |
 | `src/components/editor/panels/PrecisionPanel.tsx` | 583 | ✅ → 101 |
-| `src/lib/chat.ts` | 578 | ⬜ |
+| `src/lib/chat.ts` | 578 | ✅ → 42 |
 | `server/render/clipChains.js` | 570 | ✅ → 45 |
 | `src/hooks/useStudio.ts` | 558 | ✅ → 223 |
 | `src/components/preview/TextOverlay.tsx` | 558 | ✅ → 236 |
@@ -382,5 +401,5 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/lib/audioIntent.ts` | 523 | ✅ → 13 |
 | `src/components/editor/panels/LibraryPanel.tsx` | 523 | ✅ → 107 |
 | `src/store/editorState.ts` | 522 | ✅ → 399 |
-| `src/lib/assetLibrary.ts` | 514 | ⬜ |
+| `src/lib/assetLibrary.ts` | 514 | ✅ → 55 |
 | `server/render/videoFilters.js` | 502 | ✅ → 27 |

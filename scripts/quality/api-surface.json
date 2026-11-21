@@ -4358,6 +4358,47 @@
   "parseLibraryDoc": "v:cad9736094",
   "saveAssetLibrary": "v:d027c09233"
  },
+ "src/lib/assetLibraryCore/model.ts": {
+  "ASSET_KINDS": "v:26901f3a93",
+  "ASSET_KIND_ICON": "v:5af2391d51",
+  "AssetInput": "t:e1b018627e",
+  "AssetKind": "t:c9363d5b1d",
+  "AssetLibrary": "t:7e14a7db1d",
+  "AssetVersion": "t:00c37743ac",
+  "Collection": "t:30c54a96f8",
+  "LibraryAsset": "t:8519ca80fc"
+ },
+ "src/lib/assetLibraryCore/projectBridge.ts": {
+  "assetKindFromProject": "v:82124d4eb1",
+  "ingestProjectAssets": "v:7df134ce56"
+ },
+ "src/lib/assetLibraryCore/queries.ts": {
+  "AssetFilter": "t:248b65a9eb",
+  "assetsByKind": "v:0a71e4bed8",
+  "assetsInProject": "v:3c41bb8518",
+  "filterAssets": "v:7a9056c2ec",
+  "findDuplicates": "v:83bf91ab96",
+  "findMissing": "v:684382198f",
+  "searchAssets": "v:ce8f2d8a25",
+  "usageOf": "v:74c2738c00"
+ },
+ "src/lib/assetLibraryCore/reducer.ts": {
+  "addAsset": "v:ddf2430189",
+  "addTag": "v:a3bfceb11d",
+  "addToCollection": "v:0213f57117",
+  "addVersion": "v:208cfa6b82",
+  "clearUsage": "v:9b82bd183e",
+  "createCollection": "v:2b5fa6786b",
+  "deleteCollection": "v:b000b282b6",
+  "emptyLibrary": "v:cbd7308706",
+  "rateAsset": "v:2d683a8834",
+  "recordUsage": "v:0943c2301e",
+  "removeAsset": "v:313c48e14a",
+  "removeFromCollection": "v:0213f57117",
+  "removeTag": "v:a3bfceb11d",
+  "renameAsset": "v:d471b6bcfa",
+  "toggleFavorite": "v:313c48e14a"
+ },
  "src/lib/assetResolve.ts": {
   "assetForClip": "v:24177037c7",
   "assetIdForUri": "v:affbc370e6",
@@ -5182,10 +5223,54 @@
   "subscribeInbox": "v:8409aa6d2e",
   "subscribeMessages": "v:dbf5e735fd"
  },
+ "src/lib/chatClient/conversations.ts": {
+  "addGroupMember": "v:706ab0cc1a",
+  "createGroup": "v:4aea58622d",
+  "leaveConversation": "v:fdef5f46e4",
+  "markRead": "v:fdef5f46e4",
+  "openDm": "v:310846b8e9",
+  "openProjectConversation": "v:4d35d24244",
+  "renameGroup": "v:3127e7d4d7"
+ },
+ "src/lib/chatClient/inbox.ts": {
+  "getConversation": "v:9e9e2225cc",
+  "listConversations": "v:90d06e6ad5"
+ },
+ "src/lib/chatClient/messages.ts": {
+  "listMessages": "v:232ddd5ac0",
+  "logProjectActivity": "v:7dfa8012d9",
+  "sendMessage": "v:efc589f828",
+  "sendSystemMessage": "v:85d847472d"
+ },
+ "src/lib/chatClient/peers.ts": {
+  "listFollowingPeers": "v:76d1971781",
+  "resolvePeers": "v:fafc3ce48c"
+ },
+ "src/lib/chatClient/realtime.ts": {
+  "TypingChannel": "t:6dded243bc",
+  "openTypingChannel": "v:d016be57d2",
+  "subscribeInbox": "v:8409aa6d2e",
+  "subscribeMessages": "v:dbf5e735fd"
+ },
+ "src/lib/chatClient/session.ts": {
+  "currentUserId": "v:1a44197a23",
+  "senderFields": "v:9b674e5c80"
+ },
  "src/lib/chatCommands.ts": {
   "ChatCommand": "t:9dd8e048e9",
   "ChatCommandType": "t:54dff68b4a",
   "parseChatCommand": "v:a0a75cdf6c"
+ },
+ "src/lib/chatCore/model.ts": {
+  "ChatMessage": "t:bcd9ba7220",
+  "ChatPeer": "t:37bccca92f",
+  "Conversation": "t:2a20c75033",
+  "ConversationKind": "t:fe976abe86",
+  "ConversationRow": "t:67987a3f52",
+  "MESSAGE_COLUMNS": "v:6477df88ee",
+  "MessageRow": "t:fd4f2bb98c",
+  "groupTitle": "v:fa7df05ac0",
+  "toMessage": "v:49aa776add"
  },
  "src/lib/chords.ts": {
   "ChordParts": "t:c42635d3dc",
@@ -9633,6 +9718,38 @@
   "search": "v:d0148a8eda",
   "suggest": "v:928ffef537"
  },
+ "src/lib/universalSearchCore/adapters.ts": {
+  "assetToDoc": "v:7169359bad",
+  "projectToDoc": "v:45503eecf7"
+ },
+ "src/lib/universalSearchCore/docs.ts": {
+  "SearchDoc": "t:3cbb05e711",
+  "SearchResult": "t:2a4e55dc8f",
+  "SearchScope": "t:a253ca2712"
+ },
+ "src/lib/universalSearchCore/query.ts": {
+  "ParsedQuery": "t:491f771d5d",
+  "TimeHint": "t:1d18049abe",
+  "TimeRange": "t:f60cd26731",
+  "parseQuery": "v:0e0791074e",
+  "resolveTimeRange": "v:9c81f89fe9"
+ },
+ "src/lib/universalSearchCore/scoring.ts": {
+  "allowedEdits": "v:2a0dd949a6",
+  "docTime": "v:fa3ee372de",
+  "editDistance": "v:5bb1c16018",
+  "inRange": "v:7221088202",
+  "isUnfinished": "v:b2aa3f74ee",
+  "scoreDoc": "v:2f5f6e2766",
+  "scoreDocFuzzy": "v:2f5f6e2766"
+ },
+ "src/lib/universalSearchCore/search.ts": {
+  "SearchOptions": "t:ff5450d425",
+  "SuggestOptions": "t:4fc1ea38d3",
+  "groupByScope": "v:c5e3752e04",
+  "search": "v:d0148a8eda",
+  "suggest": "v:928ffef537"
+ },
  "src/lib/upload.ts": {
   "mediaFormData": "v:3f90c4a1d5",
   "uploadFetch": "v:308ca9fc23"
@@ -9978,6 +10095,69 @@
   "giftIcon": "v:15c0e4e57a",
   "savedPayoutAccount": "v:7ea23a9ed9",
   "subscriptionMonths": "v:b04cbe59d9"
+ },
+ "src/lib/walletClient/balance.ts": {
+  "creditHistory": "v:3e23280fd2",
+  "fetchWallet": "v:6a40183acd",
+  "startWebTopup": "v:b5a4805366"
+ },
+ "src/lib/walletClient/earnings.ts": {
+  "downloadDac7": "v:8b612c24b8",
+  "downloadEarningsStatement": "v:8b612c24b8",
+  "fetchEarnings": "v:469e54c1ed"
+ },
+ "src/lib/walletClient/gifts.ts": {
+  "listGifts": "v:03e25766a6",
+  "receivedGifts": "v:f14449e39e",
+  "sendGift": "v:b2d4f1cfef"
+ },
+ "src/lib/walletClient/payouts.ts": {
+  "fetchPayoutAccount": "v:c7865f45f3",
+  "listPayoutsUnderReview": "v:a2f220444d",
+  "myPayoutRequests": "v:a5fd174ad5",
+  "requestPayout": "v:64213a2d85",
+  "reviewPayout": "v:e1483b7663",
+  "setPayoutAccount": "v:3ebcb1490c",
+  "startStripeKyc": "v:1352baf72d"
+ },
+ "src/lib/walletClient/referral.ts": {
+  "claimReferral": "v:08f1fb8f42",
+  "myReferralStats": "v:fe28ce5827"
+ },
+ "src/lib/walletClient/session.ts": {
+  "currentUid": "v:1a44197a23"
+ },
+ "src/lib/walletClient/subscription.ts": {
+  "addAddon": "v:acb275dbfd",
+  "fetchSubscription": "v:aec2cd558b",
+  "removeAddon": "v:4cdd11add3",
+  "setAutoRenew": "v:5e5c6816f5",
+  "startTrial": "v:36840298eb",
+  "subscribeWithCoins": "v:4980f67ac8"
+ },
+ "src/lib/walletCore/errors.ts": {
+  "AddonNotAllowedError": "v:66a9cda316",
+  "BelowMinPayoutError": "v:6a0425976f",
+  "GiftNotFoundError": "v:363ca45cab",
+  "InsufficientEarnedError": "v:4cabe23b9e",
+  "KycRequiredError": "v:4c66b211e5",
+  "ManagedByStoreError": "v:4654414460",
+  "NoPayoutAccountError": "v:14d2e5fbf6",
+  "PayoutWeeklyLimitError": "v:826039448b",
+  "RecipientNotFoundError": "v:6ec4777deb",
+  "SelfSendError": "v:e7c2b63a93"
+ },
+ "src/lib/walletCore/subscription.ts": {
+  "MySubscription": "t:911956c8dc",
+  "parseSubscription": "v:4b4019fde8"
+ },
+ "src/lib/walletCore/types.ts": {
+  "CreditTx": "t:d3d1df9bdb",
+  "Gift": "t:8d0a32ed63",
+  "GiftEvent": "t:7e9753587c",
+  "PayoutAccount": "t:7993ceb9d6",
+  "PayoutRequest": "t:fa3a098290",
+  "PayoutReviewRow": "t:9f3a15968a"
  },
  "src/lib/wandMapping.ts": {
   "LayerFit": "t:4639a53bd6",

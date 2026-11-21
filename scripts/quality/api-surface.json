@@ -1918,6 +1918,39 @@
  "src/components/editor/panels/audio/audioStyles.ts": {
   "styles": "v:8e01366f10"
  },
+ "src/components/editor/panels/captions/AutoCaptionSection.tsx": {
+  "AutoCaptionSection": "v:f120a0f8f9",
+  "AutoCaptionSectionProps": "t:e253bfd98c"
+ },
+ "src/components/editor/panels/captions/CaptionInputSections.tsx": {
+  "CaptionInputSections": "v:b0da8afbef",
+  "CaptionInputSectionsProps": "t:a70caa8c4d"
+ },
+ "src/components/editor/panels/captions/CaptionRewriteSections.tsx": {
+  "CaptionRewriteSections": "v:e5cf9cc445",
+  "CaptionRewriteSectionsProps": "t:50836d85ac"
+ },
+ "src/components/editor/panels/captions/CaptionStudioSection.tsx": {
+  "CaptionStudioSection": "v:effab01558",
+  "CaptionStudioSectionProps": "t:db52511ae0"
+ },
+ "src/components/editor/panels/captions/captionInsertActions.ts": {
+  "CaptionInsertActionDeps": "t:f1b068246c",
+  "createCaptionInsertActions": "v:d9db6ea6cd"
+ },
+ "src/components/editor/panels/captions/captionLayoutActions.ts": {
+  "CaptionLayoutActionDeps": "t:73460f943c",
+  "createCaptionLayoutActions": "v:ca2d4a9ec2"
+ },
+ "src/components/editor/panels/captions/captionRewriteActions.ts": {
+  "CaptionFixActionDeps": "t:4c6fadd1fd",
+  "TranslateActionDeps": "t:a65932f1da",
+  "createCaptionFixActions": "v:31cdd149d9",
+  "createTranslateActions": "v:b2ac99d39e"
+ },
+ "src/components/editor/panels/captions/captionsStyles.ts": {
+  "styles": "v:8d4798d831"
+ },
  "src/components/editor/panels/export/AdvancedExportControls.tsx": {
   "AdvancedExportControls": "v:67cf514aad"
  },
@@ -2056,6 +2089,51 @@
  "src/components/editor/panels/shape/shapeTrackActions.ts": {
   "ShapeTrackDeps": "t:80adf0e01e",
   "createShapeTrackActions": "v:eeebc793c2"
+ },
+ "src/components/editor/panels/text/Text3dSection.tsx": {
+  "Text3dSection": "v:59da24968d",
+  "Text3dSectionProps": "t:1661aaff79"
+ },
+ "src/components/editor/panels/text/TextAnimSections.tsx": {
+  "TextAnimSections": "v:dfb7182b58",
+  "TextAnimSectionsProps": "t:acb3f28ad0"
+ },
+ "src/components/editor/panels/text/TextContentSections.tsx": {
+  "TextContentSections": "v:8481fcfee2",
+  "TextContentSectionsProps": "t:85445ee214",
+  "TextTab": "t:e79fcc080d"
+ },
+ "src/components/editor/panels/text/TextExtraSections.tsx": {
+  "TextLayoutSections": "v:0d7c55245c",
+  "TextLayoutSectionsProps": "t:49048736c0",
+  "ToShapeSection": "v:8deee38ead",
+  "ToShapeSectionProps": "t:977a91fb80"
+ },
+ "src/components/editor/panels/text/TextLookSections.tsx": {
+  "TextLookSections": "v:2c969ec0af",
+  "TextLookSectionsProps": "t:8cb0e5219c"
+ },
+ "src/components/editor/panels/text/TextStyleSection.tsx": {
+  "TextStyleSection": "v:1db92d7ab3",
+  "TextStyleSectionProps": "t:38e7631739"
+ },
+ "src/components/editor/panels/text/TextTrackingSection.tsx": {
+  "TextTrackingSection": "v:5bb18ad152",
+  "TextTrackingSectionProps": "t:e799835547"
+ },
+ "src/components/editor/panels/text/TypographySections.tsx": {
+  "TextSizeSection": "v:0fe114760e",
+  "TextTypographyProps": "t:9bb89080ea",
+  "TypographySection": "v:0fe114760e"
+ },
+ "src/components/editor/panels/text/textPanelActions.ts": {
+  "ShapeActionDeps": "t:f283d2de09",
+  "TrackActionDeps": "t:9e7c131d3c",
+  "createShapeActions": "v:1a8847d598",
+  "createTrackActions": "v:81f690e262"
+ },
+ "src/components/editor/panels/text/textStyles.ts": {
+  "styles": "v:283f75b146"
  },
  "src/components/editor/screen/EditorBanners.tsx": {
   "EditorBanners": "v:70c3dc39fe"
@@ -4811,6 +4889,15 @@
   "captionBand": "v:ceb8abd9a6",
   "captionY": "v:43dee1eb41",
   "speakerColor": "v:33064088d0"
+ },
+ "src/lib/captionPanelOps.ts": {
+  "FALLBACK_CAPTION": "v:555a5c5c92",
+  "MAX_CAPTION": "v:ac3478d69a",
+  "MIN_CAPTION": "v:356a192b79",
+  "TARGET_LANGS": "v:777add11a2",
+  "captionClip": "v:decc304852",
+  "captionLines": "v:603036d04b",
+  "quickCaptionDuration": "v:92e17f2a89"
  },
  "src/lib/captionStudio.ts": {
   "CaptionSuggestion": "t:42f5e592ff",
@@ -9056,6 +9143,13 @@
  "src/lib/textBake.ts": {
   "BakedText": "t:9e87d69459",
   "bakeTextToImage": "v:a3ea219d76"
+ },
+ "src/lib/textPanelOps.ts": {
+  "kineticStaggerDefault": "v:981d809cc5",
+  "mergeTextStyle": "v:0516d9bd05",
+  "signedPercent": "v:4f5ba5c024",
+  "templatePatch": "v:19a89f045e",
+  "trackSegmentEnd": "v:1542ff4b82"
  },
  "src/lib/textedit.ts": {
   "WordItem": "t:f689452462",

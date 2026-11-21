@@ -69,6 +69,21 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   (pl. AI-állította 40) `+20`-szal 60-ra ugrik, nem a 60-as padlóra; a low-pass 16 kHz feletti
   érték (pl. 18 kHz) csak kikapcsolható; az `AudioFxSection.setFx` felesleges `if (clip)` ellenőrzése.
 
+- **TextPanel** (`src/components/editor/panels/text/`, `src/lib/textPanelOps.ts`): (1) a kinetikus
+  lépésköz kijelzése bontásonként más alapértéket mutat (betű 30 / szó 80 / sor 140 ms), a léptető
+  viszont mindig 0,08-ról lép → betű-módban 30 ms-ról „+”-ra 100 ms lesz; (2) a `convertToShape`
+  nem véd try/finally-vel: ha a `bakeTextToImage` dobna, a „busy” állapot beragad és a rejection
+  kezeletlen (ma a bake belül elkap, így elméleti); (3) a pont-kijelölős követés a régi (bezárt)
+  panel closure-jéből indul → az újranyitott panelen nem látszik a „követés…” állapot, és a busy-őr sem hat.
+- **CaptionsPanel** (`src/components/editor/panels/captions/`, `src/lib/captionPanelOps.ts`): (1) a
+  beszélő-szín/-címke, okos pozíció és a Caption Studio akciói `void`-dal indulnak catch nélkül → egy
+  arc-/AI-hiba kezeletlen rejection, és a chip-felirat „elemzés…” állapotban ragad; a szó-időzítésnél a
+  `getProjectWordCues`/`withProgress` hibája szintén kezeletlen (a státusz ott visszaáll); (2) a fordítás a
+  nyelv NEVÉT küldi (`English`), nem a kódját — a `TARGET_LANGS.code` csak React-kulcs; (3) a „Caption
+  Studio” szekció- és alert-cím beégetett szöveg; (4) a káromkodás-maszk és a safe-zone aktor nélkül
+  (alapértelmezett), a többi AI-művelet `'ai'` aktorral dispatch-el; (5) az arc-mintavétel 60 feliratnál
+  megáll, a többi „nincs forrás” csoportba kerül.
+
 - **ClipEditSheet** (`src/lib/clipEditOps.ts`): (1) a „mentetlen változás” az effekteket
   `JSON.stringify`-jal hasonlítja → ugyanazok az értékek más kulcssorrendben (pl. felhasználói preset
   után) hamis „dirty”-t adnak; (2) a `pendingSettingsPatch` (take-választás, tempó-illesztés) a fade-eket
@@ -286,10 +301,10 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/app/auth.tsx` | 980 | ⬜ |
 | `src/hooks/useFeed.ts` | 975 | ✅ → 251 |
 | `src/app/live/[id].tsx` | 952 | ✅ → 376 |
-| `src/components/editor/panels/TextPanel.tsx` | 926 | ⬜ |
+| `src/components/editor/panels/TextPanel.tsx` | 926 | ✅ → 67 |
 | `src/components/studio/audio/ClipEditSheet.tsx` | 889 | ✅ → 310 |
 | `src/lib/offlineMix.ts` | 887 | ✅ → 21 |
-| `src/components/editor/panels/CaptionsPanel.tsx` | 850 | ⬜ |
+| `src/components/editor/panels/CaptionsPanel.tsx` | 850 | ✅ → 88 |
 | `src/lib/commands.ts` | 843 | ✅ → 13 |
 | `src/lib/vectorPath.ts` | 813 | ✅ → 35 |
 | `server/ai.js` | 805 | ✅ → 35 |

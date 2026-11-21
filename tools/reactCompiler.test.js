@@ -189,6 +189,22 @@ const MUST_BE_MEMOIZED = [
   ['src/hooks/feed/useFeedSelection.ts', 'useFeedSelection'],
   ['src/hooks/feed/useFeedPlaybackState.ts', 'useFeedPlaybackState'],
   ['src/hooks/feed/useFeedLoader.ts', 'useFeedLoader'],
+  // REFACTOR: a TextPanel.tsx szekciói (a gyökér kimarad, lásd lent)
+  ['src/components/editor/panels/text/TextContentSections.tsx', 'TextContentSections'],
+  ['src/components/editor/panels/text/TextLookSections.tsx', 'TextLookSections'],
+  ['src/components/editor/panels/text/TypographySections.tsx', 'TypographySection'],
+  ['src/components/editor/panels/text/TypographySections.tsx', 'TextSizeSection'],
+  ['src/components/editor/panels/text/TextStyleSection.tsx', 'TextStyleSection'],
+  ['src/components/editor/panels/text/Text3dSection.tsx', 'Text3dSection'],
+  ['src/components/editor/panels/text/TextAnimSections.tsx', 'TextAnimSections'],
+  ['src/components/editor/panels/text/TextExtraSections.tsx', 'TextLayoutSections'],
+  ['src/components/editor/panels/text/TextExtraSections.tsx', 'ToShapeSection'],
+  ['src/components/editor/panels/text/TextTrackingSection.tsx', 'TextTrackingSection'],
+  // REFACTOR: a CaptionsPanel.tsx szekciói (a gyökér kimarad, lásd lent)
+  ['src/components/editor/panels/captions/AutoCaptionSection.tsx', 'AutoCaptionSection'],
+  ['src/components/editor/panels/captions/CaptionStudioSection.tsx', 'CaptionStudioSection'],
+  ['src/components/editor/panels/captions/CaptionInputSections.tsx', 'CaptionInputSections'],
+  ['src/components/editor/panels/captions/CaptionRewriteSections.tsx', 'CaptionRewriteSections'],
 ];
 
 /**
@@ -219,6 +235,8 @@ const KNOWN_BAILS = [
   ['src/hooks/feed/useActivePostEffects.ts', 'useActivePostEffects', 'az onViewable useRef(…).current-jét renderben olvassa'],
   ['src/hooks/feed/useFeedAnimations.ts', 'useFeedAnimations', 'az Animated.Value refek .current-jét renderben olvassa'],
   ['src/hooks/feed/useFeedSeekVolume.ts', 'useFeedSeekVolume', 'expo-video player-mutáció (volume/muted/currentTime) és ref-írás renderben'],
+  ['src/components/editor/panels/TextPanel.tsx', 'TextPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
+  ['src/components/editor/panels/CaptionsPanel.tsx', 'CaptionsPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
 ];
 
 const cache = new Map();

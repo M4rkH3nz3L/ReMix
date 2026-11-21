@@ -205,6 +205,19 @@ const MUST_BE_MEMOIZED = [
   ['src/components/editor/panels/captions/CaptionStudioSection.tsx', 'CaptionStudioSection'],
   ['src/components/editor/panels/captions/CaptionInputSections.tsx', 'CaptionInputSections'],
   ['src/components/editor/panels/captions/CaptionRewriteSections.tsx', 'CaptionRewriteSections'],
+  // REFACTOR: a belépés-képernyő (src/app/auth.tsx) kiemelt lapjai (a gyökér előtte és utána is kimarad, lásd lent)
+  ['src/components/auth/SignInCard.tsx', 'SignInCard'],
+  ['src/components/auth/SignUpCard.tsx', 'SignUpCard'],
+  ['src/components/auth/AuthStepCards.tsx', 'MfaChallengeCard'],
+  ['src/components/auth/AuthStepCards.tsx', 'SmsOtpCard'],
+  ['src/components/auth/AuthStepCards.tsx', 'CheckEmailCard'],
+  // REFACTOR: a csatorna-képernyő (src/app/channel/[id].tsx) és kiemelt részei (a gyökér maga is memoizált marad)
+  ['src/app/channel/[id].tsx', 'ChannelScreen'],
+  ['src/components/channel/ChannelTopBar.tsx', 'ChannelTopBar'],
+  ['src/components/channel/ChannelProfileHeader.tsx', 'ChannelProfileHeader'],
+  ['src/components/channel/ChannelGridItem.tsx', 'ChannelGridItem'],
+  ['src/components/channel/ChannelSheets.tsx', 'PromoteSheet'],
+  ['src/components/channel/ChannelSheets.tsx', 'RemixModerationSheet'],
 ];
 
 /**
@@ -237,6 +250,7 @@ const KNOWN_BAILS = [
   ['src/hooks/feed/useFeedSeekVolume.ts', 'useFeedSeekVolume', 'expo-video player-mutáció (volume/muted/currentTime) és ref-írás renderben'],
   ['src/components/editor/panels/TextPanel.tsx', 'TextPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
   ['src/components/editor/panels/CaptionsPanel.tsx', 'CaptionsPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
+  ['src/app/auth.tsx', 'AuthScreen', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
 ];
 
 const cache = new Map();

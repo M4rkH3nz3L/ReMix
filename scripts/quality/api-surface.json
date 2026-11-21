@@ -1636,6 +1636,41 @@
  "src/components/admin/PayoutReviewList.tsx": {
   "PayoutReviewList": "v:5242c679de"
  },
+ "src/components/auth/AuthStepCards.tsx": {
+  "CheckEmailCard": "v:df1302c7f7",
+  "MfaChallengeCard": "v:3394e3e385",
+  "SmsOtpCard": "v:8097111d11"
+ },
+ "src/components/auth/SignInCard.tsx": {
+  "SignInCard": "v:bd87c855aa"
+ },
+ "src/components/auth/SignUpCard.tsx": {
+  "SignUpCard": "v:54e2950f3a"
+ },
+ "src/components/auth/authActions.ts": {
+  "AuthActionDeps": "t:a866c09ad8",
+  "createAuthActions": "v:a52c03a9f5"
+ },
+ "src/components/auth/authStyles.ts": {
+  "authStyles": "v:3593646933"
+ },
+ "src/components/channel/ChannelGridItem.tsx": {
+  "ChannelGridItem": "v:c978b4f76d"
+ },
+ "src/components/channel/ChannelProfileHeader.tsx": {
+  "ChannelProfileHeader": "v:94ca89e18d"
+ },
+ "src/components/channel/ChannelSheets.tsx": {
+  "PromoteSheet": "v:bb04a0395b",
+  "RemixModerationSheet": "v:4c6eb25a4d"
+ },
+ "src/components/channel/ChannelTopBar.tsx": {
+  "ChannelTopBar": "v:b1849f228c"
+ },
+ "src/components/channel/channelActions.ts": {
+  "ChannelActionDeps": "t:567adc63a5",
+  "createChannelActions": "v:943d18dd61"
+ },
  "src/components/chat/ChatThread.tsx": {
   "ChatThread": "v:955fa46c7a"
  },
@@ -4538,6 +4573,14 @@
   "trimAudioLeft": "v:412c45bf6b",
   "trimAudioRight": "v:cc22d49b7c"
  },
+ "src/lib/authForm.ts": {
+  "AuthFormInput": "t:fea315c19f",
+  "AuthFormState": "t:e34fbd6f3e",
+  "AuthMode": "t:21f2dd1687",
+  "SignUpVia": "t:c262f4f6cc",
+  "authFormState": "v:00472e4562",
+  "pagerPageMode": "v:a4d6b0df26"
+ },
  "src/lib/autoedit.ts": {
   "AutoEditCaption": "t:7d60629a50",
   "AutoEditSignals": "t:fff81ca0a5",
@@ -4932,6 +4975,13 @@
  "src/lib/caughtPolicy.ts": {
   "CaughtVerdict": "t:997f0888a1",
   "caughtVerdict": "v:293e344689"
+ },
+ "src/lib/channelScreen.ts": {
+  "channelNames": "v:17da929eb6",
+  "compact": "v:71267fb618",
+  "promoteBudget": "v:d373684251",
+  "promoteCostPerView": "v:137381aaa7",
+  "promoteTargetViews": "v:1d8b84ccf3"
  },
  "src/lib/chat.ts": {
   "ChatMessage": "t:bcd9ba7220",

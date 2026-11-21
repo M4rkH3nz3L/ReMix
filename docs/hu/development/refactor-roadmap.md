@@ -281,6 +281,14 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   sor-prioritást a kliens által küldött `tier` adja (190); (8) nyers `err.message` (ffmpeg, belső
   útvonalak) a kliensnek.
 
+- **Auth és csatorna képernyő** (`src/components/auth/`, `src/components/channel/`; HEAD-sorszám): az
+  `auth.tsx:522-525` GDPR-hozzájárulás Pressable-jének nincs `accessibilityRole`/`accessibilityState`-je
+  (checkboxként működik), és `busy` alatt sincs letiltva; a regisztráció előtti felhasználónév-ellenőrzés
+  és a store nyers hibaszövege („User already registered”) felfedi, létezik-e a név/e-mail (tervezetten);
+  `channel/[id].tsx:211-225`: a nem-tulaj remix-ága elérhetetlen, és a `remixFromPost(...).then` catch
+  nélküli; `:228-235` a `doPromote` nem ellenőrzi a `targetViews < 1`-et (csak a letiltott gomb);
+  `:74-77, 303` `id` nélkül a betöltés-jelző örökké pörög.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -298,7 +306,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/studio/image/LayerInspector.tsx` | 1105 | ✅ → 110 |
 | `src/components/editor/panels/ExportPanel.tsx` | 1059 | ✅ → 144 |
 | `server/userFiles.js` | 997 | ✅ → 47 |
-| `src/app/auth.tsx` | 980 | ⬜ |
+| `src/app/auth.tsx` | 980 | ✅ → 403 |
 | `src/hooks/useFeed.ts` | 975 | ✅ → 251 |
 | `src/app/live/[id].tsx` | 952 | ✅ → 376 |
 | `src/components/editor/panels/TextPanel.tsx` | 926 | ✅ → 67 |
@@ -316,7 +324,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/editor/panels/AudioPanel.tsx` | 718 | ✅ → 145 |
 | `src/lib/projectUtils.ts` | 715 | ✅ → 45 |
 | `src/components/studio/image/ImageCanvas.tsx` | 715 | ✅ → 442 |
-| `src/app/channel/[id].tsx` | 693 | ⬜ |
+| `src/app/channel/[id].tsx` | 693 | ✅ → 168 |
 | `server/userStorage.js` | 693 | ✅ → 46 |
 | `src/components/studio/CreateProjectModal.tsx` | 687 | ⬜ |
 | `src/lib/audioDsp.ts` | 680 | ✅ → 23 |

@@ -1,58 +1,29 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { type Href, router, useLocalSearchParams } from 'expo-router';
-import { canRemix, remixRoute } from '@/lib/imageRemix';
-import { goBackOrHome } from '@/lib/nav';
-import { requireApp } from '@/lib/webGate';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav, BOTTOM_NAV_HEIGHT } from '@/components/BottomNav';
 import { GiftSheet } from '@/components/GiftSheet';
-import { CreatorBadges, TagBadges } from '@/components/profile/CreatorControls';
-import { PrimaryButton } from '@/components/ui/controls';
-import { VideoThumb } from '@/components/VideoThumb';
-import { COVER_ASPECT, palette } from '@/constants/editor';
-import {
-  deletePost,
-  getChannel,
-  listRemixesOf,
-  moderateRemix,
-  remixFromPost,
-  toggleFollow,
-  type ChannelData,
-} from '@/lib/feed';
-import { openDm } from '@/lib/chat';
+import { createChannelActions } from '@/components/channel/channelActions';
+import { ChannelGridItem } from '@/components/channel/ChannelGridItem';
+import { ChannelProfileHeader } from '@/components/channel/ChannelProfileHeader';
+import { PromoteSheet, RemixModerationSheet } from '@/components/channel/ChannelSheets';
+import { ChannelTopBar } from '@/components/channel/ChannelTopBar';
+import { palette } from '@/constants/editor';
+import { channelNames } from '@/lib/channelScreen';
+import { getChannel, type ChannelData } from '@/lib/feed';
 import { getLiveByHost, type LiveSession } from '@/lib/live';
-import { runOptimistic } from '@/lib/optimistic';
-import { InsufficientCreditsError } from '@/lib/shop';
-import {
-  creatorTotals,
-  postPromotion,
-  promotePost,
-  type CreatorTotals,
-} from '@/lib/promotion';
+import { creatorTotals, type CreatorTotals } from '@/lib/promotion';
 import type { FeedPost } from '@/types/social';
 import { logCaught } from '@/lib/logCaught';
 
-function compact(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
-
+/**
+ * 📺 Egy alkotó csatornája: profil-fej, poszt-rács, követés, kiemelés, remix-felügyelet.
+ * REFACTOR: a gyökér az állapotot, a betöltést és a lista-vázat tartja; a részek a
+ * src/components/channel/ alatt, a tiszta számítások a src/lib/channelScreen.ts-ben.
+ */
 export default function ChannelScreen() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -96,209 +67,34 @@ export default function ChannelScreen() {
     load();
   }, [load]);
 
-  const onFollow = () => {
-    if (!id) {
-      return;
-    }
-    const next = !following;
-    // ⚡ §12.4: optimista követés-váltás + VISSZAGÖRGETÉS hibánál (korábban a
-    // `.catch(() => {})` elnyelte a hibát → a UI tévesen „követed"-et mutatott).
-    void runOptimistic({
-      apply: () => {
-        setFollowing(next);
-        setFollowers((n) => n + (next ? 1 : -1));
-      },
-      rollback: () => {
-        setFollowing(!next);
-        setFollowers((n) => n + (next ? -1 : 1));
-      },
-      commit: () => toggleFollow(id, next),
-    });
-  };
+  const { onFollow, onMessage, openPost, doModerate, doPromote, openInFeed } = createChannelActions({
+    t,
+    id,
+    data,
+    following,
+    promoteFor,
+    busy,
+    budget,
+    cpv,
+    load,
+    setFollowing,
+    setFollowers,
+    setPromoteFor,
+    setBusy,
+    setRemixFor,
+    setRemixes,
+    setRemixLoading,
+  });
 
-  // 💬 közvetlen üzenet a csatorna tulajának (DM megnyitás/létrehozás)
-  const onMessage = () => {
-    if (!id) {
-      return;
-    }
-    openDm(id)
-      .then((convId) => router.push(`/chat/${convId}`))
-      .catch((e: unknown) => { logCaught('app/channel/[id].tsx:onMessage', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); });
-  };
-
-  const showStats = (post: FeedPost) => {
-    postPromotion(post.id)
-      .then((promo) => {
-        const lines = [
-          t('stats.views', { n: post.counts.views }),
-          t('stats.likes', { n: post.counts.likes }),
-          t('stats.saves', { n: post.counts.saves }),
-          t('stats.comments', { n: post.counts.comments }),
-          t('stats.remixes', { n: post.counts.remixes }),
-        ];
-        if (promo) {
-          lines.push(
-            '',
-            t('stats.promoLine', {
-              delivered: promo.viewsDelivered,
-              target: promo.viewsTarget,
-              spent: promo.spentCredits,
-            }),
-            t(`promote.status_${promo.status}`)
-          );
-        }
-        Alert.alert(t('stats.title'), lines.join('\n'));
-      })
-      .catch((caught) => { logCaught('app/channel/[id].tsx:showStats', caught); });
-  };
-
-  const openRemixMod = (post: FeedPost) => {
-    setRemixFor(post);
-    setRemixLoading(true);
-    setRemixes([]);
-    listRemixesOf(post.id)
-      .then(setRemixes)
-      .catch((caught) => { logCaught('app/channel/[id].tsx:openRemixMod', caught); return setRemixes([]); })
-      .finally(() => setRemixLoading(false));
-  };
-
-  // egy remix feed-láthatóságának moderálása (soft removed/ok) — optimista
-  const doModerate = (remix: FeedPost, status: 'removed' | 'ok') => {
-    setRemixes((prev) =>
-      prev.map((r) => (r.id === remix.id ? { ...r, moderationStatus: status } : r))
-    );
-    moderateRemix(remix.id, status).catch((e: unknown) => {
-      logCaught('app/channel/[id].tsx:doModerate', e);
-      // visszagörgetés hibánál
-      setRemixes((prev) =>
-        prev.map((r) =>
-          r.id === remix.id ? { ...r, moderationStatus: remix.moderationStatus } : r
-        )
-      );
-      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
-    });
-  };
-
-  const openPost = (post: FeedPost) => {
-    if (data?.isMe) {
-      // saját poszt → kezelés: kiemelés / statisztika / (lejátszás) / törlés
-      const buttons: {
-        text: string;
-        style?: 'cancel' | 'destructive';
-        onPress?: () => void;
-      }[] = [
-        { text: t('promote.cta'), onPress: () => setPromoteFor(post) },
-        { text: t('stats.title'), onPress: () => showStats(post) },
-      ];
-      if (post.projectId) {
-        buttons.push({ text: t('feed.remix'), onPress: () => router.push(`/player/${post.projectId}`) });
-      }
-      if (post.counts.remixes > 0) {
-        buttons.push({
-          text: t('channel.remixMod.cta', { n: post.counts.remixes }),
-          onPress: () => openRemixMod(post),
-        });
-      }
-      buttons.push({
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => deletePost(post.id).then(load).catch((caught) => { logCaught('app/channel/[id].tsx:openPost', caught); }),
-      });
-      buttons.push({ text: t('common.cancel'), style: 'cancel' });
-      Alert.alert(post.title, undefined, buttons);
-      return;
-    }
-    if (canRemix(post)) {
-      Alert.alert(post.title, t('feed.remixPrompt'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('feed.remix'),
-          onPress: () =>
-            requireApp() &&
-            remixFromPost(post).then((pid) => {
-              if (pid) {
-                router.push(remixRoute(post, pid) as Href);
-              }
-            }),
-        },
-      ]);
-    }
-  };
-
-  const doPromote = () => {
-    if (!promoteFor || busy) {
-      return;
-    }
-    const b = parseInt(budget, 10) || 0;
-    const c = Math.max(1, parseInt(cpv, 10) || 1);
-    setBusy(true);
-    promotePost(promoteFor.id, b, c)
-      .then((r) => {
-        setPromoteFor(null);
-        Alert.alert(t('promote.cta'), t('promote.done', { views: r.viewsTarget }));
-        load();
-      })
-      .catch((e: unknown) => {
-      logCaught('app/channel/[id].tsx:doPromote', e);
-        if (e instanceof InsufficientCreditsError) {
-          Alert.alert(t('shop.needCreditsTitle'), t('shop.needCreditsBody'), [
-            { text: t('common.cancel'), style: 'cancel' },
-            { text: t('shop.buyCredits'), onPress: () => router.push('/shop') },
-          ]);
-        } else {
-          Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
-        }
-      })
-      .finally(() => setBusy(false));
-  };
-
-  const targetViews = (() => {
-    const b = parseInt(budget, 10) || 0;
-    const c = Math.max(1, parseInt(cpv, 10) || 1);
-    return Math.floor(b / c);
-  })();
-
-  const username = data?.creator?.username ?? (id ?? '').slice(0, 8);
-  // ⚠️ NE a „Csatorna" (nav-címke) legyen a név, ha nincs creator — inkább a handle
-  const displayName = data?.creator?.displayName || username;
-
-  // videóra koppintás → a csatorna videóit lapozó feed a megnyitott posztnál
-  const openInFeed = (post: FeedPost) => {
-    router.push(`/?channel=${id}&start=${post.id}`);
-  };
+  const { username, displayName } = channelNames(data, id);
 
   const gridItem = ({ item }: { item: FeedPost }) => (
-    <VideoThumb
-      style={styles.gridItem}
-      videoUri={item.videoUri}
-      posterUri={item.posterUri}
-      onPress={() => openInFeed(item)}
-      label={item.title}
-    >
-      <View style={styles.gridViews}>
-        <Ionicons name="play" size={11} color="#fff" />
-        <Text style={styles.gridViewsText}>{compact(item.counts.views)}</Text>
-      </View>
-      {/* saját poszt → kezelés (kiemelés/statisztika/remix-mod/törlés) a sarok-gombbal */}
-      {data?.isMe ? (
-        <Pressable style={styles.gridManage} onPress={() => openPost(item)} hitSlop={8}>
-          <Ionicons name="ellipsis-horizontal" size={16} color="#fff" />
-        </Pressable>
-      ) : null}
-    </VideoThumb>
+    <ChannelGridItem item={item} isMe={data?.isMe} openInFeed={openInFeed} openPost={openPost} />
   );
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <Pressable onPress={() => goBackOrHome()} hitSlop={10} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color={palette.text} />
-        </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          @{username}
-        </Text>
-        <View style={{ width: 32 }} />
-      </View>
+      <ChannelTopBar username={username} />
 
       {loading ? (
         <View style={styles.loadingBox}>
@@ -314,163 +110,33 @@ export default function ChannelScreen() {
           columnWrapperStyle={styles.gridRow}
           contentContainerStyle={{ paddingBottom: BOTTOM_NAV_HEIGHT + 24 }}
           ListHeaderComponent={
-            <View style={styles.profileHead}>
-              {data?.coverUri ? (
-                <Image source={{ uri: data.coverUri }} style={styles.cover} contentFit="cover" />
-              ) : (
-                <View style={[styles.cover, styles.coverPlaceholder]} />
-              )}
-              <View style={styles.bigAvatar}>
-                {data?.creator?.avatarUri ? (
-                  <Image
-                    source={{ uri: data.creator.avatarUri }}
-                    style={styles.bigAvatarImg}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <Text style={styles.bigAvatarText}>{displayName.slice(0, 1).toUpperCase()}</Text>
-                )}
-              </View>
-              <Text style={styles.displayName}>{displayName}</Text>
-              <Text style={styles.handle}>@{username}</Text>
-              {liveSession ? (
-                <Pressable style={styles.liveBanner} onPress={() => router.push(`/live/${liveSession.id}`)}>
-                  <View style={styles.liveBannerDot} />
-                  <Ionicons name="radio" size={15} color="#fff" />
-                  <Text style={styles.liveBannerText} numberOfLines={1}>
-                    {t('channel.liveNow', { defaultValue: 'LIVE now — tap to watch' })}
-                  </Text>
-                </Pressable>
-              ) : null}
-              {data?.creatorTypes?.length ? (
-                <View style={styles.creatorBadges}>
-                  <CreatorBadges types={data.creatorTypes} />
-                </View>
-              ) : null}
-              {data?.bio ? <Text style={styles.bio}>{data.bio}</Text> : null}
-              <View style={styles.stats}>
-                <View style={styles.stat}>
-                  <Text style={styles.statNum}>{compact(data?.postCount ?? 0)}</Text>
-                  <Text style={styles.statLabel}>{t('channel.posts')}</Text>
-                </View>
-                <View style={styles.stat}>
-                  <Text style={styles.statNum}>{compact(followers)}</Text>
-                  <Text style={styles.statLabel}>{t('channel.followers')}</Text>
-                </View>
-                <View style={styles.stat}>
-                  <Text style={styles.statNum}>{compact(data?.following ?? 0)}</Text>
-                  <Text style={styles.statLabel}>{t('channel.following')}</Text>
-                </View>
-              </View>
-              {totals ? (
-                <View style={styles.totalsRow}>
-                  <Text style={styles.totalsText}>
-                    ▶ {compact(totals.views)} · ♥ {compact(totals.likes)} · 🔀 {compact(totals.remixes)}
-                  </Text>
-                </View>
-              ) : null}
-              {data?.isMe ? (
-                // három EGYENLŐ cella oldalmargóval — telefonon semmi nem lóg ki (élő teszt CH1)
-                <View style={styles.ownActionRow}>
-                  {(
-                    [
-                      { icon: 'settings-outline', label: t('channel.editProfile'), to: '/profile' },
-                      { icon: 'folder-outline', label: t('collections.title'), to: '/collections' },
-                      { icon: 'stats-chart-outline', label: t('dashboard.title'), to: '/dashboard' },
-                    ] as const
-                  ).map((a) => (
-                    <Pressable
-                      key={a.to}
-                      style={styles.ownActionBtn}
-                      onPress={() => router.push(a.to)}
-                      accessibilityRole="button"
-                      accessibilityLabel={a.label}
-                    >
-                      <Ionicons name={a.icon} size={18} color={palette.text} />
-                      <Text
-                        style={styles.ownActionText}
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
-                        minimumFontScale={0.75}
-                      >
-                        {a.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : (
-                <View style={styles.actionRow}>
-                  <Pressable
-                    style={[styles.followBtn, following && styles.followingBtn]}
-                    onPress={onFollow}
-                  >
-                    <Text style={[styles.followBtnText, following && styles.followingBtnText]}>
-                      {following ? t('channel.following2') : t('channel.follow')}
-                    </Text>
-                  </Pressable>
-                  <Pressable style={styles.msgBtn} onPress={onMessage} accessibilityLabel={t('chat.message')}>
-                    <Ionicons name="chatbubble-outline" size={18} color={palette.text} />
-                  </Pressable>
-                  <Pressable
-                    style={styles.msgBtn}
-                    onPress={() => setGiftOpen(true)}
-                    accessibilityLabel={t('wallet.gift.title')}
-                  >
-                    <Ionicons name="gift-outline" size={18} color={palette.accent2} />
-                  </Pressable>
-                </View>
-              )}
-              {data?.skills?.length ? (
-                <View style={styles.skillsWrap}>
-                  <TagBadges tags={data.skills} max={12} />
-                </View>
-              ) : null}
-            </View>
+            <ChannelProfileHeader
+              data={data}
+              username={username}
+              displayName={displayName}
+              liveSession={liveSession}
+              followers={followers}
+              totals={totals}
+              following={following}
+              onFollow={onFollow}
+              onMessage={onMessage}
+              onGift={() => setGiftOpen(true)}
+            />
           }
           ListEmptyComponent={<Text style={styles.empty}>{t('channel.noPosts')}</Text>}
         />
       )}
 
-      {/* — kiemelés (promóció) modal — */}
-      <Modal
-        visible={promoteFor !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setPromoteFor(null)}
-      >
-        <View style={styles.backdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setPromoteFor(null)} />
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>{t('promote.cta')}</Text>
-            <Text style={styles.sheetHint}>{t('promote.hint')}</Text>
-            <Text style={styles.fieldLabel}>{t('promote.budget')}</Text>
-            <TextInput
-              style={styles.input}
-              value={budget}
-              onChangeText={setBudget}
-              keyboardType="number-pad"
-              placeholderTextColor={palette.textDim}
-            />
-            <Text style={styles.fieldLabel}>{t('promote.costPerView')}</Text>
-            <TextInput
-              style={styles.input}
-              value={cpv}
-              onChangeText={setCpv}
-              keyboardType="number-pad"
-              placeholderTextColor={palette.textDim}
-            />
-            <Text style={styles.targetText}>{t('promote.target', { views: targetViews })}</Text>
-            <View style={{ marginTop: 10 }}>
-              <PrimaryButton
-                label={t('promote.confirm', { budget: parseInt(budget, 10) || 0 })}
-                icon="megaphone-outline"
-                onPress={doPromote}
-                disabled={busy || targetViews < 1}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <PromoteSheet
+        promoteFor={promoteFor}
+        setPromoteFor={setPromoteFor}
+        budget={budget}
+        setBudget={setBudget}
+        cpv={cpv}
+        setCpv={setCpv}
+        busy={busy}
+        doPromote={doPromote}
+      />
 
       {/* 🎁 ajándék küldése ennek a creatornak (TikTok-modell) */}
       <GiftSheet
@@ -480,59 +146,13 @@ export default function ChannelScreen() {
         onClose={() => setGiftOpen(false)}
       />
 
-      {/* — 🔀 remix-felügyelet modal (az eredeti tulaj moderálja a remixeket) — */}
-      <Modal
-        visible={remixFor !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setRemixFor(null)}
-      >
-        <View style={styles.backdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setRemixFor(null)} />
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>{t('channel.remixMod.title')}</Text>
-            <Text style={styles.sheetHint}>{t('channel.remixMod.hint')}</Text>
-            {remixLoading ? (
-              <ActivityIndicator color={palette.accent} style={{ marginVertical: 24 }} />
-            ) : remixes.length === 0 ? (
-              <Text style={styles.remixEmpty}>{t('channel.remixMod.empty')}</Text>
-            ) : (
-              <FlatList
-                data={remixes}
-                keyExtractor={(r) => r.id}
-                style={{ maxHeight: 340 }}
-                renderItem={({ item }) => {
-                  const removed = item.moderationStatus === 'removed';
-                  return (
-                    <Pressable
-                      style={styles.remixRow}
-                      onPress={() => router.push(`/channel/${item.creator.id}`)}
-                    >
-                      <View style={styles.remixInfo}>
-                        <Text style={styles.remixTitle} numberOfLines={1}>
-                          @{item.creator.username}
-                        </Text>
-                        <Text style={styles.remixSub} numberOfLines={1}>
-                          {removed ? t('channel.remixMod.removedLabel') : item.title}
-                        </Text>
-                      </View>
-                      <Pressable
-                        style={[styles.remixBtn, removed ? styles.remixRestore : styles.remixRemove]}
-                        onPress={() => doModerate(item, removed ? 'ok' : 'removed')}
-                        hitSlop={6}
-                      >
-                        <Text style={styles.remixBtnText}>
-                          {removed ? t('channel.remixMod.restore') : t('channel.remixMod.remove')}
-                        </Text>
-                      </Pressable>
-                    </Pressable>
-                  );
-                }}
-              />
-            )}
-          </View>
-        </View>
-      </Modal>
+      <RemixModerationSheet
+        remixFor={remixFor}
+        setRemixFor={setRemixFor}
+        remixLoading={remixLoading}
+        remixes={remixes}
+        doModerate={doModerate}
+      />
 
       <BottomNav active="channel" />
     </SafeAreaView>
@@ -541,153 +161,7 @@ export default function ChannelScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: palette.bg },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
-  backBtn: { width: 32 },
-  headerTitle: { flex: 1, textAlign: 'center', color: palette.text, fontSize: 16, fontWeight: '800' },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  profileHead: { alignItems: 'center', paddingVertical: 16, gap: 6 },
-  cover: { alignSelf: 'stretch', aspectRatio: COVER_ASPECT, borderRadius: 14, backgroundColor: palette.surfaceHigh },
-  coverPlaceholder: { borderWidth: 1, borderColor: palette.border },
-  bigAvatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: palette.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: palette.bg,
-    marginTop: -48,
-  },
-  bigAvatarImg: { width: '100%', height: '100%' },
-  bigAvatarText: { color: '#fff', fontSize: 40, fontWeight: '800' },
-  displayName: { color: palette.text, fontSize: 18, fontWeight: '800', marginTop: 4 },
-  handle: { color: palette.textDim, fontSize: 14 },
-  liveBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    backgroundColor: palette.danger,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginTop: 10,
-  },
-  liveBannerDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff' },
-  liveBannerText: { color: '#fff', fontSize: 13, fontWeight: '800', flexShrink: 1 },
-  creatorBadges: { marginTop: 8, paddingHorizontal: 16 },
-  bio: { color: palette.text, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 6, paddingHorizontal: 24 },
-  skillsWrap: { marginTop: 14, paddingHorizontal: 16, alignItems: 'center' },
-  stats: { flexDirection: 'row', gap: 28, marginTop: 12 },
-  stat: { alignItems: 'center' },
-  statNum: { color: palette.text, fontSize: 17, fontWeight: '800' },
-  statLabel: { color: palette.textDim, fontSize: 12 },
-  followBtn: {
-    backgroundColor: palette.accent,
-    borderRadius: 999,
-    paddingHorizontal: 40,
-    paddingVertical: 10,
-  },
-  followingBtn: { backgroundColor: palette.surfaceHigh, borderWidth: 1, borderColor: palette.border },
-  followBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  followingBtnText: { color: palette.text },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14 },
-  ownActionRow: {
-    flexDirection: 'row',
-    alignSelf: 'stretch',
-    gap: 8,
-    marginTop: 14,
-    paddingHorizontal: 16,
-  },
-  ownActionBtn: {
-    flex: 1,
-    minWidth: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    minHeight: 56,
-    paddingHorizontal: 6,
-    borderRadius: 14,
-    backgroundColor: palette.surfaceHigh,
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-  ownActionText: { color: palette.text, fontSize: 12, fontWeight: '700' },
-  msgBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: palette.surfaceHigh,
-    borderWidth: 1,
-    borderColor: palette.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   gridRow: { gap: 3, paddingHorizontal: 3 },
-  gridItem: {
-    flex: 1 / 3,
-    aspectRatio: 0.62,
-    marginBottom: 3,
-    backgroundColor: palette.surfaceHigh,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  gridManage: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#00000088',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gridViews: { position: 'absolute', left: 5, bottom: 5, flexDirection: 'row', alignItems: 'center', gap: 3 },
-  gridViewsText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   empty: { color: palette.textDim, textAlign: 'center', paddingVertical: 40 },
-  totalsRow: { marginTop: 10, backgroundColor: palette.surfaceHigh, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
-  totalsText: { color: palette.text, fontSize: 13, fontWeight: '700' },
-  backdrop: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: palette.surface,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    padding: 20,
-    gap: 8,
-    borderTopWidth: 1,
-    borderColor: palette.border,
-  },
-  sheetTitle: { color: palette.text, fontSize: 18, fontWeight: '800' },
-  sheetHint: { color: palette.textDim, fontSize: 13, lineHeight: 18 },
-  fieldLabel: { color: palette.textDim, fontSize: 12, fontWeight: '700', marginTop: 6 },
-  input: {
-    backgroundColor: palette.surfaceHigh,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: palette.text,
-    fontSize: 15,
-  },
-  targetText: { color: palette.accent, fontSize: 14, fontWeight: '700', marginTop: 8 },
-  remixEmpty: { color: palette.textDim, textAlign: 'center', paddingVertical: 24 },
-  remixRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderColor: palette.border,
-  },
-  remixInfo: { flex: 1 },
-  remixTitle: { color: palette.text, fontSize: 14, fontWeight: '700' },
-  remixSub: { color: palette.textDim, fontSize: 12, marginTop: 1 },
-  remixBtn: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
-  remixRemove: { backgroundColor: palette.danger },
-  remixRestore: { backgroundColor: palette.accent },
-  remixBtnText: { color: '#fff', fontSize: 13, fontWeight: '800' },
 });
-

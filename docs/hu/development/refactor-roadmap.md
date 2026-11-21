@@ -5,6 +5,56 @@
 > platform-kompatibilitás változatlan. Szabály: nem sorszám, hanem felelősség, kohézió, csatolás és
 > tesztelhetőség szerint bontunk; a szerkezeti és a funkcionális változás sosem kerül egy commitba.
 
+## ✅ Eredmény (2026-11-21, `refactor` ág)
+
+| | Kiinduló (`e463d0a`) | Most |
+|---|---:|---:|
+| 500 sor feletti éles fájl | 63 | 2 (indokolt kivétel, lent) |
+| 1000 sor feletti forrásfájl (`large-files.json`) | 12 | 0 |
+| Jest suite / teszt | 561 / 5981 | 669 / 7387 (+1406) |
+| Lint | 0 hiba / 70 figyelmeztetés | 0 hiba / 68 figyelmeztetés |
+| Körfüggőség | 2 | 1 (`errors ↔ logCaught`) |
+| Coverage (V8) sor / függvény / ág | 73,88 / 67,58 / 81,69 % | 77,01 / 68,83 / 83,91 % (az új padló) |
+| Rögzített export (API-kapu) | 6001 / 1100 modul | 7828 / 1695 modul — a régiek neve és típusa változatlan |
+
+**Bizonyítási módszer fájlonként:** szó szerinti áthelyezés (sor-tartomány-szkriptek), az eredeti útvonal
+re-exportál (API-kapu: név + kanonikus TS-típus hash), **golden trace** — az eredeti (`git show HEAD:`) és az
+új kód ugyanazokon a forgatókönyveken, felvevő mockokkal (store/dispatch actorral, hálózat, natív, fájl,
+Alert, logCaught, teljes host-fa), bájtra azonos kimenet — **negatív kontrollokkal** (szándékos mutánsok,
+mind kiszúrva), statikus multiset-egyezés (i18n-kulcsok, logCaught-ujjlenyomatok, parancs-típusok, a11y),
+UI-n React Compiler-mérés (`tools/reactCompiler.test.js`: a memoizált részek rögzítve, ahol a gyökér a
+bontás után memoizálhatóvá vált volna, szándékos `'use no memo'` — a memoizálás bekapcsolása külön döntés).
+Ahol mérhető volt: valódi Chromium (PNG sha256), valódi ffmpeg (filtergraph + mp4 sha256), bitre pontos DSP,
+Stryker-mutációs pontszám (command-bus), Reanimated worklet-törzsek.
+
+**Indokolt kivételek (500 sor felett marad):** `src/components/studio/image/ImageStudioBody.tsx` (580 — a
+képernyő-elrendezés gyökere), `src/components/studio/audio/AudioStudioBody.tsx` (511 — az idővonal-JSX
+kiemelése ~30 propot igényelne kohézió nélkül), `src/dev/smoke/index.tsx` (989 — dev-only elosztó, bájtra
+változatlan; a fázisai a 6. fázisban suite-okba bontva).
+
+**A kapuk javítása menet közben (mind teszttel rögzítve):** az API-kapu sorrend- és helyfüggetlen lett
+(union/objektum-tagok rendezése, `import("…")`-minősítés, `typeof import`, minősített nevek), és a CommonJS
+`module.exports = …` modulokat is látja (29 szerverfájl eddig kimaradt).
+
+**6. fázis:** a `contract.test.ts` / `commands.test.ts` 13 tartomány-suite-ra bontva, közös fixture-ök a
+`src/test-utils/` alatt (izolációs őrteszttel); a jest ténylegesen futtatja a dinamikus `import()`-ot
+(`tools/jest/babel-plugin-dynamic-import.js`, csak jest — az éles bundle bájtra azonos); a 15 dev-smoke
+fázis-fájl funkció szerinti suite-okba bontva, a smoke-körfüggőség megszűnt. Eszközös (iPad) futtatás a
+refaktor során NEM történt.
+
+### Javítandó hibák súlyossági sorrendben (részletek lent, fájl:sor hivatkozással)
+
+1. 🔒⚠️ AI-számlázás megkerülése a saját env-kulcsunkon (üres kulcsú „BYOK”) — `server/aiLib/`
+2. 💰⚠️ Dupla pénzmozgás dupla koppintásra — Wallet (kifizetés/vásárlás/előfizetés/ajándék) és Bolt
+3. 🔒⚠️ Idegen felhő-render megszakítása (cancel a tulaj-ellenőrzés előtt) — `server/routes/renderLib/`
+4. 🔒⚠️ SSRF átirányításon (`/imagedoc`, `/psd/export`) és beágyazott kompozíción (`/render`) át
+5. 🔒⚠️ OAuth: beégetett `'insecure-dev-secret'` fallback (hamisítható fájl-token), XSS a `returnUrl`-en
+6. ⚠️ Image Studio SVG/vektoros PDF export: `[object Promise]` a beágyazott fotók helyén
+7. ⚠️ Projekt-tár: párhuzamos mentésnél projektek kiesnek a listából
+8. 🔒 Live egress / session / Studio, felhasználói fájlok, social feed, chat, wallet-lib, image-szerver —
+   további biztonsági és robusztussági pontok
+9. Funkcionális furcsaságok szinte minden területen (lent)
+
 ## Bizonyítási kapuk (minden lépés után)
 
 | Kapu | Parancs | Mit bizonyít |

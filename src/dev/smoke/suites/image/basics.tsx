@@ -1,0 +1,264 @@
+/** 🧪 Füstteszt — kép-stúdió alapkör: hálózat, ecset, bevitel, capture, varázspálca, zoom, lapok, vászon-művelet, paritás. (Áthelyezve: phases01; viselkedés-változás nélkül.) */
+import { ImageFormat, Skia, drawAsImage, Group } from '@shopify/react-native-skia';
+import { File } from 'expo-file-system';
+import { type ReactNode, type RefObject, createRef } from 'react';
+import { View } from 'react-native';
+import { captureRef } from 'react-native-view-shot';
+import { renderStrokes } from '@/components/studio/image/BrushOverlay';
+import { ImageCanvas } from '@/components/studio/image/ImageCanvas';
+import { LayerPanel } from '@/components/studio/image/LayerPanel';
+import { PhotoSkiaContent, makeLutImage } from '@/components/studio/image/SkiaPhotoLayer';
+import { rotateCanvasDoc } from '@/lib/imageCanvasOps';
+import { createImageDoc, addLayer } from '@/lib/imageDoc';
+import { renderImageDoc } from '@/lib/imageDocClient';
+import { makeId } from '@/lib/id';
+import { magicWandSelect } from '@/lib/magicWandClient';
+import { normalizePickedImage } from '@/lib/media';
+import { projectMediaDir } from '@/lib/projectFolderClient';
+import { cloudBaseUrl } from '@/lib/backend';
+import type { ShapeLayer, ImageLayer, PhotoLayer, ImageDoc } from '@/types/project';
+import { type Log, sleep } from '../../helpers/core';
+import { pixel, alphaImage, decode, removeFile } from '../../helpers/image';
+import { testDoc } from '../../fixtures/projects';
+import '@/lib/dspNativeClient';
+
+export async function smokeNetwork(log: Log) {
+  const base = cloudBaseUrl();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 6000);
+  try {
+    const res = await fetch(`${base}/health`, { signal: ctrl.signal });
+    log(res.ok, 'telefon → worker', `${base} HTTP ${res.status}`);
+    return res.ok;
+  } catch (e) {
+    log(false, 'telefon → worker', `${base}: ${(e as Error).message}`);
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+export function smokeBrush(log: Log) {
+  const box = { w: 300, h: 300 };
+  // vízszintes vonal a vászon közepén, 10 képpont vastag a képernyőn
+  const stroke = { points: [{ x: 0.1, y: 0.5, p: 1 }, { x: 0.9, y: 0.5, p: 1 }], color: '#ff0000', width: 10 / box.w, hardness: 1, opacity: 1, eraser: false };
+  const img = renderStrokes([stroke], 2160, 2160);
+  if (!img) {
+    log(false, 'I19 ecset offscreen', 'nincs GPU-felület');
+    return;
+  }
+  log(img.width() === 2160 && img.height() === 2160, 'I19 ecset doc-felbontáson', `${img.width()}×${img.height()}`);
+  const inside = pixel(img, 1080, 1080 - 30)[3]; // a 72 px vastag vonalon belül
+  const outside = pixel(img, 1080, 1080 - 60)[3]; // azon kívül
+  log(inside > 200 && outside === 0, 'I19 a vonal arányosan skálázódik (72 px)', `belül α=${inside}, kívül α=${outside}`);
+  // a nagy felbontás éles él: a vonal széle pár pixelen belül vált (nem egy elmosódott nagyítás)
+  let edge = 0;
+  for (let y = 1080 - 40; y < 1080 - 30; y++) {
+    const a = pixel(img, 1080, y)[3];
+    if (a > 10 && a < 245) {
+      edge += 1;
+    }
+  }
+  log(edge <= 3, 'I19 éles él', `${edge} átmeneti pixel`);
+}
+export async function smokeIntake(log: Log) {
+  for (const [name, format, ext] of [['WebP', ImageFormat.WEBP, 'webp'], ['PNG', ImageFormat.PNG, 'png']] as const) {
+    const src = alphaImage(format, ext);
+    const out = await normalizePickedImage(src, 64, 64);
+    const img = await decode(out.uri);
+    const corner = pixel(img, 2, 2);
+    const center = pixel(img, 32, 32);
+    log(/\.png$/.test(out.uri) && corner[3] === 0 && center[3] === 255, `I21 átlátszó ${name} import`, `${out.uri.split('.').pop()} sarok α=${corner[3]} közép α=${center[3]}`);
+    removeFile(src);
+    removeFile(out.uri);
+  }
+  const jpg = alphaImage(ImageFormat.JPEG, 'jpg');
+  const out = await normalizePickedImage(jpg, 64, 64);
+  log(/\.jpg$/.test(out.uri), 'I21 JPEG JPEG marad', out.uri.split('.').pop());
+  removeFile(jpg);
+  removeFile(out.uri);
+}
+export async function smokeCapture(log: Log, setHarness: (n: ReactNode) => void, ratio: number) {
+  const doc = testDoc();
+  const ref = createRef<View>() as RefObject<View>;
+  setHarness(
+    <View style={{ width: 280, height: 280 }}>
+      <ImageCanvas doc={doc} selectedId={null} onSelect={() => {}} commit={() => {}} canvasRef={ref} capturing />
+    </View>
+  );
+  await sleep(900);
+  const uri = await captureRef(ref, { format: 'png', quality: 1, width: Math.round(1080 / ratio), height: Math.round(1080 / ratio) });
+  const img = await decode(uri);
+  log(Math.abs(img.width() - 1080) <= 2 && Math.abs(img.height() - 1080) <= 2, 'I12 offline kép doc-felbontáson', `${img.width()}×${img.height()}, ratio ${ratio}`);
+  const w = img.width();
+  const corner = pixel(img, 1, 1);
+  const edge = pixel(img, Math.round(w / 2), 1);
+  const center = pixel(img, Math.round(w / 2), Math.round(w / 2));
+  log(corner[3] === 0 && edge[3] === 0, 'I12 nincs keret / háttér, átlátszó', `sarok ${corner} perem ${edge}`);
+  log(center[0] > 240 && center[1] < 15 && center[3] === 255, 'I12 a tartalom megvan', `közép ${center}`);
+  removeFile(uri);
+  setHarness(null);
+}
+/** 200×100-as kép: bal 70% piros, jobb 30% kék — aszimmetrikus, hogy a rossz leképezés kilógjon */
+function wandImage(): string {
+  const surface = Skia.Surface.MakeOffscreen(200, 100)!;
+  const canvas = surface.getCanvas();
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color('#ff0000'));
+  canvas.drawRect(Skia.XYWHRect(0, 0, 140, 100), paint);
+  paint.setColor(Skia.Color('#0000ff'));
+  canvas.drawRect(Skia.XYWHRect(140, 0, 60, 100), paint);
+  surface.flush();
+  const file = new File(projectMediaDir(), `smoke_wand_${Date.now().toString(36)}.png`);
+  file.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  return file.uri;
+}
+export async function smokeWand(log: Log) {
+  const uri = wandImage();
+  // cover négyzetes dobozban: a kép középső fele látszik (0,25–0,75), a kék 0,7-től → dobozban 0,9-től
+  const outline = await magicWandSelect(uri, 0.95, 0.5, 32, { boxAspect: 1, fit: 'cover' });
+  const xs = (outline ?? []).map((p) => p.x);
+  const min = Math.min(...xs);
+  log(!!outline && Math.abs(min - 0.9) < 0.03 && Math.max(...xs) <= 1, 'I33 pálca cover-illesztésnél a kék sávot jelöli', `dobozban x=${min.toFixed(3)}…${Math.max(...xs).toFixed(3)}`);
+  const margin = await magicWandSelect(uri, 0.5, 0.05, 32, { boxAspect: 1, fit: 'contain' });
+  log(margin === null, 'I33 contain-margóra koppintás nem jelöl ki semmit');
+  removeFile(uri);
+}
+export async function smokeZoomCanvas(log: Log, setHarness: (n: ReactNode) => void) {
+  const doc = testDoc();
+  const layerId = doc.layers[0].id;
+  setHarness(
+    <View style={{ width: 280, height: 280 }}>
+      <ImageCanvas doc={doc} selectedId={layerId} onSelect={() => {}} commit={() => {}} />
+    </View>
+  );
+  await sleep(900);
+  log(true, 'I36 a vászon kijelöléssel, kétujjas-pan gesztussal felépül a natív rétegen');
+  setHarness(null);
+}
+/** A valódi vászon kilógó réteggel, kijelölve — képernyőképhez (a fázis nyitva marad). */
+export async function smokePasteboard(log: Log, setHarness: (n: ReactNode) => void) {
+  const base = createImageDoc('Smoke', '1:1', () => makeId('lyr'), { width: 1080, height: 1080 });
+  const shape = { kind: 'shape', id: 'over', shape: 'ellipse', position: { x: 0.9, y: 0.5 }, w: 0.6, h: 0.6, fill: '#ff2d95' } as ShapeLayer;
+  const doc = addLayer({ ...base, layers: [] }, shape as ImageLayer);
+  setHarness(
+    <View style={{ width: 340, height: 320 }}>
+      <ImageCanvas doc={doc} selectedId="over" initialZoom={0.5} onSelect={() => {}} commit={() => {}} />
+    </View>
+  );
+  await sleep(800);
+  log(null, 'PASTEBOARD-READY');
+}
+/** A valódi réteg- és vászon-lapok (képernyőképhez). */
+export async function smokeSheets(log: Log, setHarness: (n: ReactNode) => void) {
+  const doc = testDoc();
+  const id = doc.layers[0].id;
+  setHarness(
+    <View style={{ width: 380, height: 320 }}>
+      <LayerPanel doc={doc} selectedId={id} onSelect={() => {}} onMergeDown={() => {}} onRasterize={() => {}} onFlatten={() => {}} commit={() => {}} onClose={() => {}} />
+    </View>
+  );
+  await sleep(1200);
+  log(null, 'SHEETS-READY');
+}
+/** Vászon-művelet a telefonról, a valódi workeren át. */
+export async function smokeCanvasOps(log: Log) {
+  const base = createImageDoc('Smoke', '1:1', () => makeId('lyr'), { width: 400, height: 200 });
+  const shape = { kind: 'shape', id: 's', shape: 'rectangle', position: { x: 0.25, y: 0.5 }, w: 0.5, h: 1, fill: '#ff0000' } as ShapeLayer;
+  const doc = addLayer({ ...base, layers: [] }, shape as ImageLayer);
+  const rotated = rotateCanvasDoc(doc, 90);
+  const uri = await renderImageDoc(rotated, rotated.height);
+  if (!uri) {
+    log(false, 'vászon-forgatás a telefonról', 'nincs render');
+    return;
+  }
+  const img = await decode(uri);
+  // 400×200 balfele piros → 90° jobbra: 200×400, a FELSŐ fele piros
+  log(img.width() === 200 && img.height() === 400 && pixel(img, 100, 100)[0] > 240 && pixel(img, 100, 300)[3] === 0, 'vászon-forgatás 90° a telefonról', `${img.width()}×${img.height()} felül ${pixel(img, 100, 100)} alul ${pixel(img, 100, 300)}`);
+  removeFile(uri);
+}
+/** 🎨 Az előnézet a valódi Skia-kimeneten, a valódi szerver-render ellen mérve. */
+export async function smokeParity(log: Log) {
+  const COLORS = ['#c83c28', '#28a050', '#3246c8', '#808080', '#e6dcc8', '#1e1928', '#f0c83c', '#5a2878'];
+  const surface = Skia.Surface.MakeOffscreen(320, 40)!;
+  const paint = Skia.Paint();
+  COLORS.forEach((c, i) => {
+    paint.setColor(Skia.Color(c));
+    surface.getCanvas().drawRect(Skia.XYWHRect(i * 40, 0, 40, 40), paint);
+  });
+  surface.flush();
+  const file = new File(projectMediaDir(), `smoke_par_${Date.now().toString(36)}.png`);
+  file.write(surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG));
+  const source = await decode(file.uri);
+  const cases: [string, Partial<PhotoLayer>][] = [
+    ['nincs', { adjust: { contrast: 0.0001 } }],
+    ['kontraszt', { adjust: { contrast: 0.3 } }],
+    ['telítettség', { adjust: { saturation: 0.5 } }],
+    ['hőmérséklet', { adjust: { temperature: 0.2 } }],
+    ['vibrance', { adjust: { vibrance: 0.6 } }],
+    ['hue', { adjust: { hue: 0.25 } }],
+    ['szintek', { levels: { black: 0.1, white: 0.8, gamma: 1.4 } }],
+    ['grade', { grade: 'teal-orange' }],
+    ['filterId', { filterId: 'warm', filterIntensity: 1 }],
+    ['gradient-map', { gradientMap: { shadow: '#102040', highlight: '#ffcc80' } }],
+  ];
+  const canvas = { width: 320, height: 320 };
+  for (const [name, patch] of cases) {
+    const layer = { kind: 'photo', id: 'p', uri: file.uri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch', ...patch } as PhotoLayer;
+    const preview = await drawAsImage(
+      <PhotoSkiaContent image={source} lut={makeLutImage(layer)} layer={layer} w={320} h={320} scale={1} canvas={canvas} />,
+      { width: 320, height: 320 }
+    );
+    const uri = await renderImageDoc({ id: 'par', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers: [layer] } as unknown as ImageDoc, 320);
+    if (!preview || !uri) {
+      log(false, `előnézet = export: ${name}`, 'nincs kép');
+      continue;
+    }
+    const real = await decode(uri);
+    let worst = 0;
+    for (let i = 0; i < COLORS.length; i++) {
+      const a = pixel(preview, i * 40 + 20, 60);
+      const b = pixel(real, i * 40 + 20, 60);
+      worst = Math.max(worst, ...[0, 1, 2].map((k) => Math.abs(a[k] - b[k])));
+    }
+    log(worst <= 14, `előnézet = export: ${name}`, `legnagyobb eltérés ${worst}/255`);
+    removeFile(uri);
+  }
+  // vágás és átlátszóság: rácspontonként az alfa
+  const shapes: [string, Partial<PhotoLayer>][] = [
+    ['téglalap-maszk', { mask: { shape: 'rectangle', x: 0.5, y: 0.5, w: 0.5, h: 0.5, feather: 0.005 } }],
+    ['ellipszis-maszk', { mask: { shape: 'ellipse', x: 0.4, y: 0.6, w: 0.5, h: 0.4, feather: 0.005 } }],
+    ['fordított maszk', { mask: { shape: 'rectangle', x: 0.5, y: 0.5, w: 0.5, h: 0.5, feather: 0.005, invert: true } }],
+    ['poligon-maszk forgatott rétegen', { rotation: 30, w: 0.7, h: 0.7, mask: { shape: 'polygon', x: 0.5, y: 0.5, w: 0.5, h: 0.5, feather: 0.005, points: [{ x: 0.3, y: 0.3 }, { x: 0.7, y: 0.35 }, { x: 0.55, y: 0.7 }] } }],
+  ];
+  for (const [name, patch] of shapes) {
+    const layer = { kind: 'photo', id: 'p', uri: file.uri, position: { x: 0.5, y: 0.5 }, w: 1, h: 1, fit: 'stretch', ...patch } as PhotoLayer;
+    const lw = 320 * layer.w;
+    const lh = 320 * layer.h;
+    const preview = await drawAsImage(
+      <Group transform={[{ translate: [160, 160] }, { rotate: ((layer.rotation ?? 0) * Math.PI) / 180 }, { translate: [-lw / 2, -lh / 2] }]}>
+        <PhotoSkiaContent image={source} lut={null} layer={layer} w={lw} h={lh} scale={1} canvas={canvas} />
+      </Group>,
+      { width: 320, height: 320 }
+    );
+    const uri = await renderImageDoc({ id: 'par', name: 'p', aspectRatio: '1:1', width: 320, height: 320, layers: [layer] } as unknown as ImageDoc, 320);
+    if (!preview || !uri) {
+      log(false, `vágás = export: ${name}`, 'nincs kép');
+      continue;
+    }
+    const real = await decode(uri);
+    let bad = 0;
+    let total = 0;
+    // a vízjel az alsó sávban van, azt kihagyjuk
+    for (let y = 10; y < 280; y += 12) {
+      for (let x = 10; x < 320; x += 12) {
+        total += 1;
+        if (Math.abs(pixel(preview, x, y)[3] - pixel(real, x, y)[3]) > 90) {
+          bad += 1;
+        }
+      }
+    }
+    log(bad / total <= 0.03, `vágás = export: ${name}`, `${bad}/${total} rácspont tér el`);
+    removeFile(uri);
+  }
+  removeFile(file.uri);
+}

@@ -23,7 +23,7 @@ A három struktúra-kapu: `npm run structure`, és része az `npm run audit`-nak
 - `npm run audit`: zöld — tsc 0 hiba, lint 0 hiba / 70 figyelmeztetés,
   **561 suite, 5981 sikeres + 1 kihagyott teszt** (49 s; teljes audit 1:52).
 - Körfüggőség: 2 ismert kör — `src/lib/errors.ts ↔ src/lib/logCaught.ts`,
-  `src/dev/smoke/phases15.tsx ↔ src/dev/smoke/shared.tsx`.
+  `src/dev/smoke/phases15.tsx ↔ src/dev/smoke/shared.tsx` (a 6. fázisban megszűnt — ma 1 kör).
 - 500 sor feletti fájl: **81** = 63 éles + 2 teszt (`contract.test.ts`, `commands.test.ts`)
   + 16 dev-only smoke (`src/dev/smoke/*`). Generált, asset- és vendored fájl nincs köztük
   (a `git ls-files` + `node_modules`/`ios`/`android` kizárással mérve).

@@ -60,9 +60,9 @@ describe('sanitizeAiConfig', () => {
     expect(sanitizeAiConfig({ provider: 'openai', model: 'm' })).toBeNull();
     expect(sanitizeAiConfig({ provider: 'EVIL', model: 'm', baseUrl: 'https://x' })).toEqual({ provider: 'custom', model: 'm', baseUrl: 'https://x', apiKey: '' });
   });
-  test('anthropic base_url nélkül is elfogadott; a mezők trimmelve, a nem-string mezők üresek', () => {
+  test('anthropic base_url nélkül is elfogadott (kulccsal); a mezők trimmelve, a nem-string mezők üresek', () => {
     expect(sanitizeAiConfig({ provider: 'anthropic', model: ' c ', apiKey: ' k ' })).toEqual({ provider: 'anthropic', model: 'c', baseUrl: '', apiKey: 'k' });
-    expect(sanitizeAiConfig({ provider: 'anthropic', model: 'c', baseUrl: 5, apiKey: {} })).toEqual({ provider: 'anthropic', model: 'c', baseUrl: '', apiKey: '' });
+    expect(sanitizeAiConfig({ provider: 'anthropic', model: 'c', baseUrl: 5, apiKey: 'k' })).toEqual({ provider: 'anthropic', model: 'c', baseUrl: '', apiKey: 'k' });
   });
 });
 
@@ -206,5 +206,33 @@ describe('funkció-promptok', () => {
     await expect(ai.runThumbHeadlines('t')).rejects.toThrow('A modell elutasította a kérést.');
     mockState.parseReply = { stop_reason: 'end_turn', parsed_output: null };
     await expect(ai.runHookGenerator('t')).rejects.toThrow('A modell válasza nem volt értelmezhető.');
+  });
+});
+
+describe('🔒 kulcs nélküli „BYOK” nem használhatja mérés nélkül a MI env-kulcsunkat', () => {
+  const { sanitizeAiConfig } = require('./byok');
+  test('támadás: üres / szóközös / nem-string kulcsú anthropic config NEM BYOK (null → a mért env-út)', () => {
+    expect(sanitizeAiConfig({ provider: 'anthropic', model: 'claude-opus-4-8' })).toBeNull();
+    expect(sanitizeAiConfig({ provider: 'anthropic', model: 'x', apiKey: '' })).toBeNull();
+    expect(sanitizeAiConfig({ provider: 'anthropic', model: 'x', apiKey: '   ' })).toBeNull();
+    expect(sanitizeAiConfig({ provider: 'anthropic', model: 'x', apiKey: {} })).toBeNull();
+  });
+  test('támadás: runStructured kulcs nélküli anthropic BYOK-configgal → elutasítva, env-kliens nem épül', async () => {
+    const ai = load({ ANTHROPIC_API_KEY: 'env' });
+    mockState.store = { uid: 'u1', tier: 'free' };
+    mockState.parseReply = { stop_reason: 'end_turn', parsed_output: { ok: true }, usage: { input_tokens: 10, output_tokens: 5 } };
+    await expect(
+      ai.runStructured('s', 'u', schema, { provider: 'anthropic', model: 'drága', baseUrl: '', apiKey: '' })
+    ).rejects.toThrow('BYOK');
+    expect(mockState.anthropic).toEqual([]);
+  });
+  test('a valódi kulcsú BYOK változatlan: a user kulcsa, NEM mért; a nem-anthropic kulcs nélkül is BYOK (a hívás a user végpontjára megy, a mi kulcsunk nélkül)', async () => {
+    expect(sanitizeAiConfig({ provider: 'anthropic', model: 'm', apiKey: ' k ' })).toEqual({ provider: 'anthropic', model: 'm', baseUrl: '', apiKey: 'k' });
+    expect(sanitizeAiConfig({ provider: 'ollama', model: 'm', baseUrl: 'https://api.openai.com/v1' })).toEqual({ provider: 'ollama', model: 'm', baseUrl: 'https://api.openai.com/v1', apiKey: '' });
+    const ai = load({ ANTHROPIC_API_KEY: 'env', REMIX_AI_KEY: 'remix-secret' });
+    fetchImpl = async () => json(200, { choices: [{ message: { content: '{"ok":true}' } }] });
+    await ai.runStructured('s', 'u', schema, { provider: 'openai', model: 'g', baseUrl: 'https://api.openai.com/v1', apiKey: '' });
+    expect(fetchCalls[0][1].headers).toEqual({ 'content-type': 'application/json' });
+    expect(mockState.anthropic).toEqual([]);
   });
 });

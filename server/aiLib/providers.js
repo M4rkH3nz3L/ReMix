@@ -7,8 +7,13 @@ const { aiTokenCount } = require('../usage');
 const { MODEL, OLLAMA_URL, LOCAL_MODEL } = require('./config');
 
 async function runAnthropic(system, userContent, schema, cfg) {
-  // BYOK: a felhasználó kulcsa/modellje, ha küldött; különben az env-alapértelmezés
-  const client = cfg && cfg.apiKey ? new Anthropic({ apiKey: cfg.apiKey }) : new Anthropic();
+  // BYOK: a felhasználó kulcsa/modellje, ha küldött; különben (cfg nélkül) az env-alapértelmezés.
+  // 🔒 BYOK-config kulcs nélkül SOHA nem eshet az env-kliensre: a BYOK-út nem mért → a MI kulcsunk
+  // mérés és kvóta nélkül futna (a sanitizeAiConfig már kiszűri; ez a mélységi védelem).
+  if (cfg && !(typeof cfg.apiKey === 'string' && cfg.apiKey.trim())) {
+    throw new Error('BYOK Anthropic-hívás API-kulcs nélkül — a saját kulcsodat add meg a profilodban.');
+  }
+  const client = cfg ? new Anthropic({ apiKey: cfg.apiKey }) : new Anthropic();
   const response = await client.messages.parse({
     model: (cfg && cfg.model) || MODEL,
     max_tokens: 16000,

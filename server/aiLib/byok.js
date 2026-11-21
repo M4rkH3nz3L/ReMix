@@ -7,6 +7,10 @@ const { assertSafeAiBaseUrl } = require('../ssrf');
  * modell; a nem-anthropic providerekhez base_url is kell (oda megy a hívás).
  * Érvénytelen → null → a worker a saját (env) AI-jára esik vissza.
  *
+ * 🔒 Az anthropic BYOK-hoz NEM-ÜRES kulcs kell: kulcs nélkül a hívás a MI
+ *    env-kulcsunkra (ANTHROPIC_API_KEY) esne, BYOK-ként viszont kvóta és mérés
+ *    nélkül → az ilyen config nem BYOK (null), a kérés a normál, mért env-útra megy.
+ *
  * ⚠️ A base_url a felhasználótól jön → a worker oda POST-ol (BYOK: saját kulcs,
  *    saját végpont). Prod-ban érdemes a providereket allowlistázni (SSRF).
  */
@@ -24,6 +28,9 @@ function sanitizeAiConfig(raw) {
     return null;
   }
   if (provider !== 'anthropic' && !baseUrl) {
+    return null;
+  }
+  if (provider === 'anthropic' && !apiKey) {
     return null;
   }
   return { provider, model, baseUrl, apiKey };

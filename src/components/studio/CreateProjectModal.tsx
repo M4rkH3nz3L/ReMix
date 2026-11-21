@@ -7,7 +7,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -15,33 +14,25 @@ import {
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Chip, PrimaryButton } from '@/components/ui/controls';
-import { aspectRatios, palette } from '@/constants/editor';
-import { AUDIO_MASTER_TARGETS } from '@/lib/audioMaster';
-import { BG_SWATCHES, CANVAS_PRESETS, clampDim } from '@/lib/canvasPresets';
+import { styles } from '@/components/studio/createProject/createProjectStyles';
+import {
+  AudioOptionsSection,
+  DesignTemplateSection,
+  Model3dFormatSection,
+  VideoAspectSection,
+} from '@/components/studio/createProject/KindOptionsSections';
+import { ImageOptionsSection } from '@/components/studio/createProject/ImageOptionsSection';
+import { KindPicker } from '@/components/studio/createProject/KindPicker';
+import { SeoFields } from '@/components/studio/createProject/SeoFields';
+import { SourceFolderSection } from '@/components/studio/createProject/SourceFolderSection';
+import { PrimaryButton } from '@/components/ui/controls';
+import { palette } from '@/constants/editor';
 import type { CreateFieldId } from '@/lib/createProjectForm';
-import { STORAGE_FORMATS } from '@/lib/model3dExport';
-import { creatableKinds } from '@/lib/projectKinds';
 import { supportedSourceKinds, type SourceKind } from '@/lib/projectSource';
 import type { Layout } from '@/hooks/useLayout';
 import type { AspectRatio, Asset, AudioMasterTarget, ProjectKind } from '@/types/project';
 import type { MeshFormat } from '@/types/model3d';
-import { AUDIO_TEMPLATES, type AudioTemplate } from '@/lib/audioTemplates';
-import { IMAGE_TEMPLATES } from '@/lib/imageTemplates';
-
-/** 🎚️ a hang-projekt választható master-céljai (a 'custom' nem induló-beállítás). */
-const AUDIO_TARGETS = AUDIO_MASTER_TARGETS.filter((tg) => tg !== 'custom');
-
-/** 🎛️ Az „Új projekt" választója = a LÉTREHOZHATÓ (kész stúdiójú) ÉS ezen az eszközön
- *  elérhető fajták — a katalógusból (`@/lib/projectKinds`), hogy sose kínáljon félkész
- *  stúdiót, és LiDAR nélkül a 3D-t se (3D-Studio.md §1.1). Renderkor számolva, mert a
- *  képesség-lekérdezés az indításkor aszinkron fut le. */
-function studioKinds(): { id: ProjectKind; icon: keyof typeof Ionicons.glyphMap }[] {
-  return creatableKinds().map((m) => ({
-    id: m.id,
-    icon: `${m.icon}-outline` as keyof typeof Ionicons.glyphMap,
-  }));
-}
+import type { AudioTemplate } from '@/lib/audioTemplates';
 
 /**
  * ➕ Az „Új projekt" alsó-sheet modal — a teljes létrehozás-űrlap: stúdió-fajta
@@ -98,6 +89,10 @@ export function CreateProjectModal(props: {
   onCreate: () => void;
   onCancel: () => void;
 }) {
+  // 🧭 A bontás után a gyökér már FORDÍTHATÓ lenne (a ref-es mezők a SeoFields-be kerültek),
+  // de a memoizálás bekapcsolása viselkedés-változás → külön döntés
+  // (tools/reactCompiler.test.js KNOWN_BAILS). Addig szándékosan kimarad.
+  'use no memo';
   const { t } = useTranslation();
   const {
     visible,
@@ -170,303 +165,61 @@ export function CreateProjectModal(props: {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* 🎛️ a három stúdió: videó / kép / hang — ez határozza meg, melyik
-                szerkesztő nyílik meg (ez a 3 együtt maga a Studio) */}
-            <Text style={styles.fieldLabel}>{t('studio.chooseKind')}</Text>
-            <View style={styles.kindRow}>
-              {studioKinds().map((k) => {
-                const active = kind === k.id;
-                return (
-                  <Pressable
-                    key={k.id}
-                    style={[styles.kindTile, active && styles.kindTileActive]}
-                    onPress={() => setKind(k.id)}
-                  >
-                    <Ionicons
-                      name={k.icon}
-                      size={24}
-                      color={active ? palette.accent : palette.textDim}
-                    />
-                    <Text style={[styles.kindTileLabel, active && styles.kindTileLabelActive]}>
-                      {t(`studio.kind.${k.id}`)}
-                    </Text>
-                    <Text style={styles.kindTileDesc} numberOfLines={2}>
-                      {t(`studio.kindDesc.${k.id}`)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <KindPicker kind={kind} setKind={setKind} />
 
-            <Text style={styles.fieldLabel}>{t('home.titleLabel')}</Text>
-            <TextInput
-              ref={fieldRefs.name}
-              value={name}
-              onChangeText={setName}
-              placeholder={t('home.projectNamePlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={styles.input}
-              autoFocus
-            />
-
-            <Text style={styles.fieldLabel}>{t('home.seoSectionTitle')}</Text>
-            <Text style={styles.seoHint}>{t('home.seoSectionHint')}</Text>
-
-            <Text style={styles.fieldLabel}>{t('home.descriptionLabel')}</Text>
-            <TextInput
-              ref={fieldRefs.description}
-              value={seoDescription}
-              onChangeText={setSeoDescription}
-              placeholder={t(`home.descriptionPlaceholder_${kind}`, {
-                defaultValue: t('home.descriptionPlaceholder'),
-              })}
-              placeholderTextColor={palette.textDim}
-              style={[styles.input, styles.inputMultiline]}
-              multiline
-            />
-
-            <Text style={styles.fieldLabel}>{t('home.hashtagsLabel')}</Text>
-            <TextInput
-              ref={fieldRefs.hashtags}
-              value={seoHashtags}
-              onChangeText={setSeoHashtags}
-              placeholder={t('home.hashtagsPlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={styles.input}
-              autoCapitalize="none"
-            />
-
-            <Text style={styles.fieldLabel}>{t('home.keywordsLabel')}</Text>
-            <TextInput
-              ref={fieldRefs.keywords}
-              value={seoKeywords}
-              onChangeText={setSeoKeywords}
-              placeholder={t('home.keywordsPlaceholder')}
-              placeholderTextColor={palette.textDim}
-              style={styles.input}
+            <SeoFields
+              kind={kind}
+              fieldRefs={fieldRefs}
+              name={name}
+              setName={setName}
+              seoDescription={seoDescription}
+              setSeoDescription={setSeoDescription}
+              seoHashtags={seoHashtags}
+              setSeoHashtags={setSeoHashtags}
+              seoKeywords={seoKeywords}
+              setSeoKeywords={setSeoKeywords}
             />
 
             {/* a képaránya CSAK a videónak van (a kép szabad W×H-t kap, a hangnak semmi) */}
-            {kind === 'video' ? (
-              <>
-                <Text style={styles.fieldLabel}>{t('home.aspectLabel')}</Text>
-                <View style={styles.aspectRow}>
-                  {aspectRatios.map((option) => (
-                    <Chip
-                      key={option.id}
-                      label={t(option.label)}
-                      active={aspect === option.id}
-                      onPress={() => setAspect(option.id)}
-                    />
-                  ))}
-                </View>
-              </>
-            ) : null}
+            {kind === 'video' ? <VideoAspectSection aspect={aspect} setAspect={setAspect} /> : null}
 
             {/* 🎨 DESIGN-projekt (S8): a sablon adja a vásznat és a rétegeket — a Kép Stúdió Design munkaterületén nyílik */}
             {kind === 'design' ? (
-              <>
-                <Text style={styles.fieldLabel}>{t('studio.image.templates.title')}</Text>
-                <View style={styles.aspectRow}>
-                  {IMAGE_TEMPLATES.map((tpl) => (
-                    <Chip
-                      key={tpl.key}
-                      label={`${t(`studio.image.templates.${tpl.key}`)} · ${tpl.width}×${tpl.height}`}
-                      active={designTemplate === tpl.key}
-                      onPress={() => setDesignTemplate(tpl.key)}
-                    />
-                  ))}
-                </View>
-              </>
+              <DesignTemplateSection designTemplate={designTemplate} setDesignTemplate={setDesignTemplate} />
             ) : null}
 
             {/* 🖼️ KÉP-projekt: dokumentum-típus + szabad vászon W×H + háttér (kép-editor) */}
             {kind === 'image' ? (
-              <>
-                <Text style={styles.fieldLabel}>{t('home.formatLabel')}</Text>
-                <View style={styles.aspectRow}>
-                  <Chip
-                    label={t('home.formatRaster')}
-                    active={imgFormat === 'raster'}
-                    onPress={() => setImgFormat('raster')}
-                  />
-                  <Chip
-                    label={t('home.formatVector')}
-                    active={imgFormat === 'vector'}
-                    onPress={() => setImgFormat('vector')}
-                  />
-                </View>
-
-                <Text style={styles.fieldLabel}>{t('home.canvasLabel')}</Text>
-                <View style={styles.aspectRow}>
-                  {CANVAS_PRESETS.map((p) => (
-                    <Chip
-                      key={p.label}
-                      label={p.label}
-                      active={clampDim(imgW) === p.w && clampDim(imgH) === p.h}
-                      onPress={() => {
-                        setImgW(String(p.w));
-                        setImgH(String(p.h));
-                      }}
-                    />
-                  ))}
-                </View>
-                <View style={styles.dimRow}>
-                  <View style={styles.dimField}>
-                    <Text style={styles.dimLabel}>{t('home.widthLabel')}</Text>
-                    <TextInput
-                      value={imgW}
-                      onChangeText={(v) => setImgW(v.replace(/[^0-9]/g, ''))}
-                      keyboardType="number-pad"
-                      style={styles.input}
-                      placeholder="1080"
-                      placeholderTextColor={palette.textDim}
-                    />
-                  </View>
-                  <Pressable
-                    onPress={() => {
-                      setImgW(imgH);
-                      setImgH(imgW);
-                    }}
-                    style={styles.swapBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('home.swapDims')}
-                  >
-                    <Ionicons name="swap-horizontal" size={18} color={palette.accent} />
-                  </Pressable>
-                  <View style={styles.dimField}>
-                    <Text style={styles.dimLabel}>{t('home.heightLabel')}</Text>
-                    <TextInput
-                      value={imgH}
-                      onChangeText={(v) => setImgH(v.replace(/[^0-9]/g, ''))}
-                      keyboardType="number-pad"
-                      style={styles.input}
-                      placeholder="1080"
-                      placeholderTextColor={palette.textDim}
-                    />
-                  </View>
-                </View>
-                <Text style={styles.seoHint}>
-                  {t('home.canvasSize', { width: clampDim(imgW), height: clampDim(imgH) })}
-                </Text>
-
-                <Text style={styles.fieldLabel}>{t('home.backgroundLabel')}</Text>
-                <View style={styles.bgRow}>
-                  {BG_SWATCHES.map((c) => (
-                    <Pressable
-                      key={c}
-                      onPress={() => setBg(c)}
-                      accessibilityRole="button"
-                      accessibilityLabel={c}
-                      style={[
-                        styles.swatch,
-                        { backgroundColor: c },
-                        bg === c && styles.swatchActive,
-                      ]}
-                    />
-                  ))}
-                  <Pressable
-                    onPress={() => setBg('transparent')}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('home.bgTransparent')}
-                    style={[
-                      styles.swatch,
-                      styles.swatchTransparent,
-                      bg === 'transparent' && styles.swatchActive,
-                    ]}
-                  >
-                    <Ionicons name="ban-outline" size={18} color={palette.textDim} />
-                  </Pressable>
-                </View>
-                <TextInput
-                  value={bg === 'transparent' ? '' : bg}
-                  onChangeText={setBg}
-                  placeholder={t('home.bgHexPlaceholder')}
-                  placeholderTextColor={palette.textDim}
-                  style={styles.input}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </>
+              <ImageOptionsSection
+                imgW={imgW}
+                setImgW={setImgW}
+                imgH={imgH}
+                setImgH={setImgH}
+                imgFormat={imgFormat}
+                setImgFormat={setImgFormat}
+                bg={bg}
+                setBg={setBg}
+              />
             ) : null}
 
             {/* 🎚️ HANG-projekt: master-cél (az alap hangosság/plafon preset) */}
             {kind === 'audio' || kind === 'music' ? (
-              <>
-                {/* 🧩 indító-sablon: sávok, tempó, jelölők, hangosság */}
-                <Text style={styles.fieldLabel}>{t('studio.audio.template.label')}</Text>
-                <View style={styles.aspectRow}>
-                  {AUDIO_TEMPLATES.map((tpl) => (
-                    <Chip key={tpl} label={t(`studio.audio.template.${tpl}`)} active={audioTemplate === tpl} onPress={() => setAudioTemplate(tpl)} />
-                  ))}
-                </View>
-                <Text style={styles.seoHint}>{t(`studio.audio.template.${audioTemplate}Hint`)}</Text>
-                <Text style={styles.fieldLabel}>{t('home.audioMasterLabel')}</Text>
-                <Text style={styles.seoHint}>{t('home.audioMasterHint')}</Text>
-                <View style={styles.aspectRow}>
-                  {AUDIO_TARGETS.map((tg) => (
-                    <Chip
-                      key={tg}
-                      label={t(`studio.master.target.${tg}`)}
-                      active={audioTarget === tg}
-                      onPress={() => setAudioTarget(tg)}
-                    />
-                  ))}
-                </View>
-              </>
+              <AudioOptionsSection
+                audioTarget={audioTarget}
+                setAudioTarget={setAudioTarget}
+                audioTemplate={audioTemplate}
+                setAudioTemplate={setAudioTemplate}
+              />
             ) : null}
 
             {/* 🧊 3D-projekt: a modell tárolási formátuma (a projekt mappájában ebben él) */}
             {kind === 'model3d' ? (
-              <>
-                <Text style={styles.fieldLabel}>{t('home.model3dFormatLabel')}</Text>
-                <Text style={styles.seoHint}>{t(`home.model3dFormatHint_${model3dFormat}`)}</Text>
-                <View style={styles.aspectRow}>
-                  {STORAGE_FORMATS.map((f) => (
-                    <Chip key={f} label={f.toUpperCase()} active={model3dFormat === f} onPress={() => setModel3dFormat(f)} />
-                  ))}
-                </View>
-              </>
+              <Model3dFormatSection model3dFormat={model3dFormat} setModel3dFormat={setModel3dFormat} />
             ) : null}
 
             {/* 🗂️ FORRÁS-MAPPA — a támogatott fájlok importja már itt (a 3D-nél nincs: csak LiDAR-szken) */}
             {supportedSourceKinds(kind).length > 0 ? (
-              <>
-                <Text style={styles.fieldLabel}>{t('home.sourceLabel')}</Text>
-                <Text style={styles.seoHint}>{t('home.sourceHint')}</Text>
-                <View style={styles.aspectRow}>
-                  {supportedSourceKinds(kind).map((sk) => (
-                    <Pressable key={sk} style={styles.sourceBtn} onPress={() => addSource(sk)}>
-                      <Ionicons name="add" size={14} color={palette.accent} />
-                      <Text style={styles.sourceBtnText}>{t(`studio.kind.${sk}`)}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-                {sources.length > 0 ? (
-                  <View style={styles.sourceList}>
-                    {sources.map((a) => (
-                      <View key={a.id} style={styles.sourceItem}>
-                        <Ionicons
-                          name={a.kind === 'video' ? 'videocam' : a.kind === 'audio' ? 'musical-notes' : 'image'}
-                          size={14}
-                          color={palette.textDim}
-                        />
-                        <Text style={styles.sourceItemName} numberOfLines={1}>
-                          {a.name}
-                        </Text>
-                        <Pressable
-                          onPress={() => removeSource(a.id)}
-                          hitSlop={8}
-                          accessibilityRole="button"
-                          accessibilityLabel={t('common.delete')}
-                        >
-                          <Ionicons name="close" size={16} color={palette.textDim} />
-                        </Pressable>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </>
+              <SourceFolderSection kind={kind} sources={sources} addSource={addSource} removeSource={removeSource} />
             ) : null}
           </ScrollView>
           <PrimaryButton
@@ -497,191 +250,3 @@ export function CreateProjectModal(props: {
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  missingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 8,
-    minHeight: 32,
-  },
-  missingText: { color: palette.warning, fontSize: 13, fontWeight: '600', flexShrink: 1 },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: '#000000aa',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    maxHeight: '100%',
-    backgroundColor: palette.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: palette.border,
-    padding: 20,
-    paddingBottom: 34,
-    gap: 14,
-  },
-  modalGrabber: {
-    alignSelf: 'center',
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: palette.border,
-    marginBottom: 2,
-  },
-  modalTitle: {
-    color: palette.text,
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  input: {
-    backgroundColor: palette.surfaceHigh,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.border,
-    color: palette.text,
-    padding: 12,
-    fontSize: 15,
-  },
-  inputMultiline: {
-    minHeight: 64,
-    textAlignVertical: 'top',
-  },
-  modalScrollContent: {
-    gap: 8,
-    paddingBottom: 4,
-  },
-  fieldLabel: {
-    color: palette.textDim,
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  seoHint: {
-    color: palette.textDim,
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: -4,
-  },
-  aspectRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  bgRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    alignItems: 'center',
-  },
-  dimRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  dimField: {
-    flex: 1,
-    gap: 4,
-  },
-  dimLabel: {
-    color: palette.textDim,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  swapBtn: {
-    width: 42,
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.surfaceHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 1,
-  },
-  swatch: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-  swatchActive: {
-    borderWidth: 3,
-    borderColor: palette.accent,
-  },
-  swatchTransparent: {
-    backgroundColor: palette.surfaceHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sourceBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: palette.surfaceHigh,
-  },
-  sourceBtnText: { color: palette.text, fontSize: 13, fontWeight: '700' },
-  sourceList: { gap: 6, marginTop: 2 },
-  sourceItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: palette.surfaceHigh,
-    borderRadius: 9,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  sourceItemName: { flex: 1, color: palette.text, fontSize: 13 },
-  kindRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  kindTile: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    backgroundColor: palette.surfaceHigh,
-  },
-  kindTileActive: {
-    borderColor: palette.accent,
-    backgroundColor: palette.accentSoft,
-  },
-  kindTileLabel: {
-    color: palette.textDim,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  kindTileLabelActive: {
-    color: palette.text,
-  },
-  kindTileDesc: {
-    color: palette.textDim,
-    fontSize: 10,
-    lineHeight: 13,
-    textAlign: 'center',
-  },
-  cancel: {
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  cancelText: {
-    color: palette.textDim,
-    fontSize: 13,
-  },
-});

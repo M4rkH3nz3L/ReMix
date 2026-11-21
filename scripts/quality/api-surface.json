@@ -2667,8 +2667,52 @@
   "PROVIDER_KINDS": "v:bbedb51969",
   "PROVIDER_LABEL": "v:c2db045d1a"
  },
+ "src/components/profile/storage/ExternalStorageSection.tsx": {
+  "ExternalStorageSection": "v:e7eb4e1cad"
+ },
+ "src/components/profile/storage/ManualProviderModal.tsx": {
+  "ManualProviderModal": "v:09044afbaa"
+ },
+ "src/components/profile/storage/Stepper.tsx": {
+  "Stepper": "v:d7f689aa05"
+ },
+ "src/components/profile/storage/StorageUsageSection.tsx": {
+  "StorageUsageSection": "v:68db5241f7"
+ },
+ "src/components/profile/storage/storageActions.ts": {
+  "StorageActionDeps": "t:6700b13ce5",
+  "createStorageActions": "v:54229d3171"
+ },
+ "src/components/profile/storage/storageStyles.ts": {
+  "styles": "v:ee54a8add1"
+ },
  "src/components/profile/styles.ts": {
   "profileStyles": "v:84cd7a0287"
+ },
+ "src/components/profile/wallet/BucketRow.tsx": {
+  "BucketRow": "v:e1016e0139"
+ },
+ "src/components/profile/wallet/CashoutSection.tsx": {
+  "CashoutSection": "v:54f06bfdbe"
+ },
+ "src/components/profile/wallet/CoinSubscriptionSection.tsx": {
+  "CoinSubscriptionSection": "v:20469581e3"
+ },
+ "src/components/profile/wallet/GiftSection.tsx": {
+  "GiftSection": "v:7f239dba4e"
+ },
+ "src/components/profile/wallet/WalletBalanceSection.tsx": {
+  "WalletBalanceSection": "v:91822aea37"
+ },
+ "src/components/profile/wallet/WalletHistory.tsx": {
+  "WalletHistory": "v:221d4d4aa0"
+ },
+ "src/components/profile/wallet/walletActions.ts": {
+  "WalletActionDeps": "t:36c52890f7",
+  "createWalletActions": "v:468b1369b8"
+ },
+ "src/components/profile/wallet/walletStyles.ts": {
+  "styles": "v:2ecfeef762"
  },
  "src/components/storage/FolderPickerSheet.tsx": {
   "FolderPickerSheet": "v:fad683e3a1"
@@ -2961,6 +3005,27 @@
   "Slider": "v:e2e0f68c21",
   "ToggleRow": "v:f6899c7b5f",
   "useWaveform": "v:92bacc3bb9"
+ },
+ "src/components/studio/createProject/ImageOptionsSection.tsx": {
+  "ImageOptionsSection": "v:b4bb7f42bb"
+ },
+ "src/components/studio/createProject/KindOptionsSections.tsx": {
+  "AudioOptionsSection": "v:d381e7a5a5",
+  "DesignTemplateSection": "v:9e3db7d6b1",
+  "Model3dFormatSection": "v:5759e4d10b",
+  "VideoAspectSection": "v:e44a16a51a"
+ },
+ "src/components/studio/createProject/KindPicker.tsx": {
+  "KindPicker": "v:e963cff7ec"
+ },
+ "src/components/studio/createProject/SeoFields.tsx": {
+  "SeoFields": "v:d8436a182f"
+ },
+ "src/components/studio/createProject/SourceFolderSection.tsx": {
+  "SourceFolderSection": "v:d5a30b0064"
+ },
+ "src/components/studio/createProject/createProjectStyles.ts": {
+  "styles": "v:a90b4c6301"
  },
  "src/components/studio/image/AdjustStackSheet.tsx": {
   "AdjustStackSheet": "v:b67fd9de90",
@@ -5380,6 +5445,13 @@
   "CreateFormValues": "t:d63c99855a",
   "missingCreateFields": "v:cf5b846dfa",
   "missingSeoFields": "v:29ac58e722"
+ },
+ "src/lib/createProjectModalOps.ts": {
+  "AUDIO_TARGETS": "v:32549eb0e3",
+  "bgHexValue": "v:ad895620cc",
+  "digitsOnly": "v:5793348f18",
+  "isCanvasPresetActive": "v:5d2b42af43",
+  "sourceAssetIcon": "v:e0074affdb"
  },
  "src/lib/creativeGraph.ts": {
   "CreativeGraph": "t:adb0016c52",
@@ -9058,6 +9130,13 @@
   "saveVersions": "v:e9dabb86ea",
   "writeRecovery": "v:1967d8d92f"
  },
+ "src/lib/storageCardOps.ts": {
+  "MANUAL_FIELDS": "v:f77e174ca6",
+  "boostMonthlyCost": "v:78615613fb",
+  "defaultProviderId": "v:f7d7e6b93f",
+  "fileKindEmoji": "v:806ddb0234",
+  "usageFraction": "v:000ed4e564"
+ },
  "src/lib/storageImport.ts": {
   "importFromStorage": "v:a5ba45bae1"
  },
@@ -9833,6 +9912,13 @@
   "startTrial": "v:36840298eb",
   "startWebTopup": "v:b5a4805366",
   "subscribeWithCoins": "v:4980f67ac8"
+ },
+ "src/lib/walletCardOps.ts": {
+  "COIN_TIERS": "v:d78537f457",
+  "KIND_ICON": "v:d9e3d9152c",
+  "giftIcon": "v:15c0e4e57a",
+  "savedPayoutAccount": "v:7ea23a9ed9",
+  "subscriptionMonths": "v:b04cbe59d9"
  },
  "src/lib/wandMapping.ts": {
   "LayerFit": "t:4639a53bd6",

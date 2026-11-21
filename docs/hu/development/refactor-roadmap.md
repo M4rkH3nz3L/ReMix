@@ -294,6 +294,21 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   visszaállítja); ha a `downloadSticker3d` dob, a `busy3d` beragad, és a panel újramountolásáig minden
   3D-objektum zárolva marad; a `listStickers3d` rejection-je sincs elkapva.
 
+- 💰⚠️ **SÚLYOS — Wallet dupla pénzmozgás** (`src/components/profile/wallet/walletActions.ts`; HEAD
+  `WalletCard.tsx:134–144`): a `guard` a render-kori `busy`-t olvassa — két gyors koppintás ugyanabban a
+  renderben KÉT pénzmozgató hívást indít (a trace az eredetiben is 2× `requestPayout`-ot mutat egy dupla
+  koppintásra); ugyanez a vásárlás, az előfizetés, az ajándék és a dev-jóváírás. Ref-alapú zár vagy
+  szerveres idempotencia-kulcs kell. Továbbá: (2) :296–299 0/érvénytelen kifizetési összegre néma
+  visszatérés, kliens-minimum nincs; (3) :207 az előfizetés hibájának logCaught-címkéje `:onPayPro`
+  (`onSubscribe` helyett — megőrizve az ujjlenyomat miatt); (4) :395 a „webes, olcsóbb” link fixen
+  `'coins_10'`; (5) :269 a mentett fiók fixen `provider: 'paypal'`; (6) beégetett „+1 🪙 (dev)” és
+  `'#39d98a'`.
+- **Tárhely-kártya** (`src/components/profile/storage/`; HEAD `StorageCard.tsx`): (7) :142, 162, 180,
+  200 `await refresh()` hatástalan (void) — a busy a frissítés vége előtt visszaáll; (8) :171–188 a
+  leválasztásnak nincs busy-őre; (9) :209–223 versenyhelyzet a fájl-listánál (késve érkező válasz
+  felülírja a nyitott forrás listáját); (10) nyers `(e as Error).message` a felhasználónak i18n nélkül;
+  (11) :98 hiányzó add-on definíciónál 0 ár, vásárolható; (12) :41–56 beégetett helyőrzők.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -331,10 +346,10 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/studio/image/ImageCanvas.tsx` | 715 | ✅ → 442 |
 | `src/app/channel/[id].tsx` | 693 | ✅ → 168 |
 | `server/userStorage.js` | 693 | ✅ → 46 |
-| `src/components/studio/CreateProjectModal.tsx` | 687 | ⬜ |
+| `src/components/studio/CreateProjectModal.tsx` | 687 | ✅ → 253 |
 | `src/lib/audioDsp.ts` | 680 | ✅ → 23 |
 | `src/components/preview/AudioLayer.tsx` | 676 | ✅ → 88 |
-| `src/components/profile/WalletCard.tsx` | 674 | ⬜ |
+| `src/components/profile/WalletCard.tsx` | 674 | ✅ → 192 |
 | `server/routes/render.js` | 667 | ✅ → 34 |
 | `src/components/editor/panels/ShapePanel.tsx` | 637 | ✅ → 45 |
 | `src/components/editor/panels/StickerPanel.tsx` | 608 | ✅ → 88 |
@@ -349,7 +364,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/hooks/useStudio.ts` | 558 | ⬜ |
 | `src/components/preview/TextOverlay.tsx` | 558 | ✅ → 236 |
 | `src/app/shop.tsx` | 557 | ⬜ |
-| `src/components/profile/StorageCard.tsx` | 549 | ⬜ |
+| `src/components/profile/StorageCard.tsx` | 549 | ✅ → 133 |
 | `src/lib/offlineMixClient.ts` | 543 | ✅ → 11 |
 | `src/components/editor/CameraRecorder.tsx` | 543 | ⬜ |
 | `src/app/schedules.tsx` | 541 | ⬜ |

@@ -231,6 +231,26 @@ const MUST_BE_MEMOIZED = [
   ['src/components/editor/panels/LibraryPanel.tsx', 'LibraryPanel'],
   // REFACTOR: a TextOverlay.tsx betű-rétegei (a gyökér kimarad, lásd lent: Reanimated shared value írása)
   ['src/components/preview/textOverlay/TextOverlayGlyphs.tsx', 'TextOverlayGlyphs'],
+  // REFACTOR: az „Új projekt" modal (CreateProjectModal.tsx) szekciói (a gyökér kimarad, lásd lent; a ref-es SeoFields előtte is kimaradt volna)
+  ['src/components/studio/createProject/KindPicker.tsx', 'KindPicker'],
+  ['src/components/studio/createProject/KindOptionsSections.tsx', 'VideoAspectSection'],
+  ['src/components/studio/createProject/KindOptionsSections.tsx', 'DesignTemplateSection'],
+  ['src/components/studio/createProject/KindOptionsSections.tsx', 'AudioOptionsSection'],
+  ['src/components/studio/createProject/KindOptionsSections.tsx', 'Model3dFormatSection'],
+  ['src/components/studio/createProject/ImageOptionsSection.tsx', 'ImageOptionsSection'],
+  ['src/components/studio/createProject/SourceFolderSection.tsx', 'SourceFolderSection'],
+  // REFACTOR: a pénztárca-kártya (WalletCard.tsx) szekciói; a BucketRow előtte is memoizált volt (a gyökér kimarad, lásd lent)
+  ['src/components/profile/wallet/BucketRow.tsx', 'BucketRow'],
+  ['src/components/profile/wallet/WalletBalanceSection.tsx', 'WalletBalanceSection'],
+  ['src/components/profile/wallet/CoinSubscriptionSection.tsx', 'CoinSubscriptionSection'],
+  ['src/components/profile/wallet/GiftSection.tsx', 'GiftSection'],
+  ['src/components/profile/wallet/CashoutSection.tsx', 'CashoutSection'],
+  ['src/components/profile/wallet/WalletHistory.tsx', 'WalletHistory'],
+  // REFACTOR: a tárhely-kártya (StorageCard.tsx) szekciói; a Stepper előtte is memoizált volt (a gyökér kimarad, lásd lent)
+  ['src/components/profile/storage/Stepper.tsx', 'Stepper'],
+  ['src/components/profile/storage/StorageUsageSection.tsx', 'StorageUsageSection'],
+  ['src/components/profile/storage/ExternalStorageSection.tsx', 'ExternalStorageSection'],
+  ['src/components/profile/storage/ManualProviderModal.tsx', 'ManualProviderModal'],
 ];
 
 /**
@@ -265,6 +285,9 @@ const KNOWN_BAILS = [
   ['src/components/editor/panels/CaptionsPanel.tsx', 'CaptionsPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
   ['src/app/auth.tsx', 'AuthScreen', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
   ['src/components/editor/panels/CaptionsPanel.tsx', 'CaptionsPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],  ['src/components/editor/panels/StickerPanel.tsx', 'StickerPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
+  ['src/components/studio/CreateProjectModal.tsx', 'CreateProjectModal', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
+  ['src/components/profile/WalletCard.tsx', 'WalletCard', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
+  ['src/components/profile/StorageCard.tsx', 'StorageCard', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
 ];
 
 const cache = new Map();

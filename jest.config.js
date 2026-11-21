@@ -13,6 +13,20 @@
  * Futtatás:  npm test        (egyszer, CI-barát)
  *            npm run test:watch
  */
+
+// A jest-expo JS/TS-transzformja + a dinamikus `import()` átírása (CSAK jestben — a Metro nem olvassa
+// ezt a fájlt; indoklás: tools/jest/babel-plugin-dynamic-import.js). A preset kulcsát írjuk felül, így
+// a preset minden más beállítása (caller, root, babelrc) változatlan marad.
+const EXPO_JS_TRANSFORM = '\\.[jt]sx?$';
+const [babelJest, expoBabelOptions] = require('jest-expo/jest-preset').transform[EXPO_JS_TRANSFORM];
+const clientJsTransform = [
+  babelJest,
+  {
+    ...expoBabelOptions,
+    plugins: [...(expoBabelOptions.plugins || []), require.resolve('./tools/jest/babel-plugin-dynamic-import')],
+  },
+];
+
 module.exports = {
   // V8-alapú coverage: nem írja át a forrást. Az alapértelmezett (babel/istanbul) a
   // `page.evaluate`-nek átadott függvényekbe is `cov_…` számlálót injektál, ami a Chromiumban
@@ -22,7 +36,8 @@ module.exports = {
     {
       displayName: 'client',
       preset: 'jest-expo',
-      testMatch: ['<rootDir>/src/**/*.test.ts', '<rootDir>/src/**/*.test.tsx'],
+      transform: { [EXPO_JS_TRANSFORM]: clientJsTransform },
+      testMatch:['<rootDir>/src/**/*.test.ts', '<rootDir>/src/**/*.test.tsx'],
       transformIgnorePatterns: [
         'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg)',
       ],

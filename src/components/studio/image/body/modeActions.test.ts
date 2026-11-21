@@ -3,10 +3,22 @@ import { Alert } from 'react-native';
 
 import { createModeActions, type ModeActionDeps } from '@/components/studio/image/body/modeActions';
 import type { StudioModeState } from '@/components/studio/image/body/useStudioModeState';
+import { effectiveCanvas } from '@/lib/canvasPresets';
 import { logCaught } from '@/lib/logCaught';
 import type { ImageDoc, ImageLayer } from '@/types/project';
 
 jest.mock('@/lib/logCaught', () => ({ logCaught: jest.fn() }));
+
+// A retus lusta Skia-importja: a jest a dinamikus importot végrehajtja (tools/jest), ezért a natív
+// Skia helyett vezérelhető mock — `fail` = a modul nem tölthető be (régi dev-kliens), `image` = a dekódolt kép.
+const mockSkia = { fail: false, image: { id: 'img' } as unknown, fromURI: jest.fn(async (uri: string) => ({ uri })) };
+jest.mock('@shopify/react-native-skia', () => ({
+  __esModule: true,
+  get Skia() {
+    if (mockSkia.fail) throw new Error('nincs natív Skia');
+    return { Data: { fromURI: mockSkia.fromURI }, Image: { MakeImageFromEncoded: () => mockSkia.image } };
+  },
+}));
 
 /**
  * 🎯 A precíziós módok be-/kilépése és lezárása (REFACTOR: az `ImageStudioBody`-ból kiemelve): a
@@ -181,11 +193,54 @@ describe('retus', () => {
     await a.api.startRetouch();
     expect(a.fns.setBusy).not.toHaveBeenCalled();
   });
+  beforeEach(() => {
+    mockSkia.fail = false;
+    mockSkia.image = { id: 'img' };
+    mockSkia.fromURI.mockClear();
+    (logCaught as jest.Mock).mockClear();
+  });
   it('ha a Skia (lusta import) nem tölthető be: logCaught az eredeti címkével, hiba-ablak, a mód nem indul, a foglaltság visszaáll', async () => {
-    // a jest-környezetben a dinamikus import nem fut — ez pont a „régi dev-kliens” ága
+    // a „régi dev-kliens” ága: a natív Skia hiányzik (korábban a jest dinamikus-import hibája véletlenül ezt adta)
+    mockSkia.fail = true;
     const a = setup();
     await a.api.startRetouch();
     expect(logCaught).toHaveBeenCalledWith('components/studio/image/ImageStudioBody.tsx:startRetouch', expect.anything());
+    expect(Alert.alert).toHaveBeenCalledWith('studio.image.wand.failTitle', 'studio.image.retouch.failBody');
+    expect(a.fns.setBrushActive).not.toHaveBeenCalled();
+    expect(a.fns.setBusy.mock.calls).toEqual([[true], [false]]);
+  });
+  it('betöltött Skia + dekódolható pillanatkép: a vászon képe a klón-forrás, a retus-ecset indul, minden más mód bezárul', async () => {
+    const a = setup();
+    await a.api.startRetouch();
+    expect(a.deps.captureCanvas).toHaveBeenCalledWith(doc, effectiveCanvas(doc).height);
+    expect(mockSkia.fromURI).toHaveBeenCalledWith('file:///cap.png');
+    expect(a.fns.setBrushSource).toHaveBeenCalledWith({ id: 'img' });
+    expect(a.fns.setBrush.mock.calls[0][0]({ size: 30, tool: 'paint', opacity: 0.4 })).toEqual({ size: 30, tool: 'clone', opacity: 1 });
+    expect(a.fns.setBrushLayerId).toHaveBeenCalledWith(null);
+    expect(a.fns.setBrushMaskMode).toHaveBeenCalledWith(false);
+    expect(a.deps.setSheet).toHaveBeenCalledWith(null);
+    expect(a.deps.setSelectedId).toHaveBeenCalledWith(null);
+    expect(a.fns.setLassoActive).toHaveBeenCalledWith(false);
+    expect(a.fns.setWandActive).toHaveBeenCalledWith(false);
+    expect(a.fns.setBrushActive).toHaveBeenCalledWith(true);
+    expect(logCaught).not.toHaveBeenCalled();
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(a.fns.setBusy.mock.calls).toEqual([[true], [false]]);
+  });
+  it('nem dekódolható pillanatkép (null kép): hiba-ablak logCaught nélkül, a mód nem indul', async () => {
+    mockSkia.image = null;
+    const a = setup();
+    await a.api.startRetouch();
+    expect(Alert.alert).toHaveBeenCalledWith('studio.image.wand.failTitle', 'studio.image.retouch.failBody');
+    expect(logCaught).not.toHaveBeenCalled();
+    expect(a.fns.setBrushSource).not.toHaveBeenCalled();
+    expect(a.fns.setBrushActive).not.toHaveBeenCalled();
+    expect(a.fns.setBusy.mock.calls).toEqual([[true], [false]]);
+  });
+  it('a vászon-pillanatkép nem készült el (nincs uri): a Skia nem dekódol, hiba-ablak, a mód nem indul', async () => {
+    const a = setup({ captureCanvas: jest.fn(async () => null) } as unknown as Partial<ModeActionDeps>);
+    await a.api.startRetouch();
+    expect(mockSkia.fromURI).not.toHaveBeenCalled();
     expect(Alert.alert).toHaveBeenCalledWith('studio.image.wand.failTitle', 'studio.image.retouch.failBody');
     expect(a.fns.setBrushActive).not.toHaveBeenCalled();
     expect(a.fns.setBusy.mock.calls).toEqual([[true], [false]]);

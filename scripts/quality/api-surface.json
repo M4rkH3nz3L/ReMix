@@ -10624,6 +10624,13 @@
  "src/store/walletEvents.ts": {
   "useWalletEvents": "v:71a4c7df07"
  },
+ "src/test-utils/dynamicImport/mocked.ts": {
+  "VALUE": "v:2df298a805"
+ },
+ "src/test-utils/dynamicImport/probe.ts": {
+  "PROBE": "v:8bed17d564",
+  "default": "v:ef2718c01e"
+ },
  "src/test-utils/projectFixtures.ts": {
   "EDITOR_TRACK_TYPES": "v:a7f781c80d",
   "asset": "v:2e3f10435f",

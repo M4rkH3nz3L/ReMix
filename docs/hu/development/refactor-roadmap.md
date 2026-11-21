@@ -250,7 +250,8 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   „A dynamic import callback was invoked without…”) — a repó tesztjeiben így a `storage` mappa/szinkron/
   GC/rebase-ágai, a render `phoneMixFile`- és médiatár-útjai és az Image Studio minőségkapuja
   CSENDBEN a catch-ágba esnek, valójában teszteletlenek (négy bontás golden trace-e egymástól függetlenül
-  mutatta ki; a trace-ekhez scratch babel-plugin fordította `require`-re). → 6. fázis.
+  mutatta ki; a trace-ekhez scratch babel-plugin fordította `require`-re). → 6. fázis: ✅ JAVÍTVA
+  (`tools/jest/babel-plugin-dynamic-import.js`, csak a jest client-projektben; az éles bundle bájtra azonos).
 
 - 🔒⚠️ **SÚLYOS — AI-számlázás megkerülése a SAJÁT env-kulcsunkon** (`server/aiLib/`; HEAD `server/ai.js`):
   a `sanitizeAiConfig` (ai.js:313-319) elfogad `{provider:'anthropic', model:'<bármi>'}` configot ÜRES

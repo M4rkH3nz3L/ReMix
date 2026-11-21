@@ -16,7 +16,7 @@ jest.mock('../../mediastore', () => ({
 }));
 jest.mock('../../ssrf', () => ({
   ...jest.requireActual('../../ssrf'),
-  safeFetch: async (u, opts) => {
+  safeFetchFollow: async (u, opts) => {
     mockFetches.push([u, opts]);
     return { ok: false };
   },
@@ -85,7 +85,7 @@ describe('remoteMediaOpts', () => {
   test('a rossz %-kódolás kivételt dob (nem null) — a jelenlegi viselkedés', () => {
     expect(() => remoteMediaOpts(req).localPath('http://worker.test/m/%E0%A4%A')).toThrow('URI malformed');
   });
-  test('üres LOCAL_DIR → mindig null; a fetch az SSRF-védett safeFetch, redirect: follow', async () => {
+  test('üres LOCAL_DIR → mindig null; a fetch a hopokat is validáló safeFetchFollow (✅ SSRF-redirect javítva)', async () => {
     // a LOCAL_DIR betöltéskor rögzül → külön modul-példány üres értékkel
     const saved = mockLocal.dir;
     mockLocal.dir = '';
@@ -97,7 +97,7 @@ describe('remoteMediaOpts', () => {
     expect(isolated(req).localPath('http://worker.test/m/u%2Fa.png')).toBeNull();
     const opts = remoteMediaOpts(req);
     await opts.fetchUrl('https://cdn.test/a.png');
-    expect(mockFetches.pop()).toEqual(['https://cdn.test/a.png', { redirect: 'follow' }]);
+    expect(mockFetches.pop()).toEqual(['https://cdn.test/a.png', undefined]);
   });
 });
 

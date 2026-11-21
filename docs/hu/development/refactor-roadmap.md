@@ -47,8 +47,8 @@ refaktor során NEM történt.
 1. 🔒⚠️ AI-számlázás megkerülése a saját env-kulcsunkon (üres kulcsú „BYOK”) — `server/aiLib/` — ✅ JAVÍTVA (kulcs nélküli anthropic config nem BYOK → mért env-út; a `runAnthropic` BYOK-ként sosem esik env-kliensre)
 2. 💰⚠️ Dupla pénzmozgás dupla koppintásra — Wallet (kifizetés/vásárlás/előfizetés/ajándék) és Bolt —
    ✅ JAVÍTVA (szinkron `createInFlightLock` zár a gyökérben; szerveres idempotencia-kulcs még nincs)
-3. 🔒⚠️ Idegen felhő-render megszakítása (cancel a tulaj-ellenőrzés előtt) — `server/routes/renderLib/`
-4. 🔒⚠️ SSRF átirányításon (`/imagedoc`, `/psd/export`) és beágyazott kompozíción (`/render`) át
+3. 🔒⚠️ Idegen felhő-render megszakítása (cancel a tulaj-ellenőrzés előtt) — `server/routes/renderLib/` — ✅ JAVÍTVA (a cancel előbb `getRenderJob`-bal tulajt ellenőriz; idegenre 404 + `render.denied`, a job érintetlen)
+4. 🔒⚠️ SSRF átirányításon (`/imagedoc`, `/psd/export`) és beágyazott kompozíción (`/render`) át — ✅ JAVÍTVA (`safeFetchFollow`: minden redirect-hop SSRF-validált, max. 5; a /render rekurzívan írja át a comp-klipeket; a `localPathOnly` csak a render-munkakönyvtárat engedi; a DNS-rebinding ablak marad)
 5. 🔒⚠️ OAuth: beégetett `'insecure-dev-secret'` fallback (hamisítható fájl-token), XSS a `returnUrl`-en — ✅ JAVÍTVA (1)+(3) (prod: csak `OAUTH_STATE_SECRET`, hiányában 503 / indulás-tiltás; returnUrl-allowlist + escape)
 6. ⚠️ Image Studio SVG/vektoros PDF export: `[object Promise]` a beágyazott fotók helyén
 7. ⚠️ Projekt-tár: párhuzamos mentésnél projektek kiesnek a listából
@@ -236,7 +236,8 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   távoli réteg-média `safeFetch(u, { redirect: 'follow' })`, a `ssrf.js` L202–209 viszont CSAK a kiinduló URL-t
   ellenőrzi, a `fetch` az átirányítást validálás nélkül követi → egy nyilvános, 302-vel belső címre
   (169.254.169.254, localhost, LAN) mutató URL-lel a `/imagedoc` és a `/psd/export` SSRF-et indít (DNS-rebinding
-  ellen sincs védelem); (2) ID L373–380: a távoli választ időkorlát nélkül, TELJESEN a memóriába olvassa, és csak
+  ellen sincs védelem) — ✅ JAVÍTVA (`ssrf.js` `safeFetchFollow`: `redirect: 'manual'`, minden `Location` ugyanazzal
+  az `assertSafeUrl`-lel, max. 5 hop; a DNS-rebinding ablak továbbra is nyitott); (2) ID L373–380: a távoli választ időkorlát nélkül, TELJESEN a memóriába olvassa, és csak
   utána nézi a 40 MB-os plafont (rétegenként 4 hivatkozás × 400 réteg, sorosan) → memória/idő-DoS; (3) ID L367 +
   IT L43–47: a `localPath` (`new URL` / `decodeURIComponent`) a `try`-on KÍVÜL fut → egy rossz %-kódolású saját
   `/m/` URL az egész `/imagedoc`-ot 500-zal (a `/psd/export`-ot 400-zal) dönti a réteg kihagyása helyett;
@@ -328,12 +329,15 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   (1) IDEGEN render-job megszakítása: a cancel (`routes/render.js:654`) a `cancelRenderJob(id)`-t a
   tulaj-ellenőrzés (655–658) ELŐTT hívja — egy idegen várakozó job ténylegesen kikerül a sorból
   (`queue.js:130`), futónál abort-flag (`queue.js:140`); az ID ismeretében bárki leállíthatja más
-  felhő-renderjét, és csak utána kap 404-et (a trace bizonyítja); (2) SSRF beágyazott kompozíción át:
+  felhő-renderjét, és csak utána kap 404-et (a trace bizonyítja) — ✅ JAVÍTVA (előbb `getRenderJob` + tulaj-
+  ellenőrzés, csak a sajátra fut a `cancelRenderJob`); (2) SSRF beágyazott kompozíción át:
   a /render csak a felső szintű klipek URI-jait írja át (`routes/render.js:52–95`), a
   `clip.comp.tracks` belső klipjeinek `uri`-ja ellenőrzés nélkül az ffmpeg `-i`-jére kerül
   (`server/render/segmentGraph.js:94`) — `http://`, `file://`, abszolút worker-útvonal is; a
   `localPathOnly` (`videoFilters.js:20–26`) csak a matte-et és a LUT-ot védi, és csak a séma-előtagot
-  szűri; (3) a /render-en nincs rateLimit (`routes/render.js:36`; az `authorization.test` `rateClass:
+  szűri — ✅ JAVÍTVA (a submit rekurzívan, max. 8 szintig írja át/utasítja el a comp-klipek uri/imageUri/matte/LUT-
+  értékét ugyanazzal a „Hiányzó médiafájlok” 400-zal; a `localPathOnly` séma nélkül is csak a
+  `<tmp>/vided-render-*` / `remix-render-*` alatti fájlt engedi — a `/color/lut-export` is ezen át szivárgott); (3) a /render-en nincs rateLimit (`routes/render.js:36`; az `authorization.test` `rateClass:
   'render'`-t vár), nincs mediaGuard, a feltöltési plafon a 2 GB-os fallback; (4) temp-mappa szivárgás a
   400-as és a felhő-ág hibaágain (43–46, 99–102; 503/429/500) a 6 órás sweepig; (5) `project = null` →
   500 a 400 helyett; (6) a body-ból jövő uid-fallback (148) és a `?userId` (418) nincs `INSECURE_DEV`-hez

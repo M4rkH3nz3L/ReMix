@@ -1,5 +1,7 @@
 // 🎨 A server/render/videoFiltersLib/ regressziós tesztjei (REFACTOR): a videoFilters.js homlokzat ugyanazokat a
 // függvény-objektumokat adja ugyanabban a sorrendben, és a szűrő-stringek JELENLEGI alakja (bájtra) rögzítve.
+const os = require('os');
+const path = require('path');
 const VF = require('../videoFilters');
 const { localPathOnly } = require('./localPath');
 const color = require('./colorChains');
@@ -21,10 +23,21 @@ describe('homlokzat (render/videoFilters.js)', () => {
   });
 });
 
+const RDIR = path.join(os.tmpdir(), 'vided-render-abc'); // a /render feltöltési munkakönyvtára (multer)
+const WDIR = path.join(os.tmpdir(), 'remix-render-xyz'); // a felhő-worker munkakönyvtára
+
 describe('localPathOnly — mélységi SSRF-védelem', () => {
   test.each([
-    ['/tmp/a.cube', '/tmp/a.cube'],
-    ['rel/l.cube', 'rel/l.cube'],
+    [path.join(RDIR, 'f1.cube'), path.join(RDIR, 'f1.cube')],
+    [path.join(WDIR, 'in_0_m.png'), path.join(WDIR, 'in_0_m.png')],
+    [path.join(RDIR, 'comp_0', 'x.png'), path.join(RDIR, 'comp_0', 'x.png')],
+    // ✅ JAVÍTVA: a séma nélküli, de a render-munkakönyvtáron KÍVÜLI útvonal eddig átment
+    ['/etc/passwd', null],
+    ['/tmp/a.cube', null],
+    ['rel/l.cube', null],
+    [path.join(RDIR, '..', '..', 'etc', 'passwd'), null],
+    [path.join(os.tmpdir(), 'vided-render-abc'), null],
+    [path.join(os.tmpdir(), 'mas-mappa', 'a.cube'), null],
     ['http://169.254.169.254/x', null],
     ['file:///etc/passwd', null],
     ['pipe:0', null],
@@ -38,20 +51,28 @@ describe('localPathOnly — mélységi SSRF-védelem', () => {
 });
 
 describe('szín-láncok', () => {
-  const clip = { adjust: { brightness: 0.1, contrast: 0.2, exposure: 0.5, highlights: 0.4, temperature: 0.1, tint: 0.1, lut: { uri: "/tmp/it's.cube" }, vignette: 0.5 }, grade: 'noir' };
+  const clip = { adjust: { brightness: 0.1, contrast: 0.2, exposure: 0.5, highlights: 0.4, temperature: 0.1, tint: 0.1, lut: { uri: path.join(RDIR, "it's.cube") }, vignette: 0.5 }, grade: 'noir' };
+  // az idézőjel '\'' szekvenciával escape-elve (bájtra ugyanaz a forma, mint eddig a /tmp/it's.cube-nál)
+  const LQ = path.join(RDIR, "it'\\''s.cube");
   test('adjustChain: sorrend, pontosság, LUT-idézés', () => {
     expect(VF.adjustChain(clip)).toBe(
-      ",exposure=exposure=0.500,eq=brightness=0.100:contrast=1.200:saturation=1.000,curves=all='0.000/0.000 0.250/0.250 0.500/0.500 0.750/0.810 1.000/1.000',colortemperature=temperature=5500,colorchannelmixer=gg=0.900,lut3d='/tmp/it'\\''s.cube',vignette=angle=0.3927"
+      `,exposure=exposure=0.500,eq=brightness=0.100:contrast=1.200:saturation=1.000,curves=all='0.000/0.000 0.250/0.250 0.500/0.500 0.750/0.810 1.000/1.000',colortemperature=temperature=5500,colorchannelmixer=gg=0.900,lut3d='${LQ}',vignette=angle=0.3927`
     );
   });
   test('gradeChain: előbb a preset, majd a kézi adjust — mind enable-ablakkal', () => {
     const en = ":enable='between(t,1,2)'";
     expect(VF.gradeChain(clip, 'between(t,1,2)')).toBe(
-      `,eq=brightness=-0.02:contrast=1.25:saturation=0${en},vignette=angle=0.8${en},exposure=exposure=0.500${en},eq=brightness=0.100:contrast=1.200:saturation=1.000${en},curves=all='0.000/0.000 0.250/0.250 0.500/0.500 0.750/0.810 1.000/1.000'${en},colortemperature=temperature=5500${en},colorchannelmixer=gg=0.900${en},lut3d='/tmp/it'\\''s.cube'${en},vignette=angle=0.3927${en}`
+      `,eq=brightness=-0.02:contrast=1.25:saturation=0${en},vignette=angle=0.8${en},exposure=exposure=0.500${en},eq=brightness=0.100:contrast=1.200:saturation=1.000${en},curves=all='0.000/0.000 0.250/0.250 0.500/0.500 0.750/0.810 1.000/1.000'${en},colortemperature=temperature=5500${en},colorchannelmixer=gg=0.900${en},lut3d='${LQ}'${en},vignette=angle=0.3927${en}`
     );
   });
   test('séma-előtagos LUT kimarad', () => {
     expect(VF.adjustChain({ adjust: { lut: { uri: 'http://x/l.cube' } } })).toBe('');
+  });
+  test('✅ JAVÍTVA: a render-munkakönyvtáron kívüli abszolút LUT/matte-út kimarad (pl. /color/lut-export)', () => {
+    expect(VF.adjustChain({ adjust: { lut: { uri: '/etc/passwd' } } })).toBe('');
+    const ins = [];
+    expect(VF.matteChain({ matte: { uri: '/etc/passwd' } }, 10, 10, 'L', 1, [], (a) => (ins.push(a), 1), 1)).toBe('L');
+    expect(ins).toEqual([]);
   });
   test('drawbox-tint, világítás', () => {
     expect(VF.filterDrawbox({ filterId: 'warm', filterIntensity: 0.5 }, 1080, 1920)).toBe(',drawbox=x=0:y=0:w=1080:h=1920:color=0xff9d4d@0.090:t=fill');
@@ -82,7 +103,7 @@ describe('régió-láncok (graph-sorok + bemenetek)', () => {
     const ins = [];
     const add = (a) => (ins.push(a), 7);
     const out = [
-      VF.matteChain({ matte: { uri: '/m.png', type: 'alpha', invert: true } }, 100, 50, 'L', 3, g, add, 2),
+      VF.matteChain({ matte: { uri: path.join(RDIR, 'm.png'), type: 'alpha', invert: true } }, 100, 50, 'L', 3, g, add, 2),
       VF.matteChain({ matte: { uri: 'file:///m.png' } }, 100, 50, 'L', 4, g, add, 2),
       VF.edgeChain({ chromaKey: { edge: -0.5 } }, 'E', 5, g),
       VF.faceBlurChain({ faceBlur: { x: 0.5, y: 0.5, w: 0.2, h: 0.2, pixelate: true } }, 100, 100, 'F', 'FO', 6, g),
@@ -101,7 +122,7 @@ describe('régió-láncok (graph-sorok + bemenetek)', () => {
       "[fbB6]crop=w=20:h=20:x='40':y='40',scale=14:14,scale=20:20:flags=neighbor[fbC6]",
       "[fbA6][fbC6]overlay=x='40':y='40'[FO]",
     ]);
-    expect(ins).toEqual([['-loop', '1', '-t', '2.000', '-i', '/m.png']]);
+    expect(ins).toEqual([['-loop', '1', '-t', '2.000', '-i', path.join(RDIR, 'm.png')]]);
   });
   test('selectiveChain: hiányzó maszk-fájl vagy üres adjust → false, a graph érintetlen', () => {
     const g = [];

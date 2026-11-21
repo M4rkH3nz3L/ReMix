@@ -16,6 +16,9 @@ const { s3Enabled, uploadFile } = require('../../s3store');
 const { trackUsage, userTier, enforceQuota } = require('../../usage');
 const { jobs } = require('./jobStore');
 
+/** a beágyazott kompozíciók legnagyobb mélysége (a mélyebb → elutasítva; véd a verem-kimerülés ellen is) */
+const MAX_COMP_DEPTH = 8;
+
 exports.renderSubmitHandler = (req, res) => {
   let project;
   let uriMap;
@@ -34,53 +37,66 @@ exports.renderSubmitHandler = (req, res) => {
   // 🎧 „azt kapod, amit hallasz”: a telefon kész keveréke (előnézet = export) — csak feltöltött fájl
   bindAudioMix(project, fieldToFile);
   const missing = [];
-  for (const track of project.tracks ?? []) {
-    for (const clip of track.clips ?? []) {
-      if (clip.kind === 'video' || clip.kind === 'image' || clip.kind === 'audio') {
-        const field = uriMap[clip.uri];
-        const file = field ? fieldToFile.get(field) : null;
-        if (file) {
-          clip.uri = file;
-        } else {
-          missing.push(clip.id);
+  const rewriteTracks = (tracks, depth) => {
+    for (const track of tracks ?? []) {
+      for (const clip of track.clips ?? []) {
+        if (clip.kind === 'video' || clip.kind === 'image' || clip.kind === 'audio') {
+          const field = uriMap[clip.uri];
+          const file = field ? fieldToFile.get(field) : null;
+          if (file) {
+            clip.uri = file;
+          } else {
+            missing.push(clip.id);
+          }
         }
-      }
-      // kép-kitöltésű forma (logó/watermark) — a képfájl is feltöltve érkezik
-      if (clip.kind === 'shape' && clip.imageUri) {
-        const field = uriMap[clip.imageUri];
-        const file = field ? fieldToFile.get(field) : null;
-        if (file) {
-          clip.imageUri = file;
-        } else {
-          missing.push(clip.id);
+        // kép-kitöltésű forma (logó/watermark) — a képfájl is feltöltve érkezik
+        if (clip.kind === 'shape' && clip.imageUri) {
+          const field = uriMap[clip.imageUri];
+          const file = field ? fieldToFile.get(field) : null;
+          if (file) {
+            clip.imageUri = file;
+          } else {
+            missing.push(clip.id);
+          }
         }
-      }
-      // 🛡️ A matte és a LUT is az FFmpeg `-i`-jére / `lut3d`-jébe megy. Ezek
-      // eddig KIMARADTAK az átírásból, így a kliens által küldött nyers érték
-      // jutott az FFmpeg-hez — az pedig érti a http(s):// és file:// sémát is:
-      // belső HTTP-kérés kényszeríthető, vagy a worker gépén lévő tetszőleges
-      // kép/LUT beleégethető a kimenetbe (amit a támadó letölt). Most csak
-      // FELTÖLTÖTT fájlra mutathatnak; ismeretlen cím → a kérés elutasítva.
-      if (clip.matte && clip.matte.uri) {
-        const field = uriMap[clip.matte.uri];
-        const file = field ? fieldToFile.get(field) : null;
-        if (file) {
-          clip.matte.uri = file;
-        } else {
-          missing.push(`${clip.id} (matte)`);
+        // 🛡️ A matte és a LUT is az FFmpeg `-i`-jére / `lut3d`-jébe megy. Ezek
+        // eddig KIMARADTAK az átírásból, így a kliens által küldött nyers érték
+        // jutott az FFmpeg-hez — az pedig érti a http(s):// és file:// sémát is:
+        // belső HTTP-kérés kényszeríthető, vagy a worker gépén lévő tetszőleges
+        // kép/LUT beleégethető a kimenetbe (amit a támadó letölt). Most csak
+        // FELTÖLTÖTT fájlra mutathatnak; ismeretlen cím → a kérés elutasítva.
+        if (clip.matte && clip.matte.uri) {
+          const field = uriMap[clip.matte.uri];
+          const file = field ? fieldToFile.get(field) : null;
+          if (file) {
+            clip.matte.uri = file;
+          } else {
+            missing.push(`${clip.id} (matte)`);
+          }
         }
-      }
-      if (clip.adjust && clip.adjust.lut && clip.adjust.lut.uri) {
-        const field = uriMap[clip.adjust.lut.uri];
-        const file = field ? fieldToFile.get(field) : null;
-        if (file) {
-          clip.adjust.lut.uri = file;
-        } else {
-          missing.push(`${clip.id} (LUT)`);
+        if (clip.adjust && clip.adjust.lut && clip.adjust.lut.uri) {
+          const field = uriMap[clip.adjust.lut.uri];
+          const file = field ? fieldToFile.get(field) : null;
+          if (file) {
+            clip.adjust.lut.uri = file;
+          } else {
+            missing.push(`${clip.id} (LUT)`);
+          }
+        }
+        // 🛡️ a BEÁGYAZOTT kompozíció (pre-compose) klipjei is az FFmpeg `-i`-jére mennek (resolveCompounds →
+        // renderProject) → ugyanaz az átírás/validáció REKURZÍVAN; enélkül a comp belső klipjeinek nyers
+        // http://169.254…, file:// vagy /etc/passwd uri-ja ellenőrzés nélkül jutott a workerhez.
+        if (clip.comp && Array.isArray(clip.comp.tracks)) {
+          if (depth >= MAX_COMP_DEPTH) {
+            missing.push(`${clip.id} (comp)`);
+          } else {
+            rewriteTracks(clip.comp.tracks, depth + 1);
+          }
         }
       }
     }
-  }
+  };
+  rewriteTracks(project.tracks, 0);
   if (missing.length > 0) {
     res.status(400).json({ error: `Hiányzó médiafájlok: ${missing.join(', ')}` });
     return;

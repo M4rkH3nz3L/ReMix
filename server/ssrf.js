@@ -209,10 +209,45 @@ async function safeFetch(rawUrl, init, opts) {
   return fetch(rawUrl, init);
 }
 
+/** ennyi átirányítást követünk legfeljebb (a média-CDN-eknek 1–2 elég) */
+const MAX_REDIRECTS = 5;
+
+/**
+ * 🛡️ `safeFetch` ÁTIRÁNYÍTÁS-KÖVETÉSSEL, minden hop validálva. A sima `fetch` a 3xx-et validálás
+ * nélkül követi (`redirect: 'follow'`), így egy nyilvános URL 302-vel belső címre (169.254.169.254,
+ * localhost, LAN) vihetné a workert. Itt `redirect: 'manual'`-lal kérünk, és minden `Location`-t
+ * ugyanazzal az `assertSafeUrl`-lel ellenőrzünk (séma, https, privát-IP), legfeljebb MAX_REDIRECTS hopig.
+ * A 303 — és a POST-os 301/302 — a spec szerint GET-re vált, body nélkül. Blokkolt hop / túl sok
+ * átirányítás → DOB (`err.ssrfBlocked = true`), mint a `safeFetch`.
+ */
+async function safeFetchFollow(rawUrl, init = {}, opts) {
+  let url = rawUrl;
+  let reqInit = { ...init, redirect: 'manual' };
+  for (let hop = 0; ; hop += 1) {
+    const res = await safeFetch(url, reqInit, opts);
+    const location = res.status >= 300 && res.status < 400 ? res.headers?.get?.('location') : null;
+    if (!location) {
+      return res;
+    }
+    res.body?.cancel?.().catch((caught) => logCaught('ssrf.js:safeFetchFollow', caught));
+    if (hop >= MAX_REDIRECTS) {
+      const err = new Error(`Túl sok átirányítás (${MAX_REDIRECTS} felett).`);
+      err.ssrfBlocked = true;
+      throw err;
+    }
+    const method = String(reqInit.method || 'GET').toUpperCase();
+    if (res.status === 303 || ((res.status === 301 || res.status === 302) && method === 'POST')) {
+      reqInit = { ...reqInit, method: 'GET', body: undefined };
+    }
+    url = new URL(location, url).toString();
+  }
+}
+
 module.exports = {
   assertSafeAiBaseUrl,
   assertSafeUrl,
   safeFetch,
+  safeFetchFollow,
   isPrivateAddress,
   hostAllowed,
 };

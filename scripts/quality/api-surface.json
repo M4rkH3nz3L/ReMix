@@ -1065,7 +1065,8 @@
   "assertSafeUrl": "v:f734ca81e9",
   "hostAllowed": "v:d1d22e166b",
   "isPrivateAddress": "v:48954a49de",
-  "safeFetch": "v:9a729bc353"
+  "safeFetch": "v:9a729bc353",
+  "safeFetchFollow": "v:77d453ee55"
  },
  "server/stems.js": {
   "STEM_NAMES": "v:649de6328e",

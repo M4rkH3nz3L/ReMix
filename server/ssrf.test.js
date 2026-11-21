@@ -2,6 +2,7 @@ const {
   assertSafeAiBaseUrl,
   assertSafeUrl,
   safeFetch,
+  safeFetchFollow,
   hostAllowed,
   isPrivateAddress,
 } = require('./ssrf');
@@ -129,6 +130,41 @@ describe('ssrf — BYOK AI-végpont védelem', () => {
       const res = await safeFetch('https://8.8.8.8/file.mp4', { method: 'GET' });
       expect(res.ok).toBe(true);
       expect(global.fetch).toHaveBeenCalledWith('https://8.8.8.8/file.mp4', { method: 'GET' });
+    });
+  });
+
+  describe('safeFetchFollow — minden átirányítás-hop SSRF-validált', () => {
+    const realFetch = global.fetch;
+    afterEach(() => {
+      global.fetch = realFetch;
+    });
+    const redirect = (status, location) => new Response(null, { status, headers: { location } });
+
+    it('manual módban kér, és a https → http leminősítő hopot elutasítja (a http célt nem hívja)', async () => {
+      global.fetch = jest.fn(async () => redirect(302, 'http://8.8.4.4/x'));
+      await expect(safeFetchFollow('https://8.8.8.8/a')).rejects.toMatchObject({ ssrfBlocked: true });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(global.fetch).toHaveBeenCalledWith('https://8.8.8.8/a', { redirect: 'manual' });
+    });
+
+    it('303 → GET body nélkül a következő hopon; a nem-3xx válasz változatlanul visszajön', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce(redirect(303, 'https://1.1.1.1/done'))
+        .mockResolvedValueOnce(new Response('ok', { status: 200 }));
+      const res = await safeFetchFollow('https://8.8.8.8/post', { method: 'POST', body: 'x' });
+      expect(await res.text()).toBe('ok');
+      expect(global.fetch.mock.calls[1]).toEqual([
+        'https://1.1.1.1/done',
+        { method: 'GET', body: undefined, redirect: 'manual' },
+      ]);
+    });
+
+    it('Location nélküli 3xx (pl. 304) → maga a válasz, nincs követés', async () => {
+      global.fetch = jest.fn(async () => new Response(null, { status: 304 }));
+      const res = await safeFetchFollow('https://8.8.8.8/a');
+      expect(res.status).toBe(304);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
     });
   });
 });

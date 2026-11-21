@@ -185,6 +185,10 @@ const MUST_BE_MEMOIZED = [
   ['src/components/live/session/LiveErrorBanner.tsx', 'LiveErrorBanner'],
   ['src/components/live/session/LiveSceneSwitcher.tsx', 'LiveSceneSwitcher'],
   ['src/components/live/session/LiveChatPanel.tsx', 'LiveChatPanel'],
+  // REFACTOR: a useFeed.ts-ből kiemelt rész-hookok (a gyökér előtte és utána is kimarad); a kimenetük identitása a golden trace-ben fordítóval is azonos
+  ['src/hooks/feed/useFeedSelection.ts', 'useFeedSelection'],
+  ['src/hooks/feed/useFeedPlaybackState.ts', 'useFeedPlaybackState'],
+  ['src/hooks/feed/useFeedLoader.ts', 'useFeedLoader'],
 ];
 
 /**
@@ -210,6 +214,11 @@ const KNOWN_BAILS = [
   ['src/components/studio/audio/clipEdit/FxPresetsSection.tsx', 'FxPresetsSection', 'a füstteszt görgetési pontját (presetsY ref) az onLayout írja'],
   ['src/app/live/studio/[id].tsx', 'LiveStudioScreen', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
   ['src/components/studio/model3d/Model3DStudio.tsx', 'Model3DStudio', 'a bejövő fájl egyszeri importjánál az eslint-disable react-hooks/exhaustive-deps kikapcsolja a fordítót (a bontás előtt is)'],
+  ['src/hooks/useFeed.ts', 'useFeed', 'a tap-gesztus refjeit (onTapItemRef/onDoubleTapRef) renderben írja (a bontás előtt: expo-video player-mutáció)'],
+  ['src/hooks/feed/useFeedTapGesture.ts', 'useFeedTapGesture', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
+  ['src/hooks/feed/useActivePostEffects.ts', 'useActivePostEffects', 'az onViewable useRef(…).current-jét renderben olvassa'],
+  ['src/hooks/feed/useFeedAnimations.ts', 'useFeedAnimations', 'az Animated.Value refek .current-jét renderben olvassa'],
+  ['src/hooks/feed/useFeedSeekVolume.ts', 'useFeedSeekVolume', 'expo-video player-mutáció (volume/muted/currentTime) és ref-írás renderben'],
 ];
 
 const cache = new Map();

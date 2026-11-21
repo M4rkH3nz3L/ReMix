@@ -186,6 +186,16 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   validálatlanul tárolódik — nincs igazolva, hogy az `assertSafeUrl` minden dav*/s3* utat fed; (13)
   L58–61, L155: az `OAUTH[provider]` lookup Object.prototype-kulcsokat is elér.
 
+- 🔒 **Social feed** (`src/lib/feedClient/`, `src/hooks/feed/`): (1) a `toggleLike`/`toggleSave`/`toggleFollow`/
+  `deletePost`/`deletePostsForProject` figyelmen kívül hagyja a Supabase `{error}`-t — RLS-elutasítás
+  sikerként oldódik, az optimista visszagörgetés csak hálózati rejectionnél fut, a UI a szerver által
+  elutasított állapotot mutathatja; (2) a `deletePost` csak `id`-re szűr, `creator_id` nélkül — a tulajt
+  kizárólag az RLS védi; (3) a `getChannel` és a `listRemixesOf` láthatóság/moderáció-szűrő nélkül kér
+  posztokat, a `listFeed('following')` `visibility in (public, followers)` — a helyesség teljesen az
+  RLS-en múlik (auditálandó); (4) a `viewerEngagement` rejection-je az egész feed-hívást bukja, az
+  `{error}` viszont csendben „nem lájkolt”; (5) az `onToggleMute` weben mindig `play()`-t hív, natívon
+  csak az aktív posztnál; a feedben nincs unfollow-út.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -198,13 +208,13 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/studio/model3d/Model3DStudio.tsx` | 1365 | ✅ → 322 |
 | `src/lib/render.ts` | 1195 | ✅ → 35 |
 | `server/text-render.js` | 1174 | ✅ → 42 |
-| `src/lib/feed.ts` | 1137 | ⬜ |
+| `src/lib/feed.ts` | 1137 | ✅ → 32 |
 | `src/app/live/studio/[id].tsx` | 1137 | ✅ → 293 |
 | `src/components/studio/image/LayerInspector.tsx` | 1105 | ✅ → 110 |
 | `src/components/editor/panels/ExportPanel.tsx` | 1059 | ✅ → 144 |
 | `server/userFiles.js` | 997 | ✅ → 47 |
 | `src/app/auth.tsx` | 980 | ⬜ |
-| `src/hooks/useFeed.ts` | 975 | ⬜ |
+| `src/hooks/useFeed.ts` | 975 | ✅ → 251 |
 | `src/app/live/[id].tsx` | 952 | ✅ → 376 |
 | `src/components/editor/panels/TextPanel.tsx` | 926 | ⬜ |
 | `src/components/studio/audio/ClipEditSheet.tsx` | 889 | ✅ → 310 |

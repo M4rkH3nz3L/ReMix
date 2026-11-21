@@ -3520,6 +3520,37 @@
   "testDoc": "v:dffb8c0917",
   "toneWav": "v:3786dbb270"
  },
+ "src/hooks/feed/createFeedActions.ts": {
+  "createFeedActions": "v:822df1d6e3"
+ },
+ "src/hooks/feed/createFeedControls.ts": {
+  "createFeedControls": "v:71d4e78a2a"
+ },
+ "src/hooks/feed/feedFormat.ts": {
+  "compact": "v:71267fb618",
+  "hotspotsOf": "v:3193f7ca46"
+ },
+ "src/hooks/feed/useActivePostEffects.ts": {
+  "useActivePostEffects": "v:d23bf57ec8"
+ },
+ "src/hooks/feed/useFeedAnimations.ts": {
+  "useFeedAnimations": "v:1d9128dfc1"
+ },
+ "src/hooks/feed/useFeedLoader.ts": {
+  "useFeedLoader": "v:40029cba5c"
+ },
+ "src/hooks/feed/useFeedPlaybackState.ts": {
+  "useFeedPlaybackState": "v:61835fe4fb"
+ },
+ "src/hooks/feed/useFeedSeekVolume.ts": {
+  "useFeedSeekVolume": "v:aeca363366"
+ },
+ "src/hooks/feed/useFeedSelection.ts": {
+  "useFeedSelection": "v:00bfd5eadf"
+ },
+ "src/hooks/feed/useFeedTapGesture.ts": {
+  "useFeedTapGesture": "v:e77b380400"
+ },
  "src/hooks/useBackLayer.ts": {
   "useBackLayer": "v:22914e02b0"
  },
@@ -5443,6 +5474,73 @@
   "toggleFollow": "v:2024fbdd97",
   "toggleLike": "v:62d4811fdd",
   "toggleSave": "v:9b8d75b64f"
+ },
+ "src/lib/feedClient/channel.ts": {
+  "getChannel": "v:0dc3a98168"
+ },
+ "src/lib/feedClient/comments.ts": {
+  "addComment": "v:7e7cf26ef4",
+  "deleteComment": "v:39807a3af0",
+  "listComments": "v:d161a43e5f",
+  "subscribeComments": "v:7029688360"
+ },
+ "src/lib/feedClient/engagement.ts": {
+  "deletePost": "v:08b1ea411b",
+  "deletePostsForProject": "v:6318b1ba09",
+  "fetchViewEvents": "v:0739347ecd",
+  "recordView": "v:08b1ea411b",
+  "recordViewEvent": "v:8dba02ecee",
+  "toggleFollow": "v:2024fbdd97",
+  "toggleLike": "v:62d4811fdd",
+  "toggleSave": "v:9b8d75b64f"
+ },
+ "src/lib/feedClient/moderation.ts": {
+  "listRemixesOf": "v:22811dcb9b",
+  "moderateRemix": "v:e9627bf6da"
+ },
+ "src/lib/feedClient/publish.ts": {
+  "publishLiveVod": "v:2bd693a761",
+  "publishPost": "v:29304f4af6"
+ },
+ "src/lib/feedClient/publishProject.ts": {
+  "publishImageProject": "v:75e5b19c90",
+  "publishRenderedProject": "v:31b61210aa"
+ },
+ "src/lib/feedClient/queries.ts": {
+  "listFeed": "v:a3f00673ec",
+  "listPostsByHashtag": "v:ad8e0423a6",
+  "listPostsByIds": "v:f1802bfbe8",
+  "searchFeed": "v:48700a9856"
+ },
+ "src/lib/feedClient/remix.ts": {
+  "remixFromPost": "v:9b20cee282"
+ },
+ "src/lib/feedClient/session.ts": {
+  "creatorFields": "v:9b674e5c80",
+  "currentUserId": "v:1a44197a23",
+  "viewerEngagement": "v:34418e6045"
+ },
+ "src/lib/feedCore/channel.ts": {
+  "ChannelData": "t:5a60db1cd9"
+ },
+ "src/lib/feedCore/comments.ts": {
+  "COMMENT_COLUMNS": "v:a87a52eb09",
+  "CommentRow": "t:555ef1ef54",
+  "PostComment": "t:762176ccfd",
+  "toComment": "v:eb694bed27"
+ },
+ "src/lib/feedCore/postRows.ts": {
+  "POST_COLUMNS": "v:257497d5ad",
+  "PostRow": "t:e20c799917",
+  "toPost": "v:6d9926e0be"
+ },
+ "src/lib/feedCore/ranking.ts": {
+  "rankForYou": "v:f82e893015",
+  "rankTrendingFeed": "v:f82e893015"
+ },
+ "src/lib/feedCore/search.ts": {
+  "SearchResults": "t:59273afca6",
+  "orFilterValue": "v:938a3458b8"
  },
  "src/lib/feedMedia.ts": {
   "needsPoster": "v:749b18b7fd",

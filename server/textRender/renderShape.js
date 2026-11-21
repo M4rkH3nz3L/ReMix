@@ -1,0 +1,369 @@
+// 🔷 Forma-klipek rasterizálása átlátszó PNG-kké headless Chromiummal (kitöltés/gradiens/minta/keret/effektek).
+const { chromium } = require('playwright-core');
+const fs = require('fs');
+const path = require('path');
+const { findChromium } = require('./chromium');
+const { borderAlignOf, shapeBorderSvg, strokeSpec } = require('../shapeStroke');
+const { polygonFor } = require('../shapeGeometry');
+const { pathDataJs, cssGradient, svgGradientDef } = require('./shapeSvg');
+const { shapePatternSvgDefJs, isRenderableShapePatternJs } = require('./shapePattern');
+
+/**
+ * Forma-klipek rasterizálása (Creative Canvas): a CSS ugyanazt rajzolja, mint
+ * az app ShapeOverlay-e (kitöltés/gradiens/keret/lekerekítés) — a kimenet a
+ * text-overlay lánccal kompatibilis {clip, states} bejegyzés.
+ */
+async function renderShapePngs(shapeClips, canvas, outDir) {
+  if (shapeClips.length === 0) {
+    return [];
+  }
+  // 🛡️ Gyors bukás hibás méret esetén. A `w`/`h` hiánya (pl. régi/rossz alakú
+  // klip) NaN-t adna, amitől a Chromium egy 0 méretű, „nem látható" elemre
+  // várna a screenshot-időkorlátig (30 mp/klip) — ehelyett azonnal jelezzük.
+  const bad = shapeClips.find(
+    (c) => !Number.isFinite(c.w) || !Number.isFinite(c.h) || c.w <= 0 || c.h <= 0
+  );
+  if (bad) {
+    throw new Error(
+      `Hibás forma-méret (${bad.id}): w=${bad.w}, h=${bad.h} — a ShapeClip top-level w/h mezőt vár (0–1).`
+    );
+  }
+  const executablePath = findChromium();
+  if (!executablePath) {
+    throw new Error('Nincs elérhető Chromium a forma-rasterizáláshoz (CHROMIUM_PATH?)');
+  }
+  const browser = await chromium.launch({ executablePath });
+  const page = await browser.newPage({
+    viewport: { width: canvas.w, height: canvas.h },
+    deviceScaleFactor: 1,
+  });
+  const results = [];
+  try {
+    for (let i = 0; i < shapeClips.length; i++) {
+      const clip = shapeClips[i];
+      const w = Math.max(2, Math.round(clip.w * canvas.w));
+      const h = Math.max(
+        2,
+        Math.round((clip.shape === 'line' ? Math.max(clip.h, 0.004) : clip.h) * canvas.h)
+      );
+      const radius =
+        clip.shape === 'ellipse'
+          ? Math.max(w, h)
+          : Math.round((clip.cornerRadius ?? 0) * Math.min(w, h));
+      const borderWidth = Math.round(((clip.borderWidth ?? 0) / 100) * canvas.h);
+      // 🖊️ S18: igazított körvonal (belül / középen / kívül) — külön SVG-réteg; ilyenkor a régi
+      // (formánként eltérő) körvonal-utak kimaradnak. Igazítás nélkül a régi viselkedés él.
+      const borderAlign = borderAlignOf(clip.borderAlign);
+      const alignedBorder = Boolean(borderAlign) && borderWidth > 0 && !clip.outline;
+      // kép-kitöltés (logó/watermark): a fájl data-URI-ként ágyazódik be —
+      // az SVG-t a Chromium natívan rendereli, méretezés contain-nel
+      let background = clip.gradient
+        ? cssGradient(clip.gradient)
+        : clip.fillGradient
+          ? `linear-gradient(135deg, ${clip.fillGradient.from}, ${clip.fillGradient.to})`
+          : clip.fill;
+      let backgroundExtra = '';
+      const isImageFillEarly = Boolean(clip.imageUri && fs.existsSync(clip.imageUri));
+      if (isImageFillEarly) {
+        const ext = path.extname(clip.imageUri).toLowerCase();
+        const mime =
+          ext === '.svg'
+            ? 'image/svg+xml'
+            : ext === '.png'
+              ? 'image/png'
+              : ext === '.webp'
+                ? 'image/webp'
+                : 'image/jpeg';
+        const b64 = fs.readFileSync(clip.imageUri).toString('base64');
+        background = `url(data:${mime};base64,${b64})`;
+        backgroundExtra =
+          'background-size:contain;background-position:center;background-repeat:no-repeat;';
+      }
+      // ✏️ szabadkézi vonal: INLINE SVG polyline. Azért SVG és nem CSS, mert
+      // a Chromium az SVG-t élsimítja (a clip-path-ot nem), és a `stroke`
+      // pontosan követi a vonalat — kerek sapkával/illesztéssel.
+      let pathSvg = '';
+      const hasSubpaths = Array.isArray(clip.subpaths) && clip.subpaths.length > 0;
+      if (
+        clip.shape === 'path' &&
+        (hasSubpaths || (Array.isArray(clip.points) && clip.points.length >= 2))
+      ) {
+        const sw = Math.max(1, Math.round(((clip.strokeWidth ?? 0.9) / 100) * canvas.h));
+        // 🔗 összetett path (boolean) = zárt, kitöltött, fill-rule-lal
+        const closed = Boolean(clip.closed || hasSubpaths);
+        const d = hasSubpaths
+          ? clip.subpaths.map((sp) => pathDataJs(sp, w, h, true)).join(' ')
+          : pathDataJs(clip.points, w, h, closed);
+        const fillRuleAttr = hasSubpaths ? ` fill-rule="${clip.fillRule || 'nonzero'}"` : '';
+        // ✂️ stroke-attribútumok: vonalvég/illesztés + szaggatás
+        const cap = clip.strokeCap ?? 'round';
+        const join = clip.strokeJoin ?? 'round';
+        const dashArr =
+          clip.strokeDash && clip.strokeDash > 0
+            ? ` stroke-dasharray="${(clip.strokeDash * sw).toFixed(1)} ${(clip.strokeDash * sw).toFixed(1)}"`
+            : '';
+        // zárt path = kitöltött forma (gradient/szín) + opcionális kontúr;
+        // nyitott path = vonal a `fill` színével
+        let fillAttr = 'none';
+        let gradDefPath = '';
+        if (closed) {
+          if (clip.gradient && clip.gradient.type !== 'conic') {
+            gradDefPath = svgGradientDef(`pgp${i}`, clip.gradient);
+            fillAttr = `url(#pgp${i})`;
+          } else if (clip.gradient && clip.gradient.type === 'conic') {
+            // SVG path-fill nem tud konikust → az első stop színe
+            fillAttr = (clip.gradient.stops[0] && clip.gradient.stops[0].color) || clip.fill;
+          } else if (clip.fillGradient) {
+            gradDefPath = `<linearGradient id="pgp${i}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${clip.fillGradient.from}"/><stop offset="1" stop-color="${clip.fillGradient.to}"/></linearGradient>`;
+            fillAttr = `url(#pgp${i})`;
+          } else {
+            fillAttr = clip.fill;
+          }
+        }
+        const cStrokeW = closed
+          ? clip.outline
+            ? Math.max(1, Math.round((clip.outline.width / 100) * canvas.h))
+            : clip.borderWidth && !alignedBorder
+              ? borderWidth
+              : 0
+          : sw;
+        const cStrokeCol = closed ? clip.outline?.color ?? clip.borderColor ?? '#ffffff' : clip.fill;
+        const strokeAttrs =
+          cStrokeW > 0
+            ? ` stroke="${cStrokeCol}" stroke-width="${cStrokeW}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr}`
+            : '';
+        const glow = clip.glow
+          ? `<path d="${d}"${fillRuleAttr} ${closed ? `fill="${clip.glow.color}"` : `fill="none" stroke="${clip.glow.color}" stroke-width="${sw * 2.4}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr}`} opacity="0.5" filter="url(#blur)"/>`
+          : '';
+        pathSvg =
+          `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible;display:block">` +
+          (clip.glow || gradDefPath
+            ? `<defs>${clip.glow ? `<filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${Math.max(1, sw * 0.6)}"/></filter>` : ''}${gradDefPath}</defs>`
+            : '') +
+          glow +
+          `<path d="${d}"${fillRuleAttr} fill="${fillAttr}"${closed ? strokeAttrs : ` stroke="${clip.fill}" stroke-width="${sw}" stroke-linecap="${cap}" stroke-linejoin="${join}"${dashArr}`}/>` +
+          `</svg>`;
+      }
+
+      // nyíl/csillag SVG-vel (élsimított, pontos stroke-kal)
+      let polySvg = '';
+      // (a definíció lentebb, a POLY_POINTS után töltődik fel)
+
+      // nyíl/csillag: clip-path sokszög — a fill/gradiens/kép-kitöltéssel is
+      // működik; keret ezekre nem értelmezett (a clip levágná)
+      // 0–100-as koordináták — az előnézet (ShapeOverlay) ugyanezeket használja (shapeGeometry)
+      // A sokszögek INLINE SVG-vel rajzolódnak, nem CSS clip-path-tal:
+      //  · a Chromium az SVG-t ÉLSIMÍTJA, a clip-path élét nem (a csillag
+      //    hegyei fűrészesek voltak),
+      //  · a `stroke` PONTOSAN a kontúrt adja — nem kell méretezett
+      //    háttér-másolattal vagy drop-shadow-lánccal közelíteni.
+      // Kép-kitöltésnél marad a clip-path: ott a kitöltés egy háttérkép, amit
+      // az SVG polygon nem tudna átvenni.
+      const svgPoly = polygonFor(clip);
+      // konikus gradienst az SVG nem tud → az ilyen poligon clip-path-ra esik
+      // vissza (a CSS-háttér konikus gradientjével)
+      const polyConic = Boolean(clip.gradient && clip.gradient.type === 'conic');
+      const useSvgPoly = Boolean(svgPoly) && !isImageFillEarly && !polyConic;
+      const clipPath = svgPoly && !useSvgPoly
+        ? `clip-path:polygon(${svgPoly.map(([px, py]) => `${px}% ${py}%`).join(', ')});`
+        : '';
+      if (useSvgPoly) {
+        const pts = svgPoly.map(([px, py]) => `${(px / 100) * w},${(py / 100) * h}`).join(' ');
+        const gradId = `pg${i}`;
+        // új multi-stop gradient > legacy fillGradient > tömör szín
+        const gradDef = clip.gradient
+          ? svgGradientDef(gradId, clip.gradient)
+          : clip.fillGradient
+            ? `<linearGradient id="${gradId}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${clip.fillGradient.from}"/><stop offset="1" stop-color="${clip.fillGradient.to}"/></linearGradient>`
+            : '';
+        const fillRef = gradDef ? `url(#${gradId})` : clip.fill;
+        const strokeW = clip.outline
+          ? Math.max(1, Math.round((clip.outline.width / 100) * canvas.h))
+          : borderWidth > 0 && !alignedBorder
+            ? borderWidth
+            : 0;
+        const strokeCol = clip.outline
+          ? clip.outline.color ?? '#ffffff'
+          : clip.borderColor ?? '#ffffff';
+        polySvg =
+          `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" ` +
+          `style="overflow:visible;display:block">` +
+          (gradDef ? `<defs>${gradDef}</defs>` : '') +
+          `<polygon points="${pts}" fill="${fillRef}"` +
+          (strokeW > 0
+            ? ` stroke="${strokeCol}" stroke-width="${strokeW * 2}" stroke-linejoin="${clip.strokeJoin ?? 'round'}" paint-order="stroke"` +
+              (clip.strokeDash && clip.strokeDash > 0
+                ? ` stroke-dasharray="${(clip.strokeDash * strokeW * 2).toFixed(1)} ${(clip.strokeDash * strokeW * 2).toFixed(1)}"`
+                : '')
+            : '') +
+          `/></svg>`;
+      }
+      const border =
+        borderWidth > 0 && !clipPath && !useSvgPoly && !pathSvg && !alignedBorder
+          ? `border:${borderWidth}px ${clip.strokeDash && clip.strokeDash > 0 ? 'dashed' : 'solid'} ${clip.borderColor ?? '#ffffff'};`
+          : '';
+      // az árnyék a sziluettet követi (drop-shadow), és túlnyúlik a formán —
+      // a wrapper paddingje ad neki helyet, a screenshot a wrapperről készül
+      // (szimmetrikus margó = a középre igazítás nem csúszik)
+      const shadowSpread = clip.shadow ? Math.max(8, Math.round(h * 0.18)) : 0;
+      // ✨ ragyogás és 🖊️ kontúr: egymásra fűzött drop-shadow-k. A CSS
+      // filter-lánc minden tagja az ELŐZŐ EREDMÉNYÉRE hat — ezért ad az
+      // eltolás nélküli, növekvő elmosású sor ragyogást, a négy tengely-irányú,
+      // elmosás nélküli pedig kontúrt (az átlókat a láncolás tölti ki).
+      // Mindkettő a SZILUETTET követi, tehát clip-path-os formán és
+      // kép-kitöltésű logón is működik, ahol a `border` nem.
+      const glowPx = clip.glow
+        ? Math.max(2, Math.round((clip.glow.size / 100) * canvas.h))
+        : 0;
+      const outlinePx = clip.outline
+        ? Math.max(1, Math.round((clip.outline.width / 100) * canvas.h))
+        : 0;
+      const filters = [];
+      // 🖊️ KONTÚR — két út, mert egyik sem jó mindkét esetre:
+      //  · tömör/gradiens forma (clip-path is): MÉRETEZETT HÁTTÉR-MÁSOLAT.
+      //    Tiszta élt ad, mert egyetlen alakzat — az egymásra fűzött
+      //    drop-shadow-k viszont lépcsőznek az éles csúcsokon (a csillag
+      //    hegyei csipkéssé váltak tőle).
+      //  · kép-kitöltésű logó: ott a sziluett a KÉP ALFÁJÁBÓL jön, egy
+      //    nagyobb másolat nem adná ki — marad a 8 irányú drop-shadow.
+      const isImageFill = isImageFillEarly;
+      let outlineLayer = '';
+      if (outlinePx > 0) {
+        const c = clip.outline.color ?? '#ffffff';
+        if (isImageFill) {
+          const d = Math.max(1, Math.round(outlinePx * 0.7071));
+          for (const [dx, dy] of [
+            [outlinePx, 0], [-outlinePx, 0], [0, outlinePx], [0, -outlinePx],
+            [d, d], [-d, d], [d, -d], [-d, -d],
+          ]) {
+            filters.push(`drop-shadow(${dx}px ${dy}px 0 ${c})`);
+          }
+        } else if (!useSvgPoly) {
+          // (SVG-s sokszögnél a stroke adja a kontúrt — ide már nem jutunk)
+          // ISMERT KORLÁT: a Chromium a `clip-path` élét nem simítja, ezért a
+          // CSILLAG éles csúcsain a kontúr fűrészes marad (a nyíl tompább
+          // szögein nem látszik). Végleges javítás: a sokszögeket inline SVG
+          // <polygon>-ná átírni — ott a `stroke` pontosan a kontúrt adja, és
+          // az élsimítás is működik.
+          const ow = w + outlinePx * 2;
+          const oh = h + outlinePx * 2;
+          // a lekerekítés arányosan nő, hogy a kontúr egyenletes maradjon
+          const oRadius = radius > 0 ? Math.round(radius * (ow / Math.max(1, w))) : 0;
+          outlineLayer =
+            `<div style="position:absolute;left:0;top:0;width:${ow}px;height:${oh}px;` +
+            `background:${c};border-radius:${oRadius}px;${clipPath}"></div>`;
+        }
+      }
+      if (glowPx > 0 && clip.shape !== 'path') {
+        const c = clip.glow.color ?? '#ffffff';
+        filters.push(
+          `drop-shadow(0 0 ${Math.round(glowPx * 0.5)}px ${c})`,
+          `drop-shadow(0 0 ${glowPx}px ${c})`
+        );
+      }
+      if (clip.shadow) {
+        filters.push(
+          `drop-shadow(0 ${Math.round(shadowSpread * 0.4)}px ${Math.round(
+            shadowSpread * 0.6
+          )}px rgba(0,0,0,0.55))`
+        );
+      }
+      // a wrapper paddingjének MINDEN effektet el kell bírnia, különben a
+      // screenshot levágná a szélüket (szimmetrikus, hogy a középre igazítás
+      // ne csússzon el)
+      // a path/sokszög kontúrja a vonal KÖZEPÉN ül: a fele a dobozon kívül esik
+      const svgStroke = pathSvg || svgPoly
+        ? Math.ceil(Math.max(clip.borderWidth ? borderWidth : 0, clip.shape === 'path' ? ((clip.strokeWidth ?? 0.9) / 100) * canvas.h : 0) / 2) + 1
+        : 0;
+      // az igazított körvonal kívül/középen túlnyúlik a formán: a margó befogadja
+      const alignPad = alignedBorder ? Math.ceil(strokeSpec(borderAlign, borderWidth).pad) + 2 : 0;
+      const borderSvg = alignedBorder ? shapeBorderSvg(clip, w, h, borderWidth, borderAlign, i) : '';
+      const shadowPad =
+        filters.length > 0 || clip.shadow || glowPx > 0
+          ? Math.max(8, shadowSpread, glowPx * 2, outlinePx * 2, svgStroke, alignPad)
+          : Math.max(svgStroke, alignPad);
+      const shadowCss = filters.length > 0 ? `filter:${filters.join(' ')};` : '';
+      const usesWrap = shadowPad > 0;
+      // 🧩 minta-kitöltés — FELÜLÍRJA a sima fill-t. A formát inline SVG-vel
+      // rajzoljuk (téglalap/ellipszis = rx-es rect, nyíl/csillag = polygon,
+      // path = `d`), a pattern-def userSpaceOnUse-ban. Ugyanabból a magból
+      // ([shapePattern]) mint az előnézet → render-parity. A ragyogás/árnyék a
+      // wrapper CSS-filterén marad; a border opcionális stroke-ként ül a formán.
+      let patternSvg = '';
+      if (isRenderableShapePatternJs(clip.pattern)) {
+        const pid = `pat${i}`;
+        const def = shapePatternSvgDefJs(clip.pattern, pid, w, h);
+        const pFill = `url(#${pid})`;
+        const pStrokeW = clip.borderWidth && !alignedBorder ? borderWidth : 0;
+        const pStroke =
+          pStrokeW > 0
+            ? ` stroke="${clip.borderColor ?? '#ffffff'}" stroke-width="${pStrokeW}"`
+            : '';
+        let geo;
+        if (svgPoly) {
+          const pts = svgPoly
+            .map(([px, py]) => `${(px / 100) * w},${(py / 100) * h}`)
+            .join(' ');
+          geo = `<polygon points="${pts}" fill="${pFill}"${pStroke}/>`;
+        } else if (
+          clip.shape === 'path' &&
+          (hasSubpaths || (Array.isArray(clip.points) && clip.points.length >= 2))
+        ) {
+          const d = hasSubpaths
+            ? clip.subpaths.map((sp) => pathDataJs(sp, w, h, true)).join(' ')
+            : pathDataJs(clip.points, w, h, Boolean(clip.closed));
+          geo = `<path d="${d}" fill="${pFill}"${pStroke}/>`;
+        } else {
+          geo = `<rect x="0" y="0" width="${w}" height="${h}" rx="${radius}" fill="${pFill}"${pStroke}/>`;
+        }
+        patternSvg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible;display:block"><defs>${def}</defs>${geo}</svg>`;
+      }
+      // FONTOS: a szűrő a WRAPPERRE megy, nem a formára. A CSS-ben a
+      // `clip-path` a `filter` UTÁN vág — ha ugyanazon az elemen van, a
+      // clip-path levágja a formán túlnyúló ragyogást/kontúrt/árnyékot
+      // (a nyíl és a csillag effektjei így nyom nélkül eltűntek).
+      const html = `<!doctype html><html><body style="margin:0;background:transparent;">
+        <div id="wrap" style="padding:${shadowPad}px;display:inline-block;${shadowCss}">
+        <div id="box" style="position:relative;width:${w + outlinePx * 2}px;height:${
+          h + outlinePx * 2
+        }px;">
+        ${outlineLayer}
+        <div id="s" style="
+          position:absolute;left:${outlinePx}px;top:${outlinePx}px;
+          width:${w}px;height:${h}px;
+          background:${pathSvg || polySvg || patternSvg ? 'transparent' : background};
+          ${patternSvg ? '' : backgroundExtra}
+          border-radius:${clip.shape === 'ellipse' ? '50%' : `${radius}px`};
+          ${patternSvg ? '' : clipPath}
+          ${patternSvg ? '' : border}
+          box-sizing:border-box;
+          opacity:${clip.opacity ?? 1};
+        ">${patternSvg || `${pathSvg}${polySvg}`}${borderSvg}</div>
+        </div>
+        </div>
+      </body></html>`;
+      await page.setContent(html);
+      const el = page.locator(usesWrap ? '#wrap' : outlinePx > 0 ? '#box' : '#s');
+      const file = path.join(outDir, `shape_${i}.png`);
+      const box = await el.boundingBox();
+      await el.screenshot({ path: file, omitBackground: true });
+      results.push({
+        clip,
+        states: [
+          {
+            file,
+            from: 0,
+            to: null,
+            w: Math.ceil(box?.width ?? w),
+            h: Math.ceil(box?.height ?? h),
+          },
+        ],
+      });
+    }
+  } finally {
+    await browser.close();
+  }
+  return results;
+}
+
+module.exports = { renderShapePngs };

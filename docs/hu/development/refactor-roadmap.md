@@ -124,6 +124,10 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   `finishRoomScan` némán semmit nem tesz, ha a `Remix3D` null; az `applyProcess` doksi „új OBJ assetet”
   ígér, a formátum valójában a tárolási beállítást követi.
 
+- **Szöveg-render (szerver)** (`server/textRender/`): üres vagy csak szóközös szöveg-klip (karaoke /
+  írógép nélkül) nulla méretű `#t` elemet ad → a valódi Chromium-screenshot kivárja a 30 s-os
+  időkorlátot és dob.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -135,7 +139,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/preview/PreviewSurface.tsx` | 1423 | ✅ → 443 |
 | `src/components/studio/model3d/Model3DStudio.tsx` | 1365 | ✅ → 322 |
 | `src/lib/render.ts` | 1195 | ⬜ |
-| `server/text-render.js` | 1174 | ⬜ |
+| `server/text-render.js` | 1174 | ✅ → 42 |
 | `src/lib/feed.ts` | 1137 | ⬜ |
 | `src/app/live/studio/[id].tsx` | 1137 | ✅ → 293 |
 | `src/components/studio/image/LayerInspector.tsx` | 1105 | ✅ → 110 |

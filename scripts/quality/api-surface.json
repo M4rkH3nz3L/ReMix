@@ -857,6 +857,55 @@
  "server/text-motion.js": {
   "renderTextSequence": "v:f7176d0856"
  },
+ "server/textRender/chromium.js": {
+  "findChromium": "v:1a44197a23"
+ },
+ "server/textRender/fontFaces.js": {
+  "customFace": "v:37401afc86",
+  "defaultFaceCss": "v:f4ffcc4535",
+  "fontFaceCss": "v:37401afc86",
+  "fontFamilyCss": "v:056faf84e0"
+ },
+ "server/textRender/renderShape.js": {
+  "renderShapePngs": "v:f0afcebf00"
+ },
+ "server/textRender/renderText.js": {
+  "bakeTextPng": "v:53dc7912f3",
+  "renderTextPngs": "v:68954547e9"
+ },
+ "server/textRender/shapePattern.js": {
+  "isRenderableShapePatternJs": "v:fb104425ef",
+  "patternPrimToSvgJs": "v:8e003c2bb0",
+  "patternTileJs": "v:aae28bd889",
+  "shapePatternSvgDefJs": "v:457e11824c"
+ },
+ "server/textRender/shapeSvg.js": {
+  "cssGradient": "v:5b1a36a263",
+  "pathDataJs": "v:8ebc0a6b8e",
+  "svgGradientDef": "v:fc2a8f9f6e"
+ },
+ "server/textRender/textCss.js": {
+  "presetCss": "v:5bd9cf5d0e",
+  "textStyleCss": "v:5bd9cf5d0e",
+  "textTransformCss": "v:7641a87459",
+  "typographyCss": "v:7641a87459"
+ },
+ "server/textRender/textHtml.js": {
+  "TEXT3D_MATERIALS": "v:e1fd821a95",
+  "escapeHtmlLite": "v:455c284de1",
+  "text3dHtml": "v:c13a46dce1",
+  "textPathHtml": "v:c13a46dce1"
+ },
+ "server/textRender/textStates.js": {
+  "ACCENT": "v:3957462f33",
+  "MAX_KARAOKE_STATES": "v:4d134bc072",
+  "MAX_TYPEWRITER_STEPS": "v:91032ad7bb",
+  "TYPEWRITER_CHAR_SEC": "v:c86ddd3bd0",
+  "emphasisState": "v:81657f0c87",
+  "karaokeStates": "v:7983a11916",
+  "statesFor": "v:21a4afedf1",
+  "typewriterStates": "v:2a526af57d"
+ },
  "server/thumbs.js": {
   "composeThumbnail": "v:1528b7b549",
   "pickBest": "v:1d9d23cdf0",

@@ -127,6 +127,40 @@
   "statementCsv": "v:b572a329d0",
   "toCsv": "v:ca5bd94c9d"
  },
+ "server/egress/clients.js": {
+  "getAdmin": "v:f4ffcc4535",
+  "getEgressClient": "v:f4ffcc4535",
+  "getRoomClient": "v:f4ffcc4535"
+ },
+ "server/egress/control.js": {
+  "egressConfigured": "v:5c04da0bc5",
+  "egressDimensions": "v:0047205134",
+  "rtmpTarget": "v:64132e4fa3",
+  "startEgress": "v:463c46d0b2",
+  "stopEgress": "v:2486071a2d"
+ },
+ "server/egress/reconcile.js": {
+  "reconcileLive": "v:12576b3f63"
+ },
+ "server/egress/tracking.js": {
+  "MAX_CONCURRENT_EGRESS": "v:f4ffcc4535",
+  "MAX_EGRESS_MINUTES": "v:f4ffcc4535",
+  "countActiveEgress": "v:40c082ac40",
+  "egressMinutes": "v:b1613aea39",
+  "intEnv": "v:6124b0296c",
+  "markEgressStopped": "v:29b4633525",
+  "recordEgress": "v:19f654c01d",
+  "stopStale": "v:62ddbee4d4",
+  "sweepStaleEgress": "v:58453b5ba6",
+  "sweepUserStale": "v:761fc00b02"
+ },
+ "server/egress/vod.js": {
+  "buildVodOutput": "v:014fcfd397",
+  "vodEnabled": "v:5c04da0bc5",
+  "vodKey": "v:27efd82e45",
+  "vodName": "v:bcef224da2",
+  "vodUrl": "v:9e8dc8e12a"
+ },
  "server/entitlements.js": {
   "ENTITLEMENTS": "v:07392bc0e7",
   "canCloudRender": "v:0a0c6e4630",

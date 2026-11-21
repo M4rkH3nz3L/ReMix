@@ -104,6 +104,20 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   „Rögzítés” defaultValue magyar a többi angol mellett; az `onCancel` törlése nem várja meg a
   `deleteProject`-et, mielőtt visszalép.
 
+- 🔒 **Live egress (szerver)** (`server/egress/`; zárójelben az eredeti `server/liveEgress.js` sor):
+  (1) a párhuzamos-egress limit versenyhelyzetben átléphető — a számlálás és az indítás nem atomi
+  (`control.js:101-103`, `:153` [415-417/467]); hiányzó tábla / számlálási hiba = engedés; (2) ha a
+  követő sor beszúrása elbukik, a LiveKit-egress fut tovább sor nélkül → a `routes/live.js`
+  `egressOwner` 404-et ad, a tulaj nem tudja leállítani, a sweep/reconcile sem látja, a költségkontroll
+  kimarad (`tracking.js:34-47` [158-172]); (3) DNS-rebinding ablak: a `resolveSafe` egyszer ellenőrzi az
+  RTMP-cél DNS-ét, a LiveKit később újra feloldja (`control.js:81` [395]); (4) nyers DB-hibaüzenet a
+  kliensnek, redaktálás nélkül (`control.js:73` [387] → `routes/live.js:140`); (5) a `stopEgress`
+  maga nem ellenőriz tulajdont — csak a route (`INSECURE_DEV` bypass-szal) (`control.js:174` [488]);
+  (6) egyetlen visszafejthetetlen stream-kulcs az egész indítást 500-zal bukja, a komment szerint
+  kihagyná (`control.js:116-120` [424-435]). Nem biztonsági: a reconcile `listEgress` → `[]` esetén
+  a sort nem zárja le (csak `[null]`-ra), így a user a stale-sweepig (240 perc) a 429-es limitben
+  ragadhat (`reconcile.js:44-50` [300-306]); a 429-üzenet record-only indításnál is „multistream”-et mond.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -165,7 +179,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/app/schedules.tsx` | 541 | ⬜ |
 | `src/lib/storage.ts` | 524 | ⬜ |
 | `src/app/admin.tsx` | 524 | ⬜ |
-| `server/liveEgress.js` | 524 | ⬜ |
+| `server/liveEgress.js` | 524 | ✅ → 27 |
 | `src/lib/audioIntent.ts` | 523 | ✅ → 13 |
 | `src/components/editor/panels/LibraryPanel.tsx` | 523 | ⬜ |
 | `src/store/editorState.ts` | 522 | ⬜ |

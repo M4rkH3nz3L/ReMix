@@ -196,6 +196,13 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   `{error}` viszont csendben „nem lájkolt”; (5) az `onToggleMute` weben mindig `play()`-t hív, natívon
   csak az aktív posztnál; a feedben nincs unfollow-út.
 
+- **Command-bus** (`src/lib/commandBus/`): a `REMOVE_CLIP` minden sáv-objektumot újraépít (a
+  `SPLIT_CLIP`/`MOVE_CLIP` megtartja a nem érintettek `===`-azonosságát) — React- és undo-referencia
+  megosztás vész el; ismeretlen/régi parancs-típusra az `applyCommand` és a `describeCommand`
+  `undefined`-ot ad, nem `null`-t; a lista-csere parancsok (markerek, fejezetek, régiók, linkek,
+  zárolt sávok) `key: undefined`-ot hagynak a kulcs törlése helyett (a fontok/thumbnail/workflow/tempo-map
+  törli); hibás payload nyers TypeError-t dob, validáció nincs.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -220,7 +227,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/studio/audio/ClipEditSheet.tsx` | 889 | ✅ → 310 |
 | `src/lib/offlineMix.ts` | 887 | ✅ → 21 |
 | `src/components/editor/panels/CaptionsPanel.tsx` | 850 | ⬜ |
-| `src/lib/commands.ts` | 843 | ⬜ |
+| `src/lib/commands.ts` | 843 | ✅ → 13 |
 | `src/lib/vectorPath.ts` | 813 | ✅ → 35 |
 | `server/ai.js` | 805 | ⬜ |
 | `src/components/editor/Toolbar.tsx` | 795 | ✅ → 237 |

@@ -4920,6 +4920,77 @@
   "colorRangeRings": "v:60ae4217c5",
   "maskToRings": "v:b2db8a700c"
  },
+ "src/lib/commandBus/applyCommand.ts": {
+  "applyCommand": "v:8d0e5a281e"
+ },
+ "src/lib/commandBus/assetReducers.ts": {
+  "reduceAddAsset": "v:e047007a46",
+  "reduceRelinkAsset": "v:4e7d931fe5",
+  "reduceRelinkUri": "v:b614ae7550",
+  "reduceRemoveAsset": "v:52137a83df",
+  "reduceUpdateAsset": "v:460213d713"
+ },
+ "src/lib/commandBus/audioReducers.ts": {
+  "reduceSetAudioBuses": "v:ec3b641a6e",
+  "reduceSetAudioMaster": "v:1210a8f977",
+  "reduceSetBpm": "v:7a9a0f7aa4",
+  "reduceSetTempoMap": "v:ae525a9fc7",
+  "reduceSetTimeSignature": "v:bdf90d8008",
+  "reduceSetTrackGain": "v:e93b888821",
+  "reduceSetTrackSend": "v:ce93c4ebc8",
+  "reduceSetTrackSidechain": "v:d081a8895a"
+ },
+ "src/lib/commandBus/describeCommand.ts": {
+  "describeCommand": "v:14be267343"
+ },
+ "src/lib/commandBus/docReducers.ts": {
+  "reduceApplyAlbum": "v:3087870333",
+  "reduceRemoveImageDoc": "v:300a364521",
+  "reduceReorderImageDocs": "v:23b97db2a9",
+  "reduceSetLiveDoc": "v:22a031c9d8",
+  "reduceSetModel3dDoc": "v:a5bb42d75a",
+  "reduceUpsertImageDoc": "v:3a00a94b73",
+  "reduceUpsertInstrumentDoc": "v:8852026b58"
+ },
+ "src/lib/commandBus/projectMetaReducers.ts": {
+  "reduceRenameProject": "v:ac64cb7766",
+  "reduceRestoreSnapshot": "v:34791928ad",
+  "reduceSetAspect": "v:a7797577d8",
+  "reduceSetFps": "v:b61bc95864",
+  "reduceSetParticles": "v:b83ad46eb5",
+  "reduceSetProjectCover": "v:33458aba14",
+  "reduceSetProjectFonts": "v:d4ffc7f47f",
+  "reduceSetProjectSeo": "v:e75f53f310",
+  "reduceSetProjectSync": "v:50731eb700",
+  "reduceSetThumbnailDoc": "v:51e92bfefb",
+  "reduceSetWorkflowRun": "v:801e4c6195"
+ },
+ "src/lib/commandBus/timelineMetaReducers.ts": {
+  "reduceSetChapters": "v:1eed6f835a",
+  "reduceSetLinks": "v:f2d11b8ef5",
+  "reduceSetLockedTracks": "v:4f43017b61",
+  "reduceSetMarkers": "v:657cae29e2",
+  "reduceSetRegions": "v:b7cda93cfe"
+ },
+ "src/lib/commandBus/trackReducers.ts": {
+  "reduceAddClip": "v:1109edadd9",
+  "reduceAddClips": "v:09da90938c",
+  "reduceAddTrack": "v:1fb1d23e8d",
+  "reduceMoveClip": "v:9b284d02be",
+  "reduceRemoveClip": "v:08c007d630",
+  "reduceRemoveTrack": "v:a9814bbbeb",
+  "reduceRenameTrack": "v:42c08c1954",
+  "reduceReplaceTrackClips": "v:026522f117",
+  "reduceReplaceTracks": "v:e0024eec53",
+  "reduceSplitClip": "v:5a2f9fee76",
+  "reduceUpdateClip": "v:5b904d22be"
+ },
+ "src/lib/commandBus/types.ts": {
+  "CommandOf": "t:977fd69904",
+  "EditorCommand": "t:f2a32fff46",
+  "EventActor": "t:d080bfa0a6",
+  "ProjectEvent": "t:647874df81"
+ },
  "src/lib/commands.ts": {
   "EditorCommand": "t:f2a32fff46",
   "EventActor": "t:d080bfa0a6",

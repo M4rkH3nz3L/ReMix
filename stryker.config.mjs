@@ -14,6 +14,7 @@ export default {
   coverageAnalysis: 'perTest',
   mutate: [
     'src/lib/commands.ts',
+    'src/lib/commandBus/*.ts',
     'src/lib/tiers.ts',
     'server/tiers.js',
     'server/billing.js',
@@ -24,6 +25,7 @@ export default {
     'server/usage.js',
     'server/security/*.js',
     '!**/*.test.js',
+    '!**/*.test.ts',
   ],
   // a nagy, tesztekhez nem kellő mappák nem kerülnek a sandboxba (a worker node_modules-át a
   // jest.stryker.config.js az eredeti helyéről oldja fel)

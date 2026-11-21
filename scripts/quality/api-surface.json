@@ -242,6 +242,48 @@
   "renderImageDoc": "v:e8752e6fd6",
   "resolveRemoteMedia": "v:860920430e"
  },
+ "server/imagedocLib/canvas.js": {
+  "MAX_CANVAS": "v:6124cb94c3",
+  "canvasSize": "v:8627fb7090",
+  "docCanvas": "v:f3780a62c8",
+  "evenClamp": "v:e094c3d621"
+ },
+ "server/imagedocLib/develop.js": {
+  "DEVELOP_BASE_COLOR": "v:649de6328e",
+  "DEVELOP_BASE_TONE": "v:649de6328e",
+  "DEVELOP_DETAIL_LENS": "v:649de6328e",
+  "DEVELOP_DETAIL_MID": "v:649de6328e",
+  "developChain": "v:0b1397e59e",
+  "developDetailFilter": "v:072004dea6",
+  "developFilterPlan": "v:b9ab957d26",
+  "isNeutralDevelop": "v:66ecefb606"
+ },
+ "server/imagedocLib/ffmpeg.js": {
+  "FFMPEG": "v:ecb252044b",
+  "imageOutputArgs": "v:9d77931b84",
+  "run": "v:cfbae86161"
+ },
+ "server/imagedocLib/guard.js": {
+  "MAX_LAYERS": "v:ab7f7b9553",
+  "MAX_TOTAL_POINTS": "v:d8cd7d68c3",
+  "imageDocGuard": "v:effcb4a366"
+ },
+ "server/imagedocLib/layers.js": {
+  "fillAsShape": "v:bc428c62c5",
+  "filterTintChain": "v:e82582ab33",
+  "isVisible": "v:9061a3ecba",
+  "rotateChain": "v:d7cae72d45",
+  "textWithStroke": "v:a90b47ee71",
+  "watermarkLayer": "v:46acea584e"
+ },
+ "server/imagedocLib/remoteMedia.js": {
+  "MAX_REMOTE_BYTES": "v:53b0a1b2fa",
+  "resolveRemoteMedia": "v:860920430e"
+ },
+ "server/imagedocLib/renderDoc.js": {
+  "BLEND_FF": "v:9fb3634eb7",
+  "renderImageDoc": "v:e8752e6fd6"
+ },
  "server/index.js": {
   "export=": "v:c5fe0200d1"
  },
@@ -686,6 +728,39 @@
  },
  "server/routes/imageTools.js": {
   "export=": "v:c5fe0200d1"
+ },
+ "server/routes/imageToolsLib/assetHandlers.js": {
+  "bgRemoveFileHandler": "v:690f23e3e9",
+  "bgRemoveHandler": "v:690f23e3e9",
+  "depthFileHandler": "v:690f23e3e9",
+  "depthFocusHandler": "v:690f23e3e9",
+  "depthParallaxHandler": "v:690f23e3e9",
+  "sticker3dPngHandler": "v:690f23e3e9",
+  "stickers3dListHandler": "v:6b7b157e78"
+ },
+ "server/routes/imageToolsLib/colorHandlers.js": {
+  "colorPixelHandler": "v:690f23e3e9",
+  "colorScopeHandler": "v:690f23e3e9",
+  "colorStatsHandler": "v:690f23e3e9",
+  "lutExportHandler": "v:690f23e3e9",
+  "textBakeHandler": "v:690f23e3e9"
+ },
+ "server/routes/imageToolsLib/interopHandlers.js": {
+  "pdfImportHandler": "v:c59c8ab8b1",
+  "psdExportHandler": "v:c59c8ab8b1",
+  "psdImportHandler": "v:c59c8ab8b1"
+ },
+ "server/routes/imageToolsLib/pdfRaster.js": {
+  "openPdfForRaster": "v:2052da7eb2",
+  "probePdfPageCount": "v:11bd3d3e47",
+  "rasterPdfPage": "v:c4b0b329b6"
+ },
+ "server/routes/imageToolsLib/remoteMediaOpts.js": {
+  "remoteMediaOpts": "v:7442acdcbd"
+ },
+ "server/routes/imageToolsLib/renderHandlers.js": {
+  "imageDocHandler": "v:690f23e3e9",
+  "svgPdfHandler": "v:690f23e3e9"
  },
  "server/routes/library.js": {
   "export=": "v:c5fe0200d1"

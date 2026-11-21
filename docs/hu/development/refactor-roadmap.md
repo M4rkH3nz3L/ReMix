@@ -165,6 +165,28 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   `listAll`-nak nincs MAX_TREE plafonja; (9) L777–785 `purgeTrash` nem létező id-t is „removed”-nak
   számol, nem tömb `ids` → TypeError (500); (10) L952–959 `uploadAbort` mindig `{aborted:true}`.
 
+- 🔒⚠️ **Kép-render és kép-eszközök (szerver)** (`server/imagedocLib/`, `server/routes/imageToolsLib/`; a
+  sorszám a HEAD-beli `server/imagedoc.js` (ID) és `server/routes/imageTools.js` (IT)): (1) SÚLYOS — IT L41: a
+  távoli réteg-média `safeFetch(u, { redirect: 'follow' })`, a `ssrf.js` L202–209 viszont CSAK a kiinduló URL-t
+  ellenőrzi, a `fetch` az átirányítást validálás nélkül követi → egy nyilvános, 302-vel belső címre
+  (169.254.169.254, localhost, LAN) mutató URL-lel a `/imagedoc` és a `/psd/export` SSRF-et indít (DNS-rebinding
+  ellen sincs védelem); (2) ID L373–380: a távoli választ időkorlát nélkül, TELJESEN a memóriába olvassa, és csak
+  utána nézi a 40 MB-os plafont (rétegenként 4 hivatkozás × 400 réteg, sorosan) → memória/idő-DoS; (3) ID L367 +
+  IT L43–47: a `localPath` (`new URL` / `decodeURIComponent`) a `try`-on KÍVÜL fut → egy rossz %-kódolású saját
+  `/m/` URL az egész `/imagedoc`-ot 500-zal (a `/psd/export`-ot 400-zal) dönti a réteg kihagyása helyett;
+  (4) IT L642–661: a `/stickers3d/:id.png` hitelesítés és rate-limit NÉLKÜL indít Chromium-WebGL rendert, a
+  yaw/pitch/size/material/env kombinációk (~10⁸) mind új render + új cache-fájl → nem hitelesített CPU/disk-DoS;
+  (5) IT L471, 495, 543, 588, 667, 698: a 40 MB-os `image` profilú route-ok a 2 GB-os `upload` multert használják
+  (az `uploadImage` helyett) → a mediaGuard csak a lemezre írt 2 GB UTÁN utasít el; (6) IT L443: a `/svg/pdf`-en
+  nincs mediaGuard, fájlonként 200 MB, fájlszám-korlát nélkül; (7) IT L588, 125, 208, 361: a `/bgremove` és a
+  PSD/PDF-útvonalak rate-limit nélküliek (csak Pro/kvóta), a `/depth/*` ONNX-futás pedig nem Pro-kapus (a
+  `/bgremove` az); a `/imagedoc` render nincs mérve (`usage`); (8) a multer méret-hibája a `lib/httpError`
+  kezelőben 500 „Szerverhiba." (`LIMIT_FILE_SIZE`) a 413 helyett, és a már létrehozott `vided-render-*`
+  munkakönyvtár ott marad (csak a 6 órás söprés viszi); (9) IT L110, 466, 489, 513, 537, 560, 581, 608, 657, 690,
+  720: a `.catch` `err.message.slice` / `err.message` nem-Error elutasításnál TypeError-t dob a catch-ben →
+  kezeletlen rejection, válasz nélkül; (10) ID L251–257: a `renderImageDoc` JSDoc-ja árván a korlátok előtt áll
+  (a bontás szándékosan így hagyta, különben a `doc` típusa megváltozna).
+
 - 🔒⚠️ **SÚLYOS — Külső tárhelyek / OAuth (szerver)** (`server/userStorageLib/`; a sorszám a HEAD-beli
   `server/userStorage.js`): (1) L63–64: az `OAUTH_STATE_SECRET` a `SUPABASE_SERVICE_ROLE_KEY`-re, majd a
   beégetett `'insecure-dev-secret'`-re esik vissza, fail-fast nélkül — a konstanssal BÁRKI hamisíthat
@@ -231,8 +253,8 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/lib/vectorPath.ts` | 813 | ✅ → 35 |
 | `server/ai.js` | 805 | ⬜ |
 | `src/components/editor/Toolbar.tsx` | 795 | ✅ → 237 |
-| `server/imagedoc.js` | 775 | ⬜ |
-| `server/routes/imageTools.js` | 741 | ⬜ |
+| `server/imagedoc.js` | 775 | ✅ → 33 |
+| `server/routes/imageTools.js` | 741 | ✅ → 56 |
 | `src/components/studio/audio/AudioStudioBody.tsx` | 738 | ✅ → 512 |
 | `src/components/editor/TimelineClip.tsx` | 732 | ✅ → 277 |
 | `src/components/editor/panels/AudioPanel.tsx` | 718 | ✅ → 145 |

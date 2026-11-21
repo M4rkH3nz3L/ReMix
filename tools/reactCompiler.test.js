@@ -251,6 +251,12 @@ const MUST_BE_MEMOIZED = [
   ['src/components/profile/storage/StorageUsageSection.tsx', 'StorageUsageSection'],
   ['src/components/profile/storage/ExternalStorageSection.tsx', 'ExternalStorageSection'],
   ['src/components/profile/storage/ManualProviderModal.tsx', 'ManualProviderModal'],
+  // REFACTOR: a useProfile.ts és a useStudio.ts kiemelt rész-hookjai (a gyökerek kimaradnak, lásd lent); a kimenetük identitása a golden trace-ben fordítóval is azonos
+  ['src/hooks/profile/useProfileSession.ts', 'useProfileSession'],
+  ['src/hooks/profile/useProfileState.ts', 'useProfileState'],
+  ['src/hooks/profile/useProfilePerformance.ts', 'useProfilePerformance'],
+  ['src/hooks/profile/useProfileLoaders.ts', 'useProfileLoaders'],
+  ['src/hooks/studio/useStudioLoaders.ts', 'useStudioLoaders'],
 ];
 
 /**
@@ -288,6 +294,11 @@ const KNOWN_BAILS = [
   ['src/components/studio/CreateProjectModal.tsx', 'CreateProjectModal', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
   ['src/components/profile/WalletCard.tsx', 'WalletCard', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
   ['src/components/profile/StorageCard.tsx', 'StorageCard', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
+  ['src/hooks/useProfile.ts', 'useProfile', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
+  ['src/hooks/profile/useProfileImage.ts', 'useProfileImage', 'try/finally a feltöltés-handlerekben (a fordító még nem támogatja; a bontás előtt a gyökér ugyanezért maradt ki)'],
+  ['src/hooks/profile/useProfileSubscription.ts', 'useProfileSubscription', 'try/finally a DEV Pro-handlerekben (a fordító még nem támogatja; a bontás előtt a gyökér ugyanezért maradt ki)'],
+  ['src/hooks/useStudio.ts', 'useStudio', 'a füstteszt createRef-jét renderben írja (a bontás előtt: eslint-disable react-hooks/exhaustive-deps is)'],
+  ['src/hooks/studio/useOpenFromStorage.ts', 'useOpenFromStorage', 'a paraméter-kulcsos effekt eslint-disable react-hooks/exhaustive-deps-e kikapcsolja a fordítót (a bontás előtt is)'],
 ];
 
 const cache = new Map();

@@ -1,45 +1,23 @@
-import { type Href, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, FlatList } from 'react-native';
+import { FlatList } from 'react-native';
 
 import { gridColumns } from '@/constants/layout';
-import { createProjectFromTemplate } from '@/constants/templates';
-import type { VideoTemplate } from '@/constants/templates';
 import { useLayout } from '@/hooks/useLayout';
-import { missingCreateFields } from '@/lib/createProjectForm';
-import { isMyAccountDeleted, reactivateAccount } from '@/lib/account';
-import { BG_SWATCHES, clampDim, isHexColor, nearestAspect } from '@/lib/canvasPresets';
-import { listSharedWithMe, type SharedProject } from '@/lib/collab';
-import { backupProjectToCloud, deleteCloudProject, syncProjectsFromCloud } from '@/lib/cloudSync';
-import { deletePostsForProject, publishRenderedProject } from '@/lib/feed';
-import { makeId } from '@/lib/id';
-import { docFromTemplate, IMAGE_TEMPLATES } from '@/lib/imageTemplates';
-import { useBrandStyle } from '@/store/brandStyleStore';
-import { PODCAST_EPISODE, startRunning } from '@/lib/workflowTemplate';
-import { pickSourceAsset, type SourceKind } from '@/lib/projectSource';
-import { fileKindOf, studioForKind } from '@/lib/remixFiles';
-import { importFromStorage } from '@/lib/storageImport';
-import {
-  createEmptyProject,
-  parseHashtags,
-  parseKeywords,
-  studioRoute,
-  type CreateProjectConfig,
-} from '@/lib/projectUtils';
-import { deleteProject, listProjects, loadProject, saveProject } from '@/lib/storage';
-import { visibleProjects } from '@/lib/projectKinds';
+import type { SharedProject } from '@/lib/collab';
+import { BG_SWATCHES } from '@/lib/canvasPresets';
+import { IMAGE_TEMPLATES } from '@/lib/imageTemplates';
 import { DEFAULT_STORAGE_FORMAT } from '@/lib/model3dExport';
-import { projectStorageMap } from '@/lib/storageQuota';
-import { pickAndParseVided, relinkInteractive } from '@/lib/videdFile';
-import { guardPro } from '@/store/paywallStore';
-import { withProgress } from '@/store/progressStore';
-import { useSeoGate } from '@/store/seoGateStore';
 import type { MeshFormat } from '@/types/model3d';
-import type { AspectRatio, Asset, AudioMasterTarget, Project, ProjectKind, ProjectMeta } from '@/types/project';
-import { logCaught } from '@/lib/logCaught';
-import { applyAudioTemplate, templateTarget, type AudioTemplate } from '@/lib/audioTemplates';
+import type { AspectRatio, Asset, AudioMasterTarget, ProjectKind, ProjectMeta } from '@/types/project';
+import { templateTarget, type AudioTemplate } from '@/lib/audioTemplates';
 import { registerDevAction } from '@/lib/devActions';
+import { createProjectCreateActions } from '@/hooks/studio/createProjectCreateActions';
+import { createProjectMenuActions } from '@/hooks/studio/createProjectMenuActions';
+import { createStudioFormActions } from '@/hooks/studio/createStudioFormActions';
+import { createStudioImportActions } from '@/hooks/studio/createStudioImportActions';
+import { useOpenFromStorage } from '@/hooks/studio/useOpenFromStorage';
+import { useStudioLoaders } from '@/hooks/studio/useStudioLoaders';
 
 /**
  * 🎬 A Stúdió / projekt-lista képernyő NEM-prezentációs magja: a lista
@@ -48,6 +26,9 @@ import { registerDevAction } from '@/lib/devActions';
  * BIT-RE az eredeti `studio/index.tsx`-é — ez csak kiemelés (Health/02.4).
  * Adat a meglévő `lib/storage`/`*Client`/Supabase rétegen; semmi közvetlen
  * projekt-írás (a store/command-bus hívások változatlanok).
+ *
+ * REFACTOR: a részek a `hooks/studio/` alatt élnek; a hook-hívások és az effektek SORRENDJE
+ * változatlan.
  */
 export function useStudio() {
   const [projects, setProjects] = useState<ProjectMeta[]>([]);
@@ -92,382 +73,65 @@ export function useStudio() {
   // a korábbi fix „640px → 2 oszlop" helyett (lásd @/constants/layout)
   const columns = gridColumns(L.width, 340, 4);
 
-  const refresh = useCallback(() => {
-    // ⚡ fókuszkor csak a HELYI lista (olcsó); a felhő-visszatöltés egyszer, mountkor fut
-    // 🔒 az ezen az eszközön nem elérhető fajták (LiDAR nélkül a 3D) rejtve — nem törölve
-    listProjects().then((all) => setProjects(visibleProjects(all))).catch((caught) => { logCaught('hooks/useStudio.ts:refresh', caught); });
-    // 👥 velem megosztott projektek (felhő, ha be van jelentkezve; egyébként [])
-    listSharedWithMe().then(setShared).catch((caught) => { logCaught('hooks/useStudio.ts:refresh', caught); });
-    // 🗄️ per-projekt MI-tárhely-használat (a MI tárolónkon foglalt pontos bájt)
-    projectStorageMap().then(setStorageMap).catch((caught) => { logCaught('hooks/useStudio.ts:refresh', caught); });
-  }, []);
+  const refresh = useStudioLoaders({ t, setProjects, setShared, setStorageMap });
 
-  useFocusEffect(refresh);
+  const { resetCreateForm, addSource, removeSource, missingFields, seoReady, cancelCreate } =
+    createStudioFormActions({
+      setCreating,
+      name,
+      setName,
+      seoDescription,
+      setSeoDescription,
+      seoHashtags,
+      setSeoHashtags,
+      seoKeywords,
+      setSeoKeywords,
+      setKind,
+      setImgW,
+      setImgH,
+      setImgFormat,
+      setBg,
+      setAudioTarget,
+      setAudioTemplateRaw,
+      setDesignTemplate,
+      setModel3dFormat,
+      setSources,
+    });
 
-  // 🗄️ EGYSZERI felhő-visszatöltés belépéskor (NEM minden fókuszkor — perf): a
-  // helyileg HIÁNYZÓ projekteket hozza vissza (újratelepítés/eszközváltás után).
-  useEffect(() => {
-    syncProjectsFromCloud()
-      .then((n) => {
-        if (n > 0) {
-          refresh();
-        }
-      })
-      .catch((caught) => { logCaught('hooks/useStudio.ts:useStudio', caught); });
-  }, [refresh]);
+  useOpenFromStorage({ t, resetCreateForm, setKind, setName, setSources, setCreating });
 
-  // 🗑️ deaktivált fiók → helyreállítás-prompt belépés után (a tartalom addig rejtve)
-  useEffect(() => {
-    isMyAccountDeleted()
-      .then((d) => {
-        if (!d) {
-          return;
-        }
-        Alert.alert(t('gdpr.deactivatedTitle'), t('gdpr.deactivatedBody'), [
-          { text: t('common.cancel'), style: 'cancel' },
-          {
-            text: t('gdpr.reactivate'),
-            onPress: () => reactivateAccount().then(refresh).catch((caught) => { logCaught('hooks/useStudio.ts:useStudio', caught); }),
-          },
-        ]);
-      })
-      .catch((caught) => { logCaught('hooks/useStudio.ts:useStudio', caught); });
-  }, [refresh, t]);
-
-  const resetCreateForm = () => {
-    setName('');
-    setSeoDescription('');
-    setSeoHashtags('');
-    setSeoKeywords('');
-    setKind('video');
-    setImgW('1080');
-    setImgH('1080');
-    setImgFormat('raster');
-    setBg(BG_SWATCHES[0]);
-    setAudioTarget('music');
-    setAudioTemplateRaw('blank');
-    setDesignTemplate(IMAGE_TEMPLATES[0].key);
-    setModel3dFormat(DEFAULT_STORAGE_FORMAT);
-    setSources([]);
-  };
-
-  // 🗂️→🎬 „Új projekt ebből" a Tárhelyemből: a fájl forrásként, a fajtájának megfelelő
-  // stúdióval és a fájlnévből képzett névvel nyitja az Új projekt űrlapot (a SEO-mezőket
-  // a user tölti ki). A fájl a projekt első megnyitásakor a projekt-mappájába kerül.
-  const openParams = useLocalSearchParams<{ openLoc?: string; openPath?: string; openUri?: string }>();
-  const handledOpen = useRef<string | null>(null);
-  useEffect(() => {
-    const { openLoc, openPath, openUri } = openParams;
-    if (!openPath || (openLoc !== 'device' && openLoc !== 'remix')) {
-      return;
-    }
-    const key = `${openLoc}:${openPath}`;
-    if (handledOpen.current === key) {
-      return;
-    }
-    handledOpen.current = key;
-    const fileName = openPath.slice(openPath.lastIndexOf('/') + 1);
-    const studio = studioForKind(fileKindOf(fileName));
-    if (!studio) {
-      return;
-    }
-    void importFromStorage({ location: openLoc, path: openPath, name: fileName, isFolder: false, uri: openUri })
-      .then((asset) => {
-        if (!asset) {
-          return;
-        }
-        resetCreateForm();
-        setKind(studio);
-        setName(fileName.replace(/\.[^.]+$/, ''));
-        setSources([asset]);
-        setCreating(true);
-      })
-      .catch((e: Error) => { logCaught('hooks/useStudio.ts:useStudio', e); return Alert.alert(t('common.error'), e.message); })
-      .finally(() => router.setParams({ openLoc: undefined, openPath: undefined, openUri: undefined }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- a paraméter-kulcsok a valódi trigger; a resetCreateForm stabil setterekből áll, a t stabil
-  }, [openParams.openLoc, openParams.openPath, openParams.openUri]);
-
-  // 🗂️ egy támogatott forrás-fájl hozzáadása a leendő projekt forrás-mappájához
-  const addSource = (sk: SourceKind) => {
-    pickSourceAsset(sk)
-      .then((asset) => {
-        if (asset) {
-          setSources((prev) => [...prev, asset]);
-        }
-      })
-      .catch((caught) => { logCaught('hooks/useStudio.ts:addSource', caught); });
-  };
-
-  // egy forrás eltávolítása a leendő projekt forrás-mappájából
-  const removeSource = (id: string) => {
-    setSources((prev) => prev.filter((x) => x.id !== id));
-  };
-
-  // az Új projekt gomb csak a név hiányában tiltott (S22: a SEO a megosztáskor kell) —
-  // a hiányzók LISTÁJA kell a képernyőnek is (megmondja, mi hiányzik, és odaugrik)
-  const missingFields = missingCreateFields({
-    name,
-    description: seoDescription,
-    hashtags: seoHashtags,
-    keywords: seoKeywords,
-  });
-  const seoReady = missingFields.length === 0;
-
-  const create = async () => {
-    const title = name.trim();
-    const description = seoDescription.trim();
-    const hashtags = parseHashtags(seoHashtags);
-    const keywords = parseKeywords(seoKeywords);
-    // védőkorlát: a gomb név nélkül tiltott; a SEO itt elhagyható (S22: a megosztás kéri be)
-    if (!title) {
-      return;
-    }
-    // 🎛️ fajta-specifikus induló-beállítások: kép → szabad W×H + formátum + háttér, hang → master-cél
-    const config: CreateProjectConfig = {};
-    // a projekt-szintű aspectRatio: képnél a megadott W×H-ból a legközelebbi enum
-    let projectAspect = aspect;
-    const tpl = kind === 'design' ? IMAGE_TEMPLATES.find((x) => x.key === designTemplate) ?? IMAGE_TEMPLATES[0] : null;
-    if (tpl) {
-      // 🎨 S8: a Design-projekt a választott sablon vásznán indul
-      projectAspect = nearestAspect(tpl.width, tpl.height);
-      config.image = { width: tpl.width, height: tpl.height, format: 'vector', background: tpl.background };
-    } else if (kind === 'image') {
-      const w = clampDim(imgW);
-      const h = clampDim(imgH);
-      projectAspect = nearestAspect(w, h);
-      config.image = {
-        width: w,
-        height: h,
-        format: imgFormat,
-        // érvénytelen hex → essen vissza az alap sötétre (a 'transparent' átmegy)
-        background: bg === 'transparent' || isHexColor(bg) ? bg : BG_SWATCHES[0],
-      };
-    } else if (kind === 'audio' || kind === 'music') {
-      config.audioMasterTarget = audioTarget;
-    } else if (kind === 'model3d') {
-      config.model3dStorageFormat = model3dFormat;
-    }
-    // a cím szolgál a projekt neveként ÉS a SEO-címként is (később külön szerkeszthető)
-    const created = createEmptyProject(
-      title,
-      projectAspect,
-      { title, description, hashtags, keywords },
+  const { create, createFromTemplate } = createProjectCreateActions({
+    form: {
+      name,
+      seoDescription,
+      seoHashtags,
+      seoKeywords,
+      aspect,
       kind,
-      config
-    );
-    // 🎨 a „Design" belépési pont (S8): az első lap a sablon szerkeszthető rétegeivel, márkára színezve
-    const designed = tpl ? { ...created, imageDocs: [docFromTemplate(tpl, title, () => makeId('lyr'), useBrandStyle.getState())] } : created;
-    // 🎵 a „Zene" belépési pont (S10): ugyanaz a hang-projekt, a Zene-sablonnal (ha a felhasználó nem választott mást)
-    const base =
-      kind === 'audio' || kind === 'music'
-        ? applyAudioTemplate(created, kind === 'music' && audioTemplate === 'blank' ? 'music' : audioTemplate, {
-            voice: t('studio.audio.template.trackVoice'),
-            music: t('studio.audio.template.trackMusic'),
-            sfx: t('studio.audio.template.trackSfx'),
-            sections: [t('studio.audio.template.intro'), t('studio.audio.template.verse'), t('studio.audio.template.chorus'), t('studio.audio.template.outro')],
-          })
-        : designed;
-    // ▶️ C4: a Podcast-sablon a Podcast-epizód munkafolyamatot is elindítja (a Hang Stúdió sávja vezet végig)
-    const withRun = (kind === 'audio' || kind === 'music') && audioTemplate === 'podcast' ? { ...base, workflowRun: startRunning(PODCAST_EPISODE, () => makeId('wf'), new Date().toISOString()) } : base;
-    // 🗂️ a létrehozáskor hozzáadott források a projekt forrás-mappájába (assets)
-    const project = sources.length > 0 ? { ...withRun, assets: sources } : withRun;
-    await saveProject(project);
-    backupProjectToCloud(project); // 🗄️ azonnal a userhez a felhőbe is (best-effort)
-    setCreating(false);
-    resetCreateForm();
-    // 🎛️ a fajtának megfelelő stúdióba nyitunk (videó → editor, kép/hang → saját)
-    router.push(studioRoute(kind, project.id) as Href);
-  };
+      designTemplate,
+      imgW,
+      imgH,
+      imgFormat,
+      bg,
+      audioTarget,
+      model3dFormat,
+      audioTemplate,
+      sources,
+    },
+    setCreating,
+    resetCreateForm,
+    t,
+  });
 
-  const createFromTemplate = (template: VideoTemplate) => {
-    const project = createProjectFromTemplate(template);
-    saveProject(project)
-      .then(() => {
-        backupProjectToCloud(project); // 🗄️ felhő-backup (best-effort)
-        router.push(`/editor/${project.id}`);
-      })
-      .catch((caught) => { logCaught('hooks/useStudio.ts:createFromTemplate', caught); return Alert.alert(t('common.error'), t('home.createFailed')); });
-  };
+  const { confirmDelete, duplicate, startRename, saveRename, shareToFeed, projectMenu } =
+    createProjectMenuActions({ t, refresh, renaming, setRenaming, renameValue, setRenameValue });
 
-  const confirmDelete = (meta: ProjectMeta) => {
-    Alert.alert(t('home.deleteTitle'), t('home.deleteMessage', { name: meta.name }), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => {
-          // „nincs projekt → nincs videó": helyi törlés + a projekthez tartozó
-          // feed-posztok törlése + a felhő-projekt törlése (a DB-trigger defenzíven
-          // szintén törli a posztokat, pl. még-nem-mentett felhő esetén is fedve).
-          deleteProject(meta.id)
-            .then(() => Promise.all([deletePostsForProject(meta.id), deleteCloudProject(meta.id)]))
-            .then(refresh)
-            .catch((caught) => { logCaught('hooks/useStudio.ts:confirmDelete', caught); });
-        },
-      },
-    ]);
-  };
-
-  const duplicate = (meta: ProjectMeta) => {
-    loadProject(meta.id)
-      .then((p) => {
-        if (!p) {
-          return;
-        }
-        return saveProject({
-          ...p,
-          id: makeId('prj'),
-          name: `${p.name}${t('home.copySuffix')}`,
-          createdAt: new Date().toISOString(),
-          // 🔀 remix-lineage: az új projekt az eredetiből készült
-          remixOf: { projectId: p.id, name: p.name },
-          // 📁 a másolat SAJÁT mappát kap a betöltéskor (a fájlokat átmásolja), a
-          // szinkron projektenként külön döntés → alapból ki
-          folder: undefined,
-          syncToRemix: undefined,
-        });
-      })
-      .then(refresh)
-      .catch((caught) => { logCaught('hooks/useStudio.ts:duplicate', caught); return Alert.alert(t('common.error'), t('home.duplicateFailed')); });
-  };
-
-  const startRename = (meta: ProjectMeta) => {
-    setRenaming(meta);
-    setRenameValue(meta.name);
-  };
-
-  const saveRename = () => {
-    const meta = renaming;
-    const nextName = renameValue.trim();
-    setRenaming(null);
-    if (!meta || !nextName || nextName === meta.name) {
-      return;
-    }
-    loadProject(meta.id)
-      .then((p) => (p ? saveProject({ ...p, name: nextName }) : undefined))
-      .then(refresh)
-      .catch((caught) => { logCaught('hooks/useStudio.ts:saveRename', caught); return Alert.alert(t('common.error'), t('home.renameFailed')); });
-  };
-
-  const shareToFeed = (meta: ProjectMeta, remixTracks?: boolean) => {
-    // 🔀 C3: hang-projektnél az alkotó dönt — a remix a sávokat is megkapja-e (alapból nem)
-    if (meta.kind === 'audio' && remixTracks === undefined) {
-      Alert.alert(t('feed.remixTracksTitle'), t('feed.remixTracksBody'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('feed.remixTracksNo'), onPress: () => shareToFeed(meta, false) },
-        { text: t('feed.remixTracksYes'), onPress: () => shareToFeed(meta, true) },
-      ]);
-      return;
-    }
-    loadProject(meta.id)
-      .then(async (loaded) => {
-        // 📣 S22: a SEO a megosztáskor kell — hiányzik → bekéri, megszakításkor nem posztol
-        const p = loaded ? await useSeoGate.getState().ensureSeo(loaded) : null;
-        if (!p) {
-          return;
-        }
-        // render (ha kell) → feltöltés → posztolás; Pro-kapu a felhő-renderre
-        return guardPro(
-          () =>
-            withProgress(t('feed.rendering'), (report) => publishRenderedProject(p, report, remixTracks ? { remixTracks } : undefined)).then(
-              (res) => {
-                if (res) {
-                  refresh();
-                  Alert.alert(t('feed.shareToFeed'), t('feed.sharedOk'), [
-                    { text: t('common.ok') },
-                    { text: t('nav.feed'), onPress: () => router.push('/') },
-                  ]);
-                }
-              }
-            ),
-          (e) => Alert.alert(t('common.error'), e.message)
-        );
-      })
-      .catch((e: Error) => { logCaught('hooks/useStudio.ts:shareToFeed', e); return Alert.alert(t('common.error'), e.message); });
-  };
-
-  const projectMenu = (meta: ProjectMeta) => {
-    Alert.alert(meta.name, undefined, [
-      // 🧊 a 3D-projektnek nincs idővonala → a feed-megosztás (render) üres lenne; a modell
-      // képként/videóként a 3D Stúdió Export lapjáról vagy a videószerkesztőből osztható
-      ...(meta.kind === 'model3d' ? [] : [{ text: t('feed.shareToFeed'), onPress: () => shareToFeed(meta) }]),
-      { text: t('common.rename'), onPress: () => startRename(meta) },
-      { text: t('common.duplicate'), onPress: () => duplicate(meta) },
-      { text: t('collab.share'), onPress: () => router.push(`/collab/${meta.id}`) },
-      {
-        text: t('storage.projectStorage'),
-        onPress: () => router.push({ pathname: '/storage', params: { project: meta.id } } as Href),
-      },
-      { text: t('common.delete'), style: 'destructive', onPress: () => confirmDelete(meta) },
-      { text: t('common.cancel'), style: 'cancel' },
-    ]);
-  };
-
-  const importVided = () => {
-    pickAndParseVided()
-      .then((result) => {
-        if (!result) {
-          return;
-        }
-        const finish = (p: Project) => {
-          saveProject(p)
-            .then(() => {
-              refresh();
-              router.push(studioRoute(p.kind, p.id) as Href);
-            })
-            .catch((caught) => { logCaught('hooks/useStudio.ts:finish', caught); return Alert.alert(t('common.import'), t('home.saveFailed')); });
-        };
-        if (result.missing.length === 0) {
-          if (result.relinked > 0) {
-            Alert.alert(
-              t('home.importDoneTitle'),
-              t('home.importRelinked', { count: result.relinked })
-            );
-          }
-          finish(result.project);
-          return;
-        }
-        Alert.alert(
-          t('home.missingMediaTitle'),
-          t('home.missingMediaCount', { count: result.missing.length }) +
-            (result.relinked > 0
-              ? ' ' + t('home.missingMediaRelinkedNote', { count: result.relinked })
-              : '') +
-            '. ' +
-            t('home.missingMediaAsk'),
-          [
-            { text: t('common.cancel'), style: 'cancel' },
-            { text: t('common.later'), onPress: () => finish(result.project) },
-            {
-              text: t('home.relink'),
-              onPress: () => {
-                relinkInteractive(result.project, result.missing).then(finish);
-              },
-            },
-          ]
-        );
-      })
-      .catch((err: Error) => { logCaught('hooks/useStudio.ts:importVided', err); return Alert.alert(t('common.import'), err.message); });
-  };
-
-  // 🤖 „AI eszközök": az AI a szerkesztőben él → a legutóbbi projektet nyitjuk
-  // meg egyből az AI-panellel; ha még nincs projekt, előbb létrehozunk egyet
-  const openAiTools = () => {
-    // az AI-panel a videó-editorban él → a legutóbbi VIDEÓ-projektet nyitjuk;
-    // ha csak kép/hang van (vagy semmi), az új-projekt lapot kínáljuk
-    const recent = projects.find((p) => (p.kind ?? 'video') === 'video');
-    if (recent) {
-      router.push(`/editor/${recent.id}?panel=assistant`);
-    } else {
-      setCreating(true);
-    }
-  };
-
-  // a létrehozás-modal bezárása mégsével (forma visszaállítással)
-  const cancelCreate = () => {
-    setCreating(false);
-    resetCreateForm();
-  };
+  const { importVided, openAiTools } = createStudioImportActions({
+    t,
+    refresh,
+    projects,
+    setCreating,
+  });
 
   // 🧪 füstteszt: az „Új projekt” űrlap kitöltése és a létrehozás (a valódi `create` útja; csak __DEV__)
   const createRef = useRef(create);

@@ -11,86 +11,41 @@
  */
 import type { Detent } from '@/lib/panelLayout';
 import type { VideoPanelId } from '@/lib/panelSpecs';
-import { findClip } from '@/lib/projectUtils';
 import type { EditorCommand, EventActor, ProjectEvent } from '@/lib/commands';
 import type { LockBroadcast, LockMap } from '@/lib/clipLock';
 import type { BrushStyle } from '@/lib/draw';
 import type { PacingInsight } from '@/lib/pacingClient';
 import type { Asset, ChapterKind, Clip, Project, TrackType } from '@/types/project';
+import type {
+  InsightLane,
+  PanelId,
+  ProxyQuality,
+  SnapStrength,
+  SnapTargets,
+  TrimMode,
+} from '@/store/editorStateParts/editorConstants';
 
-/** 🎯 proxy minőség-tier → a proxy leghosszabb oldala (px) */
-export type ProxyQuality = 'low' | 'medium' | 'high';
-export const PROXY_MAX_SIDE: Record<ProxyQuality, number> = { low: 640, medium: 960, high: 1280 };
-
-/** 🔎 melyik „insight" sáv látszik az idővonal fölött (egyszerre egy — kevesebb chrome) */
-export type InsightLane = 'story' | 'map' | 'pacing';
-
-/** 🧲 idővonal-illesztés erőssége: ki / normál / erős (a küszöböt skálázza) */
-export type SnapStrength = 'off' | 'normal' | 'strong';
-/** erősség → SNAP_PX szorzó (0 = nincs illesztés) */
-export const SNAP_FACTOR: Record<SnapStrength, number> = { off: 0, normal: 1, strong: 2 };
-
-/**
- * ✂️ Trim-mód (profi vágó-viselkedés). A `normal` a hagyományos trim/mozgatás;
- * a `ripple` a mögötte lévőket tolja; a `roll`, `slip`, `slide` a szomszédos
- * klipekkel dolgozik (lásd `rollEdit`/`slipEdit`/`slideEdit`). A trim-fogantyú
- * a roll/ripple/normal szerint viselkedik, a klip-test húzása a slip/slide/normal
- * szerint — így egy módválasztóval az összes profi vágás elérhető.
- */
-export type TrimMode = 'normal' | 'ripple' | 'roll' | 'slip' | 'slide';
-export const TRIM_MODES: TrimMode[] = ['normal', 'ripple', 'roll', 'slip', 'slide'];
-
-/**
- * 🧲 Illesztési CÉLPONTOK: melyik fajtára kapjon a klip-él/lejátszófej. A magnet
- * gomb hosszú nyomása kapcsolja őket; a `snapStrength: 'off'` mindent kikapcsol.
- */
-export interface SnapTargets {
-  playhead: boolean;
-  clips: boolean;
-  markers: boolean;
-  beats: boolean;
-  regions: boolean;
-}
-export const DEFAULT_SNAP_TARGETS: SnapTargets = {
-  playhead: true,
-  clips: true,
-  markers: true,
-  beats: true,
-  regions: true,
-};
-
-/** 🏷️ timeline-régió színek — új régió ciklikusan kap, az átszínezés ezen lépked */
-export const REGION_COLORS = ['#7c5cff', '#4a9eff', '#2ecc8f', '#ffb454', '#ff5ca8', '#ff6b6b'];
-
-/** a panel-azonosítók egyetlen forrása a panel-regiszter (`@/lib/panelSpecs`) */
-export type PanelId = VideoPanelId | null;
-
-/** Kijelöléshez nem kötött panelek — nyitva maradnak kijelölés nélkül is. */
-export const STANDALONE_PANELS: PanelId[] = [
-  'audio',
-  'export',
-  'imagedoc',
-  'captions',
-  'sticker',
-  'assistant',
-  'library',
-  'transcript',
-  'multicam',
-  'creatorPreset',
-  'workflow',
-];
-
-export const HISTORY_LIMIT = 50;
-/** ennyi eseményt őrzünk meg projektenként (AI-memória nyersanyag) */
-export const EVENT_LIMIT = 300;
-
-/** a sáv-kapcsolók state-kulcsai — mind `TrackType[]`-et tárol */
-export type TrackFlagKey =
-  | 'mutedTracks'
-  | 'soloTracks'
-  | 'collapsedTracks'
-  | 'hiddenTracks'
-  | 'lockedTracks';
+// REFACTOR: a konstansok, a SESSION_RESET és a touchedTrackTypes az `editorStateParts/` alatt;
+// innen VÁLTOZATLAN néven tovább-exportálva (a slice-ok és a `@/store/editorStore` importjai nem változnak)
+export {
+  DEFAULT_SNAP_TARGETS,
+  EVENT_LIMIT,
+  HISTORY_LIMIT,
+  type InsightLane,
+  type PanelId,
+  PROXY_MAX_SIDE,
+  type ProxyQuality,
+  REGION_COLORS,
+  SNAP_FACTOR,
+  type SnapStrength,
+  type SnapTargets,
+  STANDALONE_PANELS,
+  type TrackFlagKey,
+  TRIM_MODES,
+  type TrimMode,
+} from '@/store/editorStateParts/editorConstants';
+export { SESSION_RESET } from '@/store/editorStateParts/sessionReset';
+export { touchedTrackTypes } from '@/store/editorStateParts/touchedTrackTypes';
 
 export interface EditorState {
   project: Project | null;
@@ -440,83 +395,4 @@ export interface EditorState {
   setDocThumb: (docId: string, thumbUri: string, thumbKey: string) => void;
   /** a renderelt változat rögzítése a projekten (artefaktum — nem undo/dirty) */
   setRendered: (rendered: Project['rendered']) => void;
-}
-
-/**
- * Az ÁTMENETI szerkesztő-módok alaphelyzete. Projekt betöltésekor ÉS
- * bezárásakor UGYANEZT kell nullázni — a lista két helyre másolása már kétszer
- * okozott beragadt módot (a zárolás/rajzoló-mód átragadt a következő
- * projektre), ezért közös konstans.
- *
- * A `styleClipboard` SZÁNDÉKOSAN nincs benne: a másolt megjelenés projektek
- * közt is átvihető.
- */
-export const SESSION_RESET = {
-  multiSelectIds: [] as string[],
-  multiSelectMode: false,
-  drawBrush: null,
-  drawMaskMode: false,
-  rippleMode: false,
-  razorMode: false,
-  trimMode: 'normal' as TrimMode,
-  snapGrid: 0,
-  snapStrength: 'normal' as SnapStrength,
-  snapTargets: { ...DEFAULT_SNAP_TARGETS },
-  hiddenTracks: [] as TrackType[],
-  autoTrackHeight: false,
-  playbackRate: 1,
-  playThrough: false,
-  rangeIn: null as number | null,
-  rangeOut: null as number | null,
-  showSafeZones: false,
-  focusMode: false,
-  comparingOriginal: false,
-  compareSplit: null as number | null,
-  masterVolume: 1,
-  insightLane: 'story' as InsightLane,
-  maskEdit: false,
-  rotoMask: false,
-  videoVoiceActive: false,
-  mutedTracks: [] as TrackType[],
-  soloTracks: [] as TrackType[],
-  lockedTracks: [] as TrackType[],
-  fxBypass: false,
-  collapsedTracks: [] as TrackType[],
-  trackHeightScale: {} as Partial<Record<TrackType, number>>,
-  suggestedCuts: [] as number[],
-  pacingInsight: null as PacingInsight | null,
-  searchMatchTimes: [] as number[],
-  beatTimes: [] as number[],
-  downbeatTimes: [] as number[],
-  variantPreview: null,
-  pickTarget: null,
-};
-
-/**
- * 🔒 Egy command által ÉRINTETT sáv-típus(ok) — a core-guardhoz (zárolt sáv).
- * Üres tömb = a parancs nem sáv-scope-os (pl. SET_FPS, markerek) → sosem blokkolt.
- */
-export function touchedTrackTypes(project: Project, cmd: EditorCommand): TrackType[] {
-  switch (cmd.type) {
-    case 'ADD_CLIP':
-    case 'ADD_CLIPS':
-    case 'REPLACE_TRACK_CLIPS':
-    case 'SET_TRACK_GAIN':
-      return [cmd.trackType];
-    case 'REPLACE_TRACKS':
-      return cmd.tracks.map((t) => t.trackType);
-    case 'UPDATE_CLIP':
-    case 'REMOVE_CLIP':
-    case 'SPLIT_CLIP': {
-      const t = findClip(project, cmd.clipId)?.track.type;
-      return t ? [t] : [];
-    }
-    case 'MOVE_CLIP': {
-      // a mozgatás a FORRÁS és a CÉL sávot is érinti — bármelyik zárolt → tiltott
-      const from = findClip(project, cmd.clipId)?.track.type;
-      return from ? [from, cmd.toTrackType] : [cmd.toTrackType];
-    }
-    default:
-      return [];
-  }
 }

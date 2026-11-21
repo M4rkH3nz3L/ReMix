@@ -3946,6 +3946,65 @@
  "src/hooks/feed/useFeedTapGesture.ts": {
   "useFeedTapGesture": "v:e77b380400"
  },
+ "src/hooks/profile/createAccountActions.ts": {
+  "createAccountActions": "v:c0a2541cbe"
+ },
+ "src/hooks/profile/createAiProviderActions.ts": {
+  "createAiProviderActions": "v:e81c3e1afc"
+ },
+ "src/hooks/profile/createProfileEditActions.ts": {
+  "createProfileEditActions": "v:a49e8fb8aa"
+ },
+ "src/hooks/profile/profileValidation.ts": {
+  "profileFieldErrors": "v:e6aba98b7f"
+ },
+ "src/hooks/profile/providerForm.ts": {
+  "EMPTY_FORM": "v:9721989244",
+  "ProviderForm": "t:9721989244",
+  "providerFormFromProvider": "v:12f34ca94d",
+  "providerFormValidity": "v:d3b0e26ee4",
+  "providerInputFromForm": "v:4074cb08e1"
+ },
+ "src/hooks/profile/useProfileImage.ts": {
+  "useProfileImage": "v:a96747c0c5"
+ },
+ "src/hooks/profile/useProfileLoaders.ts": {
+  "useProfileLoaders": "v:95bb37069e"
+ },
+ "src/hooks/profile/useProfilePerformance.ts": {
+  "useProfilePerformance": "v:c6cfe91f32"
+ },
+ "src/hooks/profile/useProfileSession.ts": {
+  "useProfileSession": "v:b35842e07a"
+ },
+ "src/hooks/profile/useProfileState.ts": {
+  "useProfileState": "v:8df2da6fcf"
+ },
+ "src/hooks/profile/useProfileSubscription.ts": {
+  "useProfileSubscription": "v:445296d5a1"
+ },
+ "src/hooks/studio/buildNewProject.ts": {
+  "NewProjectForm": "t:474cfea668",
+  "buildNewProject": "v:20c343f400"
+ },
+ "src/hooks/studio/createProjectCreateActions.ts": {
+  "createProjectCreateActions": "v:b5352b9caf"
+ },
+ "src/hooks/studio/createProjectMenuActions.ts": {
+  "createProjectMenuActions": "v:c18fae68ae"
+ },
+ "src/hooks/studio/createStudioFormActions.ts": {
+  "createStudioFormActions": "v:017b2520ac"
+ },
+ "src/hooks/studio/createStudioImportActions.ts": {
+  "createStudioImportActions": "v:0cbed6f2c2"
+ },
+ "src/hooks/studio/useOpenFromStorage.ts": {
+  "useOpenFromStorage": "v:c4db9186b6"
+ },
+ "src/hooks/studio/useStudioLoaders.ts": {
+  "useStudioLoaders": "v:fb135c6f4b"
+ },
  "src/hooks/useBackLayer.ts": {
   "useBackLayer": "v:22914e02b0"
  },
@@ -10142,6 +10201,29 @@
   "TRIM_MODES": "v:aa1382f0bf",
   "TrackFlagKey": "t:8c443e05e7",
   "TrimMode": "t:f08c7a26d7",
+  "touchedTrackTypes": "v:3d009f0756"
+ },
+ "src/store/editorStateParts/editorConstants.ts": {
+  "DEFAULT_SNAP_TARGETS": "v:e180c76bee",
+  "EVENT_LIMIT": "v:e26973e6ee",
+  "HISTORY_LIMIT": "v:e1822db470",
+  "InsightLane": "t:7ff28775ac",
+  "PROXY_MAX_SIDE": "v:a927c6abfe",
+  "PanelId": "t:d5c9d3fd6e",
+  "ProxyQuality": "t:aa398bf353",
+  "REGION_COLORS": "v:649de6328e",
+  "SNAP_FACTOR": "v:279f1aa4df",
+  "STANDALONE_PANELS": "v:f61f3bfd9f",
+  "SnapStrength": "t:bd643247eb",
+  "SnapTargets": "t:e180c76bee",
+  "TRIM_MODES": "v:aa1382f0bf",
+  "TrackFlagKey": "t:8c443e05e7",
+  "TrimMode": "t:f08c7a26d7"
+ },
+ "src/store/editorStateParts/sessionReset.ts": {
+  "SESSION_RESET": "v:efe1efbfe1"
+ },
+ "src/store/editorStateParts/touchedTrackTypes.ts": {
   "touchedTrackTypes": "v:3d009f0756"
  },
  "src/store/editorStore.ts": {

@@ -309,6 +309,14 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   felülírja a nyitott forrás listáját); (10) nyers `(e as Error).message` a felhasználónak i18n nélkül;
   (11) :98 hiányzó add-on definíciónál 0 ár, vásárolható; (12) :41–56 beégetett helyőrzők.
 
+- **Profil / stúdió hookok** (`src/hooks/profile/`, `src/hooks/studio/`): (1) a `useStudio` `create`-jének
+  nincs catch-e — `saveProject`-hiba kezeletlen rejection, nincs logCaught és Alert, a `creating` igaz
+  marad; (2) a Design-projekt elveszti a formátumát (a `config.image.format: 'vector'`-t a
+  `docFromTemplate` felülírja); (3) az avatar- és borító-feltöltés a render-kori profilt spreadeli — a
+  feltöltés közbeni mezőszerkesztések mentéskor elvesznek; (4) a `refresh` egyetlen `Promise.all`-lal
+  tölti a profilt, a szolgáltatókat és a taskokat — egy hiba az egész profil-képernyőt üresen hagyja;
+  (5) a dev-akció effekt első-render closure-öket használ (csak a stabil setterek miatt működik).
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -353,7 +361,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `server/routes/render.js` | 667 | ✅ → 34 |
 | `src/components/editor/panels/ShapePanel.tsx` | 637 | ✅ → 45 |
 | `src/components/editor/panels/StickerPanel.tsx` | 608 | ✅ → 88 |
-| `src/hooks/useProfile.ts` | 601 | ⬜ |
+| `src/hooks/useProfile.ts` | 601 | ✅ → 202 |
 | `src/components/studio/image/body/useImageExport.tsx` | 601 | ✅ → 73 |
 | `src/lib/svgImport.ts` | 595 | ✅ → 65 |
 | `src/lib/universalSearch.ts` | 593 | ⬜ |
@@ -361,7 +369,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/editor/panels/PrecisionPanel.tsx` | 583 | ✅ → 101 |
 | `src/lib/chat.ts` | 578 | ⬜ |
 | `server/render/clipChains.js` | 570 | ✅ → 45 |
-| `src/hooks/useStudio.ts` | 558 | ⬜ |
+| `src/hooks/useStudio.ts` | 558 | ✅ → 223 |
 | `src/components/preview/TextOverlay.tsx` | 558 | ✅ → 236 |
 | `src/app/shop.tsx` | 557 | ⬜ |
 | `src/components/profile/StorageCard.tsx` | 549 | ✅ → 133 |
@@ -373,6 +381,6 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `server/liveEgress.js` | 524 | ✅ → 27 |
 | `src/lib/audioIntent.ts` | 523 | ✅ → 13 |
 | `src/components/editor/panels/LibraryPanel.tsx` | 523 | ✅ → 107 |
-| `src/store/editorState.ts` | 522 | ⬜ |
+| `src/store/editorState.ts` | 522 | ✅ → 399 |
 | `src/lib/assetLibrary.ts` | 514 | ⬜ |
 | `server/render/videoFilters.js` | 502 | ✅ → 27 |

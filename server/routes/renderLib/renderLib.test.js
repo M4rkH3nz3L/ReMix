@@ -155,12 +155,12 @@ describe('job-kezelők — felhő-sor', () => {
     ]);
   });
 
-  test('JELENLEGI viselkedés (jelentve, nem javítva): idegen sor-jobnál a cancelRenderJob a tulaj-ellenőrzés ELŐTT fut', async () => {
+  test('✅ JAVÍTVA: idegen sor-jobnál a tulaj-ellenőrzés a cancelRenderJob ELŐTT fut → 404, a job érintetlen', async () => {
     mockQueue.enabled = true;
     mockQueue.jobs = { q: { userId: 'u-masik', state: 'waiting' } };
     const res = fakeRes();
     await renderCancelHandler(req('q', 'u1'), res);
     expect(res.code).toBe(404);
-    expect(mockQueue.cancelled).toEqual(['q']);
+    expect(mockQueue.cancelled).toEqual([]);
   });
 });

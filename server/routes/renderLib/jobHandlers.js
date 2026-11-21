@@ -115,12 +115,18 @@ exports.renderCancelHandler = async (req, res) => {
     return;
   }
   if (queueEnabled()) {
-    const r = await cancelRenderJob(req.params.id).catch((caught) => { logCaught('routes/render.js', caught); return null; });
+    // 🔒 a tulaj-ellenőrzés a megszakítás ELŐTT: a cancelRenderJob mellékhatásos (a várakozó jobot
+    // törli, a futónak abort-flaget tesz) → idegen jobhoz hozzá sem nyúlunk (refactor-roadmap 3.)
+    const j = await getRenderJob(req.params.id).catch((caught) => { logCaught('routes/render.js', caught); return null; });
+    if (j && !canAccessRenderJob(j.userId, req.user?.id, INSECURE_DEV)) {
+      denyRenderJob(req, res, j.userId);
+      return;
+    }
+    const r = j
+      ? await cancelRenderJob(req.params.id).catch((caught) => { logCaught('routes/render.js', caught); return null; })
+      : null;
+    // a két hívás között a job tulaja nem változhat (job.data.userId), így a cancel a fenti döntésre ül
     if (r && r.found) {
-      if (!canAccessRenderJob(r.userId, req.user?.id, INSECURE_DEV)) {
-        denyRenderJob(req, res, r.userId);
-        return;
-      }
       res.json({ ok: true, mode: 'queue', removed: r.removed, active: r.active });
       return;
     }

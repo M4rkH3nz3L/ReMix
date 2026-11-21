@@ -39,8 +39,21 @@ változatlan; a fázisai a 6. fázisban suite-okba bontva).
 **6. fázis:** a `contract.test.ts` / `commands.test.ts` 13 tartomány-suite-ra bontva, közös fixture-ök a
 `src/test-utils/` alatt (izolációs őrteszttel); a jest ténylegesen futtatja a dinamikus `import()`-ot
 (`tools/jest/babel-plugin-dynamic-import.js`, csak jest — az éles bundle bájtra azonos); a 15 dev-smoke
-fázis-fájl funkció szerinti suite-okba bontva, a smoke-körfüggőség megszűnt. Eszközös (iPad) futtatás a
-refaktor során NEM történt.
+fázis-fájl funkció szerinti suite-okba bontva, a smoke-körfüggőség megszűnt.
+
+**Eszközös kör (2026-11-21, a top 5 javítás után, `1a4f3381`):** 32 dev-smoke fázis a `refactor` build-en
+(külön Metro a worktree-ből, a bundle-ben ellenőrizve a refaktorált modulok), iPad Pro 12.9 (iPadOS) és
+iPhone 17 Pro Max (USB). Zöld mindkét eszközön többek közt: timeline, screens, menus, studio, cliptext, brush,
+pathops, quickcreate, export13 (16), audiomix (11), audioedge, waveform, offline, dspnative, previewengine,
+offlinefx, pixel (10), a11y. A hibás fázisokra **A/B-próba** a refaktor előtti `e463d0a`-n, ugyanazon az
+eszközön: **mindegyik hiba a refaktor ELŐTT is fennállt** (vagy ingadozik az alapállapoton is) — nincs
+refaktor-regresszió. Régi, eszközös hibák (külön javítandók): a `RenderStage`/`captureRef` harness-ref
+`null` marad (clip — ingadozó, textfx, selection, vector, boolean, color, assistant, remix — iPaden;
+iPhone-on a selection/textfx/fxorder zöld); thumbdoc (projekt/bélyegkép `null`); fxorder/masterdyn élő
+előnézet LUFS `null`/`-Infinity` (ingadozó); iPhone-on a textoverlay „rések: text, helyi: false” (a
+telepített dev-kliens natív render-motorja a szöveget nem rendereli helyben — az alapállapoton is így).
+Mérési csapda: a worktree symlinkelt `node_modules`-a a Metro lusta `import()`-jait rossz útra oldja fel —
+valódi (APFS-klón) `node_modules` kell.
 
 ### Javítandó hibák súlyossági sorrendben (részletek lent, fájl:sor hivatkozással)
 

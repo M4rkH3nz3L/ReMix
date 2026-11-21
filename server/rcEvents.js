@@ -4,7 +4,7 @@
 // Termékek (az App Store Connect / Play Console / RevenueCat azonosítói):
 //   • Coin-csomag (consumable): `coins_<n>` — n Coin a VÁSÁROLT alegyenlegre, a csomag
 //     bónusza a BÓNUSZ-alegyenlegre (PRO-CASH 2.1). A csomagok listája a kliens
-//     src/lib/coins.ts COIN_PACKS tükre (a contract.test.ts zárolja).
+//     src/lib/coins.ts COIN_PACKS tükre (a billing.contract.test.ts zárolja).
 //   • Áruházi előfizetés: `remix_<basic|pro|ultra>_<monthly|annual>` — a szint ebből jön.
 //     A Vállalati nem áruházi termék (szervezeti szerződés, 4. fázis).
 // A webhook CSAK ezeket a saját termékeket írja; ismeretlen termékre nem csinál semmit.

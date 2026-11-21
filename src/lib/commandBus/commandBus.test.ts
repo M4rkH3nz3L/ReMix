@@ -8,6 +8,7 @@ import { reduceSetMarkers } from '@/lib/commandBus/timelineMetaReducers';
 import { reduceSetBpm } from '@/lib/commandBus/audioReducers';
 import { reduceSetFps } from '@/lib/commandBus/projectMetaReducers';
 import { reduceUpsertImageDoc } from '@/lib/commandBus/docReducers';
+import { deepFreeze } from '@/test-utils/projectFixtures';
 import type { Asset, AudioClip, ImageDoc, Project, Track, TrackType, VideoClip } from '@/types/project';
 
 /**
@@ -17,14 +18,6 @@ import type { Asset, AudioClip, ImageDoc, Project, Track, TrackType, VideoClip }
  */
 
 const TRACK_TYPES: TrackType[] = ['video', 'pip', 'music', 'aux1'];
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const v of Object.values(value)) deepFreeze(v);
-  }
-  return value;
-}
 
 const video = (id: string, start = 0): VideoClip =>
   ({ id, kind: 'video', start, duration: 2, uri: `file:///${id}.mp4`, trimIn: 0, sourceDuration: 2, speed: 1, volume: 1, filterId: 'none' });

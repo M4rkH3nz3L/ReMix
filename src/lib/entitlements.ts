@@ -3,7 +3,7 @@
  *
  * Minden fizetős KÉPESSÉG itt nevesített mező → a kliens-gate (paywall/UX) ebből dolgozik, a
  * szerver-enforce a TÜKRÉBŐL ([server/entitlements.js](../../server/entitlements.js)). A kettőt a
- * `contract.test.ts` **bitre** zárolja (nincs drift). A MÉRT kvóták (aiTokens/renderMinutes/…) NEM itt
+ * `tierQuota.contract.test.ts` **bitre** zárolja (nincs drift). A MÉRT kvóták (aiTokens/renderMinutes/…) NEM itt
  * vannak, hanem a [usageMeter](./usageMeter.ts) `TIER_QUOTAS`-ban (külön réteg); ez a tábla a
  * BOOLEAN/enum/limit képesség-gate-eké.
  *

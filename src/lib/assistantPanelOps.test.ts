@@ -10,7 +10,8 @@ import {
 } from '@/lib/assistantPanelOps';
 import type { AiCommand } from '@/lib/aiCommands';
 import type { AutoEditVariant } from '@/lib/autoedit';
-import type { AudioClip, Clip, ImageClip, Project, TextClip, Track, TrackType, VideoClip } from '@/types/project';
+import { audioClip as baseAudioClip, projectWithTracks as makeProject, textClip, track, videoClip as baseVideoClip } from '@/test-utils/projectFixtures';
+import type { AudioClip, ImageClip, Project, VideoClip } from '@/types/project';
 
 /**
  * 🤖 Az AI-asszisztens panel tiszta magjának regressziós pajzsa (a bontás előtti
@@ -18,45 +19,14 @@ import type { AudioClip, Clip, ImageClip, Project, TextClip, Track, TrackType, V
  * előnézet sávjai és az AI-válasz → EditorCommand-köteg leképezés.
  */
 
-function track(type: TrackType, clips: Clip[] = [], id = `trk-${type}`): Track {
-  return { id, type, name: type, clips };
-}
-
-function videoClip(id: string, start = 0, duration = 5, uri = `file:///clip-${id}.mp4`): VideoClip {
-  return {
-    id, kind: 'video', start, duration,
-    uri, trimIn: 0, sourceDuration: duration,
-    speed: 1, volume: 1, filterId: 'none',
-  };
-}
+const videoClip = (id: string, start = 0, duration = 5, uri = `file:///clip-${id}.mp4`): VideoClip =>
+  baseVideoClip(id, start, duration, uri);
 
 function imageClip(id: string): ImageClip {
   return { id, kind: 'image', start: 0, duration: 3, uri: `file:///img-${id}.png` } as ImageClip;
 }
 
-function textClip(id: string, start = 0, duration = 5): TextClip {
-  return {
-    id, kind: 'text', start, duration,
-    text: 'Hello', color: '#fff', backgroundColor: null, fontSize: 7,
-    fontWeight: 'normal', position: { x: 0.5, y: 0.5 }, animation: 'none',
-  };
-}
-
-function audioClip(id: string, start = 0, duration = 5): AudioClip {
-  return {
-    id, kind: 'audio', start, duration,
-    uri: `file:///audio-${id}.m4a`, label: id, volume: 1, fadeIn: 0, fadeOut: 0, source: 'imported',
-  };
-}
-
-function makeProject(tracks: Track[]): Project {
-  return {
-    id: 'p1', name: 'Teszt', aspectRatio: '9:16', fps: 30,
-    tracks, assets: [],
-    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
-    schemaVersion: 6,
-  };
-}
+const audioClip = (id: string, start = 0, duration = 5): AudioClip => baseAudioClip(id, start, duration);
 
 function variant(keep: { start: number; end: number }[], captions = 0): AutoEditVariant {
   return {

@@ -5,7 +5,7 @@ import type { Tier } from '@/lib/tiers';
  *
  * Előfizetés: `remix_<basic|pro|ultra>_<monthly|annual>` — a RevenueCat-entitlement neve a
  * szint azonosítója (`basic` / `pro` / `ultra`). Coin-csomag: `coins_<n>` (lásd coins.ts
- * COIN_PACKS). A worker tükre: server/rcEvents.js (a contract.test.ts zárolja).
+ * COIN_PACKS). A worker tükre: server/rcEvents.js (a billing.contract.test.ts zárolja).
  * A Vállalati nem áruházi termék (szervezeti szerződés).
  */
 

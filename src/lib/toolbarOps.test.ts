@@ -8,7 +8,8 @@ import {
   tracksWithoutClips,
 } from '@/lib/toolbarOps';
 import type { ToolId } from '@/lib/toolbarSpec';
-import type { AdjustClip, Clip, Project, TextClip, Track, TrackType, VideoClip } from '@/types/project';
+import { projectWithTracks as makeProject, textClip, track, videoClip as baseVideoClip } from '@/test-utils/projectFixtures';
+import type { AdjustClip, VideoClip } from '@/types/project';
 
 /**
  * 🧰 A szerkesztő-eszköztár tiszta magjának regressziós pajzsa (a bontás előtti
@@ -16,37 +17,10 @@ import type { AdjustClip, Clip, Project, TextClip, Track, TrackType, VideoClip }
  * duplikálás/törlés sávlistája és a tutorial-előléptetés.
  */
 
-function track(type: TrackType, clips: Clip[] = [], id = `trk-${type}`): Track {
-  return { id, type, name: type, clips };
-}
-
-function videoClip(id: string, start = 0, duration = 5): VideoClip {
-  return {
-    id, kind: 'video', start, duration,
-    uri: `file:///clip-${id}.mp4`, trimIn: 0, sourceDuration: duration,
-    speed: 1, volume: 1, filterId: 'none',
-  };
-}
-
-function textClip(id: string, start = 0, duration = 5): TextClip {
-  return {
-    id, kind: 'text', start, duration,
-    text: 'Hello', color: '#fff', backgroundColor: null, fontSize: 7,
-    fontWeight: 'normal', position: { x: 0.5, y: 0.5 }, animation: 'none',
-  };
-}
+const videoClip = (id: string, start = 0, duration = 5): VideoClip => baseVideoClip(id, start, duration);
 
 function adjustClip(id: string, start: number, duration: number): AdjustClip {
   return { id, kind: 'adjust', start, duration, adjust: {} } as AdjustClip;
-}
-
-function makeProject(tracks: Track[]): Project {
-  return {
-    id: 'p1', name: 'Teszt', aspectRatio: '9:16', fps: 30,
-    tracks, assets: [],
-    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
-    schemaVersion: 6,
-  };
 }
 
 describe('pipCornerFor — a következő PiP sarka', () => {

@@ -10531,6 +10531,19 @@
  "src/store/walletEvents.ts": {
   "useWalletEvents": "v:71a4c7df07"
  },
+ "src/test-utils/projectFixtures.ts": {
+  "EDITOR_TRACK_TYPES": "v:a7f781c80d",
+  "asset": "v:2e3f10435f",
+  "audioClip": "v:e27cf0bc08",
+  "clipsOf": "v:2feb5d66ad",
+  "deepFreeze": "v:bfa73f5dc0",
+  "expectChanged": "v:1f2873419d",
+  "makeProject": "v:2da525dbfa",
+  "projectWithTracks": "v:b398572f26",
+  "textClip": "v:33b6c023a8",
+  "track": "v:2607848d76",
+  "videoClip": "v:f7743032d2"
+ },
  "src/types/live.ts": {
   "LiveChannelId": "t:eb69d25cc7",
   "LiveDestination": "t:e1c1074a39",

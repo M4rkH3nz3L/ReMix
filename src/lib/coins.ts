@@ -6,7 +6,7 @@ import type { Tier } from '@/lib/tiers';
  * A főkönyv egész **cent-Coinban** számol (1 Coin = 100 cent-Coin); a felület két
  * tizedessel mutatja. A pénzmozgás SZERVER-HITELES (a `coin_debit` / `coin_credit` DB-
  * függvények); ez a modul a kliens előnézetéhez és kijelzéséhez ugyanazt a szabályt
- * mondja ki, amit a DB. A kettőt a `contract.test.ts` zárolja (díjak, árak, minimum).
+ * mondja ki, amit a DB. A kettőt a `billing.contract.test.ts` zárolja (díjak, árak, minimum).
  *
  * Három alegyenleg (PRO-CASH 2.2): vásárolt (nem váltható), bónusz (nem váltható, lejár),
  * megkeresett (függő 30 napig, utána beváltható). Költési sorrend: bónusz → vásárolt →

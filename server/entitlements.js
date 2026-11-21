@@ -1,5 +1,5 @@
 // 🎯 ENTITLEMENT-tábla — a SCOPES.md §5 mátrix SZERVER-tükre (függőség-mentes).
-// A kliens forrása: src/lib/entitlements.ts. A kettőt a src/lib/contract.test.ts BITRE
+// A kliens forrása: src/lib/entitlements.ts. A kettőt a src/lib/tierQuota.contract.test.ts BITRE
 // zárolja (nincs drift). A szerver-enforce (render/publish/storage/AI) ebből a hiteles
 // (server-authoritative) tierből dolgozik — a kliensben sosem bízunk.
 const ENTITLEMENTS = {

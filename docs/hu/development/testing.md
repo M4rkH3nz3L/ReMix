@@ -30,15 +30,21 @@ presettel, `server` és `build` sima Node-dal) + [jest.setup.js](../../../jest.s
 |---|---|---|---|
 | **Egység (tiszta mag)** | Az expo-mentes `src/lib/` és a worker tiszta függvényei | `src/**/*.test.ts`, `server/**/*.test.js` | a zöme |
 | **Property** | Invariánsok véletlen bemeneten (fast-check, rögzített seed) | `*.property.test.ts/js` | a kritikus magokon |
-| **Kontraktus** | Kliens ↔ worker tükrök (tier-kvóták, effekt-filterek, betűk) | [contract.test.ts](../../../src/lib/contract.test.ts), `*.contract.test.ts` | minden tükörre |
+| **Kontraktus** | Kliens ↔ worker tükrök (tier-kvóták, effekt-filterek, betűk) | `src/lib/*.contract.test.ts` (pl. [tierQuota](../../../src/lib/tierQuota.contract.test.ts), [render](../../../src/lib/render.contract.test.ts), [billing](../../../src/lib/billing.contract.test.ts)) | minden tükörre |
 | **Komponens / store** | React-fa (react-test-renderer) és a zustand-store műveletei | `src/**/*.test.tsx`, `src/store/*.test.ts` | ahol a logika UI-hoz kötött |
 | **Renderer (képpont, hang)** | A valódi szerveres render (Chromium + ffmpeg) az előnézet ellen | `image*.test.ts`, `server/imagedoc*.test.js`, hang-paritás | a paritás-kapuk |
 | **DB** | RLS, Coin-gazdaság, verseny-helyzetek (SQL) | `supabase/tests/` | a pénz és a jogosultság |
 | **Eszköz** | Deep linkes füstteszt iPaden (`src/dev/smoke/`) | `remix://dev-image-smoke?phase=…` | kézi / mérési kör |
 
-**Új teszt helye:** `src/**/*.test.ts(x)` (kliens) vagy `server/**/*.test.js` (worker). A **nehéz logikát a
+**Új teszt helye:** `src/**/*.test.ts(x)` (kliens) vagy `server/**/*.test.js` (worker). A reducer példa-tesztjei a
+`src/lib/commandBus/<tartomány>Reducers.test.ts` fájlokban, a felelős reducer-modul mellett. A **nehéz logikát a
 `lib/` magba told** ([coding-standards.md](./coding-standards.md)) — akkor tesztelhető. Refaktor ELŐTT
 legyen a mostani viselkedést rögzítő (karakterizációs) teszt.
+
+**Közös fixture-ök:** [src/test-utils/](../../../src/test-utils/projectFixtures.ts) (`track`, `makeProject`,
+`projectWithTracks`, `videoClip`, `audioClip`, `textClip`, `asset`, `clipsOf`, `expectChanged`, `deepFreeze`) —
+új projekt-/klip-építőt ide tegyél, ne másold. A mappát **csak teszt** importálhatja; az
+[isolation.test.ts](../../../src/test-utils/isolation.test.ts) őr bukik, ha éles kód hivatkozik rá.
 
 ## 3. Mikor írj property-tesztet
 

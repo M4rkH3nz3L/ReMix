@@ -9,7 +9,8 @@ import {
   setLockBroadcaster,
   useEditorStore,
 } from '@/store/editorStore';
-import type { Clip, Project, Track, TrackType, VideoClip } from '@/types/project';
+import { projectWithTracks as makeProject, track, videoClip as baseVideoClip } from '@/test-utils/projectFixtures';
+import type { VideoClip } from '@/types/project';
 
 /**
  * 🧱 Health §01 — a slice-ozott store PUBLIKUS SZERZŐDÉSE (drift-pajzs).
@@ -21,24 +22,7 @@ import type { Clip, Project, Track, TrackType, VideoClip } from '@/types/project
  * granularitása változatlan (egy szerkesztés = egy history-lépés).
  */
 
-function videoClip(id: string, start = 0, duration = 5): VideoClip {
-  return {
-    id, kind: 'video', start, duration,
-    uri: `file:///clip-${id}.mp4`, trimIn: 0, sourceDuration: duration,
-    speed: 1, volume: 1, filterId: 'none',
-  };
-}
-function track(type: TrackType, clips: Clip[] = []): Track {
-  return { id: `trk-${type}`, type, name: type, clips };
-}
-function makeProject(tracks: Track[]): Project {
-  return {
-    id: 'p1', name: 'Teszt', aspectRatio: '9:16', fps: 30,
-    tracks, assets: [],
-    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
-    schemaVersion: 6,
-  };
-}
+const videoClip = (id: string, start = 0, duration = 5): VideoClip => baseVideoClip(id, start, duration);
 
 const store = () => useEditorStore.getState();
 afterEach(() => store().closeProject());

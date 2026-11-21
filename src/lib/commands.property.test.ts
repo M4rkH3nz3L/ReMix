@@ -3,11 +3,12 @@ import * as fc from 'fast-check';
 import { applyCommand, type EditorCommand } from '@/lib/commands';
 import { canHostClip, compatibleTracksFor } from '@/lib/projectUtils';
 import { useEditorStore } from '@/store/editorStore';
+import { deepFreeze } from '@/test-utils/projectFixtures';
 import type { AspectRatio, AudioClip, Clip, Project, Track, TrackType, VideoClip } from '@/types/project';
 
 /**
  * 🎲 A command-bus reducer (applyCommand) TULAJDONSÁGAI véletlen command-sorozatokon (fast-check).
- * A példa-alapú commands.test.ts egy-egy parancsot néz; ez a kombinációkat:
+ * A példa-alapú commandBus/*Reducers.test.ts egy-egy parancsot néz; ez a kombinációkat:
  *  • a bemenet sosem mutálódik (mélyen fagyasztott projekten fut — egy írás TypeError-t dob),
  *  • `null` = nincs változás, nem-null = új objektum;
  *  • a sorozat után a projekt séma-érvényes (egyedi id-k, kompatibilis sáv, pozitív hossz);
@@ -119,14 +120,6 @@ function toCommand(p: Project, intent: Intent, fps: number, nextId: () => string
     case 'bpm':
       return { type: 'SET_BPM', bpm: intent.bpm };
   }
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const v of Object.values(value)) deepFreeze(v);
-  }
-  return value;
 }
 
 const onGrid = (sec: number, fps: number) => Math.abs(sec * fps - Math.round(sec * fps)) < 1e-6;

@@ -7,7 +7,7 @@ import type { UsageMetric } from '@/lib/usageMeter';
  *
  * Coinból fizetett előfizetésnél a szerver (`subscribe_with_coins`, `add_addon`,
  * `renew_due_subscriptions`) ugyanezt a szabályt alkalmazza; ez a modul a kliens
- * előnézetéhez mondja ki. A kettőt a contract.test.ts zárolja (add-on árak, minimum-szint).
+ * előnézetéhez mondja ki. A kettőt a billing.contract.test.ts zárolja (add-on árak, minimum-szint).
  *
  *  • Felfelé váltás: azonnal; a régi szint fel nem használt része időarányosan jóváíródik,
  *    az új szint teljes periódusa indul mostantól.

@@ -3,22 +3,15 @@ import type { AlbumDoc, Asset, AudioBus, ImageDoc, InstrumentDoc, Project, Track
 import type { LiveDoc } from '@/types/live';
 import type { Model3DDoc } from '@/types/model3d';
 import type { WorkflowRun } from '@/lib/workflowTemplate';
+import { deepFreeze } from '@/test-utils/projectFixtures';
 
 /**
- * 🧱 A reducer azon parancsai, amiket a commands.test.ts nem érint: projekt-beállítások, dokumentumok,
+ * 🧱 A reducer azon parancsai, amiket a commandBus/*Reducers.test.ts nem érint: projekt-beállítások, dokumentumok,
  * hang-keverő, album, snapshot, relink — mindegyiknél a változás ÉS a no-op (`null`) ág, a szorítások,
  * valamint a describeCommand minden parancsra. A bemenet minden esetben mélyen fagyasztva (immutabilitás).
  */
 
 const TRACK_TYPES: TrackType[] = ['video', 'text', 'music', 'voiceover', 'sfx', 'aux1'];
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const v of Object.values(value)) deepFreeze(v);
-  }
-  return value;
-}
 
 function makeProject(overrides: Partial<Project> = {}): Project {
   return deepFreeze({

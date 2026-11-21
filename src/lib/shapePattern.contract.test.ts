@@ -2,7 +2,7 @@
  * 🔗 Forma-minta CONTRACT-teszt — a kliens [shapePattern](./shapePattern.ts) TS-magja
  * és a worker-render JS-tükre (`server/text-render.js`) bitre egyezik. Ha szétcsúsznak,
  * az előnézet (react-native-svg) és a beégetett kép (Chromium SVG) eltérne. Lásd a
- * [contract](./contract.test.ts) indoklást.
+ * [contract](./render.contract.test.ts) indoklást.
  */
 import { shapePatternSvgDef, type ShapePattern } from './shapePattern';
 

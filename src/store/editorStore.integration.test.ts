@@ -3,7 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ensureClipAssets } from '@/lib/assetResolve';
 import * as storage from '@/lib/storage';
 import { useEditorStore } from '@/store/editorStore';
-import type { Clip, Project, Track, TrackType, VideoClip } from '@/types/project';
+import { track, videoClip } from '@/test-utils/projectFixtures';
+import type { Project } from '@/types/project';
 
 /**
  * 🧱 CORE §2.9 — a mag „arany-út" integrációs smoke-tesztje (headless, RN-render
@@ -15,16 +16,6 @@ import type { Clip, Project, Track, TrackType, VideoClip } from '@/types/project
  * (reducer, store-invariáns, undo/redo, atomi mentés), ez a teszt elbukik.
  */
 
-function track(type: TrackType, clips: Clip[] = []): Track {
-  return { id: `trk-${type}`, type, name: type, clips };
-}
-function videoClip(id: string, start = 0, duration = 10): VideoClip {
-  return {
-    id, kind: 'video', start, duration,
-    uri: `file:///clip-${id}.mp4`, trimIn: 0, sourceDuration: duration,
-    speed: 1, volume: 1, filterId: 'none',
-  };
-}
 function makeProject(): Project {
   return {
     id: 'golden', name: 'Arany-út', aspectRatio: '9:16', fps: 30,

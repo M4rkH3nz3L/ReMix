@@ -1,6 +1,6 @@
 // @ts-check
 // 💠 Tier-rangsor — a kliens src/lib/tiers.ts SZERVER-tükre (függőség-mentes).
-// A kettőt a src/lib/contract.test.ts zárolja. A gate-logika rang szerint dönt:
+// A kettőt a src/lib/tierQuota.contract.test.ts zárolja. A gate-logika rang szerint dönt:
 // free < basic < pro < ultra < business. (Csomag-nevek: Free/Amatőr/Haladó/Profi/Vállalati.)
 const TIER_ORDER = ['free', 'basic', 'pro', 'ultra', 'business'];
 

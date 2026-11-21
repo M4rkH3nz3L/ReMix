@@ -8,7 +8,7 @@ const SERVER_DIR = path.join(__dirname, '..');
 
 // Választható betűtípusok (a család-név egyezik az app expo-font kulcsával) — a
 // render EGYETLEN forrása a függőség-mentes ./fonts (a kliens↔worker parity-t a
-// src/lib/contract.test.ts zárolja). A TTF base64 data-URI-ként ágyazódik a HTML-be.
+// src/lib/fonts.contract.test.ts zárolja). A TTF base64 data-URI-ként ágyazódik a HTML-be.
 const { DEFAULT_FONT, FONT_FILES } = require('../fonts');
 const FALLBACK_FONT = "-apple-system, 'Helvetica Neue', Arial, sans-serif";
 const fontFaceCache = {};

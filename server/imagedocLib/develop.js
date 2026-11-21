@@ -3,7 +3,7 @@ const { adjustChain } = require('../render');
 // 📸 RAW-develop (S-PHOTO — PIXEL 01): a KLIENS `developToFilterPlan` TÜKRE. A
 // non-destruktív fotó-előhívás egyetlen forrás-igazsága a deklaratív lépés-lista
 // ({param, value}[]) — a kliens preview és a worker render UGYANEBBŐL dolgozik,
-// a `src/lib/contract.test.ts` `toEqual`-lal zárolja a két fn-t (egyoldali drift = piros).
+// a `src/lib/photoDevelop.contract.test.ts` `toEqual`-lal zárolja a két fn-t (egyoldali drift = piros).
 //
 // base-mezők (ClipAdjust): a renderben a MEGLÉVŐ `adjustChain`-re esnek vissza
 // (exposure/contrast/highlights/… bitre a sima korrekcióval azonos); a detail-

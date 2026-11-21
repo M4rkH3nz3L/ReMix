@@ -4,7 +4,7 @@
 // Per-típus alap-amount — AZONOS a kliens VIDEO_EFFECTS `defaultAmount`-jával
 // (videoEffects.ts). Így a null-amount VÉDELMI ág is preview==render (a klip
 // rendesen explicit amountot kap az addEffect-ben, de ha valahol hiányzik, a
-// kettő akkor is egyezik). A contract-teszt (src/lib/contract.test.ts) zárolja.
+// kettő akkor is egyezik). A contract-teszt (src/lib/render.contract.test.ts) zárolja.
 const EFFECT_DEFAULT_AMOUNT = {
   blur: 0.4,
   sharpen: 0.5,
@@ -97,7 +97,7 @@ function effectChainFx(clip) {
 /**
  * 🖼️ Nyírás-matek (skew/shear) — a kliens `src/lib/canvasTransform.ts` `shearPoint`-jával
  * BITRE AZONOS. A render `skewChain`-je ezt használja a sarok-vetítéshez; a contract-teszt
- * (`src/lib/contract.test.ts`) a kliens-oldallal egyezésre köti → preview == export.
+ * (`src/lib/render.contract.test.ts`) a kliens-oldallal egyezésre köti → preview == export.
  */
 function shearPoint(x, y, skewXDeg, skewYDeg) {
   const DEG = Math.PI / 180;

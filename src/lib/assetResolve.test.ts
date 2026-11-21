@@ -6,9 +6,8 @@ import {
   relinkAsset,
   resolveClipUri,
 } from '@/lib/assetResolve';
+import { asset } from '@/test-utils/projectFixtures';
 import type { Asset, Clip, Project } from '@/types/project';
-
-const asset = (id: string, uri: string): Asset => ({ id, kind: 'video', uri, provider: 'local' });
 
 const vClip = (id: string, over: Partial<{ uri: string; assetId: string }> = {}): Clip =>
   ({

@@ -5,7 +5,7 @@
  * ELŐNÉZET korábban a legtöbb típust csak opacity-fade-del közelítette. Ez a
  * modul az EGYETLEN forrás a típus→xfade-mód leképezéshez ÉS a preview-geometria
  * közelítéshez — a `server/render.js` ugyanezt az XFADE-mapet exportálja, és a
- * `contract.test.ts` zárolja, hogy a kettő nem driftel.
+ * `render.contract.test.ts` zárolja, hogy a kettő nem driftel.
  *
  * PURE / expo-mentes: csak szám-matek, semmi RN/Expo import → önmagában tesztelhető.
  */

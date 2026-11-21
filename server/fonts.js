@@ -5,7 +5,7 @@
 // kliens UI-választékban (`src/constants/fonts.ts`), így az előnézet és a beégetett
 // kép/videó UGYANAZT a fontot mutatja (Preview == Export). A TTF-ek az app
 // `assets/fonts/` és a worker `server/assets/fonts/` mappáiban élnek — a parity-t a
-// `src/lib/contract.test.ts` zárolja (drift → piros teszt).
+// `src/lib/fonts.contract.test.ts` zárolja (drift → piros teszt).
 const FONT_FILES = {
   Anton: 'Anton-Regular.ttf',
   BebasNeue: 'BebasNeue-Regular.ttf',

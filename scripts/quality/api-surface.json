@@ -644,6 +644,18 @@
  "server/render/clipChains.js": {
   "createClipChains": "v:3e6dafb2d9"
  },
+ "server/render/clipChainsLib/appearance.js": {
+  "createAppearanceChains": "v:37d8ff7f6c"
+ },
+ "server/render/clipChainsLib/geometry.js": {
+  "createGeometryChains": "v:fc10141fef"
+ },
+ "server/render/clipChainsLib/maskChains.js": {
+  "createMaskChains": "v:18b985004a"
+ },
+ "server/render/clipChainsLib/motionChains.js": {
+  "createMotionChains": "v:d607cf4780"
+ },
  "server/render/compositeLayers.js": {
   "overlayAdjust": "v:c6fffe9d1d",
   "overlayPip": "v:c6fffe9d1d"
@@ -729,6 +741,28 @@
   "matteChain": "v:b04e109319",
   "motionChain": "v:914ebcd1ae",
   "selectiveChain": "v:7d82380491",
+  "stabilizeChain": "v:7641a87459"
+ },
+ "server/render/videoFiltersLib/colorChains.js": {
+  "FILTERS": "v:b711b78d16",
+  "LIGHTING": "v:11715b924a",
+  "adjustChain": "v:5270f6cdd4",
+  "filterDrawbox": "v:9525d48c9d",
+  "gradeChain": "v:5270f6cdd4",
+  "lightingChain": "v:7641a87459"
+ },
+ "server/render/videoFiltersLib/localPath.js": {
+  "localPathOnly": "v:1ca96736b9"
+ },
+ "server/render/videoFiltersLib/regionChains.js": {
+  "edgeChain": "v:009225f5a2",
+  "faceBlurChain": "v:4dc9abbb88",
+  "matteChain": "v:b04e109319",
+  "selectiveChain": "v:7d82380491"
+ },
+ "server/render/videoFiltersLib/timeChains.js": {
+  "fadeFilters": "v:efcd014424",
+  "motionChain": "v:914ebcd1ae",
   "stabilizeChain": "v:7641a87459"
  },
  "server/routes/account.js": {
@@ -821,6 +855,24 @@
  },
  "server/routes/render.js": {
   "export=": "v:c5fe0200d1"
+ },
+ "server/routes/renderLib/jobHandlers.js": {
+  "renderCancelHandler": "v:c59c8ab8b1",
+  "renderFileHandler": "v:c59c8ab8b1",
+  "renderStatusHandler": "v:c59c8ab8b1"
+ },
+ "server/routes/renderLib/jobStore.js": {
+  "jobs": "v:aaf7bb9020"
+ },
+ "server/routes/renderLib/packageHandlers.js": {
+  "collectHandler": "v:690f23e3e9",
+  "proxyHandler": "v:690f23e3e9"
+ },
+ "server/routes/renderLib/queueHandler.js": {
+  "renderQueueHandler": "v:c59c8ab8b1"
+ },
+ "server/routes/renderLib/submitHandler.js": {
+  "renderSubmitHandler": "v:690f23e3e9"
  },
  "server/routes/schemas/ai.js": {
   "assist": "v:a95bb1d451",

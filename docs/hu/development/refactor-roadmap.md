@@ -249,6 +249,23 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   upstream hibaszöveg jut a hívóhoz (ai.js:280, 363); (5) gyenge prompt-injection határ (ai.js:433, 741;
   a séma-validáció enyhíti).
 
+- 🔒⚠️ **SÚLYOS — Szerveres videó-render** (`server/routes/renderLib/`, `server/render/`; HEAD-sorszám):
+  (1) IDEGEN render-job megszakítása: a cancel (`routes/render.js:654`) a `cancelRenderJob(id)`-t a
+  tulaj-ellenőrzés (655–658) ELŐTT hívja — egy idegen várakozó job ténylegesen kikerül a sorból
+  (`queue.js:130`), futónál abort-flag (`queue.js:140`); az ID ismeretében bárki leállíthatja más
+  felhő-renderjét, és csak utána kap 404-et (a trace bizonyítja); (2) SSRF beágyazott kompozíción át:
+  a /render csak a felső szintű klipek URI-jait írja át (`routes/render.js:52–95`), a
+  `clip.comp.tracks` belső klipjeinek `uri`-ja ellenőrzés nélkül az ffmpeg `-i`-jére kerül
+  (`server/render/segmentGraph.js:94`) — `http://`, `file://`, abszolút worker-útvonal is; a
+  `localPathOnly` (`videoFilters.js:20–26`) csak a matte-et és a LUT-ot védi, és csak a séma-előtagot
+  szűri; (3) a /render-en nincs rateLimit (`routes/render.js:36`; az `authorization.test` `rateClass:
+  'render'`-t vár), nincs mediaGuard, a feltöltési plafon a 2 GB-os fallback; (4) temp-mappa szivárgás a
+  400-as és a felhő-ág hibaágain (43–46, 99–102; 503/429/500) a 6 órás sweepig; (5) `project = null` →
+  500 a 400 helyett; (6) a body-ból jövő uid-fallback (148) és a `?userId` (418) nincs `INSECURE_DEV`-hez
+  kötve (ma elérhetetlen, de törékeny); (7) a helyi (≤ 15 s) szerver-render nincs kvótázva és mérve, a
+  sor-prioritást a kliens által küldött `tier` adja (190); (8) nyers `err.message` (ffmpeg, belső
+  útvonalak) a kliensnek.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -290,7 +307,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/lib/audioDsp.ts` | 680 | ✅ → 23 |
 | `src/components/preview/AudioLayer.tsx` | 676 | ✅ → 88 |
 | `src/components/profile/WalletCard.tsx` | 674 | ⬜ |
-| `server/routes/render.js` | 667 | ⬜ |
+| `server/routes/render.js` | 667 | ✅ → 34 |
 | `src/components/editor/panels/ShapePanel.tsx` | 637 | ✅ → 45 |
 | `src/components/editor/panels/StickerPanel.tsx` | 608 | ⬜ |
 | `src/hooks/useProfile.ts` | 601 | ⬜ |
@@ -300,7 +317,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/lib/wallet.ts` | 592 | ⬜ |
 | `src/components/editor/panels/PrecisionPanel.tsx` | 583 | ✅ → 101 |
 | `src/lib/chat.ts` | 578 | ⬜ |
-| `server/render/clipChains.js` | 570 | ⬜ |
+| `server/render/clipChains.js` | 570 | ✅ → 45 |
 | `src/hooks/useStudio.ts` | 558 | ⬜ |
 | `src/components/preview/TextOverlay.tsx` | 558 | ⬜ |
 | `src/app/shop.tsx` | 557 | ⬜ |
@@ -315,4 +332,4 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/editor/panels/LibraryPanel.tsx` | 523 | ⬜ |
 | `src/store/editorState.ts` | 522 | ⬜ |
 | `src/lib/assetLibrary.ts` | 514 | ⬜ |
-| `server/render/videoFilters.js` | 502 | ⬜ |
+| `server/render/videoFilters.js` | 502 | ✅ → 27 |

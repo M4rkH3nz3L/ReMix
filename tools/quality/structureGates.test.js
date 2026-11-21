@@ -95,6 +95,8 @@ describe('api-surface canonicalText', () => {
     expect(canon('type T = typeof import("./a").Biquad;')).not.toBe(canon('type T = typeof Gain;'));
     expect(canon('type T = { body: fs.ReadStream };')).toBe(canon('type T = { body: ReadStream };'));
     expect(canon('type T = { body: fs.ReadStream };')).not.toBe(canon('type T = { body: WriteStream };'));
+    expect(canon('type T = { a: import("react-native").Animated.Value };')).toBe(canon('type T = { a: Value };'));
+    expect(canon('type T = typeof Animated.Value;')).toBe(canon('type T = typeof Value;'));
   });
 
   it('a valódi változást észreveszi: új tag, opcionalitás, típus', () => {

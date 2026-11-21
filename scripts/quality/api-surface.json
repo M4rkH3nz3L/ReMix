@@ -1651,7 +1651,7 @@
  },
  "src/components/admin/adminActions.ts": {
   "AdminActionDeps": "t:ce5736622d",
-  "createAdminActions": "v:ab7a8e9a8d"
+  "createAdminActions": "v:d76f29057f"
  },
  "src/components/admin/adminStyles.ts": {
   "styles": "v:86750e9d1a"
@@ -2778,7 +2778,7 @@
  },
  "src/components/shop/shopActions.ts": {
   "ShopActionDeps": "t:1abcf22122",
-  "createShopActions": "v:ba321fa6ec"
+  "createShopActions": "v:a39869e92c"
  },
  "src/components/shop/shopStyles.ts": {
   "styles": "v:2761c30b00"
@@ -4833,9 +4833,11 @@
  "src/lib/asyncGuard.ts": {
   "AliveGuard": "t:da2a8ffdb5",
   "GenerationGuard": "t:04f1c1a137",
+  "InFlightLock": "t:37e945f3a3",
   "StaleResponseError": "v:aed6fcc4b9",
   "createAliveGuard": "v:3224b02d46",
   "createGenerationGuard": "v:e60b8e13c4",
+  "createInFlightLock": "v:12c527af5c",
   "latestOnly": "v:694fd87b4a"
  },
  "src/lib/audioAnalyze.ts": {

@@ -4,6 +4,7 @@ import type { TFunction } from 'i18next';
 import type { Dispatch, SetStateAction } from 'react';
 import { Alert, Platform } from 'react-native';
 
+import type { InFlightLock } from '@/lib/asyncGuard';
 import { PurchaseCancelledError, purchaseCoinPack } from '@/lib/billing';
 import { MIN_PAYOUT_CENTS, coinsToCents, formatCoins, formatEur, moneyErrorText } from '@/lib/coins';
 import { logCaught } from '@/lib/logCaught';
@@ -34,6 +35,8 @@ import { savedPayoutAccount, subscriptionMonths } from '@/lib/walletCardOps';
 export interface WalletActionDeps {
   t: TFunction;
   busy: boolean;
+  /** szinkron „egyszerre egy” zár (a gyökér egyszer hozza létre) — a dupla koppintás ellen */
+  inFlight: InFlightLock;
   setBusy: (v: boolean) => void;
   setBalance: (b: number) => void;
   setAccount: Dispatch<SetStateAction<PayoutAccount | null>>;
@@ -51,20 +54,23 @@ export interface WalletActionDeps {
 /**
  * 🪙 A pénztárca hook nélküli akciói (a WalletCard.tsx-ből kiemelve, szó szerint): dev-jóváírás,
  * Coin-csomag (áruház / web), előfizetés Coinból, ajándék, kifizetési fiók, KYC, kifizetés.
- * Minden pénzmozgató akció a `guard`-on át fut (egyszerre egy).
+ * Minden pénzmozgató akció a `guard`-on át fut (egyszerre egy): a render-kori `busy` csak a
+ * UI-t tiltja, a tényleges kizárást a szinkron `inFlight` zár adja (két koppintás ugyanabban a
+ * renderben is csak EGY pénzmozgató hívást indít).
  */
 export function createWalletActions(d: WalletActionDeps) {
-  const { t, busy, setBusy, setBalance, setAccount, setSubKey, setSendTo, setPayoutCoins, refresh } = d;
+  const { t, busy, inFlight, setBusy, setBalance, setAccount, setSubKey, setSendTo, setPayoutCoins, refresh } = d;
   const { subTier, annual, sendTo, payoutEmail, payoutCoins } = d;
 
   const guard = async (fn: () => Promise<void>) => {
-    if (busy) {
+    if (busy || !inFlight.tryAcquire()) {
       return;
     }
     setBusy(true);
     try {
       await fn();
     } finally {
+      inFlight.release();
       setBusy(false);
     }
   };

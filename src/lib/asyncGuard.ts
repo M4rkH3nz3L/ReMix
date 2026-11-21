@@ -105,3 +105,36 @@ export function latestOnly<A extends unknown[], R>(
     });
   };
 }
+
+export interface InFlightLock {
+  /**
+   * Szabad volt-e a kulcs → most lefoglalva (true); már foglalt → false, a hívó NE induljon.
+   * Szinkron: a második, ugyanabban a renderben érkező koppintás már a foglalt zárat látja.
+   */
+  tryAcquire: (key?: string) => boolean;
+  /** A kulcs felengedése (a művelet `finally`-jében). Idempotens. */
+  release: (key?: string) => void;
+}
+
+/**
+ * „Egyszerre egy” zár a dupla koppintás ellen (pénzmozgató és admin-akciók). A render-kori
+ * `busy` state erre NEM elég: két koppintás ugyanabban a renderben ugyanazt a (még hamis)
+ * `busy`-t olvassa. Ez a zár a React-renderen kívül él (a gyökér egyszer hozza létre, pl.
+ * `useState(createInFlightLock)`), az első `await` ELŐTT foglal és `finally`-ben enged.
+ * Kulcs nélkül egyetlen globális zár; kulccsal (pl. `report:<id>`) kulcsonként külön.
+ */
+export function createInFlightLock(): InFlightLock {
+  const held = new Set<string>();
+  return {
+    tryAcquire: (key = '') => {
+      if (held.has(key)) {
+        return false;
+      }
+      held.add(key);
+      return true;
+    },
+    release: (key = '') => {
+      held.delete(key);
+    },
+  };
+}

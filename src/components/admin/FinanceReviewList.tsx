@@ -4,6 +4,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
 import { formatEur } from '@/lib/coins';
+import { createInFlightLock } from '@/lib/asyncGuard';
 import { logCaught } from '@/lib/logCaught';
 import { listOpenInvoices, listPendingOrgs, markInvoicePaid, reviewOrg, type OpenInvoice, type PendingOrg } from '@/lib/org';
 
@@ -16,6 +17,8 @@ export function FinanceReviewList() {
   const [orgs, setOrgs] = useState<PendingOrg[]>([]);
   const [invoices, setInvoices] = useState<OpenInvoice[]>([]);
   const [busy, setBusy] = useState(false);
+  // 🔒 szinkron zár: a render-kori `busy` két koppintást egy renderben átengedne
+  const [inFlight] = useState(createInFlightLock);
 
   const load = useCallback(() => {
     listPendingOrgs().then(setOrgs).catch((caught) => { logCaught('components/admin/FinanceReviewList.tsx:orgs', caught); });
@@ -27,7 +30,7 @@ export function FinanceReviewList() {
   }, [load]);
 
   const act = (fn: () => Promise<unknown>) => {
-    if (busy) {
+    if (busy || !inFlight.tryAcquire()) {
       return;
     }
     setBusy(true);
@@ -37,7 +40,10 @@ export function FinanceReviewList() {
         logCaught('components/admin/FinanceReviewList.tsx:act', e);
         Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
       })
-      .finally(() => setBusy(false));
+      .finally(() => {
+        inFlight.release();
+        setBusy(false);
+      });
   };
   const mark = (v: boolean | null) => (v == null ? '—' : v ? '✓' : '✗');
 

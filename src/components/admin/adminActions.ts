@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { Alert } from 'react-native';
 
 import { rolePermKey, withPair, withUserRole } from '@/lib/adminScreenOps';
+import type { InFlightLock } from '@/lib/asyncGuard';
 import { resolveAppeal, type AppealRow } from '@/lib/appeals';
 import { logCaught } from '@/lib/logCaught';
 import { resolveReport, type ReportRow } from '@/lib/reports';
@@ -23,10 +24,14 @@ import {
  * (optimista + visszagörgetés), egyedi szerep, szerep-kiosztás, felfüggesztés, bejelentések és
  * fellebbezések. A jogosultság-ellenőrzés (`can*`) a gyökérben marad; ide csak a `canSuspend`
  * jön, a szerep-választó gombjaihoz. A logCaught-címkék az eredeti fájl ujjlenyomatai.
+ * A jog-kapcsoló, a bejelentés- és a fellebbezés-lezárás kulcsonkénti szinkron zárral fut
+ * (`inFlight`): két koppintás ugyanabban a renderben is csak EGY írást küld.
  */
 export interface AdminActionDeps {
   t: TFunction;
   pairs: Set<string>;
+  /** szinkron, kulcsonkénti „egyszerre egy” zár (a gyökér egyszer hozza létre) */
+  inFlight: InFlightLock;
   roles: AppRole[];
   newSlug: string;
   newLabel: string;
@@ -43,6 +48,7 @@ export interface AdminActionDeps {
 export function createAdminActions({
   t,
   pairs,
+  inFlight,
   roles,
   newSlug,
   newLabel,
@@ -57,15 +63,21 @@ export function createAdminActions({
 }: AdminActionDeps) {
   const toggle = (role: string, perm: string) => {
     const k = rolePermKey(role, perm);
+    // 🔒 a render-kori `pairs` a második koppintásra is ugyanazt az `on`-t adná → kétszeres írás
+    if (!inFlight.tryAcquire(`perm:${k}`)) {
+      return;
+    }
     const on = !pairs.has(k);
     // optimista
     setPairs((prev) => withPair(prev, k, on));
-    setRolePermission(role, perm, on).catch((e: unknown) => {
-      logCaught('app/admin.tsx:toggle', e);
-      // visszagörgetés
-      setPairs((prev) => withPair(prev, k, !on));
-      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
-    });
+    setRolePermission(role, perm, on)
+      .catch((e: unknown) => {
+        logCaught('app/admin.tsx:toggle', e);
+        // visszagörgetés
+        setPairs((prev) => withPair(prev, k, !on));
+        Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => inFlight.release(`perm:${k}`));
   };
 
   const addRole = () => {
@@ -120,30 +132,37 @@ export function createAdminActions({
 
   // 🚩 bejelentés lezárása (kezelve / elutasítva) — optimista
   const doResolve = (id: string, status: 'resolved' | 'dismissed') => {
+    if (!inFlight.tryAcquire(`report:${id}`)) {
+      return;
+    }
     setReports((prev) => prev.filter((r) => r.id !== id));
-    resolveReport(id, status).catch((e: unknown) => {
-      logCaught('app/admin.tsx:doResolve', e);
-      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
-      load();
-    });
+    resolveReport(id, status)
+      .catch((e: unknown) => {
+        logCaught('app/admin.tsx:doResolve', e);
+        Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+        load();
+      })
+      .finally(() => inFlight.release(`report:${id}`));
   };
   // 🚩 poszt-bejelentés kezelése: a poszt eltávolítása + a bejelentés lezárása
   const doRemoveReported = (rep: ReportRow) => {
-    if (!rep.postId) {
+    if (!rep.postId || !inFlight.tryAcquire(`remove:${rep.id}`)) {
       return;
     }
     moderatePostGlobal(rep.postId, 'removed')
       .then(() => doResolve(rep.id, 'resolved'))
-      .catch((e: unknown) => { logCaught('app/admin.tsx:doRemoveReported', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); });
+      .catch((e: unknown) => { logCaught('app/admin.tsx:doRemoveReported', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); })
+      .finally(() => inFlight.release(`remove:${rep.id}`));
   };
   // 🚩 komment-bejelentés kezelése: a komment törlése (comment.moderate) + lezárás
   const doRemoveReportedComment = (rep: ReportRow) => {
-    if (!rep.commentId) {
+    if (!rep.commentId || !inFlight.tryAcquire(`remove:${rep.id}`)) {
       return;
     }
     moderateCommentGlobal(rep.commentId)
       .then(() => doResolve(rep.id, 'resolved'))
-      .catch((e: unknown) => { logCaught('app/admin.tsx:doRemoveReportedComment', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); });
+      .catch((e: unknown) => { logCaught('app/admin.tsx:doRemoveReportedComment', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); })
+      .finally(() => inFlight.release(`remove:${rep.id}`));
   };
   // 🚫 fiók-felfüggesztés (user.suspend): a tiltott user nem tud belépni
   const doSuspend = (u: UserWithRole, suspended: boolean) => {
@@ -162,12 +181,17 @@ export function createAdminActions({
   };
   // 🟡 fellebbezés elbírálása: granted → a poszt visszaáll, denied → marad removed
   const doResolveAppeal = (app: AppealRow, decision: 'granted' | 'denied') => {
+    if (!inFlight.tryAcquire(`appeal:${app.id}`)) {
+      return;
+    }
     setAppeals((prev) => prev.filter((a) => a.id !== app.id));
-    resolveAppeal(app.id, app.postId, decision).catch((e: unknown) => {
-      logCaught('app/admin.tsx:doResolveAppeal', e);
-      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
-      load();
-    });
+    resolveAppeal(app.id, app.postId, decision)
+      .catch((e: unknown) => {
+        logCaught('app/admin.tsx:doResolveAppeal', e);
+        Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+        load();
+      })
+      .finally(() => inFlight.release(`appeal:${app.id}`));
   };
 
   return {

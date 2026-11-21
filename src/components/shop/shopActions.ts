@@ -3,6 +3,7 @@ import type { TFunction } from 'i18next';
 import type { Dispatch, SetStateAction } from 'react';
 import { Alert } from 'react-native';
 
+import type { InFlightLock } from '@/lib/asyncGuard';
 import { MIN_SHOP_PRICE_CENTS, coinsToCents, formatCoins, moneyErrorText } from '@/lib/coins';
 import { logCaught } from '@/lib/logCaught';
 import { visibleProjects } from '@/lib/projectKinds';
@@ -26,11 +27,14 @@ import type { ProjectMeta } from '@/types/project';
  * A bolt-képernyő hook nélküli akció-gyára (REFACTOR: a src/app/shop.tsx-ből): megnyitás a
  * szerkesztőben, vásárlás, megvett tétel használata, publikálás, visszavonás. A pénzmozgató
  * hívások argumentumai, a busy-őr és a logCaught-címkék (az eredeti fájl ujjlenyomatai)
- * változatlanok.
+ * változatlanok. A `busy` csak a UI-t tiltja; a kizárást a szinkron `inFlight` zár adja (két
+ * koppintás ugyanabban a renderben is csak EGY vásárlást / publikálást / visszavonást indít).
  */
 export interface ShopActionDeps {
   t: TFunction;
   busy: boolean;
+  /** szinkron „egyszerre egy” zár (a gyökér egyszer hozza létre) — a dupla koppintás ellen */
+  inFlight: InFlightLock;
   pubProjectId: string | null;
   pubTitle: string;
   pubPrice: string;
@@ -47,6 +51,7 @@ export interface ShopActionDeps {
 export function createShopActions({
   t,
   busy,
+  inFlight,
   pubProjectId,
   pubTitle,
   pubPrice,
@@ -83,7 +88,7 @@ export function createShopActions({
   };
 
   const onBuy = (item: ShopItem) => {
-    if (busy || !requireSignIn()) {
+    if (busy || !requireSignIn() || !inFlight.tryAcquire()) {
       return;
     }
     setBusy(true);
@@ -106,11 +111,14 @@ export function createShopActions({
           Alert.alert(t('common.error'), moneyErrorText(t, e));
         }
       })
-      .finally(() => setBusy(false));
+      .finally(() => {
+        inFlight.release();
+        setBusy(false);
+      });
   };
 
   const onUseOwned = (item: ShopItem) => {
-    if (busy) {
+    if (busy || !inFlight.tryAcquire()) {
       return;
     }
     setBusy(true);
@@ -121,7 +129,10 @@ export function createShopActions({
         }
       })
       .catch((caught) => { logCaught('app/shop.tsx:onUseOwned', caught); })
-      .finally(() => setBusy(false));
+      .finally(() => {
+        inFlight.release();
+        setBusy(false);
+      });
   };
 
   const openPublish = () => {
@@ -143,6 +154,9 @@ export function createShopActions({
     const priceCents = coinsToCents(pubPrice);
     if (isBelowShopMinimum(priceCents)) {
       Alert.alert(t('shop.title'), t('shop.priceMin', { min: formatCoins(MIN_SHOP_PRICE_CENTS) }));
+      return;
+    }
+    if (!inFlight.tryAcquire()) {
       return;
     }
     setBusy(true);
@@ -172,7 +186,10 @@ export function createShopActions({
       .catch((e: unknown) =>
         { logCaught('app/shop.tsx:doPublish', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); }
       )
-      .finally(() => setBusy(false));
+      .finally(() => {
+        inFlight.release();
+        setBusy(false);
+      });
   };
 
   const confirmUnpublish = (item: ShopItem) => {
@@ -181,7 +198,16 @@ export function createShopActions({
       {
         text: t('shop.unpublish'),
         style: 'destructive',
-        onPress: () => unpublishItem(item.id).then(load).catch((caught) => { logCaught('app/shop.tsx:confirmUnpublish', caught); }),
+        // 🔒 a visszavonásnak nem volt őre: két nyitva hagyott megerősítő kétszer hívta
+        onPress: () => {
+          if (!inFlight.tryAcquire()) {
+            return;
+          }
+          unpublishItem(item.id)
+            .then(load)
+            .catch((caught) => { logCaught('app/shop.tsx:confirmUnpublish', caught); })
+            .finally(() => inFlight.release());
+        },
       },
     ]);
   };

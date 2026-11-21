@@ -1,5 +1,6 @@
 import {
   createAliveGuard,
+  createInFlightLock,
   createGenerationGuard,
   latestOnly,
   StaleResponseError,
@@ -100,5 +101,26 @@ describe('latestOnly', () => {
   it('egyetlen hívás normálisan feloldódik', async () => {
     const wrapped = latestOnly(async (x: number) => x * 2);
     await expect(wrapped(21)).resolves.toBe(42);
+  });
+});
+
+describe('createInFlightLock (dupla koppintás ellen)', () => {
+  it('a második szinkron foglalás elbukik, felengedés után újra sikerül', () => {
+    const lock = createInFlightLock();
+    expect(lock.tryAcquire()).toBe(true);
+    expect(lock.tryAcquire()).toBe(false);
+    lock.release();
+    expect(lock.tryAcquire()).toBe(true);
+  });
+
+  it('a kulcsok függetlenek; a felengedés idempotens', () => {
+    const lock = createInFlightLock();
+    expect(lock.tryAcquire('a')).toBe(true);
+    expect(lock.tryAcquire('b')).toBe(true);
+    expect(lock.tryAcquire('a')).toBe(false);
+    lock.release('a');
+    lock.release('a');
+    expect(lock.tryAcquire('a')).toBe(true);
+    expect(lock.tryAcquire('b')).toBe(false);
   });
 });

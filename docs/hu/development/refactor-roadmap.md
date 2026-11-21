@@ -45,7 +45,8 @@ refaktor során NEM történt.
 ### Javítandó hibák súlyossági sorrendben (részletek lent, fájl:sor hivatkozással)
 
 1. 🔒⚠️ AI-számlázás megkerülése a saját env-kulcsunkon (üres kulcsú „BYOK”) — `server/aiLib/` — ✅ JAVÍTVA (kulcs nélküli anthropic config nem BYOK → mért env-út; a `runAnthropic` BYOK-ként sosem esik env-kliensre)
-2. 💰⚠️ Dupla pénzmozgás dupla koppintásra — Wallet (kifizetés/vásárlás/előfizetés/ajándék) és Bolt
+2. 💰⚠️ Dupla pénzmozgás dupla koppintásra — Wallet (kifizetés/vásárlás/előfizetés/ajándék) és Bolt —
+   ✅ JAVÍTVA (szinkron `createInFlightLock` zár a gyökérben; szerveres idempotencia-kulcs még nincs)
 3. 🔒⚠️ Idegen felhő-render megszakítása (cancel a tulaj-ellenőrzés előtt) — `server/routes/renderLib/`
 4. 🔒⚠️ SSRF átirányításon (`/imagedoc`, `/psd/export`) és beágyazott kompozíción (`/render`) át
 5. 🔒⚠️ OAuth: beégetett `'insecure-dev-secret'` fallback (hamisítható fájl-token), XSS a `returnUrl`-en — ✅ JAVÍTVA (1)+(3) (prod: csak `OAUTH_STATE_SECRET`, hiányában 503 / indulás-tiltás; returnUrl-allowlist + escape)
@@ -357,7 +358,12 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   `WalletCard.tsx:134–144`): a `guard` a render-kori `busy`-t olvassa — két gyors koppintás ugyanabban a
   renderben KÉT pénzmozgató hívást indít (a trace az eredetiben is 2× `requestPayout`-ot mutat egy dupla
   koppintásra); ugyanez a vásárlás, az előfizetés, az ajándék és a dev-jóváírás. Ref-alapú zár vagy
-  szerveres idempotencia-kulcs kell. Továbbá: (2) :296–299 0/érvénytelen kifizetési összegre néma
+  szerveres idempotencia-kulcs kell. → ✅ JAVÍTVA (kliens): a `guard` a render-kori `busy` mellett a
+  gyökérben egyszer létrehozott szinkron zárat (`src/lib/asyncGuard.ts` `createInFlightLock`) foglalja az
+  első `await` előtt, `finally`-ben enged; render-teszt: `wallet/walletActions.test.tsx`. Szerveres
+  idempotencia-kulcs NINCS (a `/wallet/payout`-ot a heti limit + `for update`, a vásárlást a
+  `unique (item_id, buyer_id)` védi; az ajándék, az előfizetés és a Coin-csomag nem idempotens) — a valódi
+  javítás szerveroldali. Továbbá: (2) :296–299 0/érvénytelen kifizetési összegre néma
   visszatérés, kliens-minimum nincs; (3) :207 az előfizetés hibájának logCaught-címkéje `:onPayPro`
   (`onSubscribe` helyett — megőrizve az ujjlenyomat miatt); (4) :395 a „webes, olcsóbb” link fixen
   `'coins_10'`; (5) :269 a mentett fiók fixen `provider: 'paypal'`; (6) beégetett „+1 🪙 (dev)” és
@@ -398,14 +404,17 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 - 💰⚠️ **Bolt dupla vásárlás** (`src/components/shop/shopActions.ts`; HEAD `src/app/shop.tsx`): (1) :157–162 a
   busy-őr a render-kori értéket olvassa — egy renderen belüli két koppintás 2× `purchaseItem`-et indít (a
   trace az eredetiben is ezt mutatja; ugyanaz a minta, mint a Walletnél); a `doPublish` (:212) ugyanígy, a
-  `confirmUnpublish`-nak (:250) nincs őre; (2) :531–545 halott stílusok; (3) :153, :245 nyers `e.message`
+  `confirmUnpublish`-nak (:250) nincs őre; → ✅ JAVÍTVA (szinkron `inFlight` zár a vásárlás, a használat, a
+  publikálás és a visszavonás körül; render-teszt: `shop/shopActions.test.tsx`); (2) :531–545 halott stílusok; (3) :153, :245 nyers `e.message`
   i18n nélkül. A bolt képernyőn nincs Free/Pro logika és 30 %-os díj-kijelzés.
 - **Render-sor képernyő** (`src/app/schedules.tsx` — valójában a felhő-render sor nézegetője): :248
   ismeretlen `phaseKey`-re ikon nélküli chip (`?.` hiányzik a JobRow-ban); :86 nyers hibaüzenet.
 - 🔒 **Admin** (`src/components/admin/`; HEAD `src/app/admin.tsx`): :97–107 a `toggle` a render-kori `pairs`-t
-  olvassa — dupla koppintás kétszer küldi ugyanazt; :139 a `removeRole` hibája `String(e)`; :201
+  olvassa — dupla koppintás kétszer küldi ugyanazt; → ✅ JAVÍTVA (kulcsonkénti szinkron zár: jog-kapcsoló,
+  bejelentés/fellebbezés lezárása, DAC7, valamint a PayoutReviewList/FinanceReviewList azonos `busy`-mintája;
+  render-teszt: `admin/adminActions.test.tsx`); :139 a `removeRole` hibája `String(e)`; :201
   beszédtelen logCaught-címke (`app/admin.tsx:run`); :73–90 `Promise.all` — egy lista hibája az egészet
-  üresen hagyja; :171, :213, :421 a jelentés-/fellebbezés-/DAC7-műveleteknek nincs busy-őre.
+  üresen hagyja; :171, :213, :421 a jelentés-/fellebbezés-/DAC7-műveleteknek nincs busy-őre (✅ JAVÍTVA: zár).
 - **Kamera-felvevő** (`src/components/editor/cameraRecorder/`; HEAD `CameraRecorder.tsx`): :140–188 elavult
   closure — felvétel/visszaszámlálás alatt váltott sebesség és szűrő nem érvényesül (3× után is
   `speed:1`); :78–84, :88–96 unmount/elrejtés felvétel közben nem hívja a `stopRecording`-ot — a

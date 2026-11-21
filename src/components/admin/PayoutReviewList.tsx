@@ -4,6 +4,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/editor';
 import { formatCoins, formatEur } from '@/lib/coins';
+import { createInFlightLock } from '@/lib/asyncGuard';
 import { logCaught } from '@/lib/logCaught';
 import { listPayoutsUnderReview, reviewPayout, type PayoutReviewRow } from '@/lib/wallet';
 
@@ -16,6 +17,8 @@ export function PayoutReviewList() {
   const { t } = useTranslation();
   const [rows, setRows] = useState<PayoutReviewRow[]>([]);
   const [busy, setBusy] = useState(false);
+  // 🔒 szinkron zár: a render-kori `busy` két koppintást egy renderben átengedne
+  const [inFlight] = useState(createInFlightLock);
 
   const load = useCallback(() => {
     listPayoutsUnderReview()
@@ -28,7 +31,7 @@ export function PayoutReviewList() {
   }, [load]);
 
   const decide = (row: PayoutReviewRow, approve: boolean) => {
-    if (busy) {
+    if (busy || !inFlight.tryAcquire()) {
       return;
     }
     setBusy(true);
@@ -38,7 +41,10 @@ export function PayoutReviewList() {
         logCaught('components/admin/PayoutReviewList.tsx:decide', e);
         Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
       })
-      .finally(() => setBusy(false));
+      .finally(() => {
+        inFlight.release();
+        setBusy(false);
+      });
   };
 
   return (

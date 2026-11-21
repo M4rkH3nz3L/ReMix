@@ -14,6 +14,7 @@ import { RolePermissionMatrix } from '@/components/admin/RolePermissionMatrix';
 import { UserRoleList } from '@/components/admin/UserRoleList';
 import { palette } from '@/constants/editor';
 import { rolePermKey } from '@/lib/adminScreenOps';
+import { createInFlightLock } from '@/lib/asyncGuard';
 import {
   listPermissions,
   listRolePermissions,
@@ -56,6 +57,8 @@ export default function AdminScreen() {
   const [loading, setLoading] = useState(true);
   const [newSlug, setNewSlug] = useState('');
   const [newLabel, setNewLabel] = useState('');
+  // 🔒 szinkron, kulcsonkénti zár a dupla koppintás ellen (a render-kori állapot erre nem elég)
+  const [inFlight] = useState(createInFlightLock);
 
   const load = useCallback(() => {
     // (nincs szinkron setLoading az effektben — a kezdő `loading` már true; a
@@ -96,6 +99,7 @@ export default function AdminScreen() {
   } = createAdminActions({
     t,
     pairs,
+    inFlight,
     roles,
     newSlug,
     newLabel,
@@ -175,12 +179,17 @@ export default function AdminScreen() {
           {canFinance ? (
             <Pressable
               style={[styles.reportBtn, { marginTop: 18 }]}
-              onPress={() =>
-                downloadDac7(new Date().getFullYear() - 1).catch((e: unknown) => {
-                  logCaught('app/admin.tsx:dac7', e);
-                  Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
-                })
-              }
+              onPress={() => {
+                if (!inFlight.tryAcquire('dac7')) {
+                  return;
+                }
+                downloadDac7(new Date().getFullYear() - 1)
+                  .catch((e: unknown) => {
+                    logCaught('app/admin.tsx:dac7', e);
+                    Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
+                  })
+                  .finally(() => inFlight.release('dac7'));
+              }}
             >
               <Text style={styles.reportBtnTextDim}>{t('admin.dac7Export', { year: new Date().getFullYear() - 1 })}</Text>
             </Pressable>

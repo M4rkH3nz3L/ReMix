@@ -15,6 +15,7 @@ import { WalletHistory } from '@/components/profile/wallet/WalletHistory';
 import { createWalletActions } from '@/components/profile/wallet/walletActions';
 import { styles } from '@/components/profile/wallet/walletStyles';
 import { palette } from '@/constants/editor';
+import { createInFlightLock } from '@/lib/asyncGuard';
 import { billingClientAvailable } from '@/lib/billing';
 import {
   webTopupAvailable,
@@ -60,6 +61,8 @@ export function WalletCard() {
   const [payouts, setPayouts] = useState<PayoutRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  // 🔒 szinkron zár a dupla koppintás ellen (a `busy` render-kori, két koppintás egy renderben átcsúszna)
+  const [inFlight] = useState(createInFlightLock);
 
   const [subTier, setSubTier] = useState<Exclude<Tier, 'free' | 'business'>>('basic');
   const [annual, setAnnual] = useState(false);
@@ -100,6 +103,7 @@ export function WalletCard() {
   const { onBuyDev, onBuyPack, onSubscribe, onPickGift, onSaveAccount, onKyc, onCashout } = createWalletActions({
     t,
     busy,
+    inFlight,
     setBusy,
     setBalance,
     setAccount,

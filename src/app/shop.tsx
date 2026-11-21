@@ -23,6 +23,7 @@ import {
   type ShopItem,
   type ShopKind,
 } from '@/lib/shop';
+import { createInFlightLock } from '@/lib/asyncGuard';
 import { KIND_EMOJI } from '@/lib/shopScreenOps';
 import type { ProjectMeta } from '@/types/project';
 import { formatCoins } from '@/lib/coins';
@@ -49,6 +50,8 @@ export default function ShopScreen() {
   // és a felhasználónak esélye sem volt újrapróbálni
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState(false);
+  // 🔒 szinkron zár a dupla koppintás ellen (a `busy` render-kori, két koppintás egy renderben átcsúszna)
+  const [inFlight] = useState(createInFlightLock);
 
   const [publishOpen, setPublishOpen] = useState(false);
   const [myProjects, setMyProjects] = useState<ProjectMeta[]>([]);
@@ -112,6 +115,7 @@ export default function ShopScreen() {
   const { onBuy, onUseOwned, openPublish, doPublish, confirmUnpublish } = createShopActions({
     t,
     busy,
+    inFlight,
     pubProjectId,
     pubTitle,
     pubPrice,

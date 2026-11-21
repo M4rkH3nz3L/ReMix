@@ -336,6 +336,22 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   `rateAsset(NaN)` NaN-t tárol; az `addVersion` üres hash-t a felső szintre írja; a no-op `removeTag`/
   `removeFromCollection`/azonos nevű `renameAsset` is új referenciát és `updatedAt`-et ad.
 
+- 💰⚠️ **Bolt dupla vásárlás** (`src/components/shop/shopActions.ts`; HEAD `src/app/shop.tsx`): (1) :157–162 a
+  busy-őr a render-kori értéket olvassa — egy renderen belüli két koppintás 2× `purchaseItem`-et indít (a
+  trace az eredetiben is ezt mutatja; ugyanaz a minta, mint a Walletnél); a `doPublish` (:212) ugyanígy, a
+  `confirmUnpublish`-nak (:250) nincs őre; (2) :531–545 halott stílusok; (3) :153, :245 nyers `e.message`
+  i18n nélkül. A bolt képernyőn nincs Free/Pro logika és 30 %-os díj-kijelzés.
+- **Render-sor képernyő** (`src/app/schedules.tsx` — valójában a felhő-render sor nézegetője): :248
+  ismeretlen `phaseKey`-re ikon nélküli chip (`?.` hiányzik a JobRow-ban); :86 nyers hibaüzenet.
+- 🔒 **Admin** (`src/components/admin/`; HEAD `src/app/admin.tsx`): :97–107 a `toggle` a render-kori `pairs`-t
+  olvassa — dupla koppintás kétszer küldi ugyanazt; :139 a `removeRole` hibája `String(e)`; :201
+  beszédtelen logCaught-címke (`app/admin.tsx:run`); :73–90 `Promise.all` — egy lista hibája az egészet
+  üresen hagyja; :171, :213, :421 a jelentés-/fellebbezés-/DAC7-műveleteknek nincs busy-őre.
+- **Kamera-felvevő** (`src/components/editor/cameraRecorder/`; HEAD `CameraRecorder.tsx`): :140–188 elavult
+  closure — felvétel/visszaszámlálás alatt váltott sebesség és szűrő nem érvényesül (3× után is
+  `speed:1`); :78–84, :88–96 unmount/elrejtés felvétel közben nem hívja a `stopRecording`-ot — a
+  `recordAsync` függőben marad; :107/114/121 ugyanaz a logCaught-címke három különböző hibára.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -390,13 +406,13 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `server/render/clipChains.js` | 570 | ✅ → 45 |
 | `src/hooks/useStudio.ts` | 558 | ✅ → 223 |
 | `src/components/preview/TextOverlay.tsx` | 558 | ✅ → 236 |
-| `src/app/shop.tsx` | 557 | ⬜ |
+| `src/app/shop.tsx` | 557 | ✅ → 238 |
 | `src/components/profile/StorageCard.tsx` | 549 | ✅ → 133 |
 | `src/lib/offlineMixClient.ts` | 543 | ✅ → 11 |
-| `src/components/editor/CameraRecorder.tsx` | 543 | ⬜ |
-| `src/app/schedules.tsx` | 541 | ⬜ |
+| `src/components/editor/CameraRecorder.tsx` | 543 | ✅ → 208 |
+| `src/app/schedules.tsx` | 541 | ✅ → 199 |
 | `src/lib/storage.ts` | 524 | ✅ → 27 |
-| `src/app/admin.tsx` | 524 | ⬜ |
+| `src/app/admin.tsx` | 524 | ✅ → 193 |
 | `server/liveEgress.js` | 524 | ✅ → 27 |
 | `src/lib/audioIntent.ts` | 523 | ✅ → 13 |
 | `src/components/editor/panels/LibraryPanel.tsx` | 523 | ✅ → 107 |

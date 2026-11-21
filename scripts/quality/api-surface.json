@@ -1630,11 +1630,30 @@
  "src/components/WebAlertHost.tsx": {
   "WebAlertHost": "v:0df91b0cb1"
  },
+ "src/components/admin/AdminHeader.tsx": {
+  "AdminHeader": "v:e070642a9a"
+ },
  "src/components/admin/FinanceReviewList.tsx": {
   "FinanceReviewList": "v:5242c679de"
  },
  "src/components/admin/PayoutReviewList.tsx": {
   "PayoutReviewList": "v:5242c679de"
+ },
+ "src/components/admin/ReportReviewSection.tsx": {
+  "ReportReviewSection": "v:138f194266"
+ },
+ "src/components/admin/RolePermissionMatrix.tsx": {
+  "RolePermissionMatrix": "v:ccdf0c9c5a"
+ },
+ "src/components/admin/UserRoleList.tsx": {
+  "UserRoleList": "v:aea94c80dd"
+ },
+ "src/components/admin/adminActions.ts": {
+  "AdminActionDeps": "t:ce5736622d",
+  "createAdminActions": "v:ab7a8e9a8d"
+ },
+ "src/components/admin/adminStyles.ts": {
+  "styles": "v:86750e9d1a"
  },
  "src/components/auth/AuthStepCards.tsx": {
   "CheckEmailCard": "v:df1302c7f7",
@@ -1784,6 +1803,21 @@
  },
  "src/components/editor/VodProcessingOverlay.tsx": {
   "VodProcessingOverlay": "v:0df91b0cb1"
+ },
+ "src/components/editor/cameraRecorder/CameraControls.tsx": {
+  "CameraBottomBar": "v:ca0fe6a3b1",
+  "CameraTopBar": "v:003a74479d"
+ },
+ "src/components/editor/cameraRecorder/CameraOverlays.tsx": {
+  "CameraPermissionPrompt": "v:d173b49f7b",
+  "FilterGridOverlay": "v:483f516ec9",
+  "RecordingIndicators": "v:48b47a1e1b"
+ },
+ "src/components/editor/cameraRecorder/cameraRecorderStyles.ts": {
+  "styles": "v:c2ac25cbdb"
+ },
+ "src/components/editor/cameraRecorder/saveRecording.ts": {
+  "saveRecordingToProject": "v:3c7ec1e65d"
  },
  "src/components/editor/panels/AdjustPanel.tsx": {
   "AdjustPanel": "v:77c542048f"
@@ -2713,6 +2747,40 @@
  },
  "src/components/profile/wallet/walletStyles.ts": {
   "styles": "v:2ecfeef762"
+ },
+ "src/components/schedules/JobRow.tsx": {
+  "JobRow": "v:ca8df60125"
+ },
+ "src/components/schedules/ScheduleCards.tsx": {
+  "InfoCard": "v:30d3877eb9",
+  "SummaryStat": "v:52cf756cfc"
+ },
+ "src/components/schedules/WorkerCard.tsx": {
+  "WorkerCard": "v:8590e8c3ac"
+ },
+ "src/components/schedules/scheduleMeta.ts": {
+  "DONE_GREEN": "v:06d46186f3",
+  "IconName": "t:44757a86b9",
+  "PHASE_META": "v:787c2f4111",
+  "STATE_META": "v:32cecc25cb"
+ },
+ "src/components/schedules/schedulesStyles.ts": {
+  "styles": "v:6318426795"
+ },
+ "src/components/shop/PublishSheet.tsx": {
+  "PublishSheet": "v:e3525bbfb0"
+ },
+ "src/components/shop/ShopCards.tsx": {
+  "BrowseCard": "v:b872370635",
+  "ListingCard": "v:ec704d5d70",
+  "PurchaseCard": "v:dcd77b892a"
+ },
+ "src/components/shop/shopActions.ts": {
+  "ShopActionDeps": "t:1abcf22122",
+  "createShopActions": "v:ba321fa6ec"
+ },
+ "src/components/shop/shopStyles.ts": {
+  "styles": "v:2761c30b00"
  },
  "src/components/storage/FolderPickerSheet.tsx": {
   "FolderPickerSheet": "v:fad683e3a1"
@@ -4119,6 +4187,12 @@
   "toggleAdjustment": "v:2fe56ecfcb",
   "updateAdjustment": "v:c8bcf16235"
  },
+ "src/lib/adminScreenOps.ts": {
+  "roleLabelOf": "v:f7f763c22e",
+  "rolePermKey": "v:85dacb143c",
+  "withPair": "v:cd425d09c4",
+  "withUserRole": "v:39b21a3406"
+ },
  "src/lib/affinity.ts": {
   "CONNECTION_BOOST": "v:ff0e46b0b0",
   "CreatorInteraction": "t:5c9593d150",
@@ -5098,6 +5172,14 @@
   "CameraMove": "t:e0aea6a263",
   "CameraPreset": "t:83e7ea66e5",
   "buildCameraMove": "v:f527d62342"
+ },
+ "src/lib/cameraRecorderOps.ts": {
+  "MAX_SEC": "v:e6c3dd6304",
+  "SPEEDS": "v:e2d45e6715",
+  "clipTimelineDuration": "v:0894d446f9",
+  "countdownLeft": "v:7228ad69f3",
+  "formatRecordTime": "v:03507174b5",
+  "recordedSourceDuration": "v:af541789f1"
  },
  "src/lib/canvasPresets.ts": {
   "BG_SWATCHES": "v:649de6328e",
@@ -8978,6 +9060,12 @@
   "WorkerActiveJob": "t:5e1167f7de",
   "fetchRenderQueue": "v:6cbce78bc0"
  },
+ "src/lib/schedulesScreenOps.ts": {
+  "cap": "v:e2d4d022b4",
+  "countJobs": "v:2fbb3d58ec",
+  "progressBarWidth": "v:9cb678c56c",
+  "workerShortId": "v:307cdd6c4e"
+ },
  "src/lib/search.ts": {
   "RankOptions": "t:deb7db71da",
   "ResultType": "t:0b0f68e2eb",
@@ -9074,6 +9162,11 @@
   "storeSoundPack": "v:a7be98911d",
   "syncOwnedSoundPacks": "v:e93968272b",
   "unpublishItem": "v:cedd9aefe5"
+ },
+ "src/lib/shopScreenOps.ts": {
+  "KIND_EMOJI": "v:848c736205",
+  "isBelowShopMinimum": "v:c9276087f0",
+  "kindEmoji": "v:df55a3cdaa"
  },
  "src/lib/shotScore.ts": {
   "ShotScore": "t:791e171ad6",

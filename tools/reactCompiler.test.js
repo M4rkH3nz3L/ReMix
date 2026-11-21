@@ -257,6 +257,30 @@ const MUST_BE_MEMOIZED = [
   ['src/hooks/profile/useProfilePerformance.ts', 'useProfilePerformance'],
   ['src/hooks/profile/useProfileLoaders.ts', 'useProfileLoaders'],
   ['src/hooks/studio/useStudioLoaders.ts', 'useStudioLoaders'],
+  // REFACTOR: a bolt-képernyő (src/app/shop.tsx) részei (a gyökér maga is memoizált marad)
+  ['src/app/shop.tsx', 'ShopScreen'],
+  ['src/components/shop/ShopCards.tsx', 'BrowseCard'],
+  ['src/components/shop/ShopCards.tsx', 'PurchaseCard'],
+  ['src/components/shop/ShopCards.tsx', 'ListingCard'],
+  ['src/components/shop/PublishSheet.tsx', 'PublishSheet'],
+  // REFACTOR: a render-sor képernyő (src/app/schedules.tsx) kártyái — előtte is memoizáltak voltak (a gyökér kimarad, lásd lent)
+  ['src/components/schedules/JobRow.tsx', 'useJobDescription'],
+  ['src/components/schedules/JobRow.tsx', 'JobRow'],
+  ['src/components/schedules/WorkerCard.tsx', 'WorkerCard'],
+  ['src/components/schedules/ScheduleCards.tsx', 'SummaryStat'],
+  ['src/components/schedules/ScheduleCards.tsx', 'InfoCard'],
+  // REFACTOR: az admin-panel (src/app/admin.tsx) szekciói; a fejléc előtte is memoizált volt (a gyökér maga is memoizált marad)
+  ['src/app/admin.tsx', 'AdminScreen'],
+  ['src/components/admin/AdminHeader.tsx', 'AdminHeader'],
+  ['src/components/admin/RolePermissionMatrix.tsx', 'RolePermissionMatrix'],
+  ['src/components/admin/UserRoleList.tsx', 'UserRoleList'],
+  ['src/components/admin/ReportReviewSection.tsx', 'ReportReviewSection'],
+  // REFACTOR: a kamera-felvevő (CameraRecorder.tsx) vezérlői és rétegei (a gyökér kimarad, lásd lent)
+  ['src/components/editor/cameraRecorder/CameraControls.tsx', 'CameraTopBar'],
+  ['src/components/editor/cameraRecorder/CameraControls.tsx', 'CameraBottomBar'],
+  ['src/components/editor/cameraRecorder/CameraOverlays.tsx', 'CameraPermissionPrompt'],
+  ['src/components/editor/cameraRecorder/CameraOverlays.tsx', 'FilterGridOverlay'],
+  ['src/components/editor/cameraRecorder/CameraOverlays.tsx', 'RecordingIndicators'],
 ];
 
 /**
@@ -299,6 +323,8 @@ const KNOWN_BAILS = [
   ['src/hooks/profile/useProfileSubscription.ts', 'useProfileSubscription', 'try/finally a DEV Pro-handlerekben (a fordító még nem támogatja; a bontás előtt a gyökér ugyanezért maradt ki)'],
   ['src/hooks/useStudio.ts', 'useStudio', 'a füstteszt createRef-jét renderben írja (a bontás előtt: eslint-disable react-hooks/exhaustive-deps is)'],
   ['src/hooks/studio/useOpenFromStorage.ts', 'useOpenFromStorage', 'a paraméter-kulcsos effekt eslint-disable react-hooks/exhaustive-deps-e kikapcsolja a fordítót (a bontás előtt is)'],
+  ['src/app/schedules.tsx', 'SchedulesScreen', 'a betöltés try/finally-t használ (a fordító még nem támogatja) — a bontás előtt is'],
+  ['src/components/editor/CameraRecorder.tsx', 'CameraRecorder', 'az engedélykérő effekt eslint-disable react-hooks/exhaustive-deps-e kikapcsolja a fordítót (a bontás előtt is)'],
 ];
 
 const cache = new Map();

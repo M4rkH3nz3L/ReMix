@@ -1,41 +1,31 @@
 import { Ionicons } from '@expo/vector-icons';
-import { goBackOrHome } from '@/lib/nav';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AdminHeader } from '@/components/admin/AdminHeader';
+import { createAdminActions } from '@/components/admin/adminActions';
+import { styles } from '@/components/admin/adminStyles';
+import { FinanceReviewList } from '@/components/admin/FinanceReviewList';
+import { PayoutReviewList } from '@/components/admin/PayoutReviewList';
+import { ReportReviewSection } from '@/components/admin/ReportReviewSection';
+import { RolePermissionMatrix } from '@/components/admin/RolePermissionMatrix';
+import { UserRoleList } from '@/components/admin/UserRoleList';
 import { palette } from '@/constants/editor';
+import { rolePermKey } from '@/lib/adminScreenOps';
 import {
-  assignRole,
-  createRole,
-  deleteRole,
   listPermissions,
   listRolePermissions,
   listRoles,
   listUsersWithRoles,
-  moderateCommentGlobal,
-  moderatePostGlobal,
-  setRolePermission,
-  setUserSuspended,
   type AppPermission,
   type AppRole,
   type UserWithRole,
 } from '@/lib/roles';
-import { FinanceReviewList } from '@/components/admin/FinanceReviewList';
-import { PayoutReviewList } from '@/components/admin/PayoutReviewList';
 import { downloadDac7 } from '@/lib/wallet';
-import { listOpenAppeals, resolveAppeal, type AppealRow } from '@/lib/appeals';
-import { listOpenReports, resolveReport, type ReportRow } from '@/lib/reports';
+import { listOpenAppeals, type AppealRow } from '@/lib/appeals';
+import { listOpenReports, type ReportRow } from '@/lib/reports';
 import { useRoles } from '@/store/roleStore';
 import { logCaught } from '@/lib/logCaught';
 
@@ -45,6 +35,8 @@ import { logCaught } from '@/lib/logCaught';
  *  • egyedi szerep létrehozása/törlése,
  *  • felhasználók szerep-kiosztása (ha `user.manage`).
  * A tartalom-kötött jogok (saját projekt/poszt) NEM itt élnek — azok az ownershipből.
+ * A gyökér tartja a jog-kapukat (`can*`), az állapotot és a betöltést; az akciók az
+ * admin/adminActions.ts-ben, a szekciók a src/components/admin/ alatt (REFACTOR).
  */
 export default function AdminScreen() {
   const { t } = useTranslation();
@@ -65,8 +57,6 @@ export default function AdminScreen() {
   const [newSlug, setNewSlug] = useState('');
   const [newLabel, setNewLabel] = useState('');
 
-  const key = (role: string, perm: string) => `${role}|${perm}`;
-
   const load = useCallback(() => {
     // (nincs szinkron setLoading az effektben — a kezdő `loading` már true; a
     // finally kapcsolja ki. Újratöltéskor spinner nélkül frissül.)
@@ -81,7 +71,7 @@ export default function AdminScreen() {
       .then(([r, p, rp, u, rep, app]) => {
         setRoles(r);
         setPerms(p);
-        setPairs(new Set(rp.map((x) => key(x.role, x.permission))));
+        setPairs(new Set(rp.map((x) => rolePermKey(x.role, x.permission))));
         setUsers(u);
         setReports(rep as ReportRow[]);
         setAppeals(app as AppealRow[]);
@@ -94,135 +84,35 @@ export default function AdminScreen() {
     load();
   }, [load]);
 
-  const toggle = (role: string, perm: string) => {
-    const k = key(role, perm);
-    const on = !pairs.has(k);
-    // optimista
-    setPairs((prev) => {
-      const next = new Set(prev);
-      if (on) next.add(k);
-      else next.delete(k);
-      return next;
-    });
-    setRolePermission(role, perm, on).catch((e: unknown) => {
-      logCaught('app/admin.tsx:toggle', e);
-      // visszagörgetés
-      setPairs((prev) => {
-        const next = new Set(prev);
-        if (on) next.delete(k);
-        else next.add(k);
-        return next;
-      });
-      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
-    });
-  };
-
-  const addRole = () => {
-    if (!newSlug.trim()) {
-      return;
-    }
-    createRole(newSlug, newLabel)
-      .then(() => {
-        setNewSlug('');
-        setNewLabel('');
-        load();
-      })
-      .catch((e: unknown) => { logCaught('app/admin.tsx:addRole', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); });
-  };
-
-  const removeRole = (role: AppRole) => {
-    Alert.alert(t('admin.deleteRoleTitle'), role.label, [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => deleteRole(role.slug).then(load).catch((e: unknown) => { logCaught('app/admin.tsx:removeRole', e); return Alert.alert(t('common.error'), String(e)); }),
-      },
-    ]);
-  };
-
-  const changeUserRole = (u: UserWithRole) => {
-    // körkörös léptetés a szerepeken (egyszerű választó, külön picker nélkül)
-    Alert.alert(
-      u.name,
-      t('admin.pickRole'),
-      [
-        ...roles.map((r) => ({
-          text: `${r.label}${r.slug === u.role ? ' ✓' : ''}`,
-          onPress: () => {
-            assignRole(u.id, r.slug)
-              .then(() => setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, role: r.slug } : x))))
-              .catch((e: unknown) => { logCaught('app/admin.tsx:changeUserRole', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); });
-          },
-        })),
-        // 🚫 fiók-tiltás/feloldás (csak `user.suspend` birtokosnak)
-        ...(canSuspend
-          ? [
-              { text: t('admin.suspend'), style: 'destructive' as const, onPress: () => doSuspend(u, true) },
-              { text: t('admin.unsuspend'), onPress: () => doSuspend(u, false) },
-            ]
-          : []),
-        { text: t('common.cancel'), style: 'cancel' as const },
-      ]
-    );
-  };
-
-  // 🚩 bejelentés lezárása (kezelve / elutasítva) — optimista
-  const doResolve = (id: string, status: 'resolved' | 'dismissed') => {
-    setReports((prev) => prev.filter((r) => r.id !== id));
-    resolveReport(id, status).catch((e: unknown) => {
-      logCaught('app/admin.tsx:doResolve', e);
-      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
-      load();
-    });
-  };
-  // 🚩 poszt-bejelentés kezelése: a poszt eltávolítása + a bejelentés lezárása
-  const doRemoveReported = (rep: ReportRow) => {
-    if (!rep.postId) {
-      return;
-    }
-    moderatePostGlobal(rep.postId, 'removed')
-      .then(() => doResolve(rep.id, 'resolved'))
-      .catch((e: unknown) => { logCaught('app/admin.tsx:doRemoveReported', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); });
-  };
-  // 🚩 komment-bejelentés kezelése: a komment törlése (comment.moderate) + lezárás
-  const doRemoveReportedComment = (rep: ReportRow) => {
-    if (!rep.commentId) {
-      return;
-    }
-    moderateCommentGlobal(rep.commentId)
-      .then(() => doResolve(rep.id, 'resolved'))
-      .catch((e: unknown) => { logCaught('app/admin.tsx:doRemoveReportedComment', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); });
-  };
-  // 🚫 fiók-felfüggesztés (user.suspend): a tiltott user nem tud belépni
-  const doSuspend = (u: UserWithRole, suspended: boolean) => {
-    const run = () =>
-      setUserSuspended(u.id, suspended).catch((e: unknown) =>
-        { logCaught('app/admin.tsx:run', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); }
-      );
-    if (suspended) {
-      Alert.alert(t('admin.suspendTitle'), t('admin.suspendConfirm', { name: u.name }), [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('admin.suspend'), style: 'destructive', onPress: run },
-      ]);
-    } else {
-      run();
-    }
-  };
-  // 🟡 fellebbezés elbírálása: granted → a poszt visszaáll, denied → marad removed
-  const doResolveAppeal = (app: AppealRow, decision: 'granted' | 'denied') => {
-    setAppeals((prev) => prev.filter((a) => a.id !== app.id));
-    resolveAppeal(app.id, app.postId, decision).catch((e: unknown) => {
-      logCaught('app/admin.tsx:doResolveAppeal', e);
-      Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e));
-      load();
-    });
-  };
+  const {
+    toggle,
+    addRole,
+    removeRole,
+    changeUserRole,
+    doResolve,
+    doRemoveReported,
+    doRemoveReportedComment,
+    doResolveAppeal,
+  } = createAdminActions({
+    t,
+    pairs,
+    roles,
+    newSlug,
+    newLabel,
+    canSuspend,
+    load,
+    setPairs,
+    setUsers,
+    setReports,
+    setAppeals,
+    setNewSlug,
+    setNewLabel,
+  });
 
   if (!canRole && !canUser && !canReview && !canPayouts && !canFinance) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-        <Header t={t} />
+        <AdminHeader t={t} />
         <View style={styles.center}>
           <Ionicons name="lock-closed-outline" size={40} color={palette.border} />
           <Text style={styles.dim}>{t('admin.noAccess')}</Text>
@@ -233,7 +123,7 @@ export default function AdminScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <Header t={t} />
+      <AdminHeader t={t} />
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={palette.accent} />
@@ -242,172 +132,37 @@ export default function AdminScreen() {
         <ScrollView contentContainerStyle={styles.scroll}>
           {/* — Szerep → jog mátrix — */}
           {canRole ? (
-            <>
-              <Text style={styles.section}>{t('admin.rolePerms')}</Text>
-              {roles.map((role) => (
-                <View key={role.slug} style={styles.roleCard}>
-                  <View style={styles.roleHead}>
-                    <Text style={styles.roleTitle}>
-                      {role.label} <Text style={styles.roleSlug}>· {role.slug}</Text>
-                    </Text>
-                    {!role.isSystem ? (
-                      <Pressable onPress={() => removeRole(role)} hitSlop={8}>
-                        <Ionicons name="trash-outline" size={16} color={palette.textDim} />
-                      </Pressable>
-                    ) : null}
-                  </View>
-                  {perms.map((p) => {
-                    const on = pairs.has(key(role.slug, p.key));
-                    return (
-                      <Pressable key={p.key} style={styles.permRow} onPress={() => toggle(role.slug, p.key)}>
-                        <View style={styles.permText}>
-                          <Text style={styles.permLabel}>{p.label}</Text>
-                          {p.description ? <Text style={styles.permDesc}>{p.description}</Text> : null}
-                        </View>
-                        <Ionicons
-                          name={on ? 'checkbox' : 'square-outline'}
-                          size={22}
-                          color={on ? palette.accent : palette.border}
-                        />
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ))}
-
-              {/* — Egyedi szerep — */}
-              <Text style={styles.section}>{t('admin.newRole')}</Text>
-              <View style={styles.newRow}>
-                <TextInput
-                  style={[styles.input, { flex: 1 }]}
-                  value={newSlug}
-                  onChangeText={setNewSlug}
-                  placeholder={t('admin.roleSlug')}
-                  placeholderTextColor={palette.textDim}
-                  autoCapitalize="none"
-                />
-                <TextInput
-                  style={[styles.input, { flex: 1 }]}
-                  value={newLabel}
-                  onChangeText={setNewLabel}
-                  placeholder={t('admin.roleLabel')}
-                  placeholderTextColor={palette.textDim}
-                />
-                <Pressable style={styles.addBtn} onPress={addRole}>
-                  <Ionicons name="add" size={22} color="#fff" />
-                </Pressable>
-              </View>
-            </>
+            <RolePermissionMatrix
+              t={t}
+              roles={roles}
+              perms={perms}
+              pairs={pairs}
+              removeRole={removeRole}
+              toggle={toggle}
+              newSlug={newSlug}
+              setNewSlug={setNewSlug}
+              newLabel={newLabel}
+              setNewLabel={setNewLabel}
+              addRole={addRole}
+            />
           ) : null}
 
           {/* — Felhasználók szerepe — */}
           {canUser ? (
-            <>
-              <Text style={styles.section}>{t('admin.users')}</Text>
-              {users.map((u) => (
-                <Pressable key={u.id} style={styles.userRow} onPress={() => changeUserRole(u)}>
-                  <Text style={styles.userName} numberOfLines={1}>
-                    {u.name}
-                  </Text>
-                  <View style={styles.roleBadge}>
-                    <Text style={styles.roleBadgeText}>
-                      {roles.find((r) => r.slug === u.role)?.label ?? u.role}
-                    </Text>
-                    <Ionicons name="chevron-down" size={13} color={palette.textDim} />
-                  </View>
-                </Pressable>
-              ))}
-            </>
+            <UserRoleList t={t} users={users} roles={roles} changeUserRole={changeUserRole} />
           ) : null}
 
           {/* — 🚩 Bejelentések (report.review) — */}
           {canReview ? (
-            <>
-              <Text style={styles.section}>{t('admin.reports')}</Text>
-              {reports.length === 0 ? (
-                <Text style={styles.dim}>{t('admin.noReports')}</Text>
-              ) : (
-                reports.map((rep) => (
-                  <View key={rep.id} style={styles.roleCard}>
-                    <Text style={styles.roleTitle}>
-                      {t(`report.reason_${rep.reason}`, { defaultValue: rep.reason })}{' '}
-                      <Text style={styles.roleSlug}>· {rep.targetType}</Text>
-                    </Text>
-                    {rep.note ? <Text style={styles.permDesc}>{rep.note}</Text> : null}
-                    {rep.targetType === 'message' && rep.messageBody ? (
-                      <Text style={styles.permDesc} numberOfLines={4}>
-                        {rep.messageSender ? `${rep.messageSender}: ` : ''}
-                        {`"${rep.messageBody}"`}
-                      </Text>
-                    ) : null}
-                    <View style={styles.reportActions}>
-                      {rep.targetType === 'post' ? (
-                        <Pressable
-                          style={[styles.reportBtn, styles.reportRemove]}
-                          onPress={() => doRemoveReported(rep)}
-                        >
-                          <Text style={styles.reportBtnText}>{t('admin.reportRemove')}</Text>
-                        </Pressable>
-                      ) : null}
-                      {rep.targetType === 'comment' ? (
-                        <Pressable
-                          style={[styles.reportBtn, styles.reportRemove]}
-                          onPress={() => doRemoveReportedComment(rep)}
-                        >
-                          <Text style={styles.reportBtnText}>{t('admin.reportRemoveComment')}</Text>
-                        </Pressable>
-                      ) : null}
-                      <Pressable
-                        style={[styles.reportBtn, styles.reportResolve]}
-                        onPress={() => doResolve(rep.id, 'resolved')}
-                      >
-                        <Text style={styles.reportBtnText}>{t('admin.reportResolve')}</Text>
-                      </Pressable>
-                      <Pressable
-                        style={[styles.reportBtn, styles.reportDismiss]}
-                        onPress={() => doResolve(rep.id, 'dismissed')}
-                      >
-                        <Text style={styles.reportBtnTextDim}>{t('admin.reportDismiss')}</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                ))
-              )}
-
-              {/* — 🟡 Fellebbezések (report.review): eltávolított poszt visszaállítása — */}
-              <Text style={styles.section}>{t('admin.appeals')}</Text>
-              {appeals.length === 0 ? (
-                <Text style={styles.dim}>{t('admin.noAppeals')}</Text>
-              ) : (
-                appeals.map((app) => (
-                  <View key={app.id} style={styles.roleCard}>
-                    <Text style={styles.roleTitle} numberOfLines={1}>
-                      {app.postTitle || app.postId.slice(0, 8)}
-                    </Text>
-                    {app.postDescription ? (
-                      <Text style={styles.permDesc} numberOfLines={2}>
-                        {app.postDescription}
-                      </Text>
-                    ) : null}
-                    {app.note ? <Text style={styles.permDesc}>{`"${app.note}"`}</Text> : null}
-                    <View style={styles.reportActions}>
-                      <Pressable
-                        style={[styles.reportBtn, styles.reportResolve]}
-                        onPress={() => doResolveAppeal(app, 'granted')}
-                      >
-                        <Text style={styles.reportBtnText}>{t('admin.appealGrant')}</Text>
-                      </Pressable>
-                      <Pressable
-                        style={[styles.reportBtn, styles.reportDismiss]}
-                        onPress={() => doResolveAppeal(app, 'denied')}
-                      >
-                        <Text style={styles.reportBtnTextDim}>{t('admin.appealDeny')}</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                ))
-              )}
-            </>
+            <ReportReviewSection
+              t={t}
+              reports={reports}
+              appeals={appeals}
+              doRemoveReported={doRemoveReported}
+              doRemoveReportedComment={doRemoveReportedComment}
+              doResolve={doResolve}
+              doResolveAppeal={doResolveAppeal}
+            />
           ) : null}
 
           {/* — Kifizetések kézi ellenőrzése (PRO-CASH C3.4) — */}
@@ -435,90 +190,3 @@ export default function AdminScreen() {
     </SafeAreaView>
   );
 }
-
-function Header({ t }: { t: (k: string) => string }) {
-  return (
-    <View style={styles.header}>
-      <Pressable onPress={() => goBackOrHome()} hitSlop={10} style={{ width: 32 }}>
-        <Ionicons name="chevron-back" size={22} color={palette.text} />
-      </Pressable>
-      <Text style={styles.headerTitle}>{t('admin.title')}</Text>
-      <View style={{ width: 32 }} />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: palette.bg },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
-  headerTitle: { flex: 1, textAlign: 'center', color: palette.text, fontSize: 16, fontWeight: '800' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  dim: { color: palette.textDim, fontSize: 15 },
-  scroll: { padding: 14, paddingBottom: 48, gap: 8 },
-  section: { color: palette.text, fontSize: 15, fontWeight: '800', marginTop: 16, marginBottom: 4 },
-  roleCard: {
-    backgroundColor: palette.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: palette.border,
-    padding: 12,
-    marginBottom: 8,
-  },
-  roleHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  roleTitle: { color: palette.text, fontSize: 15, fontWeight: '800' },
-  roleSlug: { color: palette.textDim, fontSize: 12, fontWeight: '500' },
-  permRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
-  permText: { flex: 1 },
-  permLabel: { color: palette.text, fontSize: 14, fontWeight: '600' },
-  permDesc: { color: palette.textDim, fontSize: 12, marginTop: 1 },
-  newRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  input: {
-    backgroundColor: palette.surfaceHigh,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    color: palette.text,
-    fontSize: 14,
-  },
-  addBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
-    backgroundColor: palette.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: palette.surface,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: palette.border,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    marginBottom: 6,
-    gap: 10,
-  },
-  userName: { flex: 1, color: palette.text, fontSize: 14, fontWeight: '600' },
-  roleBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: palette.surfaceHigh,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  roleBadgeText: { color: palette.text, fontSize: 12, fontWeight: '700' },
-  reportActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  reportBtn: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
-  reportRemove: { backgroundColor: palette.danger },
-  reportResolve: { backgroundColor: palette.accent },
-  reportDismiss: { backgroundColor: palette.surfaceHigh, borderWidth: 1, borderColor: palette.border },
-  reportBtnText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  reportBtnTextDim: { color: palette.textDim, fontSize: 12, fontWeight: '700' },
-});

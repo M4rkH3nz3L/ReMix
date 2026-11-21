@@ -1,63 +1,41 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
-import { requireApp, requireSignIn } from '@/lib/webGate';
+import { requireSignIn } from '@/lib/webGate';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Chip, PrimaryButton } from '@/components/ui/controls';
+import { PublishSheet } from '@/components/shop/PublishSheet';
+import { BrowseCard, ListingCard, PurchaseCard } from '@/components/shop/ShopCards';
+import { createShopActions } from '@/components/shop/shopActions';
+import { styles } from '@/components/shop/shopStyles';
 import { palette } from '@/constants/editor';
 import {
   creditBalance,
-  getPayload,
-  InsufficientCreditsError,
   listShopItems,
   myListings,
   myPurchases,
-  importPayloadAsProject,
-  publishProjectAsItem,
-  publishSoundPack,
-  purchaseItem,
-  storeSoundPack,
   SHOP_KINDS,
-  unpublishItem,
   type PurchasedItem,
   type ShopItem,
   type ShopKind,
 } from '@/lib/shop';
-import { listProjects, loadProject } from '@/lib/storage';
-import { visibleProjects } from '@/lib/projectKinds';
+import { KIND_EMOJI } from '@/lib/shopScreenOps';
 import type { ProjectMeta } from '@/types/project';
-import { MIN_SHOP_PRICE_CENTS, coinsToCents, formatCoins, moneyErrorText } from '@/lib/coins';
+import { formatCoins } from '@/lib/coins';
 import { logCaught } from '@/lib/logCaught';
-
-const KIND_EMOJI: Record<ShopKind, string> = {
-  template: '🎬',
-  overlay: '🖼️',
-  lut: '🎨',
-  sfx: '🔊',
-  sticker: '✨',
-  font: '🔤',
-  preset: '🎛️',
-  soundpack: '🥁',
-};
 
 
 type Tab = 'browse' | 'purchases' | 'sell';
 
+/**
+ * 🛍️ A bolt-képernyő: a gyökér az állapotot (eredeti hook-sorrendben), a betöltést, a
+ * fül-váltást és a kompozíciót tartja; az akciók a shop/shopActions.ts-ben, a kártyák és a
+ * publikálás modal a src/components/shop/ alatt.
+ */
 export default function ShopScreen() {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('browse');
@@ -131,204 +109,21 @@ export default function ShopScreen() {
     setKind(next);
   };
 
-  const openInEditor = (payload: unknown, itemId?: string) => {
-    // 🌐 weben nincs szerkesztő → a megvett tétel az appban használható
-    if (!requireApp()) {
-      return;
-    }
-    // 🛍️ V4: a hangcsomag a telefon loop-könyvtárába kerül (Hang Stúdió → Loopok), nem új projekt
-    if (itemId && storeSoundPack(itemId, payload)) {
-      Alert.alert(t('shop.title'), t('shop.soundPackStored'));
-      return;
-    }
-    importPayloadAsProject(payload, itemId)
-      .then((pid) => {
-        if (pid) {
-          router.replace(`/editor/${pid}`);
-        } else {
-          Alert.alert(t('shop.title'), t('shop.useUnsupported'));
-        }
-      })
-      .catch((e: unknown) =>
-        { logCaught('app/shop.tsx:openInEditor', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); }
-      );
-  };
-
-  const onBuy = (item: ShopItem) => {
-    if (busy || !requireSignIn()) {
-      return;
-    }
-    setBusy(true);
-    purchaseItem(item.id)
-      .then((payload) => {
-        refreshBalance();
-        Alert.alert(t('shop.boughtTitle'), t('shop.boughtBody', { title: item.title }), [
-          { text: t('common.cancel'), style: 'cancel' },
-          { text: t('shop.useInProject'), onPress: () => openInEditor(payload, item.id) },
-        ]);
-      })
-      .catch((e: unknown) => {
-      logCaught('app/shop.tsx:onBuy', e);
-        if (e instanceof InsufficientCreditsError) {
-          Alert.alert(t('shop.needCreditsTitle'), t('shop.needCreditsBody'), [
-            { text: t('common.cancel'), style: 'cancel' },
-            { text: t('shop.buyCredits'), onPress: () => router.push('/profile') },
-          ]);
-        } else {
-          Alert.alert(t('common.error'), moneyErrorText(t, e));
-        }
-      })
-      .finally(() => setBusy(false));
-  };
-
-  const onUseOwned = (item: ShopItem) => {
-    if (busy) {
-      return;
-    }
-    setBusy(true);
-    getPayload(item.id)
-      .then((payload) => {
-        if (payload) {
-          openInEditor(payload, item.id);
-        }
-      })
-      .catch((caught) => { logCaught('app/shop.tsx:onUseOwned', caught); })
-      .finally(() => setBusy(false));
-  };
-
-  const openPublish = () => {
-    listProjects()
-      .then((all) => {
-        const ps = visibleProjects(all);
-        setMyProjects(ps);
-        setPubProjectId(ps[0]?.id ?? null);
-        setPubTitle(ps[0]?.name ?? '');
-        setPublishOpen(true);
-      })
-      .catch((caught) => { logCaught('app/shop.tsx:openPublish', caught); });
-  };
-
-  const doPublish = () => {
-    if (!pubProjectId || !pubTitle.trim() || busy) {
-      return;
-    }
-    const priceCents = coinsToCents(pubPrice);
-    if (priceCents > 0 && priceCents < MIN_SHOP_PRICE_CENTS) {
-      Alert.alert(t('shop.title'), t('shop.priceMin', { min: formatCoins(MIN_SHOP_PRICE_CENTS) }));
-      return;
-    }
-    setBusy(true);
-    loadProject(pubProjectId)
-      .then((p) => {
-        if (!p) {
-          throw new Error(t('shop.publishNoProject'));
-        }
-        if (pubKind === 'soundpack') {
-          return publishSoundPack(p, { title: pubTitle.trim(), priceCents });
-        }
-        return publishProjectAsItem(p, {
-          title: pubTitle.trim(),
-          priceCents,
-          kind: 'template',
-        });
-      })
-      .then((item) => {
-        if (!item) {
-          Alert.alert(t('shop.title'), t('shop.soundPackEmpty'));
-          return;
-        }
-        setPublishOpen(false);
-        Alert.alert(t('shop.title'), t('shop.publishedOk'));
-        load();
-      })
-      .catch((e: unknown) =>
-        { logCaught('app/shop.tsx:doPublish', e); return Alert.alert(t('common.error'), e instanceof Error ? e.message : String(e)); }
-      )
-      .finally(() => setBusy(false));
-  };
-
-  const confirmUnpublish = (item: ShopItem) => {
-    Alert.alert(item.title, t('shop.unpublishConfirm'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('shop.unpublish'),
-        style: 'destructive',
-        onPress: () => unpublishItem(item.id).then(load).catch((caught) => { logCaught('app/shop.tsx:confirmUnpublish', caught); }),
-      },
-    ]);
-  };
-
-  const priceLabel = (cents: number) => (cents > 0 ? `${formatCoins(cents)} 🪙` : t('shop.free'));
-
-  const browseCard = (item: ShopItem) => (
-    <View style={styles.card}>
-      <View style={styles.cardTop}>
-        <Text style={styles.cardEmoji}>{KIND_EMOJI[item.kind] ?? '🎬'}</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <Text style={styles.cardMeta} numberOfLines={1}>
-            {item.sellerName ?? t('shop.creator')} · ⬇ {item.downloads}
-          </Text>
-        </View>
-        <Text style={styles.cardPrice}>{priceLabel(item.priceCents)}</Text>
-      </View>
-      {item.description ? (
-        <Text style={styles.cardDesc} numberOfLines={2}>
-          {item.description}
-        </Text>
-      ) : null}
-      <PrimaryButton
-        label={item.priceCents > 0 ? t('shop.buyFor', { price: formatCoins(item.priceCents) }) : t('shop.getFree')}
-        icon="cart-outline"
-        onPress={() => onBuy(item)}
-        disabled={busy}
-      />
-    </View>
-  );
-
-  const purchaseCard = (p: PurchasedItem) => (
-    <View style={styles.card}>
-      <View style={styles.cardTop}>
-        <Text style={styles.cardEmoji}>{KIND_EMOJI[p.item.kind] ?? '🎬'}</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {p.item.title}
-          </Text>
-          <Text style={styles.cardMeta}>{t('shop.owned')}</Text>
-        </View>
-      </View>
-      <PrimaryButton
-        label={t('shop.useInProject')}
-        icon="create-outline"
-        onPress={() => onUseOwned(p.item)}
-        disabled={busy}
-      />
-    </View>
-  );
-
-  const listingCard = (item: ShopItem) => (
-    <View style={styles.card}>
-      <View style={styles.cardTop}>
-        <Text style={styles.cardEmoji}>{KIND_EMOJI[item.kind] ?? '🎬'}</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <Text style={styles.cardMeta}>
-            {priceLabel(item.priceCents)} · ⬇ {item.downloads} ·{' '}
-            {item.status === 'published' ? t('shop.live') : t('shop.removed')}
-          </Text>
-        </View>
-        {item.status === 'published' ? (
-          <Pressable onPress={() => confirmUnpublish(item)} hitSlop={8}>
-            <Ionicons name="trash-outline" size={20} color={palette.danger} />
-          </Pressable>
-        ) : null}
-      </View>
-    </View>
-  );
+  const { onBuy, onUseOwned, openPublish, doPublish, confirmUnpublish } = createShopActions({
+    t,
+    busy,
+    pubProjectId,
+    pubTitle,
+    pubPrice,
+    pubKind,
+    load,
+    refreshBalance,
+    setBusy,
+    setMyProjects,
+    setPubProjectId,
+    setPubTitle,
+    setPublishOpen,
+  });
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
@@ -399,7 +194,7 @@ export default function ShopScreen() {
           data={items}
           keyExtractor={(i) => i.id}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => browseCard(item)}
+          renderItem={({ item }) => <BrowseCard t={t} item={item} busy={busy} onBuy={onBuy} />}
           ListEmptyComponent={<Text style={styles.empty}>{t('shop.emptyBrowse')}</Text>}
         />
       ) : tab === 'purchases' ? (
@@ -407,7 +202,7 @@ export default function ShopScreen() {
           data={purchases}
           keyExtractor={(p) => p.item.id}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => purchaseCard(item)}
+          renderItem={({ item }) => <PurchaseCard t={t} p={item} busy={busy} onUseOwned={onUseOwned} />}
           ListEmptyComponent={<Text style={styles.empty}>{t('shop.emptyPurchases')}</Text>}
         />
       ) : (
@@ -415,143 +210,28 @@ export default function ShopScreen() {
           data={listings}
           keyExtractor={(i) => i.id}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => listingCard(item)}
+          renderItem={({ item }) => <ListingCard t={t} item={item} confirmUnpublish={confirmUnpublish} />}
           ListEmptyComponent={<Text style={styles.empty}>{t('shop.emptyListings')}</Text>}
         />
       )}
 
       {/* — publikálás modal — */}
-      <Modal visible={publishOpen} transparent animationType="slide" onRequestClose={() => setPublishOpen(false)}>
-        <View style={styles.backdrop}>
-          <Pressable style={styles.backdropTap} onPress={() => setPublishOpen(false)} />
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>{t('shop.publishCta')}</Text>
-            <Text style={styles.sheetHint}>{t('shop.publishHint')}</Text>
-            <View style={styles.kindRow}>
-              <Chip label={`${KIND_EMOJI.template} ${t('shop.kind.template')}`} active={pubKind === 'template'} onPress={() => setPubKind('template')} />
-              <Chip label={`${KIND_EMOJI.soundpack} ${t('shop.kind.soundpack')}`} active={pubKind === 'soundpack'} onPress={() => setPubKind('soundpack')} />
-            </View>
-            {pubKind === 'soundpack' ? <Text style={styles.sheetHint}>{t('shop.soundPackHint')}</Text> : null}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.kindRow}>
-              {myProjects.map((p) => (
-                <Chip
-                  key={p.id}
-                  label={p.name}
-                  active={pubProjectId === p.id}
-                  onPress={() => {
-                    setPubProjectId(p.id);
-                    setPubTitle(p.name);
-                  }}
-                />
-              ))}
-            </ScrollView>
-            <Text style={styles.fieldLabel}>{t('shop.titleLabel')}</Text>
-            <TextInput
-              style={styles.input}
-              value={pubTitle}
-              onChangeText={setPubTitle}
-              placeholder={t('shop.titleLabel')}
-              placeholderTextColor={palette.textDim}
-            />
-            <Text style={styles.fieldLabel}>{t('shop.priceLabel')}</Text>
-            <TextInput
-              style={styles.input}
-              value={pubPrice}
-              onChangeText={setPubPrice}
-              keyboardType="decimal-pad"
-              placeholder="0,40"
-              placeholderTextColor={palette.textDim}
-            />
-            <View style={{ marginTop: 12 }}>
-              <PrimaryButton
-                label={t('shop.publishNow')}
-                icon="pricetag-outline"
-                onPress={doPublish}
-                disabled={busy || !pubProjectId || !pubTitle.trim()}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <PublishSheet
+        t={t}
+        publishOpen={publishOpen}
+        setPublishOpen={setPublishOpen}
+        pubKind={pubKind}
+        setPubKind={setPubKind}
+        myProjects={myProjects}
+        pubProjectId={pubProjectId}
+        setPubProjectId={setPubProjectId}
+        pubTitle={pubTitle}
+        setPubTitle={setPubTitle}
+        pubPrice={pubPrice}
+        setPubPrice={setPubPrice}
+        busy={busy}
+        doPublish={doPublish}
+      />
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: palette.bg },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
-  backBtn: { flexDirection: 'row', alignItems: 'center', minWidth: 72 },
-  backText: { color: palette.text, fontSize: 16 },
-  headerTitle: { flex: 1, textAlign: 'center', color: palette.text, fontSize: 17, fontWeight: '800' },
-  balancePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: palette.surfaceHigh,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  balanceText: { color: palette.text, fontSize: 14, fontWeight: '800' },
-  tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
-  kindRow: { paddingHorizontal: 16, gap: 8, paddingBottom: 10 },
-  sellCta: { paddingHorizontal: 16, paddingBottom: 10 },
-  loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  list: { padding: 16, gap: 12, paddingBottom: 40 },
-  empty: { color: palette.textDim, fontSize: 14, textAlign: 'center', paddingVertical: 32 },
-  card: {
-    backgroundColor: palette.surface,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 16,
-    padding: 14,
-    gap: 10,
-  },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  cardEmoji: { fontSize: 28 },
-  cardTitle: { color: palette.text, fontSize: 15, fontWeight: '700' },
-  cardMeta: { color: palette.textDim, fontSize: 12 },
-  cardPrice: { color: palette.accent, fontSize: 15, fontWeight: '800' },
-  cardDesc: { color: palette.textDim, fontSize: 13, lineHeight: 18 },
-  backdrop: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
-  backdropTap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  sheet: {
-    backgroundColor: palette.surface,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    padding: 20,
-    gap: 10,
-    borderTopWidth: 1,
-    borderColor: palette.border,
-  },
-  sheetTitle: { color: palette.text, fontSize: 18, fontWeight: '800' },
-  sheetHint: { color: palette.textDim, fontSize: 13, lineHeight: 18 },
-  packRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
-  pack: {
-    flex: 1,
-    backgroundColor: palette.surfaceHigh,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 14,
-    padding: 14,
-    alignItems: 'center',
-    gap: 4,
-  },
-  packAmount: { color: palette.text, fontSize: 16, fontWeight: '800' },
-  packDev: { color: palette.textDim, fontSize: 10 },
-  dismiss: { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
-  dismissText: { color: palette.textDim, fontSize: 15, fontWeight: '600' },
-  fieldLabel: { color: palette.textDim, fontSize: 12, fontWeight: '700', marginTop: 6 },
-  input: {
-    backgroundColor: palette.surfaceHigh,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: palette.text,
-    fontSize: 15,
-  },
-});

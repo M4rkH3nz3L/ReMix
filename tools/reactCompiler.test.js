@@ -218,6 +218,19 @@ const MUST_BE_MEMOIZED = [
   ['src/components/channel/ChannelGridItem.tsx', 'ChannelGridItem'],
   ['src/components/channel/ChannelSheets.tsx', 'PromoteSheet'],
   ['src/components/channel/ChannelSheets.tsx', 'RemixModerationSheet'],
+  // REFACTOR: a StickerPanel.tsx szekciói (a gyökér kimarad, lásd lent)
+  ['src/components/editor/panels/sticker/StickerShapesSection.tsx', 'StickerShapesSection'],
+  ['src/components/editor/panels/sticker/StickerFxSections.tsx', 'ParticlesSection'],
+  ['src/components/editor/panels/sticker/StickerFxSections.tsx', 'DrawSection'],
+  ['src/components/editor/panels/sticker/Sticker3dSection.tsx', 'Sticker3dSection'],
+  ['src/components/editor/panels/sticker/EmojiStickerSections.tsx', 'FaceStickerSection'],
+  ['src/components/editor/panels/sticker/EmojiStickerSections.tsx', 'TapStickerSection'],
+  // REFACTOR: a LibraryPanel.tsx szekciói (a gyökér maga is memoizált marad)
+  ['src/components/editor/panels/library/UrlImportSection.tsx', 'UrlImportSection'],
+  ['src/components/editor/panels/library/ProviderSection.tsx', 'ProviderSection'],
+  ['src/components/editor/panels/LibraryPanel.tsx', 'LibraryPanel'],
+  // REFACTOR: a TextOverlay.tsx betű-rétegei (a gyökér kimarad, lásd lent: Reanimated shared value írása)
+  ['src/components/preview/textOverlay/TextOverlayGlyphs.tsx', 'TextOverlayGlyphs'],
 ];
 
 /**
@@ -251,6 +264,7 @@ const KNOWN_BAILS = [
   ['src/components/editor/panels/TextPanel.tsx', 'TextPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
   ['src/components/editor/panels/CaptionsPanel.tsx', 'CaptionsPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
   ['src/app/auth.tsx', 'AuthScreen', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
+  ['src/components/editor/panels/CaptionsPanel.tsx', 'CaptionsPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],  ['src/components/editor/panels/StickerPanel.tsx', 'StickerPanel', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
 ];
 
 const cache = new Map();

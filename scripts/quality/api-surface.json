@@ -2071,6 +2071,24 @@
  "src/components/editor/panels/filter/ThreeDSection.tsx": {
   "ThreeDSection": "v:89addbcfce"
  },
+ "src/components/editor/panels/library/ProviderSection.tsx": {
+  "ProviderSection": "v:28498b4484",
+  "ProviderSectionProps": "t:3e8c0ed91f"
+ },
+ "src/components/editor/panels/library/UrlImportSection.tsx": {
+  "UrlImportSection": "v:882b9fc412",
+  "UrlImportSectionProps": "t:a9103e2310"
+ },
+ "src/components/editor/panels/library/libraryActions.ts": {
+  "EntryActionDeps": "t:bf05436389",
+  "UrlImportDeps": "t:ea8787b712",
+  "createEntryAction": "v:116ecd230b",
+  "createUrlImportAction": "v:1d67257b65",
+  "loadAllProviders": "v:ac64b326a8"
+ },
+ "src/components/editor/panels/library/libraryStyles.ts": {
+  "styles": "v:21a77d039f"
+ },
  "src/components/editor/panels/precision/AppearanceSection.tsx": {
   "AppearanceSection": "v:6d4322cc5c"
  },
@@ -2124,6 +2142,33 @@
  "src/components/editor/panels/shape/shapeTrackActions.ts": {
   "ShapeTrackDeps": "t:80adf0e01e",
   "createShapeTrackActions": "v:eeebc793c2"
+ },
+ "src/components/editor/panels/sticker/EmojiStickerSections.tsx": {
+  "FaceStickerSection": "v:7260be6e0e",
+  "FaceStickerSectionProps": "t:4207ed6675",
+  "TapStickerSection": "v:2c9a6bf95a",
+  "TapStickerSectionProps": "t:5ca6bef733"
+ },
+ "src/components/editor/panels/sticker/Sticker3dSection.tsx": {
+  "Sticker3dSection": "v:fe981a8c9c",
+  "Sticker3dSectionProps": "t:1dd1351c1f"
+ },
+ "src/components/editor/panels/sticker/StickerFxSections.tsx": {
+  "DrawSection": "v:728203d867",
+  "DrawSectionProps": "t:7dce3be46d",
+  "ParticlesSection": "v:32a3d76050",
+  "ParticlesSectionProps": "t:ee89d3355a"
+ },
+ "src/components/editor/panels/sticker/StickerShapesSection.tsx": {
+  "StickerShapesSection": "v:b3ffe455b9",
+  "StickerShapesSectionProps": "t:4c4798b2a1"
+ },
+ "src/components/editor/panels/sticker/stickerActions.ts": {
+  "StickerActionDeps": "t:ed15340333",
+  "createStickerActions": "v:68ae319a1a"
+ },
+ "src/components/editor/panels/sticker/stickerStyles.ts": {
+  "styles": "v:4d0aebaadd"
  },
  "src/components/editor/panels/text/Text3dSection.tsx": {
   "Text3dSection": "v:59da24968d",
@@ -2537,6 +2582,10 @@
  },
  "src/components/preview/surface/useSmartGuides.ts": {
   "useSmartGuides": "v:1b8a7a7f4d"
+ },
+ "src/components/preview/textOverlay/TextOverlayGlyphs.tsx": {
+  "TextOverlayGlyphs": "v:6001ef68d2",
+  "TextOverlayGlyphsProps": "t:08f3375c3e"
  },
  "src/components/preview/videoFill.ts": {
   "videoFill": "v:466ecdee3e"
@@ -6688,6 +6737,16 @@
   "meterFill": "v:cceede7d93",
   "trackLevelAt": "v:f0c4f126d4"
  },
+ "src/lib/libraryPanelOps.ts": {
+  "ProviderState": "t:401495f8a9",
+  "entryRemoteUrl": "v:79b4af9b39",
+  "formatSize": "v:8aa42f8155",
+  "importAtSec": "v:52b6a2aab7",
+  "libraryQuery": "v:f9eea3d24a",
+  "loadingStates": "v:e688df6f97",
+  "matchesQuery": "v:adef7247e0",
+  "visibleEntries": "v:4f3f730d9b"
+ },
  "src/lib/linkGroups.ts": {
   "mergeLinkGroup": "v:5d8e6539f9"
  },
@@ -8958,6 +9017,16 @@
   "Stem": "t:48a36d6f28",
   "separateStems": "v:62415e5c2e"
  },
+ "src/lib/stickerPanelOps.ts": {
+  "StickerShape": "t:e5c2f3cc5f",
+  "brushWidthStep": "v:18e4130053",
+  "faceStickerLayout": "v:cfca5f8247",
+  "imageAspect": "v:8468cf58ce",
+  "logoHeight": "v:de2ef69a8a",
+  "particlesFor": "v:2a917233de",
+  "shapeDefaults": "v:d0dd4586f2",
+  "sticker3dPreviewUrl": "v:c7b39d8115"
+ },
  "src/lib/stickers3d.ts": {
   "STICKER_ENVIRONMENTS": "v:d275cd29c4",
   "STICKER_MATERIALS": "v:6c35e25634",
@@ -9193,6 +9262,18 @@
  "src/lib/textBake.ts": {
   "BakedText": "t:9e87d69459",
   "bakeTextToImage": "v:a3ea219d76"
+ },
+ "src/lib/textOverlayStyle.ts": {
+  "KaraokeWord": "t:5c70f6fb00",
+  "STROKE_DIRS": "v:19bb9fa1a7",
+  "animatedProps": "v:0d6c0f395c",
+  "bounceOut": "v:64ad26126a",
+  "glowCopyOf": "v:eb844bfc38",
+  "karaokeWordsOf": "v:9532003903",
+  "presetStyles": "v:aeea976528",
+  "shownText": "v:9d97361f23",
+  "text3dFaceColor": "v:c305636cca",
+  "textTypography": "v:dfb79b6ec2"
  },
  "src/lib/textPanelOps.ts": {
   "kineticStaggerDefault": "v:981d809cc5",

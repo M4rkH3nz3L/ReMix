@@ -7,7 +7,10 @@ declare const __dirname: string;
 // a vászon a kész képet mutatja: a rendszer betűméret-beállítása az exportot nem érinti,
 // ezért itt sem hathat (0,823-as iPhone-on a sablonok szövege 18%-kal keskenyebb volt)
 describe('TextOverlay', () => {
-  const source: string = fs.readFileSync(path.join(__dirname, 'TextOverlay.tsx'), 'utf8');
+  // REFACTOR óta a betű-rétegek a textOverlay/ alatt élnek: a gyökérrel együtt mérjük
+  const source: string = ['TextOverlay.tsx', 'textOverlay/TextOverlayGlyphs.tsx']
+    .map((f) => fs.readFileSync(path.join(__dirname, f), 'utf8'))
+    .join('\n');
 
   it('minden Text kikapcsolja a rendszer-betűméretet', () => {
     const tags = source.match(/<(?:Animated\.)?Text\b[^>]*?(?=\n\s*[a-zA-Z]+=|\s|>)[\s\S]*?>/g) ?? [];

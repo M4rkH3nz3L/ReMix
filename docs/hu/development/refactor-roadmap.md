@@ -289,6 +289,11 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   nélküli; `:228-235` a `doPromote` nem ellenőrzi a `targetViews < 1`-et (csak a letiltott gomb);
   `:74-77, 303` `id` nélkül a betöltés-jelző örökké pörög.
 
+- **Matrica / könyvtár panel** (`src/components/editor/panels/sticker/`, `library/`): a `fetchFaces`
+  rejection-je nincs elkapva (`void addFaceSticker`) — kezeletlen rejection (a `finally` a busy-t
+  visszaállítja); ha a `downloadSticker3d` dob, a `busy3d` beragad, és a panel újramountolásáig minden
+  3D-objektum zárolva marad; a `listStickers3d` rejection-je sincs elkapva.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -332,7 +337,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/profile/WalletCard.tsx` | 674 | ⬜ |
 | `server/routes/render.js` | 667 | ✅ → 34 |
 | `src/components/editor/panels/ShapePanel.tsx` | 637 | ✅ → 45 |
-| `src/components/editor/panels/StickerPanel.tsx` | 608 | ⬜ |
+| `src/components/editor/panels/StickerPanel.tsx` | 608 | ✅ → 88 |
 | `src/hooks/useProfile.ts` | 601 | ⬜ |
 | `src/components/studio/image/body/useImageExport.tsx` | 601 | ✅ → 73 |
 | `src/lib/svgImport.ts` | 595 | ✅ → 65 |
@@ -342,7 +347,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/lib/chat.ts` | 578 | ⬜ |
 | `server/render/clipChains.js` | 570 | ✅ → 45 |
 | `src/hooks/useStudio.ts` | 558 | ⬜ |
-| `src/components/preview/TextOverlay.tsx` | 558 | ⬜ |
+| `src/components/preview/TextOverlay.tsx` | 558 | ✅ → 236 |
 | `src/app/shop.tsx` | 557 | ⬜ |
 | `src/components/profile/StorageCard.tsx` | 549 | ⬜ |
 | `src/lib/offlineMixClient.ts` | 543 | ✅ → 11 |
@@ -352,7 +357,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/app/admin.tsx` | 524 | ⬜ |
 | `server/liveEgress.js` | 524 | ✅ → 27 |
 | `src/lib/audioIntent.ts` | 523 | ✅ → 13 |
-| `src/components/editor/panels/LibraryPanel.tsx` | 523 | ⬜ |
+| `src/components/editor/panels/LibraryPanel.tsx` | 523 | ✅ → 107 |
 | `src/store/editorState.ts` | 522 | ⬜ |
 | `src/lib/assetLibrary.ts` | 514 | ⬜ |
 | `server/render/videoFilters.js` | 502 | ✅ → 27 |

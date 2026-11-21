@@ -163,6 +163,19 @@ const MUST_BE_MEMOIZED = [
   ['src/components/live/studio/LiveStudioChrome.tsx', 'LiveStudioLoading'],
   ['src/components/live/studio/LiveStudioChrome.tsx', 'LiveStudioTopBar'],
   ['src/components/live/studio/LiveStudioChrome.tsx', 'StartStreamBar'],
+  // REFACTOR: a 3D Stúdió (Model3DStudio.tsx) részei — rögzítés, feldolgozás, néző (a gyökér kimarad, lásd lent)
+  ['src/components/studio/model3d/capture/CaptureModePicker.tsx', 'CaptureModePicker'],
+  ['src/components/studio/model3d/capture/ModeCard.tsx', 'ModeCard'],
+  ['src/components/studio/model3d/capture/MeshScanScreen.tsx', 'MeshScanScreen'],
+  ['src/components/studio/model3d/capture/ObjectCaptureScreen.tsx', 'ObjectCaptureScreen'],
+  ['src/components/studio/model3d/capture/RoomScanScreen.tsx', 'RoomScanScreen'],
+  ['src/components/studio/model3d/processing/ReconstructingScreen.tsx', 'ReconstructingScreen'],
+  ['src/components/studio/model3d/render/Model3DViewer.tsx', 'Model3DViewer'],
+  ['src/components/studio/model3d/render/ModelViewport.tsx', 'ModelViewport'],
+  ['src/components/studio/model3d/render/StudioHeader.tsx', 'StudioHeader'],
+  ['src/components/studio/model3d/render/ViewerInfoPanel.tsx', 'ViewerInfoPanel'],
+  ['src/components/studio/model3d/render/ViewerToolbar.tsx', 'ViewerToolbar'],
+  ['src/components/studio/model3d/render/ViewerToolbar.tsx', 'Tool'],
 ];
 
 /**
@@ -187,6 +200,7 @@ const KNOWN_BAILS = [
   ['src/components/studio/audio/clipEdit/FxParamsSection.tsx', 'FxParamsSection', 'a parametrikus EQ patch-e template-literál kulcsú objektum (a fordító még nem támogatja)'],
   ['src/components/studio/audio/clipEdit/FxPresetsSection.tsx', 'FxPresetsSection', 'a füstteszt görgetési pontját (presetsY ref) az onLayout írja'],
   ['src/app/live/studio/[id].tsx', 'LiveStudioScreen', "szándékos 'use no memo': a bontás után fordítható lenne, de a memoizálás bekapcsolása viselkedés-változás — külön döntés"],
+  ['src/components/studio/model3d/Model3DStudio.tsx', 'Model3DStudio', 'a bejövő fájl egyszeri importjánál az eslint-disable react-hooks/exhaustive-deps kikapcsolja a fordítót (a bontás előtt is)'],
 ];
 
 const cache = new Map();

@@ -118,6 +118,12 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   a sort nem zárja le (csak `[null]`-ra), így a user a stale-sweepig (240 perc) a 429-es limitben
   ragadhat (`reconcile.js:44-50` [300-306]); a 429-üzenet record-only indításnál is „multistream”-et mond.
 
+- **3D Stúdió** (`src/components/studio/model3d/`): a `reconstruct` teljesen elbukik, ha az
+  `inspectModel` hibázik (a `finishRoomScan` ezt tolerálja); a `posterTried` a poszter-pótlás SIKERE
+  előtt állítódik, így egy sikertelen snapshot ugyanabban a munkamenetben nem próbálkozik újra; a
+  `finishRoomScan` némán semmit nem tesz, ha a `Remix3D` null; az `applyProcess` doksi „új OBJ assetet”
+  ígér, a formátum valójában a tárolási beállítást követi.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -127,7 +133,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/app/editor/[id].tsx` | 1459 | ✅ → 288 |
 | `src/components/studio/image/ImageStudioBody.tsx` | 1444 | ✅ → 581 |
 | `src/components/preview/PreviewSurface.tsx` | 1423 | ✅ → 443 |
-| `src/components/studio/model3d/Model3DStudio.tsx` | 1365 | ⬜ |
+| `src/components/studio/model3d/Model3DStudio.tsx` | 1365 | ✅ → 322 |
 | `src/lib/render.ts` | 1195 | ⬜ |
 | `server/text-render.js` | 1174 | ⬜ |
 | `src/lib/feed.ts` | 1137 | ⬜ |

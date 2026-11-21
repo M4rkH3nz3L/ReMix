@@ -2685,6 +2685,74 @@
  "src/components/studio/model3d/Model3DStudio.tsx": {
   "Model3DStudio": "v:200a08127f"
  },
+ "src/components/studio/model3d/capture/CaptureModePicker.tsx": {
+  "CaptureModePicker": "v:407433463a"
+ },
+ "src/components/studio/model3d/capture/MeshScanScreen.tsx": {
+  "MeshScanScreen": "v:c214981c17"
+ },
+ "src/components/studio/model3d/capture/ModeCard.tsx": {
+  "ModeCard": "v:c4817d5987"
+ },
+ "src/components/studio/model3d/capture/ObjectCaptureScreen.tsx": {
+  "ObjectCaptureScreen": "v:eb26ee6b6a"
+ },
+ "src/components/studio/model3d/capture/RoomScanScreen.tsx": {
+  "RoomScanScreen": "v:9727468965"
+ },
+ "src/components/studio/model3d/capture/captureActions.ts": {
+  "CaptureActionDeps": "t:d4595f6dab",
+  "createCaptureActions": "v:d42e1347da"
+ },
+ "src/components/studio/model3d/capture/captureDir.ts": {
+  "captureDirFor": "v:51f85a2bcf"
+ },
+ "src/components/studio/model3d/capture/importActions.ts": {
+  "ImportActionDeps": "t:d0b6fd9fb6",
+  "createImportActions": "v:7e856c595e"
+ },
+ "src/components/studio/model3d/export/exportActions.ts": {
+  "ExportActionDeps": "t:4cd01bd0aa",
+  "createExportActions": "v:d9059b8c05"
+ },
+ "src/components/studio/model3d/model3dStudioStyles.ts": {
+  "styles": "v:25e5e06165"
+ },
+ "src/components/studio/model3d/processing/ReconstructingScreen.tsx": {
+  "ReconstructingScreen": "v:431f38cc2b"
+ },
+ "src/components/studio/model3d/processing/modelProcessActions.ts": {
+  "ModelProcessDeps": "t:a2fdbfc6f9",
+  "createModelProcessActions": "v:5f3e2bfd6c"
+ },
+ "src/components/studio/model3d/processing/scanSaveActions.ts": {
+  "ScanSaveDeps": "t:e35420408b",
+  "createScanSaveActions": "v:41f1268a08"
+ },
+ "src/components/studio/model3d/render/Model3DViewer.tsx": {
+  "Model3DViewer": "v:90ba2b0f30",
+  "Model3DViewerProps": "t:cc5f117210"
+ },
+ "src/components/studio/model3d/render/ModelViewport.tsx": {
+  "ModelViewport": "v:b71445e07e"
+ },
+ "src/components/studio/model3d/render/StudioHeader.tsx": {
+  "StudioHeader": "v:8507198261"
+ },
+ "src/components/studio/model3d/render/ViewerInfoPanel.tsx": {
+  "ViewerInfoPanel": "v:401c247cb8"
+ },
+ "src/components/studio/model3d/render/ViewerToolbar.tsx": {
+  "ViewerToolbar": "v:67de3b9465"
+ },
+ "src/components/studio/model3d/render/viewportHandlers.ts": {
+  "ViewportHandlerDeps": "t:f2f1b9504b",
+  "createViewportHandlers": "v:2622830f25"
+ },
+ "src/components/studio/model3d/studioTypes.ts": {
+  "Phase": "t:2a53272158",
+  "SetState": "t:4597f63be5"
+ },
  "src/components/tutorial/TutorialMenu.tsx": {
   "TutorialMenu": "v:34fe7ad9c2"
  },
@@ -6548,6 +6616,21 @@
   "outputSize": "v:798ffa4dd2",
   "parseAspect": "v:1b09590054",
   "planRenderJob": "v:a87c56c5fc"
+ },
+ "src/lib/model3dStudioOps.ts": {
+  "BACKGROUNDS": "v:f86345ad5c",
+  "DARK_LIGHT": "v:e26973e6ee",
+  "captureMetaOf": "v:ffc8a2b439",
+  "capturePrimaryKey": "v:d9eae68c0a",
+  "captureStuckHintKey": "v:5f6f6fcf79",
+  "importReadErrorKey": "v:be6bb11d26",
+  "measureLineCoords": "v:c5037d385a",
+  "meshFinishDisabled": "v:c46fd1dd9d",
+  "nextInCycle": "v:0abc5445c9",
+  "posterFileUri": "v:bc762ec3dd",
+  "processMeshOptionsJson": "v:ad10f6c219",
+  "refreshedPosterUri": "v:e4d03b6e64",
+  "roomCounts": "v:fa120abbb8"
  },
  "src/lib/modelCatalog.ts": {
   "BUILD_ENGINES": "v:ff8c9c270d",

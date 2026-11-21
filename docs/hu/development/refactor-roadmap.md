@@ -139,6 +139,16 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   lezárja az élőt és törli a konfig-projektet; (6) unmount utáni `startLiveEgress`-rejection még
   `setEgress`-t hív (ártalmatlan). Nincs AppState-kezelés és nincs telefonos RTMPS-út a képernyőn.
 
+- **Felhős render (kliens)** (`src/lib/renderPipelineClient/cloudJob.ts`, `cache.ts`, `collect.ts`): (1) a
+  státusz-poll nem nézi a HTTP-státuszt — egy `state` nélküli JSON-os 404/401 a `MAX_POLLS`-ig (~10 perc)
+  pollol, aztán `renderTimeout`; (2) átmeneti poll-hiba (TimeoutError vagy kétszeri hálózati hiba)
+  `cancelRender` NÉLKÜL öli a renderet → a szerveres job tovább fut; a `netRetry` TimeoutError-üzenete
+  beégetett magyar; (3) 2 kísérlet után a 429/503 végleges válaszként jön vissza → „renderError (HTTP
+  429)”; (4) a `collectAndShareProject` nem megszakítható (nincs signal, retry nélküli poll); (5) a
+  `storeRenderCache` a régi bejegyzéseket a másolás ELŐTT törli — sikertelen másoláskor a cache üres
+  marad. Jestben a dinamikus `import()` nem fut, így a `phoneMixFile` és a médiatár-utak a repó
+  tesztjeiből elérhetetlenek.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -149,7 +159,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/components/studio/image/ImageStudioBody.tsx` | 1444 | ✅ → 581 |
 | `src/components/preview/PreviewSurface.tsx` | 1423 | ✅ → 443 |
 | `src/components/studio/model3d/Model3DStudio.tsx` | 1365 | ✅ → 322 |
-| `src/lib/render.ts` | 1195 | ⬜ |
+| `src/lib/render.ts` | 1195 | ✅ → 35 |
 | `server/text-render.js` | 1174 | ✅ → 42 |
 | `src/lib/feed.ts` | 1137 | ⬜ |
 | `src/app/live/studio/[id].tsx` | 1137 | ✅ → 293 |

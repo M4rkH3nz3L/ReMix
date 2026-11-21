@@ -7808,6 +7808,75 @@
   "localRenderGaps": "v:a7f964ac27",
   "localRenderMatchesPreview": "v:36e3b22700"
  },
+ "src/lib/renderPipeline/cancel.ts": {
+  "RenderCancelledError": "v:8e2af74747",
+  "asCancelled": "v:b8e3d43c1f",
+  "isRenderCancelledError": "v:e601c8733d"
+ },
+ "src/lib/renderPipeline/projectMedia.ts": {
+  "fileName": "v:affbc370e6",
+  "mediaUris": "v:ac53f8f6ea"
+ },
+ "src/lib/renderPipeline/settings.ts": {
+  "DEFAULT_SETTINGS": "v:66ea5d2df4",
+  "ExportPlatform": "t:ec716a9159",
+  "PLATFORM_PRESETS": "v:4f86e84264",
+  "RenderCodec": "t:307e779dac",
+  "RenderMode": "t:907cf200c6",
+  "RenderOptions": "t:e26a2a7c30",
+  "RenderSettings": "t:66ea5d2df4",
+  "settingsNeedCloud": "v:5718841813"
+ },
+ "src/lib/renderPipelineClient/cache.ts": {
+  "cachedRenderFile": "v:4a1dab204c",
+  "storeRenderCache": "v:89f2a4a22f"
+ },
+ "src/lib/renderPipelineClient/captions.ts": {
+  "transcribeToSrt": "v:5a24e294a6"
+ },
+ "src/lib/renderPipelineClient/cloudExport.ts": {
+  "exportAudioFile": "v:05126862b6",
+  "exportAudioToFile": "v:989f4d4a64",
+  "renderAndDownloadWeb": "v:1e5b215937",
+  "renderAndUploadWeb": "v:1022048d6b",
+  "renderCloud": "v:99da0efc65",
+  "renderCloudFileUrl": "v:dd0ba5304a"
+ },
+ "src/lib/renderPipelineClient/cloudJob.ts": {
+  "MAX_POLLS": "v:e26973e6ee",
+  "POLL_MS": "v:a4ac914c09",
+  "submitAndPollRender": "v:9741e4b979"
+ },
+ "src/lib/renderPipelineClient/collect.ts": {
+  "collectAndShareProject": "v:b7a2440b04"
+ },
+ "src/lib/renderPipelineClient/orchestrate.ts": {
+  "renderMp4": "v:c7fef78e34",
+  "renderProjectVersion": "v:e0ac64633f"
+ },
+ "src/lib/renderPipelineClient/phoneMix.ts": {
+  "phoneMixFile": "v:1d1f0e01b1"
+ },
+ "src/lib/renderPipelineClient/share.ts": {
+  "PostTarget": "t:187aa56cf2",
+  "renderAndPost": "v:da8cbae913",
+  "renderAndShareMp4": "v:d06e3ffdad"
+ },
+ "src/lib/renderPipelineClient/soundLibrary.ts": {
+  "LibraryTrack": "t:b5a37dd6e1",
+  "downloadTrack": "v:34cec6c000",
+  "fetchSoundLibrary": "v:0d0d7e0b90"
+ },
+ "src/lib/renderPipelineClient/transport.ts": {
+  "appendMediaPart": "v:87170b1afc",
+  "fetchWithTimeout": "v:393441172f"
+ },
+ "src/lib/renderPipelineClient/upload.ts": {
+  "MediaKind": "t:52a89e61d1",
+  "UploadTarget": "t:e5e1676bcc",
+  "uploadMedia": "v:6d8dd19ee8",
+  "uploadMediaResult": "v:897bc35c52"
+ },
  "src/lib/renderPreflight.ts": {
   "RenderHealth": "t:d5c58bfa89",
   "cloudRenderBlocked": "v:431204116f",

@@ -86,15 +86,21 @@ router.post('/storage/oauth/:provider/start', requireAuth, rateLimit('messaging'
     res.json({ url });
   } catch (err) {
     logCaught('routes/storage.js', err);
-    res.status(400).json({ error: err.message });
+    // 503: a worker aláíró titka hiányzik (prod, OAUTH_STATE_SECRET); minden más hiba 400 marad
+    res.status(err.status === 503 ? 503 : 400).json({ error: err.message });
   }
 });
+
+/** HTML-szöveg escape a tükrözött (szolgáltatótól / query-ből jövő) üzenetekhez. */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
 
 // OAuth-callback: a szolgáltató IDE tér vissza (a state hordja a usert).
 router.get('/storage/oauth/:provider/callback', async (req, res) => {
   const { code, state, error: oauthErr } = req.query;
   if (oauthErr) {
-    res.status(400).send(`OAuth hiba: ${String(oauthErr)}`);
+    res.status(400).send(`OAuth hiba: ${escapeHtml(oauthErr)}`);
     return;
   }
   try {
@@ -108,12 +114,14 @@ router.get('/storage/oauth/:provider/callback', async (req, res) => {
       `<!doctype html><meta charset="utf-8"><title>Kész</title>` +
         `<body style="font-family:system-ui;padding:2rem;text-align:center">` +
         `<h2>✅ Tárhely bekötve</h2><p>Bezárhatod ezt az ablakot.</p>` +
-        (target ? `<script>location.replace(${JSON.stringify(target)})</script>` : '') +
+        // 🔒 a cél már allowlistes (oauthCallback → safeReturnUrl); a JSON-literálban a `<` →
+        // \u003c, így `</script>` / `<!--` nem törhet ki a script-blokkból
+        (target ? `<script>location.replace(${JSON.stringify(target).replace(/</g, '\\u003c')})</script>` : '') +
         `</body>`
     );
   } catch (err) {
     logCaught('routes/storage.js', err);
-    res.status(400).send(`Bekötés sikertelen: ${err.message}`);
+    res.status(400).send(`Bekötés sikertelen: ${escapeHtml(err.message)}`);
   }
 });
 

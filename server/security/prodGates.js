@@ -24,6 +24,12 @@ function prodGateViolations(env = process.env) {
   if ((env.LIVEKIT_API_KEY || '').trim() && !(env.LIVE_STREAM_KEY_SECRET || '').trim()) {
     bad.push('LIVE_STREAM_KEY_SECRET (hiányzik)');
   }
+  // 🔒 tárhely-OAuth bekötve → az OAuth-state / fájl-token HMAC-titka KÖTELEZŐ (a beégetett
+  // dev-konstans prod-ban tilos; secret nélkül a signing.js amúgy is 503-mal megtagadja az aláírást)
+  const oauthOn = ['GOOGLE_OAUTH_CLIENT_ID', 'DROPBOX_APP_KEY', 'MS_OAUTH_CLIENT_ID'].some((k) => (env[k] || '').trim());
+  if (oauthOn && !(env.OAUTH_STATE_SECRET || '').trim()) {
+    bad.push('OAUTH_STATE_SECRET (hiányzik)');
+  }
   return bad;
 }
 

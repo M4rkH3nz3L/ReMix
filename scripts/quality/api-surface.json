@@ -1330,7 +1330,7 @@
   "getDefaultTarget": "v:2da894a936",
   "listConnected": "v:2da894a936",
   "listUserSource": "v:d940880365",
-  "oauthCallback": "v:033b6b4ce3",
+  "oauthCallback": "v:75527c054e",
   "oauthConfigured": "v:680fec1e65",
   "oauthStartUrl": "v:a355dba9d9",
   "setDefaultTarget": "v:a4eb242a29",
@@ -1368,8 +1368,9 @@
  "server/userStorageLib/oauthFlow.js": {
   "ensureAccessToken": "v:fb689668fb",
   "exchangeCode": "v:a133cd56f8",
-  "oauthCallback": "v:033b6b4ce3",
-  "oauthStartUrl": "v:a355dba9d9"
+  "oauthCallback": "v:75527c054e",
+  "oauthStartUrl": "v:a355dba9d9",
+  "safeReturnUrl": "v:bcb6c63cc3"
  },
  "server/userStorageLib/onedrive.js": {
   "onedriveListMedia": "v:ac67fcabcb",

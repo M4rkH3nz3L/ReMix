@@ -122,9 +122,9 @@ describe('OAuth-konfiguráció', () => {
 });
 
 describe('aláírás (state + capability-token)', () => {
-  test('a secret sorrendje: OAUTH_STATE_SECRET → SUPABASE_SERVICE_ROLE_KEY → insecure-dev-secret', () => {
+  test('a secret: OAUTH_STATE_SECRET; dev/teszt-ben hiányában a dev-konstans (a service-role kulcs NEM HMAC-titok)', () => {
     expect(load({ OAUTH_STATE_SECRET: 'a', SUPABASE_SERVICE_ROLE_KEY: 'b' }).signing.STATE_SECRET).toBe('a');
-    expect(load({ SUPABASE_SERVICE_ROLE_KEY: 'b' }).signing.STATE_SECRET).toBe('b');
+    expect(load({ SUPABASE_SERVICE_ROLE_KEY: 'b' }).signing.STATE_SECRET).toBe('insecure-dev-secret');
     expect(load({}).signing.STATE_SECRET).toBe('insecure-dev-secret');
   });
   test('signState/verifyState: oda-vissza; módosított vagy aláírás nélküli state → null', () => {
@@ -303,5 +303,82 @@ describe('DB-lánc és gateway', () => {
   test('mimeKind: video/image/audio előtag (kis-nagybetű független), különben null', () => {
     const { mimeKind } = load(FULL).mimeKind;
     expect([mimeKind('VIDEO/mp4'), mimeKind('image/png'), mimeKind('audio/x'), mimeKind('application/pdf'), mimeKind('')]).toEqual(['video', 'image', 'audio', null, null]);
+  });
+});
+
+/** production-módú betöltés (a secret betöltéskor rögzül), utána a NODE_ENV visszaáll */
+function loadProd(env) {
+  const prev = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  try {
+    return load(env);
+  } finally {
+    process.env.NODE_ENV = prev;
+  }
+}
+
+describe('🔒 OAuth-state / fájl-token secret production-ben', () => {
+  const forgedFileToken = (secret, uid, src, path) => `${b64u(uid)}.${hmac(secret, `${uid}:${src}:${path}`)}`;
+  const forgedState = (secret, obj) => {
+    const pl = b64u(JSON.stringify(obj));
+    return `${pl}.${hmac(secret, pl)}`;
+  };
+  test('támadás: prod-ban OAUTH_STATE_SECRET nélkül a beégetett konstanssal hamisított fájl-token / state ELUTASÍTVA', () => {
+    const { signing } = loadProd({});
+    expect(signing.verifyFileToken(forgedFileToken('insecure-dev-secret', 'victim', 'g1', 'a.mp4'), 'g1', 'a.mp4')).toBeNull();
+    expect(signing.verifyState(forgedState('insecure-dev-secret', { u: 'victim', p: 'gdrive' }))).toBeNull();
+  });
+  test('támadás: prod-ban a service-role kulcs sem HMAC-titok (az azzal aláírt token elutasítva)', () => {
+    const { signing } = loadProd({ SUPABASE_SERVICE_ROLE_KEY: 'srk' });
+    expect(signing.STATE_SECRET).toBe('');
+    expect(signing.verifyFileToken(forgedFileToken('srk', 'victim', 'g1', 'a.mp4'), 'g1', 'a.mp4')).toBeNull();
+  });
+  test('prod secret nélkül: az aláírás definiált 503-as hibát dob; az OAuth-start is', () => {
+    const { signing, oauthFlow } = loadProd(FULL_NO_SECRET);
+    expect(() => signing.signState({ u: 'a' })).toThrow('OAUTH_STATE_SECRET');
+    expect(() => signing.fileToken('a', 'g1', 'x')).toThrow(expect.objectContaining({ status: 503 }));
+    expect(() => oauthFlow.oauthStartUrl('a', 'gdrive', 'https://api.x', null)).toThrow(expect.objectContaining({ status: 503 }));
+  });
+  test('prod VALÓDI secrettel működik; a régi konstanssal hamisított token ott is elutasítva', () => {
+    const { signing } = loadProd({ OAUTH_STATE_SECRET: 'prod-secret' });
+    const t = signing.fileToken('alice', 'g1', 'a.mp4');
+    expect(signing.verifyFileToken(t, 'g1', 'a.mp4')).toBe('alice');
+    expect(signing.verifyFileToken(forgedFileToken('insecure-dev-secret', 'alice', 'g1', 'a.mp4'), 'g1', 'a.mp4')).toBeNull();
+    expect(signing.verifyState(signing.signState({ u: 'alice' }))).toEqual({ u: 'alice' });
+  });
+});
+const FULL_NO_SECRET = { GOOGLE_OAUTH_CLIENT_ID: 'gid', GOOGLE_OAUTH_CLIENT_SECRET: 'gsec' };
+
+describe('🔒 returnUrl-allowlist (XSS a callback-oldalon)', () => {
+  test('támadás: javascript: / idegen host / data: returnUrl NEM kerül a state-be', () => {
+    const { oauthFlow, signing } = load(FULL);
+    for (const bad of ['javascript:alert(1)', 'JavaScript:alert(1)', 'https://evil.example/x', 'data:text/html,<script>alert(1)</script>', '//evil.example', 'remix\n://x']) {
+      const { url } = oauthFlow.oauthStartUrl('alice', 'gdrive', 'https://api.x', bad);
+      expect(signing.verifyState(new URL(url).searchParams.get('state')).t).toBeNull();
+    }
+  });
+  test('támadás: régi (már aláírt) state-ben lévő javascript: returnUrl-t a callback NEM adja vissza', async () => {
+    const { oauthFlow, signing } = load(FULL);
+    mockState.sb = chainSb(() => ({ data: { id: 'new' }, error: null }));
+    mockState.fetchQueue = [{ ok: true, status: 200, json: { access_token: 'A', refresh_token: 'R' } }];
+    const st = signing.signState({ u: 'alice', r: 'https://r/cb', t: 'javascript:alert(document.cookie)', p: 'gdrive' });
+    await expect(oauthFlow.oauthCallback('gdrive', 'C1', st)).resolves.toBeNull();
+  });
+  test('legitim: az app deep linkje (remix://) és a CORS_ORIGINS-ben engedett web-origin átmegy; az Expo Go exp:// csak dev-ben', () => {
+    const prev = process.env.CORS_ORIGINS;
+    process.env.CORS_ORIGINS = 'https://remix.app, https://www.remix.app';
+    try {
+      const { oauthFlow } = load(FULL);
+      expect(oauthFlow.safeReturnUrl('remix://storage/connected')).toBe('remix://storage/connected');
+      expect(oauthFlow.safeReturnUrl('https://remix.app/storage/connected')).toBe('https://remix.app/storage/connected');
+      expect(oauthFlow.safeReturnUrl('https://remix.app.evil.example/x')).toBeNull();
+      expect(oauthFlow.safeReturnUrl('exp://192.168.1.5:8081/--/storage/connected')).toBe('exp://192.168.1.5:8081/--/storage/connected');
+      expect(loadProd(FULL).oauthFlow.safeReturnUrl('exp://192.168.1.5:8081/--/storage/connected')).toBeNull();
+      expect(oauthFlow.safeReturnUrl(null)).toBeNull();
+      expect(oauthFlow.safeReturnUrl(42)).toBeNull();
+    } finally {
+      if (prev === undefined) delete process.env.CORS_ORIGINS;
+      else process.env.CORS_ORIGINS = prev;
+    }
   });
 });

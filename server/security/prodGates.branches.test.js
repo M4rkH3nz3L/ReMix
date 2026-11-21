@@ -40,6 +40,19 @@ describe('prodGateViolations — Live stream-kulcs secret (PRO-LIVE L5)', () => 
   });
 });
 
+describe('prodGateViolations — OAuth-state / fájl-token secret', () => {
+  test('production + bekötött tárhely-OAuth, de nincs OAUTH_STATE_SECRET → sértés (az indulás megtagadva)', () => {
+    expect(prodGateViolations({ NODE_ENV: 'production', GOOGLE_OAUTH_CLIENT_ID: 'g' })).toEqual(['OAUTH_STATE_SECRET (hiányzik)']);
+    expect(prodGateViolations({ NODE_ENV: 'production', DROPBOX_APP_KEY: 'd', OAUTH_STATE_SECRET: ' ' })).toEqual(['OAUTH_STATE_SECRET (hiányzik)']);
+    expect(prodGateViolations({ NODE_ENV: 'production', MS_OAUTH_CLIENT_ID: 'm' })).toEqual(['OAUTH_STATE_SECRET (hiányzik)']);
+  });
+  test('secrettel, OAuth nélkül, vagy nem-production env-ben nincs sértés', () => {
+    expect(prodGateViolations({ NODE_ENV: 'production', GOOGLE_OAUTH_CLIENT_ID: 'g', OAUTH_STATE_SECRET: 's' })).toEqual([]);
+    expect(prodGateViolations({ NODE_ENV: 'production' })).toEqual([]);
+    expect(prodGateViolations({ NODE_ENV: 'development', GOOGLE_OAUTH_CLIENT_ID: 'g' })).toEqual([]);
+  });
+});
+
 describe('assertProdGates — alapértelmezett exit/log', () => {
   test('opciók nélkül, tiszta env → true, a process.exit nem hívódik', () => {
     const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {});

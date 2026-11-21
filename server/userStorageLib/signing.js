@@ -2,20 +2,39 @@ const { logCaught } = require('../lib/caught');
 // 🔌 Külső tárhely — HMAC-aláírás: az OAuth-state és a /file capability-token.
 const crypto = require('crypto');
 
-const STATE_SECRET =
-  process.env.OAUTH_STATE_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'insecure-dev-secret';
+// 🔒 A HMAC-titok CSAK az OAUTH_STATE_SECRET. Production-ben hiánya esetén NINCS titok (''):
+// az aláírás 503-as hibát dob, az ellenőrzés mindig elutasít — a beégetett konstanssal bárki
+// hamisíthatna lejárat nélküli fájl-tokent bármely uid-ra. A service-role kulcs NEM HMAC-titok
+// (a legérzékenyebb kulcs kettős használata). Dev/teszt: a dev-konstans (lokális munkához).
+const STATE_SECRET = (() => {
+  const own = (process.env.OAUTH_STATE_SECRET || '').trim();
+  if (own) {
+    return own;
+  }
+  return process.env.NODE_ENV === 'production' ? '' : 'insecure-dev-secret';
+})();
+
+/** Aláíráshoz: a titok, vagy prod-ban hiányzó titoknál definiált 503-as hiba. */
+function requireSecret() {
+  if (!STATE_SECRET) {
+    const err = new Error('A külső tárhely-aláírás nincs konfigurálva a workeren (OAUTH_STATE_SECRET hiányzik).');
+    err.status = 503;
+    throw err;
+  }
+  return STATE_SECRET;
+}
 
 function b64url(buf) {
   return Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 function signState(obj) {
   const payload = b64url(JSON.stringify(obj));
-  const sig = crypto.createHmac('sha256', STATE_SECRET).update(payload).digest('hex').slice(0, 32);
+  const sig = crypto.createHmac('sha256', requireSecret()).update(payload).digest('hex').slice(0, 32);
   return `${payload}.${sig}`;
 }
 function verifyState(state) {
   const [payload, sig] = String(state || '').split('.');
-  if (!payload || !sig) {
+  if (!STATE_SECRET || !payload || !sig) {
     return null;
   }
   const expect = crypto.createHmac('sha256', STATE_SECRET).update(payload).digest('hex').slice(0, 32);
@@ -37,7 +56,7 @@ function verifyState(state) {
 // a `findUserSource` már nem találja → a stream elhal.
 function fileToken(uid, sourceId, path) {
   const sig = crypto
-    .createHmac('sha256', STATE_SECRET)
+    .createHmac('sha256', requireSecret())
     .update(`${uid}:${sourceId}:${path}`)
     .digest('hex')
     .slice(0, 32);
@@ -45,7 +64,7 @@ function fileToken(uid, sourceId, path) {
 }
 function verifyFileToken(token, sourceId, path) {
   const [uidB64, sig] = String(token || '').split('.');
-  if (!uidB64 || !sig) {
+  if (!STATE_SECRET || !uidB64 || !sig) {
     return null;
   }
   let uid;

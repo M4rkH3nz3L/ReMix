@@ -44,11 +44,11 @@ refaktor során NEM történt.
 
 ### Javítandó hibák súlyossági sorrendben (részletek lent, fájl:sor hivatkozással)
 
-1. 🔒⚠️ AI-számlázás megkerülése a saját env-kulcsunkon (üres kulcsú „BYOK”) — `server/aiLib/`
+1. 🔒⚠️ AI-számlázás megkerülése a saját env-kulcsunkon (üres kulcsú „BYOK”) — `server/aiLib/` — ✅ JAVÍTVA (kulcs nélküli anthropic config nem BYOK → mért env-út; a `runAnthropic` BYOK-ként sosem esik env-kliensre)
 2. 💰⚠️ Dupla pénzmozgás dupla koppintásra — Wallet (kifizetés/vásárlás/előfizetés/ajándék) és Bolt
 3. 🔒⚠️ Idegen felhő-render megszakítása (cancel a tulaj-ellenőrzés előtt) — `server/routes/renderLib/`
 4. 🔒⚠️ SSRF átirányításon (`/imagedoc`, `/psd/export`) és beágyazott kompozíción (`/render`) át
-5. 🔒⚠️ OAuth: beégetett `'insecure-dev-secret'` fallback (hamisítható fájl-token), XSS a `returnUrl`-en
+5. 🔒⚠️ OAuth: beégetett `'insecure-dev-secret'` fallback (hamisítható fájl-token), XSS a `returnUrl`-en — ✅ JAVÍTVA (1)+(3) (prod: csak `OAUTH_STATE_SECRET`, hiányában 503 / indulás-tiltás; returnUrl-allowlist + escape)
 6. ⚠️ Image Studio SVG/vektoros PDF export: `[object Promise]` a beágyazott fotók helyén
 7. ⚠️ Projekt-tár: párhuzamos mentésnél projektek kiesnek a listából
 8. 🔒 Live egress / session / Studio, felhasználói fájlok, social feed, chat, wallet-lib, image-szerver —
@@ -253,7 +253,12 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   (a bontás szándékosan így hagyta, különben a `doc` típusa megváltozna).
 
 - 🔒⚠️ **SÚLYOS — Külső tárhelyek / OAuth (szerver)** (`server/userStorageLib/`; a sorszám a HEAD-beli
-  `server/userStorage.js`): (1) L63–64: az `OAUTH_STATE_SECRET` a `SUPABASE_SERVICE_ROLE_KEY`-re, majd a
+  `server/userStorage.js`): ✅ JAVÍTVA az (1) és a (3) pont (`signing.js`: a titok CSAK az `OAUTH_STATE_SECRET`, a
+  service-role kulcs többé nem HMAC-titok; production-ben hiányában az aláírás 503-as hibát dob, az ellenőrzés
+  mindig elutasít, a `prodGates` bekötött OAuth-kliens mellett megtagadja az indulást; a dev-konstans csak
+  dev/teszt-ben; `oauthFlow.safeReturnUrl`: csak `remix://`, a `CORS_ORIGINS` web-originjei és dev-ben `exp(s)://`,
+  a callback a régi state-ek célját is újra-ellenőrzi; `routes/storage.js`: a cél-literálban `<` → `\u003c`, az
+  `oauthErr` és a hibaszöveg HTML-escape-elve); a (2), (4)–(13) pont nyitott. (1) L63–64: az `OAUTH_STATE_SECRET` a `SUPABASE_SERVICE_ROLE_KEY`-re, majd a
   beégetett `'insecure-dev-secret'`-re esik vissza, fail-fast nélkül — a konstanssal BÁRKI hamisíthat
   OAuth-state-et és LEJÁRAT NÉLKÜLI fájl-capability tokent BÁRMELY uid-ra (`verifyFileToken` L656–674 →
   `routes/storage.js:211`; a trace üres env-vel elfogadta a hamisítottat); (2) L154–173, L202–214: az
@@ -304,7 +309,10 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   (`tools/jest/babel-plugin-dynamic-import.js`, csak a jest client-projektben; az éles bundle bájtra azonos).
 
 - 🔒⚠️ **SÚLYOS — AI-számlázás megkerülése a SAJÁT env-kulcsunkon** (`server/aiLib/`; HEAD `server/ai.js`):
-  a `sanitizeAiConfig` (ai.js:313-319) elfogad `{provider:'anthropic', model:'<bármi>'}` configot ÜRES
+  ✅ JAVÍTVA az (1) pont (`byok.js`: anthropic BYOK csak nem-üres kulccsal, különben null → az `aiMeter` kvótát
+  ellenőriz és a `runStructured` env-úton mér; `providers.js`: kulcs nélküli BYOK-cfg-re hiba, env-kliens nem
+  épül; az OpenAI-kompatibilis/custom BYOK a user végpontjára megy a mi kulcsunk nélkül, a lokális nem BYOK);
+  a (2)–(5) pont nyitott. A `sanitizeAiConfig` (ai.js:313-319) elfogad `{provider:'anthropic', model:'<bármi>'}` configot ÜRES
   `apiKey`-jel; az `aiMeter` (`server/lib/guards.js:76`) ezt BYOK-nak veszi és kihagyja a kvótát; a
   `runStructured` (ai.js:388-393) a BYOK-ot nem méri; a `runAnthropic` (ai.js:239) viszont `new Anthropic()`-ra
   esik vissza, ami a MI `ANTHROPIC_API_KEY`-ünket használja → bármely hitelesített (Free) user mérés és

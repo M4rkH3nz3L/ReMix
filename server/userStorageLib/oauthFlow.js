@@ -6,6 +6,40 @@ const { signState, verifyState } = require('./signing');
 const { saveSourceConfig, upsertProvider } = require('./sourcesDb');
 
 // ───────────────────────────────────────────────────────── OAuth-folyamat
+// betöltéskor rögzül (mint a signing.js titka): az Expo Go sémája csak nem-production workeren
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+/**
+ * 🔒 A callback-oldal `location.replace`-célja (returnUrl) allowlistje — validálatlanul `javascript:`
+ * / idegen host futna a worker originjén (XSS, open redirect). Engedett: az app deep link-sémája
+ * (app.json `scheme: "remix"`, a kliens `Linking.createURL('storage/connected')`-je), a
+ * CORS_ORIGINS-ben felsorolt web-originek, dev-ben az Expo Go `exp://` / `exps://` sémája.
+ * Minden más → null (a callback-oldal ekkor csak „bezárhatod az ablakot”).
+ */
+function safeReturnUrl(raw) {
+  if (typeof raw !== 'string' || raw.length > 2048 || /[\u0000-\u001f\u007f\s\\]/.test(raw)) {
+    return null;
+  }
+  let u;
+  try {
+    u = new URL(raw);
+  } catch (caught) {
+    logCaught('userStorage.js:safeReturnUrl', caught);
+    return null; // nem abszolút URL (pl. //evil, relatív út) → nem engedett
+  }
+  if (u.protocol === 'remix:') {
+    return raw;
+  }
+  if ((u.protocol === 'exp:' || u.protocol === 'exps:') && !IS_PROD) {
+    return raw;
+  }
+  if (u.protocol === 'https:' || u.protocol === 'http:') {
+    const allowed = (process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
+    return allowed.includes(u.origin) ? raw : null;
+  }
+  return null;
+}
+
 /** Az authorize-URL, amit a kliens böngészőben megnyit. A `state` aláírva hordja a usert + a redirect_uri-t. */
 function oauthStartUrl(uid, provider, redirectBase, returnUrl) {
   const p = OAUTH[provider];
@@ -16,7 +50,7 @@ function oauthStartUrl(uid, provider, redirectBase, returnUrl) {
     throw new Error(`A ${p.label} OAuth nincs konfigurálva a workeren (client id/secret).`);
   }
   const redirectUri = `${String(redirectBase).replace(/\/+$/, '')}/storage/oauth/${provider}/callback`;
-  const state = signState({ u: uid, r: redirectUri, t: returnUrl || null, p: provider });
+  const state = signState({ u: uid, r: redirectUri, t: safeReturnUrl(returnUrl), p: provider });
   const params = new URLSearchParams({
     client_id: p.clientId(),
     redirect_uri: redirectUri,
@@ -66,7 +100,8 @@ async function oauthCallback(provider, code, state) {
     label: OAUTH[provider].label,
     config: tokens,
   });
-  return parsed.t || null;
+  // a régi (allowlist előtt aláírt) state-ek returnUrl-je is újra-ellenőrizve
+  return safeReturnUrl(parsed.t);
 }
 
 /** Érvényes access token — lejáratkor frissít és visszaírja a DB-be. */
@@ -107,4 +142,4 @@ async function ensureAccessToken(source) {
   return next.access_token;
 }
 
-module.exports = { oauthStartUrl, exchangeCode, oauthCallback, ensureAccessToken };
+module.exports = { oauthStartUrl, exchangeCode, oauthCallback, ensureAccessToken, safeReturnUrl };

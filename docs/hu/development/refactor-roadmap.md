@@ -149,6 +149,22 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   marad. Jestben a dinamikus `import()` nem fut, így a `phoneMixFile` és a médiatár-utak a repó
   tesztjeiből elérhetetlenek.
 
+- 🔒 **Felhasználói fájlok (szerver)** (`server/userFilesLib/`; a sorszám a HEAD-beli `server/userFiles.js`):
+  (1) L97–103 `userRoot` elutasítás helyett KIVÁG: `'../alice'` → `files/alice/`, `'a.b'` és `'ab'`
+  ütközik — csak addig biztonságos, amíg a uid mindig szerver-hitelesített UUID; (2) L828–829
+  `sweepSessions`: védetlen `JSON.parse` — egyetlen sérült session-JSON után az adott user MINDEN
+  `uploadInit`-je tartósan 500 (ugyanígy L764 `restoreTrash`, L818 `readSession` → 500 a 4xx helyett);
+  (3) L861–870, L886–897: a multipart staging-bájtok nincsenek a kvóta-főkönyvben → sok befejezetlen
+  sessionnel kvótán felül tárolható az R2-n a 7 napos sweepig (ami csak ugyanazon user következő
+  `uploadInit`-jénél fut); (4) L294–296, L462–464: `S3_FILES_BUCKET` nélkül a user-fájlok a közös
+  média-bucketbe esnek, amelynek publikus r2.dev domainje lehet, a kulcsok kitalálhatók — konfig-
+  kockázat; (5) L671–676 `move` (és L558–562, L931–935): check-then-copy verseny, a copy csendben
+  felülír; (6) L363, L407: a kliens `contentType`-ja validálatlanul tárolódik, a `routes/files.js:133`
+  visszhangozza (attachment enyhíti, de nincs `X-Content-Type-Options: nosniff`); (7) L251–286 a
+  helyi backend multipart-útjai kihagyják az `abs()`-ellenőrzést (csak dev); (8) L196–199 a helyi
+  `listAll`-nak nincs MAX_TREE plafonja; (9) L777–785 `purgeTrash` nem létező id-t is „removed”-nak
+  számol, nem tömb `ids` → TypeError (500); (10) L952–959 `uploadAbort` mindig `{aborted:true}`.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -165,7 +181,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `src/app/live/studio/[id].tsx` | 1137 | ✅ → 293 |
 | `src/components/studio/image/LayerInspector.tsx` | 1105 | ✅ → 110 |
 | `src/components/editor/panels/ExportPanel.tsx` | 1059 | ✅ → 144 |
-| `server/userFiles.js` | 997 | ⬜ |
+| `server/userFiles.js` | 997 | ✅ → 47 |
 | `src/app/auth.tsx` | 980 | ⬜ |
 | `src/hooks/useFeed.ts` | 975 | ⬜ |
 | `src/app/live/[id].tsx` | 952 | ✅ → 376 |

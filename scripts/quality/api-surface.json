@@ -1098,6 +1098,61 @@
   "resolveBackend": "v:e72c367b45",
   "userRoot": "v:2bd7ee3e12"
  },
+ "server/userFilesLib/constants.js": {
+  "MARKER": "v:5da48294af",
+  "MAX_DEPTH": "v:91032ad7bb",
+  "MAX_PATH": "v:ce09b127d4",
+  "MAX_SEGMENT": "v:775bc5c30e",
+  "MAX_TREE": "v:e3cbba8883",
+  "PART_SIZE": "v:53b0a1b2fa",
+  "TRASH_META": "v:7d4045eafb",
+  "TRASH_RETENTION_DAYS": "v:22d200f867",
+  "UPLOAD_SESSION_DAYS": "v:902ba3cda1"
+ },
+ "server/userFilesLib/createUserFiles.js": {
+  "createUserFiles": "v:36f81b1d3e"
+ },
+ "server/userFilesLib/errors.js": {
+  "UserFilesError": "v:27e96646a7",
+  "badPath": "v:164c5cb2b9",
+  "notFound": "v:4bc913d12a"
+ },
+ "server/userFilesLib/fileOps.js": {
+  "createFileOps": "v:049e10cb62"
+ },
+ "server/userFilesLib/localBackend.js": {
+  "localBackend": "v:dfca23f859"
+ },
+ "server/userFilesLib/md5.js": {
+  "md5OfFile": "v:0b46a9eaf5"
+ },
+ "server/userFilesLib/paths.js": {
+  "baseName": "v:cb77017514",
+  "cleanSegment": "v:62f7afe122",
+  "joinPath": "v:553a138d22",
+  "nextFreeName": "v:c805d2f9a6",
+  "normalizePath": "v:62f7afe122",
+  "parentOf": "v:cb77017514",
+  "userRoot": "v:2bd7ee3e12",
+  "userTrash": "v:2bd7ee3e12",
+  "userUploads": "v:2bd7ee3e12"
+ },
+ "server/userFilesLib/resolveBackend.js": {
+  "resolveBackend": "v:e72c367b45"
+ },
+ "server/userFilesLib/s3Backend.js": {
+  "filesBucket": "v:ef2718c01e",
+  "s3Backend": "v:48ffdc2e00"
+ },
+ "server/userFilesLib/trashOps.js": {
+  "createTrashOps": "v:8e5882d06c"
+ },
+ "server/userFilesLib/treeOps.js": {
+  "createTreeOps": "v:dbf4cbba58"
+ },
+ "server/userFilesLib/uploadSessionOps.js": {
+  "createUploadSessionOps": "v:20a6c626e3"
+ },
  "server/userStorage.js": {
   "OAUTH": "v:dfaa96cff9",
   "describeUserSources": "v:2da894a936",

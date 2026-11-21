@@ -176,6 +176,15 @@ const MUST_BE_MEMOIZED = [
   ['src/components/studio/model3d/render/ViewerInfoPanel.tsx', 'ViewerInfoPanel'],
   ['src/components/studio/model3d/render/ViewerToolbar.tsx', 'ViewerToolbar'],
   ['src/components/studio/model3d/render/ViewerToolbar.tsx', 'Tool'],
+  // REFACTOR: az élő adás képernyőjének (src/app/live/[id].tsx) kiemelt renderelő részei (a gyökér előtte és utána is kimarad)
+  ['src/components/live/session/LiveSessionStages.tsx', 'ConnectingStage'],
+  ['src/components/live/session/LiveSessionStages.tsx', 'LiveVideoUnavailable'],
+  ['src/components/live/session/LiveSessionStages.tsx', 'LiveTimer'],
+  ['src/components/live/session/LiveVideoLayer.tsx', 'LiveVideoLayer'],
+  ['src/components/live/session/LiveSessionTopBar.tsx', 'LiveSessionTopBar'],
+  ['src/components/live/session/LiveErrorBanner.tsx', 'LiveErrorBanner'],
+  ['src/components/live/session/LiveSceneSwitcher.tsx', 'LiveSceneSwitcher'],
+  ['src/components/live/session/LiveChatPanel.tsx', 'LiveChatPanel'],
 ];
 
 /**

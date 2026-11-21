@@ -128,6 +128,17 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
   írógép nélkül) nulla méretű `#t` elemet ad → a valódi Chromium-screenshot kivárja a 30 s-os
   időkorlátot és dob.
 
+- 🔒 **Live session** (zárójelben a HEAD-beli `src/app/live/[id].tsx` sor; ma `src/components/live/session/`):
+  (1) a `void stopLiveEgress(...)` hívásoknak nincs `.catch`-e (:365, :441, :494) — a sikertelen
+  egress-leállítás kezeletlen rejection, megkerüli a logCaught-ot, így egy árván futó egress nyom
+  nélkül marad (a `bumpViewerPeak` :329 ugyanígy); (2) az egress-leállítás csak az `egressId`-t küldi —
+  a tulajdont a szervernek kell érvényesítenie; (3) a kliens indít egresst, ha van cél / rögzítés — a
+  Pro-kapu teljesen a szerver 402-es válaszán múlik; (4) a heartbeat hiba-állapotban (permission /
+  token / reconnect-timeout) is fut tovább → a session média nélkül „élő” marad a feedben; (5) az
+  unmount-cleanup a `myUserId()`-ból számolt `isHost`-on múlik — identitás-váltáskor (kijelentkezés)
+  lezárja az élőt és törli a konfig-projektet; (6) unmount utáni `startLiveEgress`-rejection még
+  `setEgress`-t hív (ártalmatlan). Nincs AppState-kezelés és nincs telefonos RTMPS-út a képernyőn.
+
 ## Éles fájlok (63)
 
 | Fájl | Sor | Állapot |
@@ -147,7 +158,7 @@ rögzítik, a javítás külön (funkcionális) commit, döntés után.
 | `server/userFiles.js` | 997 | ⬜ |
 | `src/app/auth.tsx` | 980 | ⬜ |
 | `src/hooks/useFeed.ts` | 975 | ⬜ |
-| `src/app/live/[id].tsx` | 952 | ⬜ |
+| `src/app/live/[id].tsx` | 952 | ✅ → 376 |
 | `src/components/editor/panels/TextPanel.tsx` | 926 | ⬜ |
 | `src/components/studio/audio/ClipEditSheet.tsx` | 889 | ✅ → 310 |
 | `src/lib/offlineMix.ts` | 887 | ✅ → 21 |

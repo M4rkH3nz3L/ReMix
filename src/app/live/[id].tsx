@@ -1,181 +1,55 @@
 import { Ionicons } from '@expo/vector-icons';
-import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/lib/nav';
 import { IS_WEB_VIEWER } from '@/lib/webGate';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture } from 'react-native-gesture-handler';
 import { LiveQuickGrid } from '@/components/live/LiveQuickGrid';
-import { Suspense, lazy, useCallback, useEffect, useMemo, useReducer, useRef, useState, type ComponentType } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Image,
-  KeyboardAvoidingView,
-  NativeModules,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { LiveChatPanel } from '@/components/live/session/LiveChatPanel';
+import { LiveErrorBanner } from '@/components/live/session/LiveErrorBanner';
+import { LiveSceneSwitcher } from '@/components/live/session/LiveSceneSwitcher';
+import { FloatingHeart } from '@/components/live/session/LiveSessionStages';
+import { LiveSessionTopBar } from '@/components/live/session/LiveSessionTopBar';
+import { LiveVideoLayer } from '@/components/live/session/LiveVideoLayer';
+import { createLiveChatActions, createLiveEndActions } from '@/components/live/session/liveSessionActions';
+import {
+  holdScreenAwake,
+  openLiveSession,
+  startHostHeartbeat,
+  stopHostOnUnmount,
+} from '@/components/live/session/liveSessionLifecycle';
 import { palette } from '@/constants/editor';
 import { encodeScenePayload, type ScenePayload } from '@/lib/liveComposite';
 import {
-  egressFailure,
   initialLiveState,
   isHostDevice,
-  isOnAir,
   liveReducer,
   type EgressStatus,
   type LiveErrorCode,
 } from '@/lib/liveState';
 import {
-  bumpViewerPeak,
-  buildLiveSelf,
-  endLive,
-  getLive,
-  heartbeatLive,
-  LIVE_REACTIONS,
   myUserId,
-  openLiveRoom,
   type LiveChat,
   type LiveRoom,
   type LiveSelf,
   type LiveSession,
 } from '@/lib/live';
-import { publishLiveVod } from '@/lib/feed';
-import { hasEnabledTargets, startLiveEgress, stopLiveEgress } from '@/lib/liveDestinations';
-import { activeScene, liveEndDisposition, sceneAfterSwipe, setActiveScene, sortedSources, toggleSourceVisible } from '@/lib/liveDoc';
-import { buildVodProject } from '@/lib/liveVod';
-import { projectFps } from '@/lib/frames';
-import { makeId } from '@/lib/id';
-import { deleteProject, loadProject, saveProject } from '@/lib/storage';
+import { sceneAfterSwipe, setActiveScene, toggleSourceVisible } from '@/lib/liveDoc';
+import { appendLiveFloat, flipFacing, quickGridSources, showsEndedView, type LiveFloat } from '@/lib/liveSessionOps';
 import type { LiveDoc } from '@/types/live';
 import type { Project } from '@/types/project';
-// type-only (erased runtime-ban → NEM húzza be a WebRTC-t)
-import type { LiveVideoStageProps } from '@/components/live/LiveVideoStage';
-import { logCaught } from '@/lib/logCaught';
 
-// 🔴 A WebRTC-videó réteg LAZY (külön modul: @/components/live/LiveVideoStage) →
-// az expo-router INDULÁSI route-validációja NEM tölti be a natív WebRTC-modult,
-// így egy WebRTC nélküli build sem dönti el az egész appot. Ha a modul nem
-// tölthető (hiányzó natív WebRTC → részleges/üres modul), fallback-komponensre
-// esünk (barátságos „frissítsd az appot" üzenet), nem dob érvénytelen-elem hibát.
-// 🔑 Van-e BELINKELVE a natív WebRTC-modul? (@livekit/react-native-webrtc a
-// `NativeModules.WebRTCModule`-t nézi, és annak hiányában a modul-TETEJÉN dob —
-// amit a lazy try/catch sem kap el, mert a Metro module-init-throw megkerüli.)
-// Ezért ELŐRE ellenőrizzük (ez NEM importálja az @livekit-et), és csak akkor
-// próbáljuk betölteni a videó-réteget, ha a WebRTC tényleg jelen van.
-const WEBRTC_AVAILABLE = !!NativeModules.WebRTCModule;
-
-const LiveVideoStage = lazy(async () => {
-  try {
-    const m = (await import('@/components/live/LiveVideoStage')) as {
-      default?: ComponentType<LiveVideoStageProps>;
-    } | undefined;
-    if (m && typeof m.default === 'function') {
-      return { default: m.default };
-    }
-  } catch (caught) {
-    logCaught('app/live/[id].tsx:LiveVideoStage', caught);
-    // a natív WebRTC-modul hiányzik (régi build) → fallback (lentebb)
-  }
-  // MINDIG valid komponenst adunk vissza (sosem `undefined` → nincs „invalid element type")
-  return { default: LiveVideoUnavailable };
-});
-
-// a reakciók a közös fehérlistából (a bejövő broadcast is csak ezeket fogadja — L2)
-const REACTIONS = LIVE_REACTIONS;
-
-/** Egy felúszó reakció-emoji (2 mp alatt felfelé + elhalványul). Az `x` drift az
- * esemény-handlerben készül (nem renderben), hogy ne hívjunk impure fn-t render közben. */
-function FloatingHeart({ emoji, x, onDone }: { emoji: string; x: number; onDone: () => void }) {
-  const anim = useRef(new Animated.Value(0)).current;
-  const doneRef = useRef(onDone);
-  doneRef.current = onDone;
-  useEffect(() => {
-    // egyszer fut (mount): a végén eltávolítja magát a doneRef-en át
-    Animated.timing(anim, { toValue: 1, duration: 2000, useNativeDriver: true }).start(() =>
-      doneRef.current(),
-    );
-  }, [anim]);
-  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -260] });
-  const opacity = anim.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 1, 0] });
-  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [0, x] });
-  return (
-    <Animated.Text style={[styles.floatEmoji, { opacity, transform: [{ translateY }, { translateX }] }]}>
-      {emoji}
-    </Animated.Text>
-  );
-}
-
-/** A videó betöltése/kapcsolódása alatti placeholder (host-avatar + „kapcsolódás"). */
-function ConnectingStage({ hostAvatar, note }: { hostAvatar: string | null; note: string }) {
-  return (
-    <View style={[StyleSheet.absoluteFill, styles.connectingBg]}>
-      <View style={styles.viewerStage}>
-        {hostAvatar ? (
-          <Image source={{ uri: hostAvatar }} style={styles.viewerAvatar} />
-        ) : (
-          <View style={[styles.viewerAvatar, styles.viewerAvatarFallback]}>
-            <Ionicons name="person" size={48} color={palette.textDim} />
-          </View>
-        )}
-        <Text style={styles.viewerNote}>{note}</Text>
-      </View>
-    </View>
-  );
-}
-
-/** Fallback, ha a natív WebRTC-modul hiányzik (régi build) → a videó nem tölthető. */
-function LiveVideoUnavailable({ hostAvatar }: LiveVideoStageProps) {
-  const { t } = useTranslation();
-  return (
-    <View style={[StyleSheet.absoluteFill, styles.connectingBg]}>
-      <View style={styles.viewerStage}>
-        {hostAvatar ? (
-          <Image source={{ uri: hostAvatar }} style={styles.viewerAvatar} />
-        ) : (
-          <View style={[styles.viewerAvatar, styles.viewerAvatarFallback]}>
-            <Ionicons name="videocam-off" size={44} color={palette.textDim} />
-          </View>
-        )}
-        <Text style={styles.viewerNote}>
-          {t('live.videoUnavailable', { defaultValue: 'Live video needs the latest app build.' })}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-/** 🔴 Élő-időzítő: mióta tart az adás (host). Másodpercenként ketyeg; a `Date.now()`
- * CSAK az intervallum-callbackben fut (nem renderben), az elapsed state-ben tárolt. */
-function LiveTimer({ startMs }: { startMs: number }) {
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    if (!startMs) {
-      return;
-    }
-    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - startMs) / 1000)));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [startMs]);
-  const h = Math.floor(elapsed / 3600);
-  const m = Math.floor((elapsed % 3600) / 60);
-  const s = elapsed % 60;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const text = h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
-  return <Text style={styles.liveTimer}>{text}</Text>;
-}
-
+/**
+ * 🔴 Az élő adás képernyője (a „Start streaming" után). REFACTOR: a részek a
+ * src/components/live/session/ alatt — WebRTC-videó réteg (lazy), fejléc, hiba-sáv,
+ * jelenet-váltó, chat; a kapcsolat-életciklus és a stream-konfiguráció (egress) hook
+ * nélküli függvényei; az expo-mentes mag a src/lib/liveSessionOps.ts. A gyökér a hookokat
+ * és az effekteket EREDETI sorrendben és függőségekkel tartja.
+ */
 export default function LiveRoomScreen() {
   const { t } = useTranslation();
   const { id, project: projectParam } = useLocalSearchParams<{ id: string; project?: string }>();
@@ -184,7 +58,7 @@ export default function LiveRoomScreen() {
   const [viewers, setViewers] = useState(1);
   const [chat, setChat] = useState<LiveChat[]>([]);
   const [text, setText] = useState('');
-  const [floats, setFloats] = useState<{ id: string; emoji: string; x: number }[]>([]);
+  const [floats, setFloats] = useState<LiveFloat[]>([]);
   // 🔴 a saját identitás (a videó-token-szerzéshez a LiveVideoStage-ben)
   const [self, setSelf] = useState<LiveSelf | null>(null);
   // 🎥 a renderelendő jelenet-állapot (host: a saját live-docából; néző: a broadcastból)
@@ -239,7 +113,7 @@ export default function LiveRoomScreen() {
     // esemény-handler (nem render) → itt szabad a Math.random
     const fid = `${Date.now()}-${Math.random()}`;
     const x = (Math.random() - 0.5) * 60;
-    setFloats((prev) => [...prev.slice(-24), { id: fid, emoji, x }]);
+    setFloats((prev) => appendLiveFloat(prev, { id: fid, emoji, x }));
   }, []);
 
   // 🎥 a host kiküldi az aktív jelenetet (saját render + broadcast a nézőknek)
@@ -299,209 +173,61 @@ export default function LiveRoomScreen() {
     []
   );
 
-  // session betöltése + realtime room nyitása
-  useEffect(() => {
-    let active = true;
-    const liveId = String(id);
-    (async () => {
-      const s = await getLive(liveId).catch((caught) => { logCaught('app/live/[id].tsx:LiveRoomScreen', caught); return null; });
-      if (!active) {
-        return;
-      }
-      if (!s) {
-        setNotFound(true);
-        return;
-      }
-      setSession(s);
-      const self = await buildLiveSelf();
-      if (!active || !self) {
-        return;
-      }
-      setSelf(self); // → a LiveVideoStage ebből szerzi a videó-tokent (lazy)
-      dispatchLs({ type: 'CONNECT', at: Date.now() });
-      roomRef.current = openLiveRoom(liveId, self, {
-        onChat: (m) => setChat((prev) => [...prev.slice(-80), m]),
-        onReaction: (emoji) => addFloat(emoji),
-        onViewers: (count) => {
-          setViewers(count);
-          // a host frissíti a csúcs-nézőszámot (RLS: csak ő)
-          if (s.hostId === self.id && projectParam) {
-            void bumpViewerPeak(liveId, count);
-          }
-        },
-        // 🛡️ L2: a néző a jelenetet a LiveKit adatcsatornáról veszi (host-hitelesítve, lásd
-        // LiveVideoStage → SceneDataReceiver) — a nyilvános broadcast `scene`-jét NEM alkalmazzuk
-      });
-
-      // 🎥 a host betölti a Studio live-produkció dokumentumát → jelenet-broadcast.
-      // (A videó-token + WebRTC-kapcsolat a lazy LiveVideoStage-ben fut.)
-      if (s.hostId === self.id && projectParam) {
-        const proj = await loadProject(String(projectParam)).catch((caught) => { logCaught('app/live/[id].tsx:LiveRoomScreen', caught); return null; });
-        if (active && proj?.live) {
-          liveDocRef.current = proj.live;
-          liveProjRef.current = proj; // VOD-poszthoz (D158)
-          const startedAt = Date.now(); // 📼 az adás kezdete (VOD becsült hossz + 🔴 live-timer)
-          startStampRef.current = startedAt;
-          setLiveStartMs(startedAt);
-          setHostScenes(proj.live.scenes.map((sc) => ({ id: sc.id, name: sc.name })));
-          setMicMuted(proj.live.mixer?.channels.find((c) => c.id === 'mic')?.mute ?? false);
-          setFacing(proj.live.cameraFacing ?? 'front');
-          broadcastScene();
-          // 🎥 egress indítása, ha VAN engedélyezett RTMP-cél (multistream, Pro)
-          //    VAGY a RÖGZÍTÉS be van kapcsolva (ekkor az egress adja a VOD-ot — a
-          //    felvétel RTMP-cél nélkül is működik). A ReMix-feed mindig megy;
-          //    nem-Pro / nincs egress-infra esetén az egress csendben kimarad.
-          const wantRecord = proj.live.record ?? false;
-          hasEnabledTargets()
-            .then((has) => {
-              if (!(has || wantRecord) || !active) return null;
-              setEgress({ state: 'starting' });
-              return startLiveEgress(liveId, wantRecord, proj.aspectRatio);
-            })
-            .then((r) => {
-              if (!r) return;
-              if (!active || endedRef.current) {
-                // 🔐 L15: az adás közben véget ért → az árva egresst AZONNAL leállítjuk
-                void stopLiveEgress(r.egressId);
-                return;
-              }
-              egressIdRef.current = r.egressId;
-              vodUrlRef.current = r.vodUrl ?? null; // 📼 D158: felvett VOD (ha van)
-              setEgress({ state: 'on', destinations: r.destinations.length, recording: !!r.vodUrl, skipped: r.skipped?.length ?? 0 });
-              if (r.skipped?.length) {
-                Alert.alert(tRef.current('live.egress.title'), tRef.current('live.egress.skipped', { names: r.skipped.map((d) => d.label).join(', ') }));
-              }
-            })
-            .catch((e: Error) => {
-            logCaught('app/live/[id].tsx:LiveRoomScreen', e);
-              // L17: a hiba LÁTHATÓ (eddig elnyelve → a host azt hitte, multistreamel)
-              const reason = egressFailure(String(e?.message ?? ''), wantRecord);
-              setEgress({ state: 'failed', reason });
-              if (active) Alert.alert(tRef.current('live.egress.title'), tRef.current(`live.egress.reason_${reason}`));
-            });
-        }
-      }
-    })();
-    return () => {
-      active = false;
-      roomRef.current?.stop();
-      roomRef.current = null;
-    };
-  }, [id, projectParam, addFloat, broadcastScene]);
+  // session betöltése + realtime room nyitása (🔌 liveSessionLifecycle)
+  useEffect(
+    () =>
+      openLiveSession({
+        id,
+        projectParam,
+        addFloat,
+        broadcastScene,
+        roomRef,
+        liveDocRef,
+        liveProjRef,
+        startStampRef,
+        endedRef,
+        egressIdRef,
+        vodUrlRef,
+        tRef,
+        setNotFound,
+        setSession,
+        setSelf,
+        setChat,
+        setViewers,
+        setLiveStartMs,
+        setHostScenes,
+        setMicMuted,
+        setFacing,
+        setEgress,
+        dispatchLs,
+      }),
+    [id, projectParam, addFloat, broadcastScene]
+  );
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [chat.length]);
 
-  const onSendChat = () => {
-    const body = text.trim();
-    if (!body) {
-      return;
-    }
-    roomRef.current?.sendChat(body);
-    setText('');
-  };
+  const { onSendChat, onReact } = createLiveChatActions({ roomRef, text, setText });
 
-  const onReact = (emoji: string) => {
-    roomRef.current?.sendReaction(emoji);
-    // a sajátot azonnal is megmutatjuk (a broadcast self:true visszahozza, de ne lógjon)
-  };
-
-  /**
-   * 📼 a felvett VOD → szerkeszthető video-projekt (mentve). Az adás-vége ÉS a hirtelen
-   * kilépés (vissza-gesztus / unmount) is ezt hívja — eddig unmountkor a VOD elveszett (L19).
-   */
-  const importVod = (): Project | null => {
-    const vod = vodUrlRef.current;
-    const proj = liveProjRef.current;
-    const record = liveDocRef.current?.record ?? false;
-    if (liveEndDisposition(record, !!vod) !== 'import-vod' || !vod || !proj) {
-      return null;
-    }
-    vodUrlRef.current = null;
-    // ⏱️ a VOD becsült hossza = az adás eltelt ideje (az editor betöltéskor pontosítja)
-    const elapsedSec = startStampRef.current > 0 ? (Date.now() - startStampRef.current) / 1000 : 0;
-    const vodProject = buildVodProject({
-      vodUrl: vod,
-      durationSec: elapsedSec,
-      fps: projectFps(proj),
-      makeId: () => makeId('clip'),
-      name: proj.live?.title || proj.name || t('live.vodDefaultName', { defaultValue: 'Live' }),
-      aspectRatio: proj.aspectRatio,
-    });
-    void saveProject(vodProject).catch((caught) => { logCaught('app/live/[id].tsx:importVod', caught); });
-    return vodProject;
-  };
-
-  const onEndOrLeave = async () => {
-    if (isHost && session && !endedRef.current) {
-      endedRef.current = true;
-      dispatchLs({ type: 'STOP', at: Date.now() });
-      if (egressIdRef.current) {
-        void stopLiveEgress(egressIdRef.current); // 🎥 multistream leállítása
-        egressIdRef.current = null;
-      }
-      await endLive(session.id).catch((caught) => { logCaught('app/live/[id].tsx:onEndOrLeave', caught); });
-      dispatchLs({ type: 'STOPPED', at: Date.now() });
-      const vod = vodUrlRef.current;
-      // 📼 record=be + van felvétel (VOD) → a felvételből SZERKESZTHETŐ video-projekt
-      //    (LIVE/05.1): a VOD a fő videosávon lévő klip (command-bus). KÜLÖNBEN a
-      //    transient live-config projekt TÖRLŐDIK → nincs üres-projekt clutter.
-      const vodProject = importVod();
-      if (vodProject && vod) {
-        // 🧹 a transient live-config projekt törlése (a VOD-projekt az új otthon)
-        if (projectParam) {
-          void deleteProject(String(projectParam)).catch((caught) => { logCaught('app/live/[id].tsx:onEndOrLeave', caught); });
-        }
-        Alert.alert(
-          t('live.vodTitle', { defaultValue: 'Felvétel kész' }),
-          t('live.vodBody', { defaultValue: 'Az élő adás felvétele szerkeszthető projekt lett.' }),
-          [
-            {
-              text: t('live.vodOpen', { defaultValue: 'Projekt megnyitása' }),
-              onPress: () => router.push(`/editor/${vodProject.id}`),
-            },
-            {
-              text: t('live.vodShare', { defaultValue: 'Megosztás feedre' }),
-              onPress: () => {
-                void publishLiveVod(vodProject, vod).catch((caught) => { logCaught('app/live/[id].tsx:onEndOrLeave', caught); });
-                goBackOrHome();
-              },
-            },
-            {
-              text: t('common.done', { defaultValue: 'Kész' }),
-              style: 'cancel',
-              onPress: () => goBackOrHome(),
-            },
-          ],
-        );
-        return; // a navigációt az Alert-gombok végzik
-      }
-      // 🧹 nem rögzített (vagy nincs VOD) → a transient live-config projekt törlése
-      if (projectParam) {
-        void deleteProject(String(projectParam)).catch((caught) => { logCaught('app/live/[id].tsx:onEndOrLeave', caught); });
-      }
-    }
-    goBackOrHome();
-  };
+  const { importVod, onEndOrLeave } = createLiveEndActions({
+    isHost,
+    session,
+    projectParam,
+    t,
+    dispatchLs,
+    endedRef,
+    egressIdRef,
+    vodUrlRef,
+    liveProjRef,
+    liveDocRef,
+    startStampRef,
+  });
 
   // host kilépéskor (unmount) best-effort leállítás
   useEffect(() => {
     return () => {
-      if (isHost && session && !endedRef.current) {
-        endedRef.current = true;
-        if (egressIdRef.current) {
-          void stopLiveEgress(egressIdRef.current);
-          egressIdRef.current = null;
-        }
-        void endLive(session.id).catch((caught) => { logCaught('app/live/[id].tsx:LiveRoomScreen', caught); });
-        // 📼 hirtelen kilépés RÖGZÍTÉSSEL → a VOD-projekt így is elkészül (L19)
-        const vodProject = importVod();
-        // 🧹 hirtelen kilépés + nem rögzít (vagy a VOD már projekt) → a transient config törlése
-        if ((vodProject || !liveDocRef.current?.record) && projectParam) {
-          void deleteProject(String(projectParam)).catch((caught) => { logCaught('app/live/[id].tsx:LiveRoomScreen', caught); });
-        }
-      }
+      stopHostOnUnmount({ isHost, session, projectParam, endedRef, egressIdRef, liveDocRef, importVod });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- az importVod a refekből dolgozik; a cleanup csak session/host-váltásra fusson újra
   }, [isHost, session, projectParam]);
@@ -510,26 +236,18 @@ export default function LiveRoomScreen() {
   // session pedig fagyott képpel „élő" maradna)
   useEffect(() => {
     if (!isHost || !session) return;
-    void activateKeepAwakeAsync('remix-live').catch((caught) => { logCaught('app/live/[id].tsx:LiveRoomScreen', caught); });
-    return () => {
-      void deactivateKeepAwake('remix-live').catch((caught) => { logCaught('app/live/[id].tsx:LiveRoomScreen', caught); });
-    };
+    return holdScreenAwake();
   }, [isHost, session]);
 
   // 💓 L14: a host 30 mp-enként „él még" jelet küld (a szerveres sweep a jel nélküli,
   // beragadt sessiont lezárja; a „Most élő" lista csak a friss adásokat mutatja)
   useEffect(() => {
     if (!isHost || !session) return;
-    const beat = () => {
-      if (!endedRef.current) void heartbeatLive(session.id).catch((caught) => { logCaught('app/live/[id].tsx:beat', caught); });
-    };
-    beat();
-    const timer = setInterval(beat, 30_000);
-    return () => clearInterval(timer);
+    return startHostHeartbeat(session.id, endedRef);
   }, [isHost, session]);
 
   // a néző: a befejezett / nem létező adás → „véget ért" nézet (nem végtelen „Kapcsolódás…")
-  if (notFound || (!isHost && ls.phase === 'error' && (ls.error === 'ended' || ls.error === 'notFound'))) {
+  if (showsEndedView(notFound, isHost, ls)) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.center}>
@@ -558,44 +276,20 @@ export default function LiveRoomScreen() {
       {/* háttér: a WEBRTC-videó LAZY rétege (host → kamera-publish, néző → remote),
           Suspense (betöltés) + ErrorBoundary (hiányzó natív modul = barátságos panel,
           nem app-crash). A kompozíciót a `scene` jelenet-állapot hajtja. */}
-      <GestureDetector gesture={sceneSwipe}>
-      <View style={StyleSheet.absoluteFill} collapsable={false}>
-        {!self ? (
-          <ConnectingStage hostAvatar={session.hostAvatar} note={t('live.connecting')} />
-        ) : !WEBRTC_AVAILABLE ? (
-          // nincs natív WebRTC (régi build) → meg SEM próbáljuk importálni a videó-
-          // réteget (az @livekit a modul-tetején dobna) → barátságos üzenet
-          <LiveVideoUnavailable
-            liveId={String(id)}
-            publish={isHost}
-            name={self.name}
-            userId={self.id}
-            hostAvatar={session.hostAvatar}
-            scene={scene}
-          />
-        ) : (
-          <ErrorBoundary>
-            <Suspense fallback={<ConnectingStage hostAvatar={session.hostAvatar} note={t('live.connecting')} />}>
-              <LiveVideoStage
-                key={stageKey}
-                liveId={String(id)}
-                publish={isHost}
-                name={self.name}
-                userId={self.id}
-                hostAvatar={session.hostAvatar}
-                scene={scene}
-                micMuted={micMuted}
-                hostId={session.hostId}
-                onScene={setScene}
-                onConnection={onConnection}
-                onFatal={onFatal}
-                facing={facing}
-              />
-            </Suspense>
-          </ErrorBoundary>
-        )}
-      </View>
-      </GestureDetector>
+      <LiveVideoLayer
+        sceneSwipe={sceneSwipe}
+        self={self}
+        session={session}
+        liveId={String(id)}
+        isHost={isHost}
+        scene={scene}
+        stageKey={stageKey}
+        micMuted={micMuted}
+        facing={facing}
+        setScene={setScene}
+        onConnection={onConnection}
+        onFatal={onFatal}
+      />
 
       {/* felúszó reakciók */}
       <View pointerEvents="none" style={styles.floatLayer}>
@@ -611,115 +305,24 @@ export default function LiveRoomScreen() {
 
       <SafeAreaView style={styles.overlay} edges={['top', 'bottom']}>
         {/* fejléc: host + LIVE + nézőszám + bezárás */}
-        <View style={styles.topBar}>
-          <View style={styles.hostChip}>
-            <View style={styles.liveDot} />
-            <Text style={styles.hostName} numberOfLines={1}>
-              {session.hostName || session.hostUsername || '—'}
-            </Text>
-          </View>
-          <View style={styles.viewerChip}>
-            <Ionicons name="eye" size={14} color="#fff" />
-            <Text style={styles.viewerCount}>{viewers}</Text>
-          </View>
-          {/* 🚦 a kapcsolat valós állapota (nem ragad „ÉLŐ"-ben) */}
-          {ls.phase === 'connecting' || ls.phase === 'reconnecting' ? (
-            <View style={[styles.stateChip, ls.phase === 'reconnecting' && styles.stateChipWarn]} accessibilityLiveRegion="polite">
-              <ActivityIndicator size="small" color="#fff" />
-              <Text style={styles.stateChipText}>{t(`live.state.${ls.phase}`)}</Text>
-            </View>
-          ) : null}
-          {/* 📡 host: multistream / felvétel állapota */}
-          {isHost && egress.state !== 'off' ? (
-            <Pressable
-              onPress={() =>
-                egress.state === 'failed' ? Alert.alert(t('live.egress.title'), t(`live.egress.reason_${egress.reason}`)) : undefined
-              }
-              style={[styles.stateChip, egress.state === 'failed' && styles.stateChipWarn]}
-              accessibilityRole="button"
-              accessibilityLabel={t('live.egress.title')}
-            >
-              <Ionicons name={egress.state === 'failed' ? 'alert-circle' : 'radio'} size={14} color="#fff" />
-              <Text style={styles.stateChipText}>
-                {egress.state === 'starting'
-                  ? t('live.egress.starting')
-                  : egress.state === 'failed'
-                    ? t('live.egress.failed')
-                    : egress.recording && egress.destinations === 0
-                      ? t('live.egress.recording')
-                      : t('live.egress.on', { count: egress.destinations })}
-              </Text>
-            </Pressable>
-          ) : null}
-          {/* 🔴 host: mióta tart az adás (live-timer) — csak ha TÉNYLEG élőben vagyunk */}
-          {isHost && liveStartMs > 0 && isOnAir(ls) && (
-            <View style={styles.timerChip}>
-              <View style={styles.liveDot} />
-              <LiveTimer startMs={liveStartMs} />
-            </View>
-          )}
-          {/* 🎛️ host: érintős gombrács */}
-          {isHost && (
-            <Pressable
-              testID="live-grid-toggle"
-              onPress={() => setGridOpen((v) => !v)}
-              hitSlop={8}
-              style={[styles.micBtn, gridOpen && styles.micBtnOn]}
-              accessibilityRole="button"
-              accessibilityLabel={t('live.quick.title')}
-            >
-              <Ionicons name="apps" size={18} color="#fff" />
-            </Pressable>
-          )}
-          {/* 📷 host: kamera-váltás adás közben (L27) */}
-          {isHost && (
-            <Pressable
-              onPress={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))}
-              hitSlop={8}
-              style={styles.micBtn}
-              accessibilityRole="button"
-              accessibilityLabel={t('live.flipCamera')}
-            >
-              <Ionicons name="camera-reverse" size={18} color="#fff" />
-            </Pressable>
-          )}
-          {/* 🎚️ host: élő mikrofon-némítás (LiveKit) */}
-          {isHost && (
-            <Pressable
-              onPress={() => setMicMuted((v) => !v)}
-              hitSlop={8}
-              style={[styles.micBtn, micMuted && styles.micBtnOff]}
-            >
-              <Ionicons name={micMuted ? 'mic-off' : 'mic'} size={18} color="#fff" />
-            </Pressable>
-          )}
-          <Pressable onPress={onEndOrLeave} hitSlop={10} style={styles.closeBtn}>
-            <Text style={styles.closeText}>{isHost ? t('live.endLive') : t('live.leave')}</Text>
-          </Pressable>
-        </View>
+        <LiveSessionTopBar
+          session={session}
+          viewers={viewers}
+          ls={ls}
+          isHost={isHost}
+          egress={egress}
+          liveStartMs={liveStartMs}
+          gridOpen={gridOpen}
+          setGridOpen={setGridOpen}
+          micMuted={micMuted}
+          setMicMuted={setMicMuted}
+          setFacing={setFacing}
+          onEndOrLeave={onEndOrLeave}
+        />
 
         {/* 🚦 hiba-sáv: mi történt + mit tehet (újrapróba / befejezés) — nem ragad „ÉLŐ"-ben */}
         {ls.phase === 'error' ? (
-          <View style={styles.errorBanner} accessibilityRole="alert">
-            <Text style={styles.errorText}>{t(`live.state.error_${ls.error ?? 'unknown'}`)}</Text>
-            <View style={styles.errorActions}>
-              {ls.error === 'reconnectTimeout' ? (
-                <Pressable
-                  style={styles.errorBtn}
-                  onPress={() => {
-                    dispatchLs({ type: 'RETRY', at: Date.now() });
-                    setStageKey((k) => k + 1);
-                  }}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.errorBtnText}>{t('live.state.retry')}</Text>
-                </Pressable>
-              ) : null}
-              <Pressable style={[styles.errorBtn, styles.errorBtnDanger]} onPress={() => void onEndOrLeave()} accessibilityRole="button">
-                <Text style={styles.errorBtnText}>{isHost ? t('live.endLive') : t('live.leave')}</Text>
-              </Pressable>
-            </View>
-          </View>
+          <LiveErrorBanner ls={ls} isHost={isHost} dispatchLs={dispatchLs} setStageKey={setStageKey} onEndOrLeave={onEndOrLeave} />
         ) : null}
 
         <Text style={styles.liveTitle} numberOfLines={2}>
@@ -728,85 +331,30 @@ export default function LiveRoomScreen() {
 
         {/* 🎥 host: élő jelenet-váltó (OBS-szerű), ha több jelenet van */}
         {isHost && hostScenes.length > 1 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.sceneSwitchRow}
-            keyboardShouldPersistTaps="handled"
-          >
-            {hostScenes.map((sc) => {
-              const on = sc.id === scene?.sceneId;
-              return (
-                <Pressable
-                  key={sc.id}
-                  onPress={() => switchScene(sc.id)}
-                  style={[styles.sceneSwitchChip, on && styles.sceneSwitchChipOn]}
-                >
-                  <Text style={[styles.sceneSwitchText, on && styles.sceneSwitchTextOn]} numberOfLines={1}>
-                    {sc.name}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          <LiveSceneSwitcher hostScenes={hostScenes} activeSceneId={scene?.sceneId} switchScene={switchScene} />
         )}
 
         {isHost && gridOpen && liveDocRef.current ? (
           <LiveQuickGrid
-            sources={(() => {
-              const current = activeScene(liveDocRef.current);
-              return current ? sortedSources(current) : [];
-            })()}
+            sources={quickGridSources(liveDocRef.current)}
             micMuted={micMuted}
             onToggle={toggleSource}
             onMic={() => setMicMuted((v) => !v)}
-            onFlip={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))}
+            onFlip={() => setFacing((f) => flipFacing(f))}
           />
         ) : null}
 
         <View style={{ flex: 1 }} />
 
         {/* chat + reakciók */}
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView
-            ref={scrollRef}
-            style={styles.chatScroll}
-            contentContainerStyle={styles.chatContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {chat.map((m, i) => (
-              <View key={`${m.id}-${m.at}-${i}`} style={styles.chatRow}>
-                <Text style={styles.chatName}>{m.name}</Text>
-                <Text style={styles.chatText}>{m.text}</Text>
-              </View>
-            ))}
-          </ScrollView>
-
-          <View style={styles.reactRow}>
-            {REACTIONS.map((e) => (
-              <Pressable key={e} onPress={() => onReact(e)} style={styles.reactBtn} hitSlop={6}>
-                <Text style={styles.reactEmoji}>{e}</Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <View style={styles.inputRow}>
-            <TextInput
-              value={text}
-              onChangeText={setText}
-              placeholder={t('live.chatPlaceholder')}
-              placeholderTextColor="#ffffff99"
-              style={styles.chatInput}
-              maxLength={500}
-              onSubmitEditing={onSendChat}
-              returnKeyType="send"
-            />
-            <Pressable onPress={onSendChat} style={styles.sendBtn} hitSlop={6}>
-              <Ionicons name="send" size={18} color="#fff" />
-            </Pressable>
-          </View>
-        </KeyboardAvoidingView>
+        <LiveChatPanel
+          scrollRef={scrollRef}
+          chat={chat}
+          text={text}
+          setText={setText}
+          onSendChat={onSendChat}
+          onReact={onReact}
+        />
       </SafeAreaView>
     </View>
   );
@@ -817,136 +365,11 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   endedText: { color: palette.textDim, fontSize: 16, fontWeight: '700' },
 
-  connectingBg: { backgroundColor: '#140c24' },
-  viewerStage: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  viewerAvatar: { width: 110, height: 110, borderRadius: 55, backgroundColor: palette.surface },
-  viewerAvatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  viewerNote: { color: '#ffffff99', fontSize: 13 },
-
   floatLayer: { position: 'absolute', right: 24, bottom: 160, width: 80, height: 320 },
-  floatEmoji: { position: 'absolute', bottom: 0, right: 0, fontSize: 30 },
 
   overlay: { flex: 1, paddingHorizontal: 14 },
-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' },
-  stateChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    minHeight: 30,
-    paddingHorizontal: 10,
-    borderRadius: 15,
-    backgroundColor: '#00000088',
-  },
-  stateChipWarn: { backgroundColor: '#b26a00cc' },
-  stateChipText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  errorBanner: {
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 14,
-    backgroundColor: '#3a0d14ee',
-    borderWidth: 1,
-    borderColor: palette.danger,
-    gap: 10,
-  },
-  errorText: { color: '#fff', fontSize: 14, lineHeight: 19, fontWeight: '600' },
-  errorActions: { flexDirection: 'row', gap: 10 },
-  errorBtn: {
-    minHeight: 44,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ffffff22',
-  },
-  errorBtnDanger: { backgroundColor: palette.danger },
-  errorBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  hostChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#00000066',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    flexShrink: 1,
-  },
-  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: palette.danger },
-  hostName: { color: '#fff', fontSize: 14, fontWeight: '800', flexShrink: 1 },
-  viewerChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#00000066',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  viewerCount: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  timerChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#00000066',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  liveTimer: { color: '#fff', fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  micBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 999,
-    backgroundColor: '#00000066',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  micBtnOff: { backgroundColor: palette.danger },
-  micBtnOn: { backgroundColor: palette.accent },
-  closeBtn: {
-    marginLeft: 'auto',
-    backgroundColor: palette.danger,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  closeText: { color: '#fff', fontSize: 13, fontWeight: '800' },
   liveTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginTop: 10, textShadowColor: '#000', textShadowRadius: 6 },
 
-  sceneSwitchRow: { gap: 8, paddingVertical: 10 },
-  sceneSwitchChip: {
-    backgroundColor: '#00000066',
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: '#ffffff22',
-    maxWidth: 160,
-  },
-  sceneSwitchChipOn: { backgroundColor: palette.accent, borderColor: palette.accent },
-  sceneSwitchText: { color: '#ffffffcc', fontSize: 13, fontWeight: '700' },
-  sceneSwitchTextOn: { color: '#fff' },
-
-  chatScroll: { maxHeight: 220 },
-  chatContent: { gap: 6, paddingVertical: 8 },
-  chatRow: { backgroundColor: '#00000055', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start', maxWidth: '92%' },
-  chatName: { color: palette.accent, fontSize: 12, fontWeight: '800' },
-  chatText: { color: '#fff', fontSize: 14, marginTop: 1 },
-
-  reactRow: { flexDirection: 'row', gap: 10, paddingVertical: 8 },
-  reactBtn: { backgroundColor: '#00000055', borderRadius: 999, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  reactEmoji: { fontSize: 22 },
-
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 4 },
-  chatInput: {
-    flex: 1,
-    backgroundColor: '#ffffff1f',
-    borderRadius: 999,
-    color: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-  },
-  sendBtn: { backgroundColor: palette.accent, borderRadius: 999, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   leaveBtn: { backgroundColor: palette.surface, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 10 },
   leaveText: { color: palette.text, fontSize: 14, fontWeight: '700' },
 });

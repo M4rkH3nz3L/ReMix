@@ -1811,6 +1811,50 @@
  "src/components/live/RecordToggle.tsx": {
   "RecordToggle": "v:f416520f5c"
  },
+ "src/components/live/session/LiveChatPanel.tsx": {
+  "LiveChatPanel": "v:ae1e6ab7bd",
+  "LiveChatPanelProps": "t:88861a5b31"
+ },
+ "src/components/live/session/LiveErrorBanner.tsx": {
+  "LiveErrorBanner": "v:1cbbff6762",
+  "LiveErrorBannerProps": "t:1b8a157e37"
+ },
+ "src/components/live/session/LiveSceneSwitcher.tsx": {
+  "LiveSceneSwitcher": "v:f94055b8be",
+  "LiveSceneSwitcherProps": "t:3c17da3d3a"
+ },
+ "src/components/live/session/LiveSessionStages.tsx": {
+  "ConnectingStage": "v:62d62df20a",
+  "FloatingHeart": "v:ffcf4c3161",
+  "LiveTimer": "v:270338cc31",
+  "LiveVideoUnavailable": "v:3e33bbf4f9"
+ },
+ "src/components/live/session/LiveSessionTopBar.tsx": {
+  "LiveSessionTopBar": "v:db1934f993",
+  "LiveSessionTopBarProps": "t:85507bd1e5"
+ },
+ "src/components/live/session/LiveVideoLayer.tsx": {
+  "LiveVideoLayer": "v:f834a939cb",
+  "LiveVideoLayerProps": "t:366860a6d3"
+ },
+ "src/components/live/session/liveSessionActions.ts": {
+  "LiveChatActionDeps": "t:db33af0eb1",
+  "LiveEndActionDeps": "t:242c5249c5",
+  "createLiveChatActions": "v:6ca867c186",
+  "createLiveEndActions": "v:1ace9b7c0b"
+ },
+ "src/components/live/session/liveSessionEgress.ts": {
+  "HostEgressDeps": "t:3952482202",
+  "startHostEgress": "v:a25fbe451f"
+ },
+ "src/components/live/session/liveSessionLifecycle.ts": {
+  "HostUnmountDeps": "t:6b236e8637",
+  "OpenLiveSessionDeps": "t:b34dd0f7ed",
+  "holdScreenAwake": "v:c1c9bcb7f4",
+  "openLiveSession": "v:be3a48a502",
+  "startHostHeartbeat": "v:eb330a707b",
+  "stopHostOnUnmount": "v:10386342e2"
+ },
  "src/components/live/studio/AddRtmpModal.tsx": {
   "AddRtmpModal": "v:bbf68178dd",
   "AddRtmpModalProps": "t:d0b244f23a"
@@ -6082,6 +6126,16 @@
   "createPerSenderLimiter": "v:af8164b465",
   "createRateLimiter": "v:02ac7a4b72",
   "createTrailingThrottle": "v:79229c7d6d"
+ },
+ "src/lib/liveSessionOps.ts": {
+  "LiveFloat": "t:6e2010e057",
+  "appendLiveChat": "v:c952449fcd",
+  "appendLiveFloat": "v:6016e21949",
+  "flipFacing": "v:4c1e28bf27",
+  "formatLiveElapsed": "v:131607af70",
+  "liveElapsedSeconds": "v:dee46f736a",
+  "quickGridSources": "v:6a2a190df2",
+  "showsEndedView": "v:a901555b18"
  },
  "src/lib/liveState.ts": {
   "EgressFailure": "t:3673b76f25",

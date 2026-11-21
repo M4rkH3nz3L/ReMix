@@ -93,6 +93,8 @@ describe('api-surface canonicalText', () => {
     expect(canon('type T = { p: import("./a").PathPoint };')).not.toBe(canon('type T = { p: Vec };'));
     expect(canon('type T = typeof import("./dsp/filters").Biquad;')).toBe(canon('type T = typeof Biquad;'));
     expect(canon('type T = typeof import("./a").Biquad;')).not.toBe(canon('type T = typeof Gain;'));
+    expect(canon('type T = { body: fs.ReadStream };')).toBe(canon('type T = { body: ReadStream };'));
+    expect(canon('type T = { body: fs.ReadStream };')).not.toBe(canon('type T = { body: WriteStream };'));
   });
 
   it('a valódi változást észreveszi: új tag, opcionalitás, típus', () => {

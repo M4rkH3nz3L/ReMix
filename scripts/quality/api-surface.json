@@ -171,7 +171,7 @@
  "server/eraseSweep.js": {
   "eligibleForErase": "v:f90e908099",
   "eraseAccount": "v:55102cce75",
-  "eraseSweepEnabled": "v:eb540385ce",
+  "eraseSweepEnabled": "v:4f8558e309",
   "runEraseSweepOnce": "v:49b2aeed2a",
   "sweepExpiredErasures": "v:853841072c"
  },
@@ -307,10 +307,10 @@
  "server/lib/log.js": {
   "LEVELS": "v:2dc6dea4f4",
   "formatEntry": "v:285691ca8d",
-  "levelThreshold": "v:48f68d1be5",
+  "levelThreshold": "v:d59e446f40",
   "log": "v:13176dafb6",
   "makeRequestId": "v:ef2718c01e",
-  "shouldLog": "v:52fbc03e85"
+  "shouldLog": "v:a36645f882"
  },
  "server/lib/loginIdentifier.js": {
   "loginWithIdentifier": "v:f2ab6f581a"
@@ -402,7 +402,7 @@
   "fleetTelemetry": "v:e7bbeaf0e0",
   "margin": "v:b4dbf0e339",
   "queueMetrics": "v:e086dc8233",
-  "unitPrices": "v:5ed02c3a10"
+  "unitPrices": "v:383ee514a1"
  },
  "server/openapiContracts.js": {
   "CONTRACTS": "v:091ea8227c",
@@ -416,7 +416,7 @@
   "PayoutRequest": "t:0109928a74",
   "PayoutSender": "t:9101909196",
   "PayoutSenders": "t:8d064b1f94",
-  "defaultSenders": "v:4572b41711",
+  "defaultSenders": "v:d1018ed498",
   "executeApproved": "v:98d2967459",
   "runApprovedPayouts": "v:1397d3e058"
  },
@@ -439,8 +439,8 @@
   "drawLayers": "v:6e8cfd5809",
   "mediaKeyFromUrl": "v:adecf51938",
   "probe": "v:d76c39dbdb",
-  "signMediaKey": "v:c8e141ef42",
-  "verifyMediaSignature": "v:ae0cc6de2f",
+  "signMediaKey": "v:06c15514f1",
+  "verifyMediaSignature": "v:4fc7d9d0fd",
   "watermarkArgs": "v:25deeabac1",
   "watermarkKeyFor": "v:db4004fc11"
  },
@@ -707,22 +707,22 @@
   "export=": "v:c5fe0200d1"
  },
  "server/routes/schemas/ai.js": {
-  "assist": "v:a373416476",
-  "autoedit": "v:80760b4742",
-  "captionstudio": "v:3452aaabbc",
-  "highlights": "v:80760b4742",
-  "hooks": "v:defdcb4d21",
-  "story": "v:80760b4742",
-  "thumbheadlines": "v:defdcb4d21",
-  "translate": "v:3452aaabbc"
+  "assist": "v:a95bb1d451",
+  "autoedit": "v:0d5f3e2587",
+  "captionstudio": "v:f9e0156a6c",
+  "highlights": "v:0d5f3e2587",
+  "hooks": "v:5cf9760777",
+  "story": "v:0d5f3e2587",
+  "thumbheadlines": "v:5cf9760777",
+  "translate": "v:f9e0156a6c"
  },
  "server/routes/schemas/analysis.js": {
-  "visionQuery": "v:d647ae83bb"
+  "visionQuery": "v:1038e6bbad"
  },
  "server/routes/schemas/audioGen.js": {
-  "drumsBody": "v:bbb60461f9",
-  "samplerSteps": "v:7005eea49f",
-  "synthBody": "v:5f61d602e2"
+  "drumsBody": "v:33803ac6dc",
+  "samplerSteps": "v:283c4b70c3",
+  "synthBody": "v:2415fdeaff"
  },
  "server/routes/social.js": {
   "export=": "v:c5fe0200d1"
@@ -771,15 +771,15 @@
  "server/security/authorization.js": {
   "LEVELS": "v:649de6328e",
   "RouteMeta": "t:19b9cd4b11",
-  "authenticated": "v:c60b2c2878",
+  "authenticated": "v:e115e5ca25",
   "clearInventory": "v:bc050ab876",
   "decide": "v:195a956f22",
-  "pro": "v:c60b2c2878",
+  "pro": "v:e115e5ca25",
   "proGate": "v:88e149daa2",
-  "publicRoute": "v:c60b2c2878",
+  "publicRoute": "v:e115e5ca25",
   "registerRoute": "v:7df8b3cffe",
   "routeInventory": "v:7e61d4a112",
-  "system": "v:c60b2c2878"
+  "system": "v:e115e5ca25"
  },
  "server/security/mediaPolicy.js": {
   "MEDIA_PROFILES": "v:9445ae8ea2",
@@ -803,8 +803,8 @@
  },
  "server/security/prodGates.js": {
   "DEV_GATES": "v:649de6328e",
-  "assertProdGates": "v:4849563d33",
-  "prodGateViolations": "v:a9fb407a41"
+  "assertProdGates": "v:8fa1be441b",
+  "prodGateViolations": "v:00c9fa9a84"
  },
  "server/security/rateLimit.js": {
   "DEFAULTS": "v:1c1872ea9c",
@@ -812,8 +812,8 @@
   "RateStore": "t:2abf02973d",
   "classConfig": "v:b446bf485f",
   "evaluate": "v:845d1f277d",
-  "keyFor": "v:001b032e22",
-  "rateLimit": "v:bb11e86e1f"
+  "keyFor": "v:d2f808aacd",
+  "rateLimit": "v:c173f8b7fd"
  },
  "server/security/redact.js": {
   "redactSecrets": "v:230b539717"
@@ -828,11 +828,11 @@
   "validateRtmpUrl": "v:68187a418d"
  },
  "server/security/securityHeaders.js": {
-  "securityHeaders": "v:ed535ea7de"
+  "securityHeaders": "v:bbf782f5d8"
  },
  "server/security/uploadPolicy.js": {
   "blockActiveContent": "v:88e149daa2",
-  "mediaGuard": "v:f84f8f5b61",
+  "mediaGuard": "v:60b49eb3de",
   "readHeader": "v:047f371552"
  },
  "server/sfx.js": {
@@ -927,17 +927,17 @@
  "server/stripe.js": {
   "WEB_EUR_CENTS_PER_COIN": "v:f83a383c0f",
   "checkoutParams": "v:76ee6772ff",
-  "createCheckoutSession": "v:029ce4edff",
+  "createCheckoutSession": "v:f540a33be8",
   "planStripeEvent": "v:87cdf8700c",
   "signStripePayload": "v:5abc318d8a",
-  "stripeConfigured": "v:9819c3d5a7",
+  "stripeConfigured": "v:d36aa9a760",
   "verifyStripeSignature": "v:e22eb642ab"
  },
  "server/stripeConnect.js": {
-  "createExpressAccount": "v:6d528aca1c",
+  "createExpressAccount": "v:d948849325",
   "kycStatusFromAccount": "v:351de40f93",
-  "onboardingLink": "v:69b22eca56",
-  "transferToAccount": "v:d1361453cb"
+  "onboardingLink": "v:71562b904d",
+  "transferToAccount": "v:3edb26ea06"
  },
  "server/svgPdf.js": {
   "renderSvgToPdf": "v:0635251f5a",
@@ -1090,12 +1090,12 @@
   "createUserFiles": "v:36f81b1d3e",
   "filesBucket": "v:ef2718c01e",
   "joinPath": "v:553a138d22",
-  "localBackend": "v:94fe6a620d",
+  "localBackend": "v:dfca23f859",
   "md5OfFile": "v:0b46a9eaf5",
   "nextFreeName": "v:c805d2f9a6",
   "normalizePath": "v:62f7afe122",
   "parentOf": "v:cb77017514",
-  "resolveBackend": "v:9f038ac304",
+  "resolveBackend": "v:e72c367b45",
   "userRoot": "v:2bd7ee3e12"
  },
  "server/userStorage.js": {
@@ -1903,7 +1903,7 @@
   "FeedImageCarousel": "v:f9bf740706"
  },
  "src/components/feed/FeedPostBody.tsx": {
-  "FeedPostBody": "v:df66fe1612"
+  "FeedPostBody": "v:a0b1df9c94"
  },
  "src/components/feed/FeedTopBar.tsx": {
   "FeedTopBar": "v:30f909418b"
@@ -2200,7 +2200,7 @@
   "PersonalCard": "v:30d0e877f6"
  },
  "src/components/profile/ProviderEditorModal.tsx": {
-  "ProviderEditorModal": "v:002299d57a"
+  "ProviderEditorModal": "v:92210e8368"
  },
  "src/components/profile/ReferralCard.tsx": {
   "ReferralCard": "v:34fe7ad9c2"
@@ -2677,7 +2677,7 @@
  },
  "src/components/studio/image/SkiaPhotoLayer.tsx": {
   "PhotoSkiaContent": "v:651b0db982",
-  "SkiaPhotoLayer": "v:0363917f0f",
+  "SkiaPhotoLayer": "v:a153146eca",
   "makeLutImage": "v:0020e04502",
   "needsSkiaPreview": "v:95ea92ea3e",
   "useCubeFile": "v:845daf724b"
@@ -3419,7 +3419,7 @@
  "src/hooks/useFeed.ts": {
   "compact": "v:71267fb618",
   "hotspotsOf": "v:3193f7ca46",
-  "useFeed": "v:4472b97ac3"
+  "useFeed": "v:76dabfeb2d"
  },
  "src/hooks/useFinishRecordingOnLeave.ts": {
   "useFinishRecordingOnLeave": "v:460efa2c14"

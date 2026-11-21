@@ -40,6 +40,11 @@ function canonicalText(node, sf) {
   const print = (n) => printer.printNode(ts.EmitHint.Unspecified, n, sf);
   const visit = (n) => {
     let v = ts.visitEachChild(n, visit, undefined);
+    // `fs.ReadStream` vs `ReadStream`: a minősítés attól függ, milyen alias (pl. `const fs = require('fs')`)
+    // van a KIÍRÓ fájl hatókörében — a bontás ezt is mozgatja; a típus neve számít
+    if (ts.isTypeReferenceNode(v) && ts.isQualifiedName(v.typeName)) {
+      v = ts.factory.updateTypeReferenceNode(v, v.typeName.right, v.typeArguments);
+    }
     if (ts.isImportTypeNode(v) && v.qualifier) {
       // `typeof import("…").Biquad` (osztály, függvény-érték) → `typeof Biquad`
       v = v.isTypeOf
